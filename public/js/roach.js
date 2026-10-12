@@ -81,12 +81,15 @@ export function gummyColorFor(seed) {
   return GUMMY_COLORS[(h >>> 0) % GUMMY_COLORS.length];
 }
 
+// 이모트별 표정
+const EMOTE_FACE = { creamcheese: 'love', redred: 'surprised', apt: 'happy', ganbare: 'angry', slickback: 'neutral', heart: 'love', shuffle: 'happy', wave: 'happy' };
 export class Roach {
   // 저장된 설정에 '바퀴 모드'가 켜져 있으면 바퀴벌레, 아니면 곰돌이 젤리 (기본)
   static style = (() => { try { return JSON.parse(localStorage.getItem('roachcity.settings') || '{}').bugMode ? 'roach' : 'gummy'; } catch { return 'gummy'; } })();
   static all = [];
   static onHurt = null;
   static onStep = null; // 발이 땅에 닿을 때 (발소리)
+  static onEmoteFx = null; // 이모트 효과 (하트 등)
   /**
    * @param {object} o { color, age, gender, accessories:[], lashes, mustache, seed(젤리 색 고정용) }
    */
@@ -1095,6 +1098,103 @@ export class Roach {
   flirt() { this.flirtT = 1.2; this.setEmotion('love', 3); }
   cast() { this.castT = 0.45; }
   setSeated(v) { this.seated = v; }
+  playEmote(id) { this.emote = id ? { id, t: 0 } : null; if (id) this.setEmotion(EMOTE_FACE[id] || 'happy', 999); else this.setEmotion(this.baseEmotion || 'neutral', 0); }
+
+  // 팔 들기: side 0 왼쪽 · 1 오른쪽, up 0 아래 ~ π 머리 위 (옆으로), fwd 앞으로 든 정도. 바퀴 모드 아랫팔도 같이
+  armPose(side, up, fwd = 0) {
+    for (const i of [side, side + 2]) {
+      const a = this.arms[i], sg = Math.sign(a.userData.baseZ) || 1;
+      a.rotation.z = sg * up; a.rotation.x = -fwd;
+    }
+  }
+  animateEmote(dt) {
+    const E = this.emote; E.t += dt; this.emoteWas = true;
+    // 노래가 있으면 노래의 재생 시각으로 센 박(E.beat)에 맞춰 움직인다. 없으면 132bpm 정도로 혼자
+    const t = E.beat !== undefined ? E.beat / 2.2 : E.t, beat = E.beat ?? t * 2.2, b = ((beat % 1) + 1) % 1, n = Math.floor(beat);
+    const hop = (h) => { this.inner.position.y = Math.abs(Math.sin(beat * Math.PI)) * h; };
+    const legs = (a0, a1) => { this.legs[0].rotation.x = a0; this.legs[1].rotation.x = a1; };
+    this.torso.rotation.y = 0; this.inner.rotation.z = 0; this.inner.rotation.x = 0; this.head.rotation.z = 0; this.head.rotation.x = 0;
+    switch (E.id) {
+      case 'creamcheese': { // 크림치즈 허니: 'L' 포즈로 콩콩 → 두 손 볼에 대고 꿀처럼 살랑살랑
+        if (n % 4 < 2) {
+          const r = n % 2 === 0;
+          this.armPose(r ? 1 : 0, 2.95, 0.1); this.armPose(r ? 0 : 1, 1.55, 0); // L
+          hop(0.18); legs(Math.sin(beat * Math.PI) * 0.3, -Math.sin(beat * Math.PI) * 0.3);
+          this.head.rotation.z = (r ? -1 : 1) * 0.15;
+        } else {
+          const sw = Math.sin(t * Math.PI * 2.2);
+          this.armPose(0, 0.75, 2.35); this.armPose(1, 0.75, 2.35); // 볼에 손
+          this.inner.rotation.z = sw * 0.12; this.head.rotation.z = -sw * 0.25; this.torso.rotation.y = sw * 0.25;
+          this.inner.position.y = Math.abs(sw) * 0.06; legs(sw * 0.15, -sw * 0.15);
+        }
+        break;
+      }
+      case 'redred': { // REDRED (공식 챌린지 영상 순서): X 2박 → 팔랑귀 2박 → 스텝 6박 → X 2박 → 차기 2박 → 팔랑귀 2박
+        const k16 = ((n % 16) + 16) % 16;
+        const sec = k16 < 2 || (k16 >= 10 && k16 < 12) ? 'x' : k16 < 4 || k16 >= 14 ? 'ear' : k16 < 10 ? 'step' : 'kick';
+        if (sec === 'step' || sec === 'kick') {
+          const q = Math.sin(beat * Math.PI * 2); // 8분음표마다 발을 번갈아
+          legs(sec === 'kick' && n % 2 ? 0.9 * (1 - b) : q * 0.55, sec === 'kick' && !(n % 2) ? 0.9 * (1 - b) : -q * 0.55);
+          this.armPose(0, 0.7 + Math.max(0, q) * 0.4, 0.5); this.armPose(1, 0.7 + Math.max(0, -q) * 0.4, 0.5);
+          this.inner.position.y = Math.abs(q) * 0.1; this.torso.rotation.y = q * 0.3;
+        } else if (sec === 'x') {
+          const pulse = 1 - b; // 박자마다 X를 탁 친다
+          this.armPose(0, -0.55 - pulse * 0.15, 1.45); this.armPose(1, -0.55 - pulse * 0.15, 1.45);
+          this.inner.position.y = pulse * 0.08; legs(n % 2 ? 0.45 * pulse : 0, n % 2 ? 0 : 0.45 * pulse);
+          this.torso.rotation.y = (n % 2 ? 0.25 : -0.25);
+        } else {
+          const fl = Math.sin(t * 28) * 0.22;
+          this.armPose(0, 2.55 + fl, 0.35); this.armPose(1, 2.55 - fl, 0.35);
+          hop(0.14); this.head.rotation.z = Math.sin(beat * Math.PI) * 0.18;
+          legs(Math.sin(beat * Math.PI * 2) * 0.5, -Math.sin(beat * Math.PI * 2) * 0.5);
+        }
+        break;
+      }
+      case 'apt': { // 아파트: 주먹을 번갈아 위아래로 쌓으며 콩콩
+        const up = n % 2 === 0;
+        this.armPose(0, 0.35, up ? 1.75 : 1.05); this.armPose(1, 0.35, up ? 1.05 : 1.75);
+        hop(0.12); this.torso.rotation.y = Math.sin(beat * Math.PI) * 0.15;
+        legs(n % 4 < 2 ? 0.3 : -0.3, n % 4 < 2 ? -0.3 : 0.3);
+        break;
+      }
+      case 'ganbare': { // 간바레: 한 박자마다 포즈를 착착 바꾼다 (주먹 번쩍 · 알통 · 가리키기)
+        const k = Math.min(1, b * 6); // 착!
+        const pose = n % 3;
+        if (pose === 0) { this.armPose(1, 2.9 * k, 0.2); this.armPose(0, 0.9, 1.2); }
+        else if (pose === 1) { this.armPose(0, 1.6, 1.2 * k + 0.3); this.armPose(1, 1.6, 1.2 * k + 0.3); }
+        else { this.armPose(1, 0.3, 1.6 * k); this.armPose(0, 0.5, 0); }
+        this.inner.position.y = (1 - k) * 0.12; this.head.rotation.z = pose === 1 ? 0 : (pose ? 0.15 : -0.15);
+        legs(pose === 0 ? 0.25 : 0, pose === 2 ? -0.25 : 0);
+        break;
+      }
+      case 'slickback': { // 슬릭백: 붕 떠서 미끄러지듯 발을 번갈아 뒤로 민다
+        const g = Math.sin(t * Math.PI * 2.4);
+        legs(g * 0.75, -g * 0.75); this.inner.position.y = 0.12 + Math.abs(g) * 0.04;
+        this.inner.rotation.x = -0.12; this.armPose(0, 0.45, -g * 0.4); this.armPose(1, 0.45, g * 0.4);
+        this.head.rotation.x = -0.1;
+        break;
+      }
+      case 'heart': { // 하트 뿅뿅: 머리 위 큰 하트 → 볼 하트
+        if (n % 4 < 2) { this.armPose(0, 2.45, 0.45); this.armPose(1, 2.45, 0.45); this.head.rotation.z = Math.sin(t * 4) * 0.12; }
+        else { this.armPose(0, 0.7, 2.4); this.armPose(1, 0.7, 2.4); this.head.rotation.z = (n % 2 ? 0.3 : -0.3); }
+        hop(0.08);
+        if (Math.floor(E.t * 2) !== E.lastHeart) { E.lastHeart = Math.floor(E.t * 2); Roach.onEmoteFx?.(this, 'heart'); }
+        break;
+      }
+      case 'shuffle': { // 셔플: 다리를 빠르게 차고 팔은 테크토닉처럼 휘휘
+        const q = Math.sin(t * Math.PI * 4.4);
+        legs(q > 0 ? q * 0.9 : 0, q < 0 ? -q * 0.9 : 0);
+        this.inner.position.y = Math.abs(q) * 0.1;
+        this.armPose(0, 1.2 + Math.sin(t * 9) * 0.9, 1.0 + Math.cos(t * 9) * 0.6); this.armPose(1, 1.2 - Math.sin(t * 9) * 0.9, 1.0 - Math.cos(t * 9) * 0.6);
+        this.torso.rotation.y = q * 0.3;
+        break;
+      }
+      default: { // 인사: 손 크게 흔들기
+        this.armPose(1, 2.5 + Math.sin(t * 12) * 0.35, 0); this.armPose(0, 0.55, 0);
+        hop(0.05); this.head.rotation.z = Math.sin(t * 3) * 0.1;
+      }
+    }
+  }
 
   /** speed: 현재 이동 속도 (m/s) */
   update(dt, speed = 0, opts = {}) {
@@ -1220,6 +1320,9 @@ export class Roach {
       for (let i = 0; i < 4; i++) { this.arms[i].rotation.z = this.arms[i].userData.baseZ * (1.5 + Math.sin(this.t * 8 + i) * 1.2); this.arms[i].rotation.x = -0.8 + Math.sin(this.t * 6 + i) * 0.5; }
       this.legs[0].rotation.x = d * 0.4; this.legs[1].rotation.x = -d * 0.4;
     }
+    // 이모트 (휠에서 고른 춤)
+    if (this.emote) this.animateEmote(dt);
+    else if (this.emoteWas) { this.emoteWas = false; this.inner.rotation.z = 0; this.inner.rotation.x = 0; this.head.rotation.z = 0; this.head.rotation.x = 0; }
     // 먹기
     if (this.eatT > 0) {
       this.eatT -= dt;
@@ -1332,8 +1435,8 @@ export class Roach {
       }
     }
     // 쓰러짐
-    this.inner.rotation.z = this.dead ? Math.PI / 2 * 0.92 : 0;
-    if (!this.flying && !this.flipped && this.crawlK <= 0.01) this.inner.rotation.x = 0;
+    this.inner.rotation.z = this.dead ? Math.PI / 2 * 0.92 : this.emote ? this.inner.rotation.z : 0; // 이모트 중엔 몸 기울기 유지
+    if (!this.flying && !this.flipped && this.crawlK <= 0.01 && !this.emote) this.inner.rotation.x = 0;
     if (this.dead) { this.inner.position.y = 0.42; for (const e of this.eyes) e.scale.y = 0.1; }
     // 피격 깜빡임
     if (this.hurtT > 0) {

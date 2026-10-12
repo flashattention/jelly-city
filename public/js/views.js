@@ -230,6 +230,7 @@ export class PlayersView {
       p.roach.root.rotation.y = angleLerp(p.roach.root.rotation.y, p.heading, Math.min(1, dt * 12));
       p.roach.setDead(!!p.dead);
       p.roach.flying = !!(p.air & 2); p.roach.flipped = !!(p.air & 4);
+      if (p.roach.emote && (p.speed > 1 || p.dead)) p.roach.playEmote(null); // 움직이면 춤 끝
       p.roach.update(dt, p.dead ? 0 : p.speed, { airborne: !!(p.air & 1), noCrawl: !!(p.air & 2) });
       if (p.sleeping && !p.bubble) p.bubble = { text: '💤', t: 2 };
     }

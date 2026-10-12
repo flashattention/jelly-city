@@ -25,7 +25,7 @@ function ensure() {
 
 export function applyVolumes() {
   if (!ctx) return;
-  musicBus.gain.value = settings.music ? 0.9 * settings.musicVol : 0;
+  musicBus.gain.value = settings.music && !ducked ? 0.9 * settings.musicVol : 0;
   sfxBus.gain.value = settings.sfx ? settings.sfxVol : 0;
   if (settings.music) startMusic();
 }
@@ -37,6 +37,9 @@ export function unlockAudio() {
   if (settings.music) startMusic();
 }
 
+// 이모트 노래(유튜브)가 나오는 동안 배경음악을 잠시 끈다
+let ducked = false;
+export function duckMusic(on) { ducked = !!on; applyVolumes(); }
 export function setMusic(on) { settings.music = !!on; saveSettings(); ensure(); applyVolumes(); }
 
 // ---------------- 배경음악: C장조 132bpm, I–V–vi–IV, 8분음표 스타카토 ----------------

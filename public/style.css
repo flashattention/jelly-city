@@ -615,3 +615,26 @@ body.bug-mode .cute-bear { display: none !important; }
 
 /* 스코프 배율 표시 */
 #scope-zoom { position: absolute; left: 50%; top: calc(50% + 32vmin); transform: translateX(-50%); color: #fff; font-family: 'Jua'; font-size: 16px; text-shadow: 0 1px 3px #000; background: rgba(0,0,0,.45); padding: 3px 12px; border-radius: 10px; }
+
+/* 이모트 휠 */
+#emote-wheel { position: fixed; left: 50%; top: 50%; width: 360px; height: 360px; margin: -180px 0 0 -180px; border-radius: 50%; background: radial-gradient(circle, rgba(30,20,40,.25) 0 64px, rgba(30,20,40,.72) 65px 178px, transparent 179px); z-index: 30; pointer-events: none; }
+#emote-wheel.hidden { display: none; }
+.ew-item { position: absolute; width: 84px; height: 84px; margin: -42px 0 0 -42px; border-radius: 50%; display: grid; place-items: center; align-content: center; color: #fff; font-family: 'Jua'; font-size: 12px; text-align: center; background: rgba(255,255,255,.08); transition: transform .08s, background .08s; }
+.ew-item span { font-size: 30px; line-height: 1; }
+.ew-item i { font-style: normal; font-size: 13px; margin-top: 2px; }
+.ew-item.on { background: linear-gradient(135deg, #ff6f91, #ffb347); transform: scale(1.18); box-shadow: 0 0 18px rgba(255,111,145,.8); }
+.ew-item .music { position: absolute; top: 4px; right: 6px; font-size: 12px; }
+#ew-center { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; color: #fff; font-family: 'Jua'; width: 120px; }
+#ew-center b { display: block; font-size: 16px; }
+#ew-center small { font-family: 'Gowun Dodum'; font-size: 11px; opacity: .8; }
+#ew-cursor { position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: #fff; box-shadow: 0 0 6px #000; }
+/* 이모트 노래: 유튜브 공식 플레이어 (보이게, 200px 이상) */
+#emote-song { position: fixed; right: 14px; bottom: 96px; z-index: 16; background: #111; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+#emote-song.hidden { display: none; }
+#es-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 8px; color: #fff; font-family: 'Jua'; font-size: 13px; }
+#es-head button { border: 0; background: rgba(255,255,255,.15); color: #fff; border-radius: 8px; cursor: pointer; padding: 1px 7px; }
+#es-box, #es-box iframe { width: 356px; height: 200px; display: block; border: 0; }
+#emote-song.tall #es-box, #emote-song.tall #es-box iframe { width: 200px; height: 356px; } /* 쇼츠는 세로로 */
+#emote-song.tall { width: 200px; }
+#emote-song.tall #es-title { font-size: 11px; }
+@media (max-width: 700px) { #emote-song { right: 8px; bottom: 140px; } }

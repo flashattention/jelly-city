@@ -609,6 +609,7 @@ export class Combat {
 
   tryFire() {
     if (this.cool > 0 || this.g.busy || this.g.dead) return;
+    this.g.stopEmote?.(); // 공격하면 춤은 멈춘다
     const g = this.g;
     const car = g.player.inCar;
     if (car) {
@@ -1086,6 +1087,7 @@ export class Combat {
       const right = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion);
       scream(vol, rel.length() > 1 ? rel.normalize().dot(right) * 0.8 : 0, +m.s || Math.random());
     }
+    else if (m.k === 'emote') { const pl = g.players.list.get(m.pid); pl?.roach.playEmote(g.isEmote?.(m.id) ? m.id : null); }
     else if (m.k === 'sparkle') this.fx.sparkle(v3(m.p), m.c || '#fff59d', 20, 3);
     else if (m.k === 'cloud') this.fx.cloud(v3(m.p), m.c || '#e8f5e9');
     else if (m.k === 'hearts') { const a = v3(m.a), b = m.b ? v3(m.b) : null; this.fx.hearts(a, b, m.e || '💗'); const p = g.players.list.get(m.pid); p?.roach.flirt(); }

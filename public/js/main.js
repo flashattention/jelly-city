@@ -24,7 +24,7 @@ import { buildWilds, renderWorldImage } from './wilds.js';
 import { AnimalsView, makeMount, mouthPos } from './animals.js';
 import { Roach } from './roach.js';
 import { buildPark } from './park.js';
-import { unlockAudio, setListener, sfx, loop } from './audio.js';
+import { unlockAudio, setListener, sfx, loop, duckMusic } from './audio.js';
 // 브라우저는 처음 누르거나 키를 칠 때부터 소리를 낼 수 있다
 for (const ev of ['pointerdown', 'keydown']) window.addEventListener(ev, unlockAudio, true);
 initBrand(); // 화면의 '바퀴시티' → '젤리시티' (바퀴 모드면 그대로)
@@ -769,9 +769,11 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyG' && !e.repeat) toggleFly();
   if (e.code === 'KeyV' && !e.repeat) toggleView();
   if (e.code === 'KeyB' && !e.repeat) flirt();
+  if (e.code === 'KeyJ' && !e.repeat) openEmoteWheel();
   if (e.code === 'KeyP' && !e.repeat) game.takePhoto?.();
 });
-window.addEventListener('keyup', (e) => { const k = KEYMAP[e.code]; if (k) game.input[k] = false; if (e.code === 'KeyZ') releaseCapture(); });
+window.addEventListener('keyup', (e) => { const k = KEYMAP[e.code]; if (k) game.input[k] = false; if (e.code === 'KeyZ') releaseCapture(); if (e.code === 'KeyJ') closeEmoteWheel(true); });
+window.addEventListener('blur', () => closeEmoteWheel(false));
 function clearKeys() { for (const k of Object.values(KEYMAP)) game.input[k] = false; game.combat?.trigger(false); }
 window.addEventListener('blur', clearKeys);
 
@@ -779,6 +781,7 @@ let dragging = false, lastMX = 0, lastMY = 0;
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 canvas.addEventListener('mousedown', (e) => {
   if (!game.started || ui.anyPanelOpen()) return;
+  if (game.emoteWheel) { closeEmoteWheel(true); return; } // 휠이 열려 있으면 클릭으로도 고른다
   if (e.button === 2) {
     // 드래곤을 타고 있으면 오른쪽 클릭 = 불덩이
     if (game.player?.mount?.ride.fly) { game.combat.dragonFireball(game.player.mount); return; }
@@ -794,6 +797,7 @@ canvas.addEventListener('mousedown', (e) => {
 window.addEventListener('mouseup', (e) => { dragging = false; if (e.button === 0) game.combat?.trigger(false); if (e.button === 2) game.aimHeld = false; });
 window.addEventListener('mousemove', (e) => {
   if (!game.started || !game.player) return;
+  if (game.emoteWheel) { moveEmoteWheel(e.movementX || 0, e.movementY || 0); return; }
   let dx = 0, dy = 0;
   if (document.pointerLockElement === canvas) { dx = e.movementX; dy = e.movementY; }
   else if (dragging) { dx = e.clientX - lastMX; dy = e.clientY - lastMY; lastMX = e.clientX; lastMY = e.clientY; }
@@ -960,6 +964,129 @@ function toggleCar() {
   if (game.mode !== 'city' || !focus?.car) return;
   game.net.send({ t: 'carEnter', id: focus.car.id });
 }
+
+// ------------------------------------------------------------------
+// 이모트 휠: J를 꾹 누르면 8가지 춤이 뜨고, 마우스로 고른 뒤 떼면 춘다 (움직이면 멈춤)
+// song: 유튜브 공식 영상의 챌린지 구간만 반복 재생 (보이는 미니 플레이어). 춤은 영상의 재생 시각으로 센 박에 맞춘다
+//   start~end: 반복 구간(초, 박 위에서 시작), bpm: 박자 (영상 장면·가사가 바뀌는 시각으로 잰 값), tall: 세로 영상(쇼츠)
+// ------------------------------------------------------------------
+const EMOTES = [
+  { id: 'creamcheese', name: '크림치즈 허니', e: '🧀' },
+  { id: 'redred', name: 'REDRED', e: '❌', song: { id: 'w9obXvHi700', start: 6.37, end: 14.37, bpm: 120, tall: true, title: "CORTIS - REDRED 공식 챌린지" } },
+  { id: 'apt', name: '아파트', e: '🏢', song: { id: '5VhmJaKV10c', start: 1.145, end: 9.145, bpm: 150, tall: true, title: 'ROSÉ - APT. 공식 챌린지' } },
+  { id: 'ganbare', name: '간바레', e: '💪', song: { id: 'm1o67ti-DME', start: 2.35, end: 8.776, bpm: 149.4, title: 'おだまよ - 頑張りたいソング' } },
+  { id: 'slickback', name: '슬릭백', e: '🕺' },
+  { id: 'heart', name: '하트 뿅뿅', e: '💖' },
+  { id: 'shuffle', name: '셔플', e: '👟' },
+  { id: 'wave', name: '인사', e: '👋' },
+];
+const EMOTE_IDS = new Set(EMOTES.map((x) => x.id));
+function openEmoteWheel() {
+  if (game.emoteWheel || ui.anyPanelOpen() || game.busy || game.dead) return;
+  game.emoteWheel = { x: 0, y: 0, sel: -1 };
+  const box = document.getElementById('ew-items');
+  box.innerHTML = EMOTES.map((m, i) => {
+    const a = (i / EMOTES.length) * Math.PI * 2;
+    return `<div class="ew-item" data-i="${i}" style="left:${180 + Math.sin(a) * 122}px;top:${180 - Math.cos(a) * 122}px"><span>${m.e}</span><i>${m.name}</i>${m.song ? '<b class="music">🎵</b>' : ''}</div>`;
+  }).join('');
+  moveEmoteWheel(0, 0);
+  document.getElementById('emote-wheel').classList.remove('hidden');
+}
+function moveEmoteWheel(dx, dy) {
+  const W = game.emoteWheel;
+  if (!W) return;
+  W.x += dx; W.y += dy;
+  const d = Math.hypot(W.x, W.y);
+  if (d > 110) { W.x *= 110 / d; W.y *= 110 / d; }
+  // 가운데에서 조금 벗어나면 그 방향의 춤을 고른다 (위가 첫 번째, 시계 방향)
+  W.sel = d < 28 ? -1 : Math.round(((Math.atan2(W.x, -W.y) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2 / EMOTES.length)) % EMOTES.length;
+  document.getElementById('ew-cursor').style.transform = `translate(${W.x}px, ${W.y}px)`;
+  document.querySelectorAll('.ew-item').forEach((el) => el.classList.toggle('on', +el.dataset.i === W.sel));
+  const m = EMOTES[W.sel];
+  document.getElementById('ew-name').textContent = m ? `${m.e} ${m.name}` : '💃 이모트';
+  if (W.sel !== W.lastSel) { if (W.sel >= 0) sfx('scope'); W.lastSel = W.sel; }
+}
+function closeEmoteWheel(apply) {
+  const W = game.emoteWheel;
+  if (!W) return;
+  game.emoteWheel = null;
+  document.getElementById('emote-wheel').classList.add('hidden');
+  if (apply && W.sel >= 0) startEmote(EMOTES[W.sel].id);
+}
+function startEmote(id) {
+  const p = game.player, m = EMOTES.find((x) => x.id === id);
+  if (!m) return;
+  if (p.inCar || p.flying || !p.onGround || p.mount || p.swimming || game.mode === 'ride') { ui.toast('💃 땅에 서 있을 때만 춤출 수 있어요'); return; }
+  if (game.emoting) stopEmote(!!m.song); // 다음 춤에 노래가 있으면 플레이어는 그대로 두고 곡만 바꾼다
+  game.emoting = { id, t: 0, song: m.song || null };
+  p.roach.playEmote(id);
+  game.net.send({ t: 'fx', k: 'emote', id });
+  sfx('jump', null, 2);
+  if (m.song) playEmoteSong(m.song);
+}
+function stopEmote(quiet = false) {
+  if (!game.emoting) return;
+  game.emoting = null;
+  game.player.roach.playEmote(null);
+  game.net.send({ t: 'fx', k: 'emote', id: null });
+  if (!quiet) stopEmoteSong();
+}
+game.stopEmote = () => stopEmote();
+// 유튜브 IFrame API (처음 쓸 때 한 번만 불러온다)
+let ytReady = null, ytPlayer = null;
+function loadYT() {
+  if (ytReady) return ytReady;
+  ytReady = new Promise((res, rej) => {
+    window.onYouTubeIframeAPIReady = res;
+    const s = document.createElement('script');
+    s.src = 'https://www.youtube.com/iframe_api'; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  return ytReady;
+}
+async function playEmoteSong(song) {
+  document.getElementById('es-title').textContent = '🎵 ' + song.title;
+  document.getElementById('emote-song').classList.remove('hidden');
+  document.getElementById('emote-song').classList.toggle('tall', !!song.tall);
+  ytClock = null;
+  duckMusic(true);
+  try { await loadYT(); } catch { ui.toast('🎵 유튜브를 불러오지 못했어요'); stopEmoteSong(); return; }
+  if (game.emoting?.song !== song) return; // 그사이 멈췄으면
+  if (!ytPlayer) {
+    ytPlayer = await new Promise((res) => {
+      const pl = new window.YT.Player('es-player', {
+        width: 356, height: 200, videoId: song.id,
+        playerVars: { autoplay: 1, start: Math.floor(song.start), playsinline: 1, rel: 0, controls: 0, disablekb: 1 },
+        events: { onReady: () => res(pl), onError: () => { ui.toast('🎵 이 노래는 여기서 재생할 수 없어요'); stopEmoteSong(); } },
+      });
+    });
+    if (game.emoting?.song !== song) { stopEmoteSong(); return; }
+    ytPlayer.seekTo(song.start, true); ytPlayer.playVideo();
+  } else ytPlayer.loadVideoById({ videoId: song.id, startSeconds: song.start });
+}
+// 노래 시각 → 박. 플레이어가 알려 주는 시각은 띄엄띄엄 오므로 그 사이는 실제 흐른 시간으로 메운다
+let ytClock = null;
+function emoteSongBeat(song) {
+  const st = ytPlayer?.getPlayerState?.();
+  if (st === 3 && ytClock) return 0; // 되감은 뒤 불러오는 중: 첫 동작에서 노래를 기다린다
+  if (st !== 1) { ytClock = null; return undefined; } // 아직 재생 전이면 혼자 춘다
+  const ct = ytPlayer.getCurrentTime(), now = performance.now();
+  // 처음으로 되감은 직후엔 플레이어가 잠깐 예전 시각을 알려 줄 수 있어 무시한다
+  const settling = ytClock?.seekAt && now - ytClock.seekAt < 500 && ct >= song.end - 0.2;
+  if (!settling && (!ytClock || ct !== ytClock.ct)) ytClock = { ct, at: now, seekAt: ytClock?.seekAt };
+  let t = ytClock.ct + (now - ytClock.at) / 1000;
+  // 챌린지 구간 끝 → 처음으로 (박 위에서 다시 시작)
+  if (t >= song.end - 0.03 || t < song.start - 1.5) { ytPlayer.seekTo(song.start, true); ytClock = { ct: song.start, at: now, seekAt: now }; t = song.start; }
+  return Math.max(0, t - song.start) * song.bpm / 60;
+}
+function stopEmoteSong() {
+  try { ytPlayer?.pauseVideo?.(); } catch { /* 아직 준비 전 */ }
+  document.getElementById('emote-song').classList.add('hidden');
+  duckMusic(false);
+}
+document.getElementById('es-close').onclick = () => stopEmoteSong();
+Roach.onEmoteFx = (r, k) => { if (k === 'heart' && r.root.visible) { const at = r.root.position.clone(); at.y += 1.2; game.combat?.fx.hearts(at, null, '💖'); } };
+game.isEmote = (id) => EMOTE_IDS.has(id);
 
 // 차 안에서 H: 빵빵 (다른 사람에게도 들린다)
 function honk() {
@@ -2140,6 +2267,12 @@ function frame() {
   loop('saber', saber ? 0.3 : 0);
   updateUnitSounds();
   updateMoveSounds(dt);
+  if (game.emoting) {
+    const moving = input.forward || input.back || input.left || input.right || input.jumpPressed || input.dashPressed || input.moveDir;
+    if (moving || !p.onGround || p.inCar || p.flying || p.mount || game.dead || game.busy || p.swimming) stopEmote();
+    else if ((game.emoting.t += dt) < 1.2 && !p.fp) p.cam.yaw = angleLerp(p.cam.yaw, p.heading, Math.min(1, dt * 4)); // 포트나이트처럼 앞모습이 보이게
+    if (game.emoting?.song && p.roach.emote) p.roach.emote.beat = emoteSongBeat(game.emoting.song);
+  }
   // 저격 조준 중에는 멀리 있는 시민·동물까지 그려서 맞힐 수 있게
   const far = game.zoomNow > 2.5;
   game.citizens.viewDist = far ? 130 * Math.min(4, game.zoomNow / 1.5) : 130;
