@@ -320,6 +320,7 @@ export class World {
         const loc = Number.isInteger(msg.loc) && this.buildings[msg.loc] ? msg.loc : -1;
         p.pos.set(+msg.x || 0, +msg.y || 0, +msg.z || 0);
         p.heading = +msg.h || 0; p.speed = +msg.s || 0; p.air = Math.max(0, Math.min(7, msg.a | 0));
+        if (p.emote && (Math.hypot(p.pos.x - p.emote.x, p.pos.z - p.emote.z) > 0.6 || Math.abs(p.pos.y - p.emote.y) > 0.8 || p.car >= 0 || (p.air & 2))) p.emote = null; // 움직이면 무적 끝
         p.mount = Number.isInteger(msg.mt) && msg.mt >= 0 && msg.mt < ANIMAL_KINDS.length ? msg.mt : -1; // 타고 있는 동물
         if (loc !== p.loc) { p.loc = loc; this.updateActiveBuildings(); }
         if (p.car >= 0 && msg.car) {
@@ -389,6 +390,9 @@ export class World {
         // 다른 플레이어에게 보여줄 연출 (총알 궤적, 투사체, 휘두르기)
         const k = String(msg.k || '');
         if (['tracer', 'proj', 'swing', 'muzzle', 'eat', 'bolt', 'sparkle', 'cloud', 'breath', 'horn', 'emote', 'emotesync', 'gust', 'holyfx'].includes(k)) this.broadcast({ ...msg, t: 'fx', pid: p.id, loc: p.loc }, p.id);
+        // 춤추는 동안 무적: 땅 위에 서서 춤을 시작한 자리 (움직이거나 공격하면 풀린다)
+        if (k === 'emote') p.emote = typeof msg.id === 'string' && msg.id.length < 20 && p.car < 0 && !p.dead && !(p.air & 2) ? { x: p.pos.x, y: p.pos.y, z: p.pos.z } : null;
+        else if (['tracer', 'proj', 'swing', 'bolt', 'gust', 'breath'].includes(k)) p.emote = null;
         break;
       }
       case 'drop': {

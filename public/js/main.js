@@ -1024,6 +1024,7 @@ function startEmote(id) {
   p.roach.playEmote(id);
   game.net.send({ t: 'fx', k: 'emote', id });
   sfx('jump', null, 2);
+  ui.toast('💃🛡️ 춤추는 동안 무적! (움직이거나 공격하면 풀려요)');
   if (m.song) playEmoteSong(m.song, { owner: 'me' });
 }
 function stopEmote(quiet = false) {

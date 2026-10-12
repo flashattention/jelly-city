@@ -72,6 +72,7 @@ export class Combat {
     } else if (msg.tt === 'player') {
       const v = this.w.players.get(msg.id);
       if (!v || v === p || v.dead || v.loc !== p.loc || v.pos.distanceTo(p.pos) > maxDist) return;
+      if (v.emote) { this.damagePlayer(v, 1, p); return; } // 춤추는 중: 🛡️ 무적 표시만
       this.damagePlayer(v, head ? dmg : damageTaken(dmg, v.profile.def || 0, stats.pierce), p, p.pos, crit);
       this.elementOnPlayer(v, stats, p);
       if (stats.kind === 'hitscan') this.scream(v.pos, v.loc, `p${v.id}`);
@@ -105,6 +106,7 @@ export class Combat {
   // 마법 속성 효과
   // 화상: 3초 동안 0.5초마다 피해 (다시 맞으면 시간만 늘어난다), 몸에 불꽃 표시
   burnPlayer(v, dps, secs, attacker) {
+    if (v.emote) return;
     if (!v || v.dead || !dps) return;
     const now = Date.now();
     const was = v.burnUntil > now;
@@ -143,6 +145,7 @@ export class Combat {
   }
   elementOnPlayer(v, stats, p) {
     if (stats.element === 'fire' && stats.burn) this.burnPlayer(v, stats.burn, 3, p);
+    if (v.emote) return; // 춤추는 중: 느려짐 · 밀림도 없다
     if (stats.element === 'ice') this.w.send(v, { t: 'slow', s: 2.5 });
     if (stats.element === 'wind') { const dx = v.pos.x - p.pos.x, dz = v.pos.z - p.pos.z, d = Math.hypot(dx, dz) || 1; this.w.send(v, { t: 'knock', x: (dx / d) * 9, z: (dz / d) * 9, up: 6, wind: true }); }
     if (stats.element === 'poison' && stats.poisonDmg) {
@@ -220,6 +223,10 @@ export class Combat {
   }
   damagePlayer(v, dmg, attacker, fromPos, crit = false) {
     if (v.dead || dmg <= 0) return;
+    if (v.emote) { // 춤추는 중엔 무적 (가끔 표시)
+      if (Date.now() - (v.emoteShieldT || 0) > 700) { v.emoteShieldT = Date.now(); this.w.broadcast({ t: 'fx', k: 'dmgnum', p: [v.pos.x, v.pos.y + 2.2, v.pos.z], v: 0, shield: 1, loc: v.loc, pid: v.id }); }
+      return;
+    }
     if (this.w.inSafeZone(v)) return; // 리스폰 존: 무적
     v.hp -= dmg;
     v.lastHurt = Date.now();
@@ -526,7 +533,7 @@ export class Combat {
         this.explodeAt(aim, u.loc, info.radius, info.dmg, null, {}, p);
       } else {
         this.w.broadcast({ t: 'fx', k: 'tracer', a: [muzzle.x, muzzle.y, muzzle.z], b: [aim.x, aim.y, aim.z], c: '#fff59d', loc: u.loc });
-        if (hit) { this.damagePlayer(p, damageTaken(info.dmg, p.profile.def || 0), { name: info.name }, muzzle); this.scream(p.pos, p.loc, `p${p.id}`); }
+        if (hit) { this.damagePlayer(p, damageTaken(info.dmg, p.profile.def || 0), { name: info.name }, muzzle); if (!p.emote) this.scream(p.pos, p.loc, `p${p.id}`); }
       }
     }
   }
@@ -669,7 +676,7 @@ export class Combat {
       const mult = car.kind === 'tank' ? 1.6 : car.kind === 'bus' ? 1.3 : 1;
       const dmg = Math.round((sp - 3) * 5 * mult);
       for (const v of this.w.players.values()) {
-        if (v === driver || v.dead || v.loc !== -1 || v.car >= 0) continue;
+        if (v === driver || v.dead || v.loc !== -1 || v.car >= 0 || v.emote) continue; // 춤추는 사람은 차도 못 친다
         const dx = v.pos.x - car.pos.x, dz = v.pos.z - car.pos.z, d = Math.hypot(dx, dz);
         if (d > r || now - (v.lastCarHit || 0) < 1200) continue;
         v.lastCarHit = now;
