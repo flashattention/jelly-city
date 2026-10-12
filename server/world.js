@@ -388,7 +388,7 @@ export class World {
       case 'fx': {
         // 다른 플레이어에게 보여줄 연출 (총알 궤적, 투사체, 휘두르기)
         const k = String(msg.k || '');
-        if (['tracer', 'proj', 'swing', 'muzzle', 'eat', 'bolt', 'sparkle', 'cloud', 'breath', 'horn', 'emote', 'gust', 'holyfx'].includes(k)) this.broadcast({ ...msg, t: 'fx', pid: p.id, loc: p.loc }, p.id);
+        if (['tracer', 'proj', 'swing', 'muzzle', 'eat', 'bolt', 'sparkle', 'cloud', 'breath', 'horn', 'emote', 'emotesync', 'gust', 'holyfx'].includes(k)) this.broadcast({ ...msg, t: 'fx', pid: p.id, loc: p.loc }, p.id);
         break;
       }
       case 'drop': {

@@ -973,7 +973,7 @@ function toggleCar() {
 //   start~end: 반복 구간(초, 박 위에서 시작), bpm: 박자 (영상 장면·가사가 바뀌는 시각으로 잰 값), tall: 세로 영상(쇼츠)
 // ------------------------------------------------------------------
 const EMOTES = [
-  { id: 'creamcheese', name: '크림치즈 허니', e: '🧀' },
+  { id: 'creamcheese', name: '크림치즈 허니', e: '🧀', song: { id: 'hoVJeMcSeto', start: 1.58, end: 14.38, bpm: 150, tall: true, title: '권루트 - L을 가져가 챌린지' } },
   { id: 'redred', name: 'REDRED', e: '❌', song: { id: 'w9obXvHi700', start: 6.37, end: 14.37, bpm: 120, tall: true, title: "CORTIS - REDRED 공식 챌린지" } },
   { id: 'apt', name: '아파트', e: '🏢', song: { id: '5VhmJaKV10c', start: 1.145, end: 9.145, bpm: 150, tall: true, title: 'ROSÉ - APT. 공식 챌린지' } },
   { id: 'ganbare', name: '간바레', e: '💪', song: { id: 'm1o67ti-DME', start: 2.35, end: 8.776, bpm: 149.4, title: 'おだまよ - 頑張りたいソング' } },
@@ -1024,7 +1024,7 @@ function startEmote(id) {
   p.roach.playEmote(id);
   game.net.send({ t: 'fx', k: 'emote', id });
   sfx('jump', null, 2);
-  if (m.song) playEmoteSong(m.song);
+  if (m.song) playEmoteSong(m.song, { owner: 'me' });
 }
 function stopEmote(quiet = false) {
   if (!game.emoting) return;
@@ -1046,26 +1046,33 @@ function loadYT() {
   });
   return ytReady;
 }
-async function playEmoteSong(song) {
-  document.getElementById('es-title').textContent = '🎵 ' + song.title;
+// 지금 미니 플레이어로 듣고 있는 노래: owner 'me'(내 춤) 또는 다른 플레이어 id (그 사람 춤을 근처에서 듣는 중)
+let songSession = null;
+async function playEmoteSong(song, { owner = 'me', at = null } = {}) {
+  const sess = songSession = { song, owner };
+  const who = owner === 'me' ? '' : `${game.players.list.get(owner)?.name || '친구'}님의 `;
+  document.getElementById('es-title').textContent = `🎵 ${who}${song.title}`;
   document.getElementById('emote-song').classList.remove('hidden');
   document.getElementById('emote-song').classList.toggle('tall', !!song.tall);
-  ytClock = null;
+  ytClock = null; sess.lastSync = 0;
   duckMusic(true);
+  const from = at ?? song.start;
   try { await loadYT(); } catch { ui.toast('🎵 유튜브를 불러오지 못했어요'); stopEmoteSong(); return; }
-  if (game.emoting?.song !== song) return; // 그사이 멈췄으면
+  if (songSession !== sess) return; // 그사이 멈췄거나 다른 노래로 바뀌었으면
   if (!ytPlayer) {
     ytPlayer = await new Promise((res) => {
       const pl = new window.YT.Player('es-player', {
         width: 356, height: 200, videoId: song.id,
-        playerVars: { autoplay: 1, start: Math.floor(song.start), playsinline: 1, rel: 0, controls: 0, disablekb: 1 },
+        playerVars: { autoplay: 1, start: Math.floor(from), playsinline: 1, rel: 0, controls: 0, disablekb: 1 },
         events: { onReady: () => res(pl), onError: () => { ui.toast('🎵 이 노래는 여기서 재생할 수 없어요'); stopEmoteSong(); } },
       });
     });
-    if (game.emoting?.song !== song) { stopEmoteSong(); return; }
-    ytPlayer.seekTo(song.start, true); ytPlayer.playVideo();
-  } else ytPlayer.loadVideoById({ videoId: song.id, startSeconds: song.start });
+    if (songSession !== sess) { stopEmoteSong(); return; }
+    ytPlayer.seekTo(from, true); ytPlayer.playVideo();
+  } else ytPlayer.loadVideoById({ videoId: song.id, startSeconds: from });
+  ytPlayer.setVolume?.(100);
 }
+game.ytNow = () => (songSession && ytPlayer?.getCurrentTime ? ytPlayer.getCurrentTime() : null); // 디버깅용: 지금 노래 위치
 // 노래 시각 → 박. 플레이어가 알려 주는 시각은 띄엄띄엄 오므로 그 사이는 실제 흐른 시간으로 메운다
 let ytClock = null;
 function emoteSongBeat(song) {
@@ -1075,18 +1082,65 @@ function emoteSongBeat(song) {
   const ct = ytPlayer.getCurrentTime(), now = performance.now();
   // 처음으로 되감은 직후엔 플레이어가 잠깐 예전 시각을 알려 줄 수 있어 무시한다
   const settling = ytClock?.seekAt && now - ytClock.seekAt < 500 && ct >= song.end - 0.2;
+  const first = !ytClock;
   if (!settling && (!ytClock || ct !== ytClock.ct)) ytClock = { ct, at: now, seekAt: ytClock?.seekAt };
   let t = ytClock.ct + (now - ytClock.at) / 1000;
   // 챌린지 구간 끝 → 처음으로 (박 위에서 다시 시작)
-  if (t >= song.end - 0.03 || t < song.start - 1.5) { ytPlayer.seekTo(song.start, true); ytClock = { ct: song.start, at: now, seekAt: now }; t = song.start; }
+  let looped = false;
+  if (t >= song.end - 0.03 || t < song.start - 1.5) { ytPlayer.seekTo(song.start, true); ytClock = { ct: song.start, at: now, seekAt: now }; t = song.start; looped = true; }
+  // 내 춤이면 주변 사람들에게 지금 노래 위치를 알려 준다 (시작할 때 · 구간이 돌 때 · 2초마다)
+  const S = songSession;
+  if (S?.owner === 'me' && game.emoting && (first || looped || now - (S.lastSync || 0) > 2000)) {
+    S.lastSync = now;
+    game.net.send({ t: 'fx', k: 'emotesync', id: game.emoting.id, pos: +t.toFixed(3) });
+  }
   return Math.max(0, t - song.start) * song.bpm / 60;
 }
 function stopEmoteSong() {
+  songSession = null;
   try { ytPlayer?.pauseVideo?.(); } catch { /* 아직 준비 전 */ }
   document.getElementById('emote-song').classList.add('hidden');
   duckMusic(false);
 }
-document.getElementById('es-close').onclick = () => stopEmoteSong();
+// 주변 플레이어가 노래 있는 춤을 추면: 30m 안이면 같은 노래를 같은 위치로 맞춰 듣는다 (내가 추는 노래가 먼저, 여럿이면 가까운 사람)
+const LISTEN_R = 30;
+game.onEmoteSync = (pid, id, pos) => {
+  const m = EMOTES.find((x) => x.id === id);
+  if (!m?.song || game.emoting?.song) return;
+  const pl = game.players.list.get(pid);
+  if (!pl?.visible || game.mutedDancer === pid) return;
+  const d = pl.pos.distanceTo(game.player.pos);
+  if (d > LISTEN_R) return;
+  const S = songSession;
+  if (S && S.owner !== pid && S.owner !== 'me') { const cur = game.players.list.get(S.owner); if (cur && cur.pos.distanceTo(game.player.pos) < d) return; }
+  const want = Math.min(m.song.end - 0.05, pos + 0.12); // 전달되는 동안 흐른 시간만큼 앞으로
+  const anchor = { pos: want, at: performance.now() }; // 춤추는 사람의 노래가 지금 어디쯤인지 계속 계산하는 기준
+  if (S?.owner === pid && S.song === m.song) { S.anchor = anchor; return; } // 이미 듣는 중: 어긋남은 매 프레임 맞춘다
+  playEmoteSong(m.song, { owner: pid, at: want }).then(() => { if (songSession?.owner === pid) songSession.anchor = { pos: anchor.pos + (performance.now() - anchor.at) / 1000, at: performance.now() }; });
+  if (songSession) songSession.anchor = anchor;
+};
+// 듣고 있는 사람의 춤을 그 노래 박에 맞추고, 멀어지면 소리를 줄이다가 끊는다
+function updateListenedSong() {
+  const S = songSession;
+  if (!S || S.owner === 'me') return;
+  const pl = game.players.list.get(S.owner);
+  const d = pl ? pl.pos.distanceTo(game.player.pos) : Infinity;
+  if (!pl?.visible || d > LISTEN_R + 5 || !pl.roach.emote || game.emoting) { stopEmoteSong(); return; }
+  ytPlayer?.setVolume?.(Math.round(100 * Math.max(0.15, Math.min(1, 1 - (d - 6) / (LISTEN_R - 6)))));
+  // 춤추는 사람 쪽 노래 위치(기준 + 흐른 시간, 구간 안에서 돌기)와 내 플레이어가 0.15초 넘게 어긋나면 맞춘다.
+  // 되감으면 불러오는 데 시간이 걸리니 조금 앞으로 (1.5초에 한 번까지)
+  const now = performance.now(), song = S.song;
+  if (S.anchor && ytPlayer?.getPlayerState?.() === 1 && now - (S.fixAt || 0) > 1500) {
+    const len = song.end - song.start;
+    const exp = song.start + ((((S.anchor.pos - song.start) + (now - S.anchor.at) / 1000) % len) + len) % len;
+    const off = ytPlayer.getCurrentTime() - exp;
+    if (Math.abs(off) > 0.15 && Math.abs(off) < len - 0.15) { S.fixAt = now; ytPlayer.seekTo(Math.min(song.end - 0.1, exp + (S.lag ?? 0.3)), true); ytClock = null; }
+    else if (S.fixAt && now - S.fixAt < 4000) S.lag = Math.max(0, Math.min(1.2, (S.lag ?? 0.3) - off)); // 되감은 뒤 남은 차이로 다음 보정량을 배운다
+  }
+  pl.roach.emote.beat = emoteSongBeat(S.song);
+}
+// ✕: 내 노래는 끄고, 남의 노래면 그 사람이 이번 춤을 멈출 때까지 다시 틀지 않는다
+document.getElementById('es-close').onclick = () => { if (songSession && songSession.owner !== 'me') game.mutedDancer = songSession.owner; stopEmoteSong(); };
 Roach.onEmoteFx = (r, k) => { if (k === 'heart' && r.root.visible) { const at = r.root.position.clone(); at.y += 1.2; game.combat?.fx.hearts(at, null, '💖'); } };
 game.isEmote = (id) => EMOTE_IDS.has(id);
 
@@ -2328,8 +2382,9 @@ function frame() {
     const moving = input.forward || input.back || input.left || input.right || input.jumpPressed || input.dashPressed || input.moveDir;
     if (moving || !p.onGround || p.inCar || p.flying || p.mount || game.dead || game.busy || p.swimming) stopEmote();
     else if ((game.emoting.t += dt) < 1.2 && !p.fp) p.cam.yaw = angleLerp(p.cam.yaw, p.heading, Math.min(1, dt * 4)); // 포트나이트처럼 앞모습이 보이게
-    if (game.emoting?.song && p.roach.emote) p.roach.emote.beat = emoteSongBeat(game.emoting.song);
+    if (game.emoting?.song && songSession?.owner === 'me' && p.roach.emote) p.roach.emote.beat = emoteSongBeat(game.emoting.song);
   }
+  updateListenedSong();
   // 저격 조준 중에는 멀리 있는 시민·동물까지 그려서 맞힐 수 있게
   const far = game.zoomNow > 2.5;
   game.citizens.viewDist = far ? 130 * Math.min(4, game.zoomNow / 1.5) : 130;

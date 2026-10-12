@@ -1244,7 +1244,8 @@ export class Combat {
       const right = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion);
       scream(vol, rel.length() > 1 ? rel.normalize().dot(right) * 0.8 : 0, +m.s || Math.random());
     }
-    else if (m.k === 'emote') { const pl = g.players.list.get(m.pid); pl?.roach.playEmote(g.isEmote?.(m.id) ? m.id : null); }
+    else if (m.k === 'emote') { const pl = g.players.list.get(m.pid); pl?.roach.playEmote(g.isEmote?.(m.id) ? m.id : null); if (!m.id && g.mutedDancer === m.pid) g.mutedDancer = null; }
+    else if (m.k === 'emotesync' && g.isEmote?.(m.id) && Number.isFinite(+m.pos)) { const pl = g.players.list.get(m.pid); if (pl && pl.roach.emote?.id !== m.id) pl.roach.playEmote(m.id); g.onEmoteSync?.(m.pid, m.id, +m.pos); }
     else if (m.k === 'sparkle') this.fx.sparkle(v3(m.p), m.c || '#fff59d', 20, 3);
     else if (m.k === 'cloud') this.fx.cloud(v3(m.p), m.c || '#e8f5e9');
     else if (m.k === 'gust' && Array.isArray(m.p) && Array.isArray(m.d)) { this.fx.gust(v3(m.p), v3(m.d)); this.remoteCast(m.pid, '#a5d6a7'); }

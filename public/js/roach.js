@@ -1115,17 +1115,34 @@ export class Roach {
     const legs = (a0, a1) => { this.legs[0].rotation.x = a0; this.legs[1].rotation.x = a1; };
     this.torso.rotation.y = 0; this.inner.rotation.z = 0; this.inner.rotation.x = 0; this.head.rotation.z = 0; this.head.rotation.x = 0;
     switch (E.id) {
-      case 'creamcheese': { // 크림치즈 허니: 'L' 포즈로 콩콩 → 두 손 볼에 대고 꿀처럼 살랑살랑
-        if (n % 4 < 2) {
-          const r = n % 2 === 0;
-          this.armPose(r ? 1 : 0, 2.95, 0.1); this.armPose(r ? 0 : 1, 1.55, 0); // L
-          hop(0.18); legs(Math.sin(beat * Math.PI) * 0.3, -Math.sin(beat * Math.PI) * 0.3);
-          this.head.rotation.z = (r ? -1 : 1) * 0.15;
-        } else {
-          const sw = Math.sin(t * Math.PI * 2.2);
-          this.armPose(0, 0.75, 2.35); this.armPose(1, 0.75, 2.35); // 볼에 손
-          this.inner.rotation.z = sw * 0.12; this.head.rotation.z = -sw * 0.25; this.torso.rotation.y = sw * 0.25;
-          this.inner.position.y = Math.abs(sw) * 0.06; legs(sw * 0.15, -sw * 0.15);
+      case 'creamcheese': { // 권루트 'L을 가져가' 챌린지 (150bpm, 한 구절 4박): L → 크림치즈 허니 → L → 크리스 크로스 → L → 야채 → L → 셀카
+        const ph = Math.floor((((n % 32) + 32) % 32) / 4), hb = Math.abs(Math.sin(beat * Math.PI)); // hb: 박마다 콩
+        const part = ['L', 'honey', 'L', 'criss', 'L', 'veg', 'L', 'selfie'][ph];
+        if (part === 'L') { // 손으로 이마에 L, 한 다리를 번갈아 높이 차며 콩콩 (몸도 기울인다)
+          const side = n % 2 ? 1 : -1;
+          this.armPose(1, 2.75, 1.3); this.armPose(0, 0.5, 0.3);
+          this.inner.position.y = hb * 0.28; this.inner.rotation.z = side * 0.12;
+          legs(side > 0 ? 1.25 * hb : -0.15, side > 0 ? -0.15 : 1.25 * hb);
+          this.head.rotation.z = -0.2; this.head.rotation.x = -0.15;
+        } else if (part === 'honey') { // 두 팔을 머리 위로 쭉, 좌우로 크게 살랑
+          const sw = Math.sin(beat * Math.PI);
+          this.armPose(0, 3.05 + sw * 0.15, 0.15 + sw * 0.25); this.armPose(1, 3.05 - sw * 0.15, 0.15 - sw * 0.25);
+          this.inner.rotation.z = sw * 0.24; this.head.rotation.z = -sw * 0.3; this.torso.rotation.y = sw * 0.25;
+          this.inner.position.y = hb * 0.16; legs(sw * 0.35, -sw * 0.35);
+        } else if (part === 'criss') { // 팔짱 끼고, 박마다 다리를 벌렸다(콩) 엇갈렸다(콩)
+          const open = n % 2 === 0;
+          this.armPose(0, 0.15, 1.75); this.armPose(1, 0.15, 1.75);
+          this.inner.position.y = hb * 0.3;
+          legs(open ? 0.6 : -0.45, open ? -0.6 : 0.45); this.torso.rotation.y = open ? 0.35 : -0.35; this.inner.rotation.z = open ? 0.08 : -0.08;
+        } else if (part === 'veg') { // 두 팔 알통 자세로 박마다 쭉쭉, 한 다리 들고 콩콩
+          const pump = 1 - b;
+          this.armPose(0, 1.6 + pump * 0.6, 0.7 + pump * 0.6); this.armPose(1, 1.6 + pump * 0.6, 0.7 + pump * 0.6);
+          this.inner.position.y = hb * 0.22; legs(1.0 * hb, 0); this.inner.rotation.z = Math.sin(beat * Math.PI) * 0.1;
+          this.head.rotation.x = -0.18 * pump;
+        } else { // 셀카: 얼굴 옆 브이, 카메라 쪽으로 쑥 다가가며 고개 갸웃
+          this.armPose(0, 1.15, 2.55); this.armPose(1, 1.15, 2.55);
+          this.inner.rotation.x = 0.35; this.inner.position.y = hb * 0.08;
+          this.head.rotation.z = n % 2 ? 0.35 : -0.35;
         }
         break;
       }
