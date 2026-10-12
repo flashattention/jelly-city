@@ -638,3 +638,7 @@ body.bug-mode .cute-bear { display: none !important; }
 #emote-song.tall { width: 200px; }
 #emote-song.tall #es-title { font-size: 11px; }
 @media (max-width: 700px) { #emote-song { right: 8px; bottom: 140px; } }
+
+/* 상점 목록 */
+.sd-group h4 { margin: 12px 0 6px; font-family: 'Jua'; font-size: 15px; }
+.sd-row .acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }

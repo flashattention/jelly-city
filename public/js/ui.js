@@ -112,6 +112,7 @@ export class UI {
     $('tb-badges').onclick = () => this.openBadges();
     $('tb-map').onclick = () => this.openWorldMap();
     $('tb-mode').onclick = () => this.setBugMode(!settings.bugMode);
+    $('tb-shops').onclick = () => this.openShopDirectory();
     const musicBtn = () => { $('tb-music').textContent = settings.music ? '🎵 음악 켬' : '🔇 음악 끔'; };
     $('tb-music').onclick = () => { setMusic(!settings.music); musicBtn(); };
     musicBtn();
@@ -135,7 +136,7 @@ export class UI {
     const groups = [
       ['🚶 이동', [['W A S D', '걷기 (방향키도 OK)'], ['Shift', '달리기 (바퀴 모드에선 여섯 다리로 기어 달려요!)'], ['Space', '점프 · 공중에서 한 번 더 2단 점프 (3단은 수련*)'], ['C', '대쉬 (거리 강화는 수련*)'], ['Space 두 번', '🪽 날기 — 날면서 Space 꾹 위로 · X 아래로 · Space 두 번 = 날개 접고 떨어지기 (G도 가능)'], ['V', '1인칭 ↔ 3인칭'], ['벽으로 걷기', '🧗 벽에 대고 계속 걸으면 벽을 기어올라요 (W/S 위아래 · A/D 옆 · Space 뛰어내리기) — 옥상도 걸을 수 있어요'], ['마우스', '화면 클릭 후 움직이면 시점 회전 · 휠로 확대/축소'], ['R', '지도에 찍은 목적지까지 자동으로 걷기']]],
       ['💬 생활', [['E', '대화하기 · 건물 들어가기/나가기 · 행동하기 · 아이템 줍기'], ['B', '💘 플러팅 — 앞에 있는 상대에게 하트 날리기'], ['P', '📷 사진 찍기 (갤러리·인스타는 휴대폰)'], ['Enter', '전체 채팅 (T도 가능)'], ['I', '가방'], ['M', '도시 전체 지도'], ['K / Tab', '📱 휴대폰 열기·닫기 — 퀘스트·카메라·인스타·튄더·연락처·문자·112'], ['Esc', '창 닫기']]],
-      ['⚔️ 전투 · 아이템', [['1 ~ 0', '핫바 칸 선택 (무기, 마법봉, 음식, 차 키)'], ['왼쪽 클릭', '공격 / 마법 / 먹기 · 활은 꾹 눌러 당겼다가 놓기!'], ['오른쪽 클릭', '🔭 1인칭 조준 (총·활) · 저격총은 스코프 · 총마다 반동이 달라요'], ['J 꾹 누르기', '💃 이모트 휠 — 마우스로 고르고 떼면 춤 (🎵 표시는 공식 챌린지 노래도 나와요)'], ['스코프 중 휠', '🔍 배율 조절 (저격총 2~8배 · 엽총 2~6배 · 바렛 4~15배)'], ['낚싯대 클릭', '🎣 물을 보고 던지기 → "입질!" 뜨면 바로 클릭'], ['Q', '선택한 아이템 바닥에 버리기'], ['Z 꾹 → 떼기', '🪢 동물 포획 — 체력을 절반 아래로 깎고, 바늘이 초록칸일 때 떼기 (가축은 언제나)'], ['F (탈것)', '🐎 포획한 동물에서 내리기 · 드래곤은 클릭으로 불 뿜기'], ['← →', '차에 치여 뒤집히면 번갈아 연타해서 일어나기']]],
+      ['⚔️ 전투 · 아이템', [['1 ~ 0', '핫바 칸 선택 (무기, 마법봉, 음식, 차 키)'], ['왼쪽 클릭', '공격 / 마법 / 먹기 · 활은 꾹 눌러 당겼다가 놓기!'], ['오른쪽 클릭', '🔭 1인칭 조준 (총·활) · 저격총은 스코프 · 총마다 반동이 달라요'], ['U', '🛒 상점 목록 — 어디서든 가게를 골라 바로 구경·구매, 📍 길 안내'], ['J 꾹 누르기', '💃 이모트 휠 — 마우스로 고르고 떼면 춤 (🎵 표시는 공식 챌린지 노래도 나와요)'], ['스코프 중 휠', '🔍 배율 조절 (저격총 2~8배 · 엽총 2~6배 · 바렛 4~15배)'], ['낚싯대 클릭', '🎣 물을 보고 던지기 → "입질!" 뜨면 바로 클릭'], ['Q', '선택한 아이템 바닥에 버리기'], ['Z 꾹 → 떼기', '🪢 동물 포획 — 체력을 절반 아래로 깎고, 바늘이 초록칸일 때 떼기 (가축은 언제나)'], ['F (탈것)', '🐎 포획한 동물에서 내리기 · 드래곤은 클릭으로 불 뿜기'], ['← →', '차에 치여 뒤집히면 번갈아 연타해서 일어나기']]],
       ['🚗 자동차', [['F', '차 타기 · 빼앗기 · 내리기'], ['H (차 안)', '📯 빵빵 경적'], ['W / S', '가속 / 후진'], ['A / D', '핸들'], ['Space', '브레이크 (헬기는 상승)'], ['Shift', '부스트 (헬기는 하강)'], ['왼쪽 클릭', '전차 주포 · 헬기 미사일']]],
     ];
     this.openModal(`<h3 class="mh">⌨️ 조작법 <small>H 키로 열고 닫아요</small></h3>
@@ -363,6 +364,18 @@ export class UI {
       if (un.loc >= 0) continue;
       ctx.fillStyle = '#ff1744';
       ctx.beginPath(); ctx.arc(un.pos.x, un.pos.z, 3.5 * k, 0, Math.PI * 2); ctx.fill();
+    }
+    if (g.shopMarkers) {
+      ctx.font = `${13 * k}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      for (const m of g.shopMarkers) {
+        const b = m.b;
+        if (Math.abs(b.x - p.x) > S * k || Math.abs(b.z - p.z) > S * k) continue;
+        ctx.save(); ctx.translate(b.x, b.z); ctx.rotate(-yaw);
+        ctx.fillStyle = '#fffaf2'; ctx.strokeStyle = '#ff7e9a'; ctx.lineWidth = 2 * k;
+        ctx.beginPath(); ctx.arc(0, 0, 9 * k, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillText(b.def.emoji, 0, 0.5 * k);
+        ctx.restore();
+      }
     }
     for (const gi of g.ground.list.values()) {
       if (!gi.rarity || gi.loc !== -1) continue;
@@ -949,7 +962,37 @@ export class UI {
   }
 
   // ---------------- 상점 ----------------
-  openShop(type) {
+  // ---------------- 상점 목록 (U): 어디서든 가게를 골라 구경하고 바로 산다 ----------------
+  openShopDirectory() {
+    const g = this.game;
+    const groups = [
+      ['⚔️ 무기 · 마법 · 방어구', ['armory_3k', 'armory_mil', 'armory_sf', 'magicshop', 'hunter', 'jeweler']],
+      ['🎽 패션', ['clothing', 'hatshop', 'eyewear']],
+      ['🚗 탈것', ['dealer']],
+      ['🍔 먹거리', ['convenience', 'burger', 'pizza', 'chicken', 'chinese', 'bunsik', 'gukbap', 'restaurant', 'bakery', 'cafe', 'seafood', 'ranch']],
+      ['🎁 그 밖에', ['fishing', 'pharmacy', 'flowershop', 'bookstore']],
+    ];
+    const row = (type) => {
+      const info = SHOPS[type]; if (!info) return '';
+      const near = g.nearestShop(type);
+      const emoji = near?.b.def.emoji || '🛒';
+      return `<div class="item sd-row"><div class="ic">${emoji}</div><div class="info"><b>${escapeHtml(info.title)}</b><small>${escapeHtml(info.subtitle)}${near ? ` · 📍 ${Math.round(near.d)}m` : ''}</small></div>
+        <div class="acts"><button class="btn mini" data-sd-buy="${type}">🛒 구경 · 구매</button>${near ? `<button class="btn mini ghost" data-sd-go="${type}">📍 길 안내</button>` : ''}</div></div>`;
+    };
+    this.openModal(`<h3 class="mh">🛒 상점 목록 <small>어디서든 바로 구경하고 살 수 있어요 · 물고기·전리품 팔기는 가게에 직접 가야 해요</small></h3>
+      <div class="money-line">💰 소지금 <b>₩${Math.floor(g.stats.money).toLocaleString()}</b></div>
+      ${groups.map(([title, types]) => `<div class="sd-group"><h4>${title}</h4><div class="itemlist">${types.map(row).join('')}</div></div>`).join('')}
+      <div style="margin-top:12px"><button class="btn ghost" id="sd-close">닫기</button></div>`, 'shops');
+    $('sd-close').onclick = () => this.closeModal();
+    $('modal-inner').querySelectorAll('[data-sd-buy]').forEach((b) => {
+      b.onclick = () => { const t = b.dataset.sdBuy; if (t === 'dealer') this.openDealer(); else this.openShop(t, { back: true }); };
+    });
+    $('modal-inner').querySelectorAll('[data-sd-go]').forEach((b) => {
+      b.onclick = () => { const n = g.nearestShop(b.dataset.sdGo); if (n) { g.setWaypoint(n.b, `${n.b.def.emoji} ${n.b.name}`); this.closeModal(); this.toast(`📍 ${n.b.name}까지 길을 안내해요 (R: 자동으로 걷기)`); } };
+    });
+  }
+
+  openShop(type, opts = {}) {
     const g = this.game;
     const info = SHOPS[type] || { title: '상점', subtitle: '' };
     const ids = shopItems(type);
@@ -974,9 +1017,10 @@ export class UI {
         const d = ITEMS[id];
         return `<div class="shop-item"><div class="ic">${d.emoji}</div><b>${escapeHtml(d.name)}</b><small>${desc(id)}</small><button class="btn mini" data-buy="${id}">₩${d.price.toLocaleString()}</button></div>`;
       }).join('')}</div>
-      <div style="margin-top:12px"><button class="btn ghost" id="shop-close">닫기</button></div>`;
+      <div style="margin-top:12px">${opts.back ? '<button class="btn ghost" id="shop-back">← 상점 목록</button> ' : ''}<button class="btn ghost" id="shop-close">닫기</button></div>`;
     this.openModal(html, 'shop');
     $('shop-close').onclick = () => this.closeModal();
+    if (opts.back) $('shop-back').onclick = () => this.openShopDirectory();
     $('modal-inner').querySelectorAll('[data-buy]').forEach((b) => {
       const d = ITEMS[b.dataset.buy];
       if (d.price > g.stats.money) b.classList.add('ghost');

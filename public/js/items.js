@@ -429,9 +429,9 @@ export const RARITY = {
 };
 const RARITY_OF = {
   common: ['wood_sword', 'iron_sword', 'combat_knife', 'pistol', 'revolver', 'uzi', 'shotgun', 'bow', 'crossbow'],
-  rare: ['qinggang', 'twin_swords', 'deagle', 'mp5', 'double_barrel', 'rifle', 'ak47', 'm4', 'hunting_rifle', 'blaster', 'composite_bow', 'recurve_bow', 'grenade'],
-  epic: ['serpent_spear', 'scar', 'sniper', 'plasma_smg', 'blaster_rifle', 'm249', 'rpg', 'zhuge_crossbow', 'thermal'],
-  legendary: ['halberd', 'dragon_glaive', 'yitian', 'minigun', 'barrett', 'saber_blue', 'saber_red', 'saber_green', 'ion_cannon'],
+  rare: ['qinggang', 'twin_swords', 'deagle', 'mp5', 'double_barrel', 'rifle', 'ak47', 'm4', 'hunting_rifle', 'blaster', 'composite_bow', 'recurve_bow', 'grenade', 'wand_wind', 'wand_ice', 'wand_fire', 'wand_poison'],
+  epic: ['serpent_spear', 'scar', 'sniper', 'plasma_smg', 'blaster_rifle', 'm249', 'rpg', 'zhuge_crossbow', 'thermal', 'wand_thunder', 'wand_holy'],
+  legendary: ['halberd', 'dragon_glaive', 'yitian', 'minigun', 'barrett', 'saber_blue', 'saber_red', 'saber_green', 'ion_cannon', 'wand_dark'],
 };
 // 맵 드랍: 먼저 무기 종류를 고르게 뽑고(근접무기만 몰리지 않게), 그 안에서 희귀도 가중치로 뽑는다
 export const DROP_GROUPS = [
@@ -446,6 +446,7 @@ export const DROP_GROUPS = [
   ['crossbow', 0.7, ['crossbow', 'zhuge_crossbow']],
   ['heavy', 0.5, ['m249', 'minigun', 'rpg', 'ion_cannon']],
   ['throw', 0.4, ['grenade', 'thermal']],
+  ['wand', 1, ['wand_fire', 'wand_ice', 'wand_thunder', 'wand_wind', 'wand_poison', 'wand_holy', 'wand_dark']], // 마법봉도 길에 떨어진다
 ];
 export const rarityOf = (id) => Object.keys(RARITY_OF).find((r) => RARITY_OF[r].includes(id)) || 'common';
 export const DROP_POOL = RARITY_OF;

@@ -353,6 +353,7 @@ function buildWorld(w) {
   for (const key of w.smashed || []) smashProp(key, [1, 0], true);
   sim.city = city;
   game.city = city; game.sim = sim;
+  buildShopMarkers();
   game.mapImage = renderMapImage(buildings, 1024);
   game.homes = w.homes;
   game.citizens = new CitizenView(scene, sim, city);
@@ -770,6 +771,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyV' && !e.repeat) toggleView();
   if (e.code === 'KeyB' && !e.repeat) flirt();
   if (e.code === 'KeyJ' && !e.repeat) openEmoteWheel();
+  if (e.code === 'KeyU' && !e.repeat) ui.openShopDirectory();
   if (e.code === 'KeyP' && !e.repeat) game.takePhoto?.();
 });
 window.addEventListener('keyup', (e) => { const k = KEYMAP[e.code]; if (k) game.input[k] = false; if (e.code === 'KeyZ') releaseCapture(); if (e.code === 'KeyJ') closeEmoteWheel(true); });
@@ -1087,6 +1089,60 @@ function stopEmoteSong() {
 document.getElementById('es-close').onclick = () => stopEmoteSong();
 Roach.onEmoteFx = (r, k) => { if (k === 'heart' && r.root.visible) { const at = r.root.position.clone(); at.y += 1.2; game.combat?.fx.hearts(at, null, '💖'); } };
 game.isEmote = (id) => EMOTE_IDS.has(id);
+
+// ------------------------------------------------------------------
+// 상점 표시: 가게 건물 위에 이름표를 띄워 멀리서도(건물 너머로도) 보이게
+// ------------------------------------------------------------------
+function shopBadgeTex(emoji, title) {
+  const c = document.createElement('canvas'); c.width = 320; c.height = 84;
+  const x = c.getContext('2d');
+  x.font = "bold 30px 'Jua', sans-serif";
+  const w = Math.min(316, 74 + x.measureText(title).width + 22);
+  const x0 = (320 - w) / 2;
+  x.fillStyle = 'rgba(40,25,20,0.35)'; x.beginPath(); x.roundRect(x0 + 2, 6, w - 2, 66, 33); x.fill();
+  x.fillStyle = '#fffaf2'; x.beginPath(); x.roundRect(x0, 2, w - 2, 66, 33); x.fill();
+  x.strokeStyle = '#ff7e9a'; x.lineWidth = 4; x.stroke();
+  x.font = '38px sans-serif'; x.textBaseline = 'middle'; x.fillText(emoji, x0 + 14, 37);
+  x.font = "bold 30px 'Jua', sans-serif"; x.fillStyle = '#4a3428'; x.fillText(title, x0 + 64, 37);
+  x.fillStyle = '#fffaf2'; x.beginPath(); x.moveTo(150, 66); x.lineTo(170, 66); x.lineTo(160, 82); x.fill(); // 말풍선 꼬리
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function buildShopMarkers() {
+  game.shopMarkers = [];
+  const group = new THREE.Group(); scene.add(group);
+  for (const b of game.city.buildings) {
+    const info = SHOPS[b.type];
+    if (!info) continue;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: shopBadgeTex(b.def.emoji, b.name), transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false }));
+    sp.scale.set(0.19, 0.05, 1); sp.renderOrder = 50;
+    sp.position.set(b.x, (b.base || 0) + (b.floors || 1) * 3.6 + 5, b.z);
+    group.add(sp);
+    game.shopMarkers.push({ sp, b, y0: sp.position.y });
+  }
+  game.shopMarkerGroup = group;
+}
+// 가까운(300m) 가게만, 너무 가까우면(12m) 간판이 보이니 숨김. 둥실둥실
+function updateShopMarkers(t) {
+  if (!game.shopMarkers) return;
+  const show = game.mode === 'city' && !game.cutscene;
+  game.shopMarkerGroup.visible = show;
+  if (!show) return;
+  const me = game.player.pos;
+  for (const m of game.shopMarkers) {
+    const d = Math.hypot(m.b.x - me.x, m.b.z - me.z);
+    m.sp.visible = d < 300 && d > 12;
+    if (!m.sp.visible) continue;
+    m.sp.position.y = m.y0 + Math.sin(t * 2 + m.b.id) * 0.4;
+    m.sp.material.opacity = Math.min(1, (300 - d) / 60);
+  }
+}
+game.nearestShop = (type) => {
+  const me = game.player.pos;
+  let best = null, bd = Infinity;
+  for (const b of game.city.buildings) if (b.type === type) { const d = Math.hypot(b.x - me.x, b.z - me.z); if (d < bd) { bd = d; best = b; } }
+  return best ? { b: best, d: bd } : null;
+};
 
 // 차 안에서 H: 빵빵 (다른 사람에게도 들린다)
 function honk() {
@@ -2267,6 +2323,7 @@ function frame() {
   loop('saber', saber ? 0.3 : 0);
   updateUnitSounds();
   updateMoveSounds(dt);
+  updateShopMarkers(t);
   if (game.emoting) {
     const moving = input.forward || input.back || input.left || input.right || input.jumpPressed || input.dashPressed || input.moveDir;
     if (moving || !p.onGround || p.inCar || p.flying || p.mount || game.dead || game.busy || p.swimming) stopEmote();

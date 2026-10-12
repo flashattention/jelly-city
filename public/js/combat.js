@@ -134,16 +134,18 @@ export class FX {
     this.items.push({ m: dust, t: 0.25, life: 0.25, kind: 'smoke' });
   }
 
-  tracer(a, b, color = '#fff59d', width = 1) {
+  // o.life: 남는 시간, o.flicker: 번개처럼 깜빡임 (총구 불꽃 없이)
+  tracer(a, b, color = '#fff59d', width = 1, o = {}) {
     const dir = new THREE.Vector3().subVectors(b, a);
     const len = dir.length();
     if (len < 0.01) return;
-    const m = new THREE.Mesh(G.cylLow(), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false }));
+    const m = new THREE.Mesh(G.cylLow(), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false, blending: o.flicker ? THREE.AdditiveBlending : THREE.NormalBlending }));
     m.scale.set(0.03 * width, len, 0.03 * width);
     m.position.copy(a).addScaledVector(dir, 0.5);
     m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
     this.scene.add(m);
-    this.items.push({ m, t: 0.09, life: 0.09, kind: 'fade' });
+    this.items.push({ m, t: o.life || 0.09, life: o.life || 0.09, kind: o.flicker ? 'flicker' : 'fade' });
+    if (o.flicker) return;
     // 총구 불꽃
     const f = new THREE.Mesh(G.sphereLow(), new THREE.MeshBasicMaterial({ color: '#fff3e0', transparent: true, opacity: 0.9 }));
     f.scale.setScalar(0.15 * width); f.position.copy(a);
@@ -169,11 +171,103 @@ export class FX {
 
   // 지그재그 번개
   bolt(a, b, color = '#ffee58') {
-    const pts = [a.clone()];
-    const n = 7;
-    for (let i = 1; i < n; i++) { const q = a.clone().lerp(b, i / n); q.x += (Math.random() - 0.5) * 0.9; q.y += (Math.random() - 0.5) * 0.9; q.z += (Math.random() - 0.5) * 0.9; pts.push(q); }
-    pts.push(b.clone());
-    for (let i = 0; i < pts.length - 1; i++) this.tracer(pts[i], pts[i + 1], color, 2.2);
+    // 지그재그 번개: 색 띤 굵은 빛 + 하얀 심 + 곁가지, 끝에서 번쩍 · 불꽃
+    const zig = (p0, p1, n, j) => { const pts = [p0.clone()]; for (let i = 1; i < n; i++) { const q = p0.clone().lerp(p1, i / n); q.x += (Math.random() - 0.5) * j; q.y += (Math.random() - 0.5) * j; q.z += (Math.random() - 0.5) * j; pts.push(q); } pts.push(p1.clone()); return pts; };
+    const main = zig(a, b, 9, 1.1);
+    const B = { life: 0.32, flicker: true };
+    for (let i = 0; i < main.length - 1; i++) { this.tracer(main[i], main[i + 1], color, 5, B); this.tracer(main[i], main[i + 1], '#ffffff', 1.6, B); }
+    for (let f = 0; f < 3; f++) {
+      const from = main[1 + Math.floor(Math.random() * (main.length - 2))];
+      const to = from.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 2.5, (Math.random() - 0.5) * 3));
+      const br = zig(from, to, 4, 0.6);
+      for (let i = 0; i < br.length - 1; i++) this.tracer(br[i], br[i + 1], color, 2, { life: 0.22, flicker: true });
+    }
+    this.part(b, new THREE.Vector3(), '#ffffff', 0.18, 2.6, 0.6);
+    this.part(a, new THREE.Vector3(), color, 0.15, 1.2, 0.3);
+    for (let i = 0; i < 14; i++) this.part(b, new THREE.Vector3((Math.random() - 0.5) * 10, Math.random() * 7, (Math.random() - 0.5) * 10), Math.random() < 0.5 ? '#fff9c4' : color, 0.45, 0.22, 0, { grav: 14 });
+  }
+  // ---------------- 마법 효과 ----------------
+  // 빛나는 알갱이: 속도 · 중력 · 공기저항 · 크기 변화 (o.normal 이면 빛나지 않는 연기)
+  part(p, v, color, life = 0.6, s0 = 0.3, s1 = 0, o = {}) {
+    const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: o.normal ? smokeTex() : glowTex(), color, transparent: true, depthWrite: false, blending: o.normal ? THREE.NormalBlending : THREE.AdditiveBlending }));
+    m.position.copy(p); m.scale.setScalar(s0);
+    this.scene.add(m);
+    this.items.push({ m, t: life, life, kind: 'part', v: v.clone(), s0, s1, grav: o.grav ?? 0, drag: o.drag ?? 0, op: o.op ?? 1, swirl: o.swirl || null });
+  }
+  // 퍼지는(또는 빨려드는) 고리. 기본은 바닥에 눕고, o.face 를 주면 그쪽을 본다
+  ring(p, color, r = 3, life = 0.5, o = {}) {
+    const m = new THREE.Mesh(new THREE.RingGeometry(0.8, 1, 48), new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+    m.position.copy(p);
+    if (o.face) m.lookAt(o.face); else m.rotation.x = -Math.PI / 2;
+    this.scene.add(m);
+    this.items.push({ m, t: life, life, kind: 'ring', r, r0: o.r0 ?? 0.2, op: o.op ?? 0.9, implode: !!o.implode, ownGeo: true });
+  }
+  // 발밑 마법진 (돌면서 나타났다 사라진다)
+  magicCircle(p, color, r = 2.2, life = 0.9) {
+    const m = new THREE.Mesh(circleGeo, new THREE.MeshBasicMaterial({ map: circleTex(color), transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+    m.rotation.x = -Math.PI / 2; m.position.copy(p); m.position.y += 0.06;
+    this.scene.add(m);
+    this.items.push({ m, t: life, life, kind: 'circle', r });
+  }
+  // 마법을 쓸 때: 마법진 + 손에서 빛이 터진다
+  castFx(feet, hand, color) {
+    this.magicCircle(feet, color);
+    for (let i = 0; i < 10; i++) this.part(hand, new THREE.Vector3((Math.random() - 0.5) * 4, Math.random() * 3, (Math.random() - 0.5) * 4), color, 0.4, 0.35, 0, { drag: 4 });
+    this.part(hand, new THREE.Vector3(), '#ffffff', 0.18, 1.1, 0.2);
+  }
+  // 투사체 꼬리 (한 프레임 몫)
+  trail(el, p, v, dt) {
+    const n = Math.max(1, Math.round(dt * 50));
+    const rnd = (k) => new THREE.Vector3((Math.random() - 0.5) * k, (Math.random() - 0.5) * k, (Math.random() - 0.5) * k);
+    for (let i = 0; i < n; i++) {
+      const q = p.clone().addScaledVector(v, -dt * (i / n));
+      if (el === 'fire') { this.part(q, rnd(1.5).addScaledVector(v, -0.05), Math.random() < 0.5 ? '#ffb74d' : '#ff5722', 0.35, 0.55, 0.05); if (Math.random() < 0.15) this.ember(q.clone(), rnd(3).setY(1 + Math.random() * 2)); }
+      else if (el === 'ice') this.part(q, rnd(1.2), Math.random() < 0.5 ? '#e1f5fe' : '#4fc3f7', 0.55, 0.28, 0, { grav: 2 });
+      else if (el === 'poison') this.part(q, rnd(0.6).setY(0.6), '#9ccc65', 0.7, 0.18, 0.45);
+      else if (el === 'dark') { this.part(q, rnd(0.8), '#7e57c2', 0.6, 0.7, 0); if (Math.random() < 0.4) this.part(q, rnd(0.4), '#140024', 0.8, 0.5, 1.0, { normal: true, op: 0.6 }); }
+    }
+  }
+  // 맞은 곳에서 터지는 모습
+  elementBurst(p, el) {
+    const rnd = (k) => new THREE.Vector3((Math.random() - 0.5) * k, (Math.random() - 0.5) * k, (Math.random() - 0.5) * k);
+    const ground = p.clone(); ground.y = Math.max(0.05, p.y - 0.8);
+    if (el === 'fire') {
+      for (let i = 0; i < 26; i++) this.part(p, rnd(14), Math.random() < 0.5 ? '#ffcc80' : '#ff5722', 0.55, 0.7, 0.1, { drag: 3, grav: -2 });
+      for (let i = 0; i < 10; i++) this.ember(p.clone(), rnd(8).setY(3 + Math.random() * 4));
+      this.ring(ground, '#ff7043', 3.8, 0.45); this.part(p, new THREE.Vector3(), '#fff3e0', 0.2, 3, 0.5);
+    } else if (el === 'ice') {
+      for (let i = 0; i < 22; i++) this.part(p, rnd(12).setY(2 + Math.random() * 5), Math.random() < 0.5 ? '#ffffff' : '#81d4fa', 0.8, 0.3, 0.05, { grav: 12, drag: 1 });
+      this.ring(ground, '#b3e5fc', 2.8, 0.7); this.ring(ground, '#4fc3f7', 1.6, 0.5);
+      this.part(p, new THREE.Vector3(), '#e1f5fe', 0.25, 2.2, 0.4);
+    } else if (el === 'poison') {
+      this.cloud(p, '#9ccc65');
+      for (let i = 0; i < 18; i++) this.part(p.clone().add(rnd(2.5)), new THREE.Vector3(0, 0.6 + Math.random(), 0), '#c5e1a5', 1.4, 0.15, 0.5, { op: 0.8 });
+      this.ring(ground, '#7cb342', 2.6, 0.8);
+    } else if (el === 'dark') {
+      this.ring(p, '#b388ff', 4, 0.45, { implode: true, face: p.clone().add(new THREE.Vector3(0, 1, 0)) });
+      for (let i = 0; i < 24; i++) { const d = rnd(1).normalize(); this.part(p.clone().addScaledVector(d, 3), d.multiplyScalar(-7), '#7e57c2', 0.4, 0.6, 0.1); }
+      setTimeout(() => { for (let i = 0; i < 18; i++) this.part(p, rnd(9), '#d1c4e9', 0.5, 0.5, 0, { drag: 2 }); this.part(p, new THREE.Vector3(), '#1a0033', 0.6, 2.5, 0.5, { normal: true, op: 0.7 }); }, 380);
+    }
+  }
+  // 회오리 돌풍: 앞으로 밀려가며 도는 바람
+  gust(p, dir) {
+    const d = dir.clone().setY(0).normalize();
+    for (let i = 0; i < 36; i++) {
+      const h = Math.random() * 2.2, a = Math.random() * Math.PI * 2, r = 0.4 + h * 0.45;
+      const q = p.clone().add(new THREE.Vector3(Math.cos(a) * r, h + 0.2, Math.sin(a) * r));
+      this.part(q, d.clone().multiplyScalar(10), Math.random() < 0.5 ? '#ffffff' : '#c8e6c9', 0.6, 0.35, 0.1, { swirl: { c: p.clone(), d: d.clone(), w: 9 + Math.random() * 4, sp: 10 }, op: 0.8 });
+    }
+    for (let i = 0; i < 2; i++) setTimeout(() => this.ring(p.clone().addScaledVector(d, 1 + i * 2).setY(p.y + 1), '#e8f5e9', 2.2, 0.4, { face: p.clone().addScaledVector(d, 10).setY(p.y + 1), op: 0.6 }), i * 90);
+  }
+  // 치유의 빛: 하늘로 솟는 빛기둥 + 금가루
+  holyFx(p) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.6, 9, 24, 1, true), new THREE.MeshBasicMaterial({ color: '#fff59d', transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+    m.position.copy(p); m.position.y += 4.5;
+    this.scene.add(m);
+    this.items.push({ m, t: 1.1, life: 1.1, kind: 'pillar', ownGeo: true });
+    for (let i = 0; i < 40; i++) { const a = Math.random() * Math.PI * 2, r = Math.random() * 1.6; this.part(p.clone().add(new THREE.Vector3(Math.cos(a) * r, Math.random() * 0.5, Math.sin(a) * r)), new THREE.Vector3(0, 2 + Math.random() * 4, 0), Math.random() < 0.5 ? '#fff59d' : '#ffffff', 1.2, 0.3, 0.05); }
+    this.ring(p.clone().setY(p.y + 0.05), '#ffe082', 3.2, 0.8);
+    this.magicCircle(p, '#ffe082', 3, 1.2);
   }
   // 떠오르는 하트·반짝이
   hearts(a, b, emoji = '💗') {
@@ -285,6 +379,30 @@ export class FX {
         it.m.scale.setScalar(it.s0 * (1 + u * 3));
         it.m.material.opacity = 0.85 * (1 - u) * (1 - u * 0.3);
       } else if (it.kind === 'smoke') { it.m.position.y += dt * 1.5; it.m.scale.multiplyScalar(1 + dt * 0.6); it.m.material.opacity = 0.7 * k; }
+      else if (it.kind === 'flicker') it.m.material.opacity = k * (0.45 + Math.random() * 0.55); // 지직지직
+      else if (it.kind === 'part') {
+        if (it.swirl) {
+          // 회오리: 축(중심)이 앞으로 가고, 알갱이는 그 둘레를 돈다
+          const S = it.swirl; S.c.addScaledVector(S.d, S.sp * dt);
+          const P = it.m.position, dx = P.x - S.c.x, dz = P.z - S.c.z, a = S.w * dt, ca = Math.cos(a), sa = Math.sin(a);
+          P.x = S.c.x + dx * ca - dz * sa; P.z = S.c.z + dx * sa + dz * ca; P.y += dt * 0.8;
+        } else {
+          it.v.y -= it.grav * dt;
+          if (it.drag) it.v.multiplyScalar(Math.max(0, 1 - it.drag * dt));
+          it.m.position.addScaledVector(it.v, dt);
+        }
+        it.m.scale.setScalar(Math.max(0.001, it.s0 + (it.s1 - it.s0) * (1 - k)));
+        it.m.material.opacity = it.op * Math.min(1, k * 2.2);
+      } else if (it.kind === 'ring') {
+        const u = 1 - k;
+        it.m.scale.setScalar(it.implode ? Math.max(0.05, it.r * (1 - u)) : it.r0 + (it.r - it.r0) * (1 - (1 - u) * (1 - u)));
+        it.m.material.opacity = it.op * (it.implode ? Math.min(1, u * 4) : k);
+      } else if (it.kind === 'circle') {
+        const u = 1 - k;
+        it.m.rotation.z += dt * 2.4;
+        it.m.scale.setScalar(it.r * (0.55 + Math.min(1, u * 5) * 0.45));
+        it.m.material.opacity = Math.min(1, u * 6) * Math.min(1, k * 3) * 0.95;
+      } else if (it.kind === 'pillar') { it.m.scale.x = it.m.scale.z = 0.3 + (1 - k) * 0.9; it.m.material.opacity = 0.55 * Math.min(1, k * 2); }
       else it.m.material.opacity = k;
       if (it.t <= 0) { this.scene.remove(it.m); it.m.material.dispose(); if (it.kind === 'sweep' || it.ownGeo) it.m.geometry.dispose(); this.items.splice(i, 1); }
     }
@@ -319,6 +437,24 @@ function radialTex(stops) {
   x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
+function glowTex() { return (_glowTex ||= radialTex([[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,255,255,0.75)'], [0.65, 'rgba(255,255,255,0.18)'], [1, 'rgba(255,255,255,0)']])); }
+let _glowTex = null;
+// 마법진: 겹 원 + 육망성 + 룬 점 (속성 색으로)
+const circleTexs = new Map();
+function circleTex(color) {
+  if (circleTexs.has(color)) return circleTexs.get(color);
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const x = c.getContext('2d'), R = 128;
+  x.strokeStyle = color; x.fillStyle = color; x.shadowColor = color; x.shadowBlur = 12;
+  for (const [r, w] of [[120, 5], [104, 2.5], [62, 3]]) { x.lineWidth = w; x.beginPath(); x.arc(R, R, r, 0, Math.PI * 2); x.stroke(); }
+  x.lineWidth = 3;
+  for (const off of [0, Math.PI / 3]) { x.beginPath(); for (let i = 0; i <= 3; i++) { const a = off + (i / 3) * Math.PI * 2 - Math.PI / 2; const px = R + Math.cos(a) * 104, py = R + Math.sin(a) * 104; if (i) x.lineTo(px, py); else x.moveTo(px, py); } x.stroke(); }
+  for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; x.beginPath(); x.arc(R + Math.cos(a) * 112, R + Math.sin(a) * 112, i % 2 ? 2.5 : 4.5, 0, Math.PI * 2); x.fill(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  circleTexs.set(color, t);
+  return t;
+}
+const circleGeo = new THREE.PlaneGeometry(1, 1);
 function fireTex() { return (_fireTex ||= radialTex([[0, 'rgba(255,255,240,1)'], [0.25, 'rgba(255,230,140,0.95)'], [0.55, 'rgba(255,140,40,0.55)'], [1, 'rgba(255,60,0,0)']])); }
 function smokeTex() { return (_smokeTex ||= radialTex([[0, 'rgba(90,90,90,0.9)'], [0.6, 'rgba(70,70,70,0.4)'], [1, 'rgba(60,60,60,0)']])); }
 const holeGeo = new THREE.PlaneGeometry(1, 1);
@@ -674,16 +810,17 @@ export class Combat {
     const color = ELEMENT_COLOR[s.element];
     const hand = this.handPos();
     const el = s.element;
+    this.fx.castFx(p.pos, hand, color);
     if (el === 'holy') {
-      this.fx.sparkle(p.pos.clone().setY(p.pos.y + 0.5), color, 24, 3);
-      g.net.send({ t: 'fx', k: 'sparkle', p: [p.pos.x, p.pos.y + 0.5, p.pos.z], c: color });
+      this.fx.holyFx(p.pos.clone());
+      g.net.send({ t: 'fx', k: 'holyfx', p: [p.pos.x, p.pos.y, p.pos.z] });
       g.net.send({ t: 'holy', w: w.id });
       return;
     }
     if (el === 'wind') {
       const fwd = new THREE.Vector3(Math.sin(p.heading), 0, Math.cos(p.heading));
-      this.fx.cloud(p.pos.clone().addScaledVector(fwd, 2.5), '#e8f5e9');
-      g.net.send({ t: 'fx', k: 'cloud', p: [p.pos.x + fwd.x * 2.5, p.pos.y, p.pos.z + fwd.z * 2.5], c: '#e8f5e9' });
+      this.fx.gust(p.pos.clone().addScaledVector(fwd, 1.2), fwd);
+      g.net.send({ t: 'fx', k: 'gust', p: [p.pos.x + fwd.x * 1.2, p.pos.y, p.pos.z + fwd.z * 1.2], d: [fwd.x, 0, fwd.z] });
       let n = 0;
       for (const t of this.targets()) {
         if (t.tt === 'car') continue;
@@ -881,10 +1018,16 @@ export class Combat {
     const color = type.startsWith('m_') ? ELEMENT_COLOR[type.slice(2)] : type === 'grenade' ? '#558b2f' : type === 'ion' ? '#18ffff' : type === 'shell' ? '#ffab00' : '#ff7043';
     let m;
     if (type.startsWith('m_')) {
+      // 마법 구슬: 빛나는 심 + 속성색 후광 + 속성별 모양 (불꽃 · 얼음 결정 · 독방울 · 암흑 고리)
+      const el = type.slice(2);
       m = new THREE.Group();
-      const core = new THREE.Mesh(G.sphereLow(), new THREE.MeshBasicMaterial({ color: '#ffffff' })); core.scale.setScalar(0.14); m.add(core);
-      const glow = new THREE.Mesh(G.sphereLow(), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false }));
-      glow.scale.setScalar(type === 'm_dark' ? 0.55 : 0.32); m.add(glow);
+      const add = (mat, sc) => { const sp = new THREE.Sprite(mat); sp.scale.setScalar(sc); m.add(sp); return sp; };
+      add(new THREE.SpriteMaterial({ map: glowTex(), color: '#ffffff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), el === 'dark' ? 0.4 : 0.6);
+      add(new THREE.SpriteMaterial({ map: glowTex(), color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), el === 'dark' ? 2.2 : 1.5);
+      if (el === 'fire') m.userData.flame = add(new THREE.SpriteMaterial({ map: fireTex(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), 1.2);
+      else if (el === 'ice') { const cr = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), new THREE.MeshBasicMaterial({ color: '#e1f5fe', transparent: true, opacity: 0.9 })); cr.scale.set(0.16, 0.5, 0.16); m.add(cr); m.userData.crystal = cr; }
+      else if (el === 'poison') m.userData.bubbles = [0, 1, 2].map(() => { const b = new THREE.Mesh(G.sphereLow(), new THREE.MeshBasicMaterial({ color: '#c5e1a5', transparent: true, opacity: 0.85 })); b.scale.setScalar(0.12); m.add(b); return b; });
+      else if (el === 'dark') { const core = new THREE.Mesh(G.sphereLow(), new THREE.MeshBasicMaterial({ color: '#0d0018' })); core.scale.setScalar(0.3); m.add(core); const rg = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.05, 6, 24), new THREE.MeshBasicMaterial({ color: '#b388ff', transparent: true, blending: THREE.AdditiveBlending })); m.add(rg); m.userData.halo = rg; }
       m.position.copy(start);
       this.g.scene.add(m);
       const pr = { type, pos: start.clone(), v: v.clone(), m, w, mine, t: 0, loc: this.g.loc(), traveled: 0, homing, color };
@@ -928,7 +1071,12 @@ export class Combat {
         const prev = pr.pos.clone();
         pr.pos.add(step); pr.traveled += step.length();
         pr.m.position.copy(pr.pos);
-        if (Math.random() < 0.6) { this.fx.sparkle(pr.pos, pr.color, 1, 0.3); }
+        const U = pr.m.userData;
+        this.fx.trail(pr.type.slice(2), pr.pos, pr.v, dt);
+        if (U.flame) U.flame.scale.setScalar(1.1 + Math.random() * 0.4);
+        if (U.crystal) { U.crystal.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), pr.v.clone().normalize()); U.crystal.rotateY(pr.t * 12); }
+        if (U.bubbles) U.bubbles.forEach((b, j) => { const a = pr.t * 9 + j * 2.1; b.position.set(Math.cos(a) * 0.32, Math.sin(a * 1.3) * 0.2, Math.sin(a) * 0.32); });
+        if (U.halo) { U.halo.rotation.x += dt * 7; U.halo.rotation.y += dt * 5; }
         let hit = null, stop = pr.pos.y <= ground + 0.1 || pr.traveled > (pr.w.id ? (itemDef(pr.w.id).range || 60) + 10 : 70);
         if (!stop && g.mode === 'city') for (const b of g.city.colliders) {
           if (!b.small && pr.pos.x > b.minX && pr.pos.x < b.maxX && pr.pos.z > b.minZ && pr.pos.z < b.maxZ && pr.pos.y < (b.h ?? 10)) { stop = true; break; }
@@ -941,14 +1089,13 @@ export class Combat {
           g.scene.remove(pr.m);
           this.projs.splice(i, 1);
           const el = pr.type.slice(2);
+          this.fx.elementBurst(pr.pos.clone(), el);
           if (el === 'fire' || el === 'dark') {
             if (pr.mine) {
               if (hit?.tt === 'rtarget') this.sendHit(hit, pr.w, { point: pr.pos.clone() });
               g.net.send({ t: 'explode', x: pr.pos.x, y: pr.pos.y, z: pr.pos.z, loc: pr.loc, w: pr.w.id, gems: pr.w.gems });
             } else this.fx.boom(pr.pos, el === 'dark' ? 2.5 : 3.5, true);
           } else {
-            if (el === 'poison') this.fx.cloud(pr.pos, '#9ccc65');
-            else this.fx.sparkle(pr.pos, pr.color, 14, 1.2);
             if (pr.mine && hit) this.sendHit(hit, pr.w, { point: pr.pos.clone() });
           }
         }
@@ -1021,6 +1168,15 @@ export class Combat {
   }
 
   // 화상 입은 대상에 불꽃 (나·다른 플레이어·시민)
+  // 다른 플레이어가 마법을 쓰면 그 발밑에도 마법진 (연쇄 번개처럼 한 번에 여러 개 와도 한 번만)
+  remoteCast(pid, color) {
+    const pl = this.g.players.list.get(pid);
+    if (!pl?.visible || performance.now() - (pl.castFxT || 0) < 400) return;
+    pl.castFxT = performance.now();
+    pl.roach.cast?.();
+    this.fx.castFx(pl.pos.clone(), pl.pos.clone().setY(pl.pos.y + 1.3), color);
+  }
+
   // 다른 사람·경찰·동물이 낸 연출에 맞는 소리
   remoteSound(m, v3) {
     const at = (a) => (Array.isArray(a) ? v3(a) : null);
@@ -1042,7 +1198,8 @@ export class Combat {
     else if (m.k === 'swing') sfx('swing', pp(), m.w);
     else if (m.k === 'bolt') sfx('magic', at(m.a), 'wand_thunder');
     else if (m.k === 'sparkle') sfx('magic', at(m.p), 'wand_holy');
-    else if (m.k === 'cloud') sfx('magic', at(m.p), 'wand_wind');
+    else if (m.k === 'cloud' || m.k === 'gust') sfx('magic', at(m.p), 'wand_wind');
+    else if (m.k === 'holyfx') sfx('magic', at(m.p), 'wand_holy');
     else if (m.k === 'breath') sfx('breath', at(m.p));
     else if (m.k === 'boom') sfx('boom', at(m.p), !m.small && (m.r || 5) >= 4);
     else if (m.k === 'dball') { sfx('rocket', at(m.p)); sfx('beast', at(m.p), { kind: 'dragon', type: 'attack' }); }
@@ -1071,8 +1228,8 @@ export class Combat {
       if (Array.isArray(m.n) && typeof m.w === 'string') this.fx.hole(v3(m.b), m.n.map(Number), m.w, m.c);
     }
     else if (m.k === 'boom') { this.fx.boom(v3(m.p), m.r || 5, m.small); if (!m.small && g.player) g.shake(Math.max(0, 1 - g.player.pos.distanceTo(v3(m.p)) / 40)); }
-    else if (m.k === 'proj') { const pr = this.spawnProj(m.type, v3(m.p), v3(m.v), { id: m.w }, false); if (pr && +m.g) pr.grav = +m.g; }
-    else if (m.k === 'bolt') this.fx.bolt(v3(m.a), v3(m.b), m.c);
+    else if (m.k === 'proj') { const pr = this.spawnProj(m.type, v3(m.p), v3(m.v), { id: m.w }, false); if (pr && +m.g) pr.grav = +m.g; if (String(m.type).startsWith('m_')) this.remoteCast(m.pid, ELEMENT_COLOR[m.type.slice(2)]); }
+    else if (m.k === 'bolt') { this.fx.bolt(v3(m.a), v3(m.b), m.c); this.remoteCast(m.pid, m.c || '#ffee58'); }
     else if (m.k === 'breath' && Array.isArray(m.p) && Array.isArray(m.d)) this.fx.breath(v3(m.p), v3(m.d), Math.min(20, +m.r || 14), Math.min(1, +m.dur || 0.45));
     else if (m.k === 'burn') this.burnFx(m);
     else if (m.k === 'dball' && Array.isArray(m.p) && Array.isArray(m.b)) {
@@ -1090,6 +1247,8 @@ export class Combat {
     else if (m.k === 'emote') { const pl = g.players.list.get(m.pid); pl?.roach.playEmote(g.isEmote?.(m.id) ? m.id : null); }
     else if (m.k === 'sparkle') this.fx.sparkle(v3(m.p), m.c || '#fff59d', 20, 3);
     else if (m.k === 'cloud') this.fx.cloud(v3(m.p), m.c || '#e8f5e9');
+    else if (m.k === 'gust' && Array.isArray(m.p) && Array.isArray(m.d)) { this.fx.gust(v3(m.p), v3(m.d)); this.remoteCast(m.pid, '#a5d6a7'); }
+    else if (m.k === 'holyfx' && Array.isArray(m.p)) { this.fx.holyFx(v3(m.p)); this.remoteCast(m.pid, '#fff59d'); }
     else if (m.k === 'hearts') { const a = v3(m.a), b = m.b ? v3(m.b) : null; this.fx.hearts(a, b, m.e || '💗'); const p = g.players.list.get(m.pid); p?.roach.flirt(); }
     else if (m.k === 'eat') { const p = g.players.list.get(m.pid); if (p) p.roach.eat(m.m, m.prop, Math.min(6, +m.d || 3), typeof m.e === 'string' ? m.e.slice(0, 4) : null, !!m.tb); }
     else if (m.k === 'swing') { const p = g.players.list.get(m.pid); if (p && p.visible) { p.roach.attack('melee'); this.fx.slash(p.pos, p.heading, typeof m.w === 'string' && itemDef(m.w) ? m.w : 'fist'); } }

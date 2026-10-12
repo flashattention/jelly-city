@@ -575,7 +575,7 @@ export class Combat {
     const d = itemDef(id);
     const item = { id, n: d.stack ? 3 : 1, gems: [], rarity: tier };
     // 총은 그 총의 탄약, 활은 화살을 함께
-    const bonus = d.ammo ? { id: d.ammo, n: Math.max(2, Math.round((itemDef(d.ammo).pack || 10) * 0.5)) } : null;
+    const bonus = d.ammo ? { id: d.ammo, n: Math.max(2, Math.round((itemDef(d.ammo).pack || 10) * 0.5)) } : d.cat === 'wand' ? { id: 'mana_potion', n: 2 } : null; // 마법봉은 마나 물약을 함께
     const sp = randomStreetPoint(this.rng).point;
     return this.dropItem(item, sp.x, 0.12, sp.z, -1, 600, { world: true, bonus });
   }
