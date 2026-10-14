@@ -1,13 +1,15 @@
-// 거대 젤리의 습격 (서버): 가끔 1~TITAN_MAX 마리가 도시 밖에서 걸어 들어와 플레이어를 쫓아 짓밟는다.
+// 거대 젤리의 습격 (서버): 누가 접속해 있으면 늘 최소 TITAN_MIN 마리(작은·중간·큰 것)가 있고,
+// TITAN_EVERY 초마다 한 마리씩 늘어 TITAN_MAX 마리까지. 도시 밖에서 걸어 들어와 플레이어를 쫓아 짓밟는다.
 // 젤리병단 장비로 뒷목을 베어야만 쓰러진다 (총·마법·폭발 등은 효과 없음)
 import { terrainH } from '../public/js/terrain.js';
 import { HALF } from '../public/js/config.js';
 import { RNG } from '../public/js/utils.js';
 import { TITAN, napePos, napeReach, titanHeight } from '../public/js/titans.js';
 
-const MAX = Number(process.env.TITAN_MAX) || 3;        // 한 번에 최대 몇 마리
-const EVERY = Number(process.env.TITAN_EVERY) || 420;  // 습격이 끝나고 다음 습격까지 (초)
-const FIRST = Number(process.env.TITAN_FIRST) || 180;  // 서버가 켜지고 첫 습격까지 (초, 누군가 접속해 있을 때만 흐른다)
+const MIN = Number(process.env.TITAN_MIN) || 3;        // 누가 접속해 있으면 늘 이만큼은 있다
+const MAX = Number(process.env.TITAN_MAX) || 10;       // 최대 마릿수
+const EVERY = Number(process.env.TITAN_EVERY) || 30;   // 몇 초마다 한 마리씩 늘어나나
+const REFILL = 10;                                      // 쓰러뜨려 MIN 아래로 줄면 다시 채우기까지 (초)
 const STILL = process.env.TITAN_STILL === '1';          // 시험용: 거대 젤리가 제자리에 서 있는다
 
 export class Titans {
@@ -16,30 +18,39 @@ export class Titans {
     this.rng = new RNG(4242);
     this.list = [];
     this.nextId = 1;
-    this.raidT = FIRST;
+    this.addT = EVERY; this.refillT = 0;
   }
   ground(x, z) { return Math.abs(x) < HALF && Math.abs(z) < HALF ? 0 : Math.max(0, terrainH(x, z)); }
 
   tick(dt) {
     const outside = [...this.w.players.values()].filter((p) => !p.dead && p.loc === -1 && !p.jailed);
-    if (!this.list.some((t) => !t.dead)) {
-      if (outside.length) this.raidT -= dt;
-      if (this.raidT <= 0) this.raid();
+    if (this.w.players.size) {
+      const alive = this.list.filter((t) => !t.dead).length;
+      if (alive === 0) this.raid(); // 누가 접속하자마자: 작은·중간·큰 거대 젤리가 한꺼번에
+      else if (alive < MIN) { this.refillT -= dt; if (this.refillT <= 0) { this.refillT = REFILL; this.spawn(); this.w.broadcast({ t: 'titanNew', n: alive + 1 }); } }
+      else this.refillT = REFILL;
+      // 그 뒤로 일정 시간마다 한 마리씩 (최대까지)
+      this.addT -= dt;
+      if (this.addT <= 0) { this.addT = EVERY; if (alive > 0 && alive < MAX) { this.spawn(); this.w.broadcast({ t: 'titanNew', n: alive + 1 }); } }
     }
     for (const t of [...this.list]) this.update(t, dt, outside);
   }
 
-  raid(n = this.rng.int(1, MAX)) {
-    for (let i = 0; i < n; i++) this.spawn();
-    this.raidT = EVERY;
-    this.w.broadcast({ t: 'sys', text: `🚨 거대 젤리 ${n}마리가 도시를 습격합니다! 젤리병단 장비로 뒷목을 노리세요!` });
+  raid(n = MIN) {
+    // 크기를 고르게: 작은 것부터 큰 것까지 나눠서
+    for (let i = 0; i < n; i++) {
+      const lo = TITAN.minS + ((TITAN.maxS - TITAN.minS) * i) / n, hi = TITAN.minS + ((TITAN.maxS - TITAN.minS) * (i + 1)) / n;
+      this.spawn(this.rng.range(lo, hi));
+    }
+    this.addT = EVERY; this.refillT = REFILL;
+    this.w.broadcast({ t: 'sys', text: `🚨 거대 젤리 ${n}마리가 도시를 습격합니다! ${EVERY}초마다 한 마리씩 늘어나요 (최대 ${MAX}마리) · 젤리병단 장비로 뒷목을 노리세요!` });
     this.w.broadcast({ t: 'titanRaid', n });
   }
-  spawn() {
+  spawn(size = this.rng.range(TITAN.minS, TITAN.maxS)) {
     // 도시 바깥 둘레에서 걸어 들어온다
     const a = this.rng.range(0, Math.PI * 2), R = HALF + this.rng.range(40, 90);
     const x = Math.cos(a) * R, z = Math.sin(a) * R;
-    const t = { id: this.nextId++, x, z, y: this.ground(x, z), h: Math.atan2(-x, -z), s: this.rng.range(TITAN.minS, TITAN.maxS), c: this.rng.int(0, TITAN.colors.length - 1), state: 0, atkT: 3, t: 0, life: 0, dead: false, deadT: 0, gx: 0, gz: 0, noEffT: 0 };
+    const t = { id: this.nextId++, x, z, y: this.ground(x, z), h: Math.atan2(-x, -z), s: size, c: this.rng.int(0, TITAN.colors.length - 1), state: 0, atkT: 3, t: 0, life: 0, dead: false, deadT: 0, gx: 0, gz: 0, noEffT: 0 };
     this.pickGoal(t);
     this.list.push(t);
     return t;
@@ -106,7 +117,8 @@ export class Titans {
     this.w.broadcast({ t: 'sys', text: `⚔️ ${p.name}님이 거대 젤리의 뒷목을 베어 쓰러뜨렸어요!` });
     this.w.send(p, { t: 'xp', v: Math.round(150 + t.s * 15), reason: '🧸 거대 젤리 토벌' });
     this.w.combat.dropItem({ id: 'cash', n: Math.round(100 + t.s * 10) }, t.x, t.y + 0.3, t.z, -1, 120);
-    if (!this.list.some((x) => !x.dead)) this.w.broadcast({ t: 'sys', text: '🎉 거대 젤리를 모두 물리쳤어요! 도시가 다시 평화로워졌어요' });
+    const left = this.list.filter((x) => !x.dead).length;
+    if (left < MIN) this.w.broadcast({ t: 'sys', text: `🧸 남은 거대 젤리 ${left}마리 · 곧 다시 몰려와요!` });
   }
   // 스냅샷: [id, x, z, 방향, 크기, 상태(0 걷기 · 1 공격 · 2 쓰러짐), 색]
   snap() {

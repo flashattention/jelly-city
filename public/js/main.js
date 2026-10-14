@@ -553,6 +553,7 @@ function setupNet() {
   });
   net.on('runners', (m) => game.runners.spawn(m.list || []));
   net.on('rideNo', () => { if (game.player.mountSteed != null) { game.player.mountSteed = null; dismount(false); ui.toast('🐎 다른 사람이 먼저 탔어요'); } });
+  net.on('titanNew', (m) => { ui.toast(`🧸 거대 젤리가 한 마리 더 나타났어요! (지금 ${m.n}마리)`); sfx('stomp', null, 10); });
   net.on('titanRaid', (m) => {
     ui.lootBanner(`🚨 거대 젤리 ${m.n}마리 습격!`, '젤리병단 장비(🛒 젤리 택티컬)를 들고 우클릭 갈고리로 날아가 뒷목을 베세요!', '#c62828', '');
     sfx('raid');
