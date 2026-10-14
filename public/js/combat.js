@@ -609,6 +609,8 @@ export class Combat {
       const big = u.kind === 'tank' || u.kind === 'heli';
       out.push({ tt: 'unit', id: u.id, base: u.obj.position, r: big ? 2.4 : 0.55, h: big ? 3 : 2 });
     }
+    // 거대 젤리 (총알·마법은 서버가 '효과 없음', 젤리병단 칼은 뒷목 판정)
+    if (g.mode === 'city' && g.titans) for (const sh of g.titans.shapes()) out.push({ tt: 'titan', id: sh.id, base: sh.base, r: sh.r, h: sh.h });
     // 차에서 뛰어내려 도망가는 시민
     if (g.mode === 'city') for (const o of g.runners?.list.values() || []) if (!o.dead) out.push({ tt: 'runner', id: o.id, base: o.r.root.position, r: 0.55, h: o.r.height });
     if (g.mode === 'city') for (const a of g.animals?.list || []) {
@@ -1253,6 +1255,16 @@ export class Combat {
     else if (m.k === 'hearts') { const a = v3(m.a), b = m.b ? v3(m.b) : null; this.fx.hearts(a, b, m.e || '💗'); const p = g.players.list.get(m.pid); p?.roach.flirt(); }
     else if (m.k === 'eat') { const p = g.players.list.get(m.pid); if (p) p.roach.eat(m.m, m.prop, Math.min(6, +m.d || 3), typeof m.e === 'string' ? m.e.slice(0, 4) : null, !!m.tb); }
     else if (m.k === 'swing') { const p = g.players.list.get(m.pid); if (p && p.visible) { p.roach.attack('melee'); this.fx.slash(p.pos, p.heading, typeof m.w === 'string' && itemDef(m.w) ? m.w : 'fist'); } }
+    else if (m.k === 'odm') g.odm?.remote(m);
+    else if (m.k === 'noeffect' && Array.isArray(m.p)) g.ui.floatText(v3(m.p), `🛡️ ${m.text || '효과 없음'}`, '#ffab40');
+    else if (m.k === 'titandown' && Array.isArray(m.p)) {
+      // 뒷목을 베었다! 피가 아니라 젤리 증기가 피어오른다
+      const n = v3(m.p);
+      for (let i = 0; i < 40; i++) this.fx.part(n.clone(), new THREE.Vector3((Math.random() - 0.5) * 14, Math.random() * 10, (Math.random() - 0.5) * 14), Math.random() < 0.5 ? '#ff8fb1' : '#fff59d', 1.0, 1.2, 0.2, { grav: 6 });
+      for (let i = 0; i < 12; i++) setTimeout(() => this.fx.part(n.clone().add(new THREE.Vector3((Math.random() - 0.5) * 8, -n.y * Math.random(), (Math.random() - 0.5) * 8)), new THREE.Vector3(0, 3 + Math.random() * 3, 0), '#ffffff', 3, 2, 6, { normal: true, op: 0.5 }), i * 250);
+      sfx('slay', n);
+      if (g.player) g.shake(Math.max(0, 0.9 - g.player.pos.distanceTo(n) / 120));
+    }
     else if (m.k === 'dmgnum' && m.shield) g.ui.floatText(v3(m.p), '🛡️ 무적', '#80d8ff'); // 춤추는 중이라 안 다침
     else if (m.k === 'dmgnum') {
       g.ui.floatText(v3(m.p), `${m.crit ? '💥' : ''}-${m.v}`, m.crit ? '#ffd600' : '#ff5252');

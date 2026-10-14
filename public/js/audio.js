@@ -383,7 +383,7 @@ function splash(out, t, big) {
 
 // ---------------- 재생 ----------------
 // 한 번 울리는 소리. pos 가 없으면 바로 내 귀 앞에서
-const RANGE = { step: 25, land: 30, jump: 25, splash: 40, flap: 30, gun: 140, sniper: 260, boom: 260, beast: 90, dragon: 260, horn: 90, crash: 90, prop: 80, door: 30, swing: 40, magic: 60 };
+const RANGE = { stomp: 260, slay: 260, hook: 40, step: 25, land: 30, jump: 25, splash: 40, flap: 30, gun: 140, sniper: 260, boom: 260, beast: 90, dragon: 260, horn: 90, crash: 90, prop: 80, door: 30, swing: 40, magic: 60 };
 export function sfx(name, pos = null, arg = null, vol = 1) {
   if (!ready()) return;
   const range = name === 'gun' && ['sniper', 'barrett', 'hunting_rifle'].includes(arg) ? RANGE.sniper : name === 'beast' && (arg?.kind || '').includes('dragon') ? RANGE.dragon : RANGE[name] || 80;
@@ -416,6 +416,10 @@ export function sfx(name, pos = null, arg = null, vol = 1) {
   else if (name === 'splash') splash(out, t, !!arg);
   else if (name === 'stroke') { nz(out, t, 0.22, { f: 1100, f2: 700, q: 1.2, vol: 0.3, a: 0.04 }); osc(out, t + 0.1, 0.05, { f: 1200, curve: [[0.04, 2200]], vol: 0.06 }); }
   else if (name === 'scope') { nz(out, t, 0.02, { type: 'highpass', f: 3000, vol: 0.4 }); osc(out, t, 0.04, { f: 2400, vol: 0.06, a: 0.001 }); } // 딸깍
+  else if (name === 'hook') { nz(out, t, 0.04, { type: 'highpass', f: 3000, vol: 0.6 }); metal(out, t, 0.25, 1300, 0.35); whoosh(out, t + 0.02, 0.3, 900, 3000, 0.35); } // 철컥 + 슉
+  else if (name === 'stomp') { const k = Math.min(1.4, (arg || 12) / 12); osc(out, t, 0.6 * k, { f: 70, curve: [[0.5, 28]], vol: 1, a: 0.002 }); nz(out, t, 0.7 * k, { type: 'lowpass', f: 500, f2: 80, vol: 0.8 }); } // 쿵
+  else if (name === 'raid') { for (let i = 0; i < 4; i++) for (const f of [660, 880]) osc(out, t + i * 0.45 + (f === 880 ? 0.22 : 0), 0.2, { type: 'square', f, vol: 0.14, filter: { f: 2500 }, shape: 'lin' }); } // 땡땡 경보
+  else if (name === 'slay') { whoosh(out, t, 0.25, 800, 4000, 0.6); metal(out, t + 0.05, 0.5, 2200, 0.4); osc(out, t + 0.25, 1.2, { f: 60, curve: [[1, 25]], vol: 1, a: 0.01 }); nz(out, t + 0.25, 2.2, { type: 'lowpass', f: 1200, f2: 200, vol: 0.6, a: 0.2, curve: 'lin' }); } // 싹둑 → 쿠웅 → 치이익
   else if (name === 'saberOn') { osc(out, t, 0.6, { type: 'sawtooth', f: 40, curve: [[0.4, 110]], vol: 0.35, filter: { f: 1200, q: 4 } }); nz(out, t, 0.3, { type: 'highpass', f: 2500, vol: 0.2, curve: 'lin' }); }
 }
 
@@ -454,6 +458,11 @@ function makeLoop(name) {
     n.buffer = noiseBuf; n.loop = true; fl.type = 'bandpass'; fl.frequency.value = 650; fl.Q.value = 0.7; ng.gain.value = 0.5;
     l.frequency.value = 0.3; lg.gain.value = 250; l.connect(lg).connect(fl.frequency);
     n.connect(fl).connect(ng).connect(g); src.push(n, l);
+  } else if (name === 'gas') {
+    // 입체기동 가스 분사: 쉬이익
+    const n = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), ng = ctx.createGain();
+    n.buffer = noiseBuf; n.loop = true; fl.type = 'bandpass'; fl.frequency.value = 2600; fl.Q.value = 0.8; ng.gain.value = 0.45;
+    n.connect(fl).connect(ng).connect(g); src.push(n);
   } else if (name === 'saber') {
     for (const f of [92, 95.5]) { const o = ctx.createOscillator(), fl = ctx.createBiquadFilter(), og = ctx.createGain(); o.type = 'sawtooth'; o.frequency.value = f; fl.type = 'lowpass'; fl.frequency.value = 600; og.gain.value = 0.15; o.connect(fl).connect(og).connect(g); src.push(o); }
   }

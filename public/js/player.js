@@ -64,6 +64,7 @@ export class Player {
     if (this.roach.seated && !this.mount) { this.roach.setSeated(false); this.roach.riding = false; this.roach.root.scale.setScalar(this.roach.baseScale); }
     this.roach.root.visible = true;
     if (this.climb) { this.updateClimb(dt, input, world); return; }
+    if (this.odm) { this.updateOdm(dt, input, world); return; }
     const yaw = this.cam.yaw;
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
     const rx = Math.cos(yaw), rz = -Math.sin(yaw);
@@ -179,6 +180,83 @@ export class Player {
       this.roach.update(dt, this.dashT > 0 ? 14 : this.speed, { airborne: !this.onGround && (this.airJump > 0 || this.dashT > 0), noCrawl: this.flying });
     }
     root.visible = !this.fp && !(this.adsFP && this.aim > 0.75);
+  }
+
+  // ---------------- 젤리병단 장비 (입체기동) ----------------
+  // 갈고리를 건 동안: 걸린 곳으로 당겨지고(줄 길이만큼은 진자처럼 흔들림) · WASD로 방향 · Space 가스로 가속.
+  // 갈고리를 풀면 그 기세로 날아가다가 땅이나 옥상에 내려앉는다
+  odmStart(vel) {
+    this.odm ||= { vel: new THREE.Vector3(Math.sin(this.heading) * this.speed, Math.max(this.vy, 3), Math.cos(this.heading) * this.speed), hook: null };
+    if (vel) this.odm.vel.copy(vel);
+    this.climb = null; this.flying = false; this.onGround = false;
+  }
+  updateOdm(dt, input, world) {
+    const O = this.odm, V = O.vel;
+    const chest = this.pos.clone(); chest.y += 1.1;
+    let pulling = false;
+    if (O.hook) {
+      const a = O.hook.get ? O.hook.get() : O.hook.p;
+      if (!a) O.hook = null;
+      else {
+        const to = a.clone().sub(chest), d = to.length();
+        to.divideScalar(d || 1);
+        if (d > 2.2) { V.addScaledVector(to, 46 * dt); pulling = true; } // 감는다
+        else V.multiplyScalar(Math.max(0, 1 - 8 * dt)); // 다 왔으면 매달려 멈춘다
+        const radial = V.dot(to);
+        if (d >= O.hook.len && radial < 0) V.addScaledVector(to, -radial); // 줄보다 멀어지지 않게 (진자)
+        O.hook.len = Math.max(1.5, Math.min(O.hook.len, d));
+      }
+    }
+    // WASD: 화면 기준으로 몸을 틀어 방향 조절
+    if (input.enabled) {
+      const yaw = this.cam.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+      const f = (input.forward ? 1 : 0) - (input.back ? 1 : 0), sd = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+      V.x += (fx * f + rx * sd) * 14 * dt; V.z += (fz * f + rz * sd) * 14 * dt;
+      // Space: 가스 분사 (바라보는 쪽으로)
+      if (input.jump) {
+        const cp = Math.cos(this.cam.pitch);
+        V.x += fx * cp * 24 * dt; V.z += fz * cp * 24 * dt; V.y += (-Math.sin(this.cam.pitch) * 24 + 6) * dt;
+        O.gas = 0.12;
+      }
+    }
+    O.gas = Math.max(0, (O.gas || 0) - dt);
+    O.pulling = pulling;
+    V.y -= (O.hook ? 9 : 20) * dt;
+    V.multiplyScalar(Math.max(0, 1 - 0.3 * dt));
+    const sp = V.length(); if (sp > 48) V.multiplyScalar(48 / sp);
+    const prevY = this.pos.y;
+    this.pos.addScaledVector(V, dt);
+    if (world.ceiling) this.pos.y = Math.min(this.pos.y, world.ceiling - this.roach.height);
+    // 건물: 옥상 위에서 내려오면 올라서고, 옆에서 부딪히면 밀려난다
+    let landed = false;
+    const r = this.radius;
+    for (const c of world.colliders) {
+      if (c.small || c.broken) continue;
+      const top = c.top ?? c.h ?? 10;
+      if (this.pos.x < c.minX - r || this.pos.x > c.maxX + r || this.pos.z < c.minZ - r || this.pos.z > c.maxZ + r || this.pos.y >= top) continue;
+      if (prevY >= top - 0.4 && V.y <= 0) { this.pos.y = top; landed = !O.hook || !O.pulling; V.y = 0; continue; }
+      const pen = [[this.pos.x - (c.minX - r), -1, 'x'], [(c.maxX + r) - this.pos.x, 1, 'x'], [this.pos.z - (c.minZ - r), -1, 'z'], [(c.maxZ + r) - this.pos.z, 1, 'z']].sort((a, b) => a[0] - b[0])[0];
+      if (pen[2] === 'x') { this.pos.x += pen[1] * pen[0]; V.x *= -0.15; } else { this.pos.z += pen[1] * pen[0]; V.z *= -0.15; }
+    }
+    const gy = this.groundAt(world, this.pos.x, this.pos.z, this.pos.y);
+    if (this.pos.y <= gy) { this.pos.y = gy; if (!O.hook || V.y < 0) landed = true; V.y = Math.max(0, V.y); }
+    const hsp = Math.hypot(V.x, V.z);
+    if (hsp > 0.5) this.heading = Math.atan2(V.x, V.z);
+    this.speed = hsp;
+    if (landed && !O.hook) {
+      // 내려앉기: 남은 기세로 조금 미끄러진다
+      this.odm = null; this.onGround = true; this.vy = 0; this.jumps = 0; this.roach.jumpSquash = 1;
+      this.onSfx?.('land', Math.max(6, -V.y + hsp * 0.4));
+    }
+    const root = this.roach.root;
+    root.position.copy(this.pos);
+    root.rotation.y = angleLerp(root.rotation.y, this.heading, Math.min(1, dt * 10));
+    this.roach.flying = false; this.roach.odmSpeed = sp;
+    this.roach.update(dt, 0, { airborne: true, noCrawl: true });
+    // 날아가는 자세: 몸을 앞으로 눕히고 두 팔(칼)을 뒤로
+    this.roach.inner.rotation.x = Math.min(1.1, sp / 30) * (O.hook ? 0.9 : 0.6);
+    for (const i of [0, 1]) { const a = this.roach.arms[i]; a.rotation.x = 0.9; a.rotation.z = a.userData.baseZ * 1.6; }
+    root.visible = !this.fp;
   }
 
   // 벽 타기: W 위로 · S 아래로 · A/D 옆으로 · Space 뛰어내리기

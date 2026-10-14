@@ -83,6 +83,22 @@ export function gummyColorFor(seed) {
 
 // 이모트별 표정
 const EMOTE_FACE = { creamcheese: 'love', redred: 'surprised', apt: 'happy', ganbare: 'angry', slickback: 'neutral', heart: 'love', shuffle: 'happy', wave: 'happy' };
+// 젤리병단 문장: 방패 + 하얗고 파란 젤리 석상 (한 번만 그린다)
+let _crest = null;
+function jellyCrestTex() {
+  if (_crest) return _crest;
+  const c = document.createElement('canvas'); c.width = 256; c.height = 288;
+  const x = c.getContext('2d');
+  const shield = () => { x.beginPath(); x.moveTo(20, 18); x.lineTo(236, 18); x.lineTo(236, 150); x.quadraticCurveTo(236, 250, 128, 278); x.quadraticCurveTo(20, 250, 20, 150); x.closePath(); };
+  shield(); x.fillStyle = '#f5ecd7'; x.fill(); x.lineWidth = 10; x.strokeStyle = '#5d4037'; x.stroke();
+  // 젤리 석상 (곰돌이 실루엣): 왼쪽 하양 · 오른쪽 파랑으로 반씩
+  const bear = (fill) => { x.fillStyle = fill; x.beginPath(); x.arc(128, 100, 48, 0, Math.PI * 2); x.arc(88, 62, 20, 0, Math.PI * 2); x.arc(168, 62, 20, 0, Math.PI * 2); x.fill(); x.beginPath(); x.ellipse(128, 190, 58, 66, 0, 0, Math.PI * 2); x.fill(); x.fillRect(96, 244, 64, 14); };
+  x.save(); x.beginPath(); x.rect(0, 0, 128, 288); x.clip(); bear('#ffffff'); x.restore();
+  x.save(); x.beginPath(); x.rect(128, 0, 128, 288); x.clip(); bear('#1e4fa3'); x.restore();
+  x.strokeStyle = '#263238'; x.lineWidth = 4; x.beginPath(); x.moveTo(128, 50); x.lineTo(128, 258); x.stroke();
+  _crest = new THREE.CanvasTexture(c); _crest.colorSpace = THREE.SRGBColorSpace;
+  return _crest;
+}
 export class Roach {
   // 저장된 설정에 '바퀴 모드'가 켜져 있으면 바퀴벌레, 아니면 곰돌이 젤리 (기본)
   static style = (() => { try { return JSON.parse(localStorage.getItem('roachcity.settings') || '{}').bugMode ? 'roach' : 'gummy'; } catch { return 'gummy'; } })();
@@ -899,6 +915,7 @@ export class Roach {
     g.clear();
     this.detailsDirty = true;
     this.heldPose = 'none';
+    this.setOdmGear(spec === 'odm');
     if (!spec) return;
     const [kind, col] = spec.split(':');
     const c = col || '#cfd8dc';
@@ -997,6 +1014,11 @@ export class Roach {
         this.heldPose = 'wand'; break;
       }
       case 'food': buildFood(g, spec.split(':')[1], spec.split(':')[2] || '#ffcc80'); this.heldPose = 'food'; break;
+      case 'odm': { // 젤리병단 장비: 양손에 길쭉한 칼날 (망토·가스통은 setOdmGear)
+        const odmBlade = (grp) => { mesh(G.box(), toon('#37474f'), grp, 0, 0.05, 0, 0.09, 0.26, 0.1); mesh(G.box(), toon('#eceff1'), grp, 0, -0.62, 0.02, 0.03, 1.05, 0.12); mesh(G.box(), toon('#b0bec5'), grp, 0, -0.62, 0.075, 0.02, 1.05, 0.02); };
+        odmBlade(g);
+        this.heldPose = 'melee'; break;
+      }
       case 'doll': {
         mesh(G.sphereLow(), toon(c), g, 0, -0.25, 0.15, 0.18, 0.2, 0.16);
         mesh(G.sphereLow(), toon(c), g, 0, -0.02, 0.15, 0.14, 0.13, 0.13);
@@ -1006,6 +1028,35 @@ export class Roach {
       }
     }
     g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+
+  // 젤리병단 장비를 들면: 등에 초록 망토(젤리 석상 문장) · 허리에 가스통 · 왼손에도 칼
+  setOdmGear(on) {
+    if (this.odmGear) { this.torso.remove(this.odmGear); this.odmGear = null; this.cape = null; }
+    if (this.odmBladeL) { this.odmBladeL.parent?.remove(this.odmBladeL); this.odmBladeL = null; }
+    if (!on) return;
+    const G2 = this.odmGear = new THREE.Group();
+    this.torso.add(G2);
+    const green = new THREE.MeshToonMaterial({ color: '#2f5d3e', side: THREE.DoubleSide }), metal = toon('#78909c'), strap = toon('#5d4037');
+    // 망토: 어깨에서 늘어뜨려 등을 감싼다 (어깨를 축으로 흔들린다)
+    const cape = this.cape = new THREE.Group(); cape.position.set(0, 1.62, -0.06); G2.add(cape);
+    const cloth = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.78, 1.25, 20, 1, true, Math.PI - 1.35, 2.7), green);
+    cloth.position.y = -0.62; cloth.castShadow = true; cape.add(cloth);
+    mesh(G.sphereLow(), green, cape, 0, 0.02, -0.33, 0.36, 0.17, 0.22); // 접힌 두건
+    // 문장: 방패 안에 하얗고 파란 젤리 석상 (조사병단 날개 문장 같은 색감)
+    const emb = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.7), new THREE.MeshBasicMaterial({ map: jellyCrestTex(), transparent: true, side: THREE.DoubleSide }));
+    emb.position.set(0, -0.55, -0.72); emb.rotation.y = Math.PI; emb.rotation.x = 0.17; cape.add(emb);
+    // 가스통과 칼집 (허리 양옆)
+    for (const sx of [-1, 1]) {
+      const can = mesh(G.cylLow(), metal, G2, sx * 0.58, 0.72, -0.12, 0.11, 0.62, 0.11); can.rotation.x = Math.PI / 2 - 0.25;
+      mesh(G.box(), toon('#455a64'), G2, sx * 0.6, 0.6, 0.18, 0.12, 0.18, 0.5);
+    }
+    mesh(G.box(), strap, G2, 0, 0.82, 0, 1.12, 0.07, 0.95); // 허리 벨트
+    mesh(G.box(), metal, G2, 0, 0.82, -0.5, 0.36, 0.22, 0.14); // 입체기동 본체
+    // 왼손 칼
+    const L = this.odmBladeL = new THREE.Group(); L.position.set(0, -0.42, 0); this.arms[0].add(L);
+    mesh(G.box(), toon('#37474f'), L, 0, 0.05, 0, 0.09, 0.26, 0.1); mesh(G.box(), toon('#eceff1'), L, 0, -0.62, 0.02, 0.03, 1.05, 0.12);
+    G2.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   }
 
   // 먹기 연출: motion = bite | slurp | spoon | drink | slice | drumstick, prop = 'shape:color'
@@ -1337,6 +1388,7 @@ export class Roach {
       for (let i = 0; i < 4; i++) { this.arms[i].rotation.z = this.arms[i].userData.baseZ * (1.5 + Math.sin(this.t * 8 + i) * 1.2); this.arms[i].rotation.x = -0.8 + Math.sin(this.t * 6 + i) * 0.5; }
       this.legs[0].rotation.x = d * 0.4; this.legs[1].rotation.x = -d * 0.4;
     }
+    if (this.cape) { const fl = Math.min(1, (this.odmSpeed ?? speed) / 20); this.cape.rotation.x = -(0.08 + fl * 1.05) + Math.sin(this.t * (4 + fl * 14)) * (0.03 + fl * 0.08); }
     // 이모트 (휠에서 고른 춤)
     if (this.emote) this.animateEmote(dt);
     else if (this.emoteWas) { this.emoteWas = false; this.inner.rotation.z = 0; this.inner.rotation.x = 0; this.head.rotation.z = 0; this.head.rotation.x = 0; }

@@ -8,6 +8,7 @@ import { setupWorld, housePrice, freeUnits, isHomeType, homeLabel, WORLD_VERSION
 import { sanitizeLook, BASIC_ACC } from '../public/js/look.js';
 import { levelStats } from '../public/js/level.js';
 import { Combat } from './combat.js';
+import { Titans } from './titans.js';
 import { Wildlife } from './wildlife.js';
 import { ANIMAL_KINDS } from '../public/js/fauna.js';
 import { itemDef } from '../public/js/items.js';
@@ -73,6 +74,7 @@ export class World {
     this.dirty = false;
     this.combat = new Combat(this);
     this.wild = new Wildlife(this);
+    this.titans = new Titans(this);
     setInterval(() => this.purgeGuests(), 10 * 60 * 1000).unref?.();
     this.smashed = new Map(); // 부서진 소품 → 복구 시각
     this.snapN = 0;
@@ -278,6 +280,7 @@ export class World {
 
   leave(p) {
     if (!this.players.has(p.id)) return;
+    this.wild.dropRider(p);
     clearTimeout(p.jailTimer);
     if (p.talking !== null) this.endTalk(p, p.talking);
     if (p.car >= 0) { const car = this.traffic.cars[p.car]; if (car) this.traffic.exit(car); }
@@ -389,7 +392,7 @@ export class World {
       case 'fx': {
         // 다른 플레이어에게 보여줄 연출 (총알 궤적, 투사체, 휘두르기)
         const k = String(msg.k || '');
-        if (['tracer', 'proj', 'swing', 'muzzle', 'eat', 'bolt', 'sparkle', 'cloud', 'breath', 'horn', 'emote', 'emotesync', 'gust', 'holyfx'].includes(k)) this.broadcast({ ...msg, t: 'fx', pid: p.id, loc: p.loc }, p.id);
+        if (['tracer', 'proj', 'swing', 'muzzle', 'eat', 'bolt', 'sparkle', 'cloud', 'breath', 'horn', 'emote', 'emotesync', 'gust', 'holyfx', 'odm'].includes(k)) this.broadcast({ ...msg, t: 'fx', pid: p.id, loc: p.loc }, p.id);
         // 춤추는 동안 무적: 땅 위에 서서 춤을 시작한 자리 (움직이거나 공격하면 풀린다)
         if (k === 'emote') p.emote = typeof msg.id === 'string' && msg.id.length < 20 && p.car < 0 && !p.dead && !(p.air & 2) ? { x: p.pos.x, y: p.pos.y, z: p.pos.z } : null;
         else if (['tracer', 'proj', 'swing', 'bolt', 'gust', 'breath'].includes(k)) p.emote = null;
@@ -442,6 +445,8 @@ export class World {
       case 'flirt': this.flirt(p, msg); break;
       case 'report112': this.combat.report112(p, String(msg.token || '')); break;
       case 'capture': this.wild.capture(p, msg.id | 0, !!msg.ok); break;
+      case 'rideSteed': if (!this.wild.rideSteed(p, msg.id | 0)) this.send(p, { t: 'rideNo' }); break;
+      case 'leaveSteed': this.wild.leaveSteed(p, msg.id | 0); break;
       case 'heal': if (!p.dead) this.combat.healPlayer(p, Math.max(0, Math.min(100, +msg.v || 0))); break;
       case 'buyHouse': {
         const b = this.buildings[msg.id];
@@ -977,6 +982,7 @@ export class World {
     for (const car of this.traffic.cars) if (car.honk) { car.honk = false; this.broadcast({ t: 'carSay', id: car.id, text: car.bubble?.text || '빵빵~ 🚗' }); }
     this.combat.tick(dt);
     this.wild.tick(dt);
+    this.titans.tick(dt);
     if (this.smashed.size) { const now = Date.now(); for (const [k, t] of this.smashed) if (now > t) { this.smashed.delete(k); this.broadcast({ t: 'unsmash', key: k }); } }
     // 대화 중인 플레이어가 멀어지거나 오래 말이 없으면 대화 종료
     for (const p of this.players.values()) {
@@ -1013,7 +1019,7 @@ export class World {
     const cars = [];
     for (const car of this.traffic.cars) cars.push(q(car.pos.x), q(car.pos.z), q(car.heading, 100), q(car.speed), CAR_MODES.indexOf(car.mode), car.owner ?? -1, q(car.pos.y || 0), car.occ || 0, q(car.turret || 0, 100));
     const players = [...this.players.values()].map((p) => [p.id, q(p.pos.x, 100), q(p.pos.y, 100), q(p.pos.z, 100), q(p.heading, 100), q(p.speed), p.loc, p.car, p.air, p.sleeping ? 1 : 0, Math.round(p.hp), p.dead ? 1 : 0, p.stars || 0, p.mount ?? -1]);
-    const snap = { t: 'snap', m: this.minutes, w: this.weather, n: npcs, meta, c: cars, p: players, u: this.combat.unitSnap(), ev: this.sim.drainEvents() };
+    const snap = { t: 'snap', m: this.minutes, w: this.weather, n: npcs, meta, c: cars, p: players, u: this.combat.unitSnap(), ti: this.titans.snap(), ev: this.sim.drainEvents() };
     if (this.snapN % 3 === 0) snap.a = this.wild.snap();
     if (++this.snapN % 10 === 0) {
       const nd = [];

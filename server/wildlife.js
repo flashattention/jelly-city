@@ -3,6 +3,7 @@ import { ANIMALS, ANIMAL_KINDS } from '../public/js/fauna.js';
 import { REGIONS, terrainH, WATER_Y, PARK } from '../public/js/terrain.js';
 import { HALF } from '../public/js/config.js';
 import { RNG } from '../public/js/utils.js';
+import { randomStreetPoint } from '../public/js/citizens.js';
 
 const q = (v, k = 10) => Math.round(v * k);
 
@@ -41,7 +42,18 @@ export class Wildlife {
     const [x0, z0, x1, z1] = rects[0];
     return [(x0 + x1) / 2, (z0 + z1) / 2];
   }
+  // 도시 말: 차도가 아니라 인도 쪽 길 위
+  streetSpot(near = null) {
+    for (let i = 0; i < 30; i++) {
+      const { point, type } = randomStreetPoint(this.rng);
+      const off = (this.rng.chance(0.5) ? 1 : -1) * 5.6;
+      if (type === 'X') point.x += off; else point.z += off;
+      if (!near || Math.hypot(point.x - near.x, point.z - near.z) < 70) return [point.x, point.z];
+    }
+    return near ? [near.x, near.z] : [0, 0];
+  }
   place(a) {
+    if (ANIMALS[a.kind].city) { [a.x, a.z] = this.streetSpot(); a.tx = a.x; a.tz = a.z; a.hp = ANIMALS[a.kind].hp; a.dead = false; a.angry = null; a.gone = false; a.rider = null; a.ay = 0; return; }
     [a.x, a.z] = this.randomPoint(a.kind);
     a.tx = a.x; a.tz = a.z; a.hp = ANIMALS[a.kind].hp; a.dead = false; a.angry = null; a.gone = false;
     a.ay = ANIMALS[a.kind].fly ? this.rng.range(14, 30) : 0;
@@ -60,6 +72,7 @@ export class Wildlife {
       const d = ANIMALS[a.kind];
       if (a.dead) { a.deadT -= dt; if (a.deadT <= 0) this.place(a); continue; }
       if (d.fly) { this.tickDragon(a, d, dt, outside, flyers); continue; }
+      if (d.city) { this.tickSteed(a, d, dt, outside); continue; }
       // 가장 가까운 플레이어 (아무도 근처에 없으면 쉬고 있는다 → 서버 부담 ↓)
       let tgt = null, td = 1e9;
       let near = 1e9;
@@ -239,12 +252,35 @@ export class Wildlife {
 
   // 플레이어 근처의 동물만 보낸다 [id, x, z, 방향, 움직임, 체력%, 상태, 공중 높이]
   // 상태: 1 쓰러짐, 2 공격 중, 4 불 뿜는 중, 8 포획돼 사라짐
+  // 도시 말: 누가 타고 있으면 숨겨 두고(gone), 아니면 길을 따라 천천히 걷는다
+  tickSteed(a, d, dt, outside) {
+    if (a.gone) { a.mv = 0; return; }
+    if (!outside.some((p) => Math.hypot(p.pos.x - a.x, p.pos.z - a.z) < 320)) { a.mv = 0; return; }
+    a.t -= dt;
+    if (a.t <= 0 || Math.hypot(a.tx - a.x, a.tz - a.z) < 1.5) { a.t = this.rng.range(6, 16); if (this.rng.chance(0.35)) { a.tx = a.x; a.tz = a.z; } else [a.tx, a.tz] = this.streetSpot(a); }
+    const dx = a.tx - a.x, dz = a.tz - a.z, L = Math.hypot(dx, dz);
+    if (L > 0.5) { a.h = Math.atan2(dx, dz); a.x += (dx / L) * d.speed * dt; a.z += (dz / L) * d.speed * dt; a.mv = 1; this.w.sim.pushOut(a, 0.9); } else a.mv = 0;
+  }
+  // 플레이어가 올라탐 / 내림 (main.js 의 E · F)
+  rideSteed(p, id) {
+    const a = this.list[id];
+    if (!a || !ANIMALS[a.kind].city || a.gone || p.loc !== -1 || Math.hypot(a.x - p.pos.x, a.z - p.pos.z) > 6) return false;
+    a.gone = true; a.rider = p.id;
+    return true;
+  }
+  leaveSteed(p, id) {
+    const a = this.list[id];
+    if (!a || a.rider !== p.id) return;
+    a.gone = false; a.rider = null; a.x = p.pos.x; a.z = p.pos.z; a.h = p.heading || 0; a.tx = a.x; a.tz = a.z; a.t = 3;
+  }
+  dropRider(p) { for (const a of this.list) if (a.rider === p.id) this.place(a); } // 탄 채로 나가면 말은 길로 돌아간다
   snap() {
-    const players = [...this.w.players.values()].filter((p) => p.loc < 0 && (Math.abs(p.pos.x) > HALF - 80 || Math.abs(p.pos.z) > HALF - 80));
-    if (!players.length) return [];
+    const outside = [...this.w.players.values()].filter((p) => p.loc < 0);
+    const players = outside.filter((p) => Math.abs(p.pos.x) > HALF - 80 || Math.abs(p.pos.z) > HALF - 80);
+    if (!outside.length) return [];
     const out = [];
     for (const a of this.list) {
-      if (!players.some((p) => Math.abs(p.pos.x - a.x) < 300 && Math.abs(p.pos.z - a.z) < 300)) continue;
+      if (!(ANIMALS[a.kind].city ? outside : players).some((p) => Math.abs(p.pos.x - a.x) < 300 && Math.abs(p.pos.z - a.z) < 300)) continue;
       out.push(a.id, q(a.x), q(a.z), q(a.h, 100), a.mv, Math.round((a.hp / ANIMALS[a.kind].hp) * 100), (a.dead ? 1 : 0) | (a.attacking > 0 ? 2 : 0) | (a.breath > 0 ? 4 : 0) | (a.gone ? 8 : 0), q(a.ay));
     }
     return out;

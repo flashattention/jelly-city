@@ -24,6 +24,7 @@ import { buildWilds, renderWorldImage } from './wilds.js';
 import { AnimalsView, makeMount, mouthPos } from './animals.js';
 import { Roach } from './roach.js';
 import { buildPark } from './park.js';
+import { TitansView, Odm } from './odm.js';
 import { unlockAudio, setListener, sfx, loop, duckMusic } from './audio.js';
 // 브라우저는 처음 누르거나 키를 칠 때부터 소리를 낼 수 있다
 for (const ev of ['pointerdown', 'keydown']) window.addEventListener(ev, unlockAudio, true);
@@ -363,6 +364,8 @@ function buildWorld(w) {
   game.players = new PlayersView(scene, w.you);
   for (const m of w.players) game.players.add(m);
   game.units = new UnitsView(scene);
+  game.titans = new TitansView(scene, city.groundY);
+  game.odm = new Odm(game, scene);
   game.ground = new GroundView(scene);
   for (const g of w.ground || []) game.ground.add(g);
   game.runners = new Runners(scene, city.groundY);
@@ -512,6 +515,7 @@ function setupNet() {
     }
     game.players.applySnap(s.p);
     game.units.apply(s.u || []);
+    game.titans?.apply(s.ti || []);
     if (s.a) game.animals.apply(s.a);
     for (const ev of s.ev) game.citizens.applyEvent(ev);
   });
@@ -548,6 +552,11 @@ function setupNet() {
     if (car && m.text) { car.bubble = { text: m.text, t: 2.5 }; if (m.text.includes('빵빵') && game.loc() === -1) sfx('horn', car.pos, car.kind === 'bus' || car.kind === 'truck' ? 'big' : null); }
   });
   net.on('runners', (m) => game.runners.spawn(m.list || []));
+  net.on('rideNo', () => { if (game.player.mountSteed != null) { game.player.mountSteed = null; dismount(false); ui.toast('🐎 다른 사람이 먼저 탔어요'); } });
+  net.on('titanRaid', (m) => {
+    ui.lootBanner(`🚨 거대 젤리 ${m.n}마리 습격!`, '젤리병단 장비(🛒 젤리 택티컬)를 들고 우클릭 갈고리로 날아가 뒷목을 베세요!', '#c62828', '');
+    sfx('raid');
+  });
   net.on('rpos', (m) => game.runners.applyPos(m.a || []));
   net.on('runnerDown', (m) => game.runners.down(m.id));
   net.on('runnerGone', (m) => game.runners.gone(m.id));
@@ -785,6 +794,8 @@ canvas.addEventListener('mousedown', (e) => {
   if (!game.started || ui.anyPanelOpen()) return;
   if (game.emoteWheel) { closeEmoteWheel(true); return; } // 휠이 열려 있으면 클릭으로도 고른다
   if (e.button === 2) {
+    // 젤리병단 장비: 오른쪽 클릭 = 갈고리 발사 (꾹 누르는 동안 당긴다)
+    if (game.odm?.has() && game.odm.fire()) return;
     // 드래곤을 타고 있으면 오른쪽 클릭 = 불덩이
     if (game.player?.mount?.ride.fly) { game.combat.dragonFireball(game.player.mount); return; }
     game.aimHeld = true; return;
@@ -796,7 +807,7 @@ canvas.addEventListener('mousedown', (e) => {
   dragging = true; lastMX = e.clientX; lastMY = e.clientY;
   if (e.button === 0) canvas.requestPointerLock?.()?.catch?.(() => {});
 });
-window.addEventListener('mouseup', (e) => { dragging = false; if (e.button === 0) game.combat?.trigger(false); if (e.button === 2) game.aimHeld = false; });
+window.addEventListener('mouseup', (e) => { dragging = false; if (e.button === 0) game.combat?.trigger(false); if (e.button === 2) { game.aimHeld = false; game.odm?.release(); } });
 window.addEventListener('mousemove', (e) => {
   if (!game.started || !game.player) return;
   if (game.emoteWheel) { moveEmoteWheel(e.movementX || 0, e.movementY || 0); return; }
@@ -879,6 +890,12 @@ function findFocus() {
     if (r) { const T = game.park.now(); opts.push({ kind: 'ride', ride: r, d: 0.5, label: `${r.emoji} ${r.name} 타기${r.boardable(T) ? '' : ` (다음 차례까지 ${r.wait(T)}초)`}` }); }
   }
   const pos = p.pos;
+  // 길을 돌아다니는 도시 말: 가까이서 E로 바로 올라탄다
+  if (game.mode === 'city' && !p.mount && !p.odm && game.animals) {
+    let st = null, sd = 3.8;
+    for (const a of game.animals.list) { if (!a.def.city || !a.visible || a.gone) continue; const d = Math.hypot(a.pos.x - pos.x, a.pos.z - pos.z); if (d < sd) { sd = d; st = a; } }
+    if (st) opts.push({ kind: 'steed', a: st, d: sd - 0.8, label: '🐎 말 타기 (Shift 질주 · F 내리기)' });
+  }
   let npc = null, nd = 2.8;
   for (const c of game.sim.citizens) {
     if (!c.visible || c.mode === 'dead') continue;
@@ -936,6 +953,7 @@ function interact() {
   } else if (focus.kind === 'ground') game.net.send({ t: 'pickup', gid: focus.g.id });
   else if (focus.kind === 'door') enterBuilding(focus.b);
   else if (focus.kind === 'ride') startRide(focus.ride);
+  else if (focus.kind === 'steed') rideSteed(focus.a);
   else if (focus.kind === 'exit') { if (game.jail) ui.toast('🔒 감옥 문이 잠겨 있어요. 석방될 때까지 기다리세요'); else exitBuilding(); }
   else if (focus.kind === 'action') doAction(focus.a.action);
 }
@@ -956,6 +974,7 @@ function leaveCar(silent) {
 }
 
 function toggleCar() {
+  if (game.player.odm) return; // 입체기동 중엔 차를 못 탄다
   const p = game.player;
   if (p.inCar) {
     if (p.inCar.kind === 'heli' && (p.inCar.pos.y || 0) > 2) { ui.toast('🚁 먼저 착륙하세요 (Shift로 하강)'); return; }
@@ -1589,9 +1608,19 @@ function toggleMount(kind, it) {
   ui.toast(p.mount.ride.fly ? `${d.emoji} ${d.name}에 올라탔어요! Space 두 번 = 날기 · 클릭 = 불 뿜기 · F = 내리기` : `${d.emoji} ${d.name}에 올라탔어요! Shift로 달리기 · F = 내리기`);
   sendState();
 }
+// 도시 말에 올라타기: 서버에 알리고(그동안 길에서는 사라진다) 바로 탄다
+function rideSteed(a) {
+  const p = game.player;
+  if (p.mount || p.inCar) return;
+  game.net.send({ t: 'rideSteed', id: a.id });
+  toggleMount('horse');
+  p.mountSteed = a.id; a.gone = true;
+}
+game.dismountForOdm = () => dismount(false);
 function dismount(say) {
   const p = game.player;
   if (!p.mount) return;
+  if (p.mountSteed != null) { game.net.send({ t: 'leaveSteed', id: p.mountSteed }); p.mountSteed = null; } // 내린 자리에 말을 둔다
   scene.remove(p.mount.mesh.g);
   if (say) ui.toast(`${p.mount.def.emoji} ${p.mount.def.name}에서 내렸어요`);
   p.mount = null;
@@ -1714,6 +1743,13 @@ Roach.onStep = (r, speed) => {
     return;
   }
   const now = performance.now();
+  if (r.titan) {
+    r.root.getWorldPosition(stepPos);
+    const d = stepPos.distanceTo(p.pos);
+    sfx('stomp', stepPos, r.root.scale.x);
+    if (d < 70) game.shake(Math.max(0, 0.5 - d / 140));
+    return;
+  }
   if (now - (game.stepT || 0) < 70) return;
   r.root.getWorldPosition(stepPos);
   if (stepPos.distanceTo(p.pos) > 25) return;
@@ -1850,6 +1886,7 @@ function computeBadges() {
 // 날기 · 1인칭 · 플러팅 · 뒤집힘
 // ------------------------------------------------------------------
 function toggleFly() {
+  if (game.player.odm) return;
   const p = game.player;
   if (p.inCar) return;
   if (game.jail && !p.flying) { ui.toast('🔒 감옥 안에서는 날 수 없어요'); return; }
@@ -2379,6 +2416,9 @@ function frame() {
   updateUnitSounds();
   updateMoveSounds(dt);
   updateShopMarkers(t);
+  if (p.odm && (game.mode !== 'city' || game.dead || game.busy || game.jail)) { p.odm = null; game.odm.release(); } // 건물 안 · 쓰러짐 · 체포 땐 입체기동 끝
+  game.titans.update(dt, game.odm.has());
+  game.odm.update(dt);
   if (game.emoting) {
     const moving = input.forward || input.back || input.left || input.right || input.jumpPressed || input.dashPressed || input.moveDir;
     if (moving || !p.onGround || p.inCar || p.flying || p.mount || game.dead || game.busy || p.swimming) stopEmote();
@@ -2473,6 +2513,7 @@ function spectateFrame(dt, t) {
   game.citizens.update(dt, camera.position, -1);
   game.players.update(dt, -1, game.traffic);
   game.units.update(dt, -1, game.city.groundY);
+  game.titans.update(dt, false);
   game.ground.update(t, -1);
   game.combat.fx.update(dt);
   const night = updateEnvironment(game.hour(), camera.position, dt);

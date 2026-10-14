@@ -48,6 +48,7 @@ export class Combat {
   // 플레이어가 보낸 타격 처리
   hit(p, msg) {
     if (p.dead || p.jailed) return;
+    if (msg.tt === 'titan') { p.emote = null; return this.w.titans.hit(p, { id: msg.id, w: String(msg.w || '') }); } // 거대 젤리: 뒷목 판정은 따로
     const stats = weaponStats(msg.w, Array.isArray(msg.gems) ? msg.gems.slice(0, 3) : []);
     if (!stats.dmg) return;
     const pellets = Math.max(1, Math.min(10, msg.n || 1));

@@ -16,6 +16,8 @@ export const ANIMALS = {
   // 드래곤 협곡: 하늘을 날며 불을 뿜는다 (fly: 날기, fire: 불 뿜기). 체력이 절반 아래로 떨어지면 지쳐서 땅에 내려앉는다
   dragon: { name: '드래곤', emoji: '🐉', hp: 1200, speed: 6, run: 16, dmg: 30, aggro: 34, hostile: true, fly: true, fire: true, region: ['dragon'], loot: [['dragon_scale', 2, 1], ['dragon_heart', 1, 0.5]], n: 5, xp: 500, r: 2.6, h: 3.6, size: 1.6 },
   baby_dragon: { name: '새끼 드래곤', emoji: '🐲', hp: 380, speed: 5, run: 13, dmg: 13, aggro: 24, hostile: true, fly: true, fire: true, region: ['dragon'], loot: [['baby_dragon_scale', 1, 1]], n: 7, xp: 160, r: 1.3, h: 1.8, size: 0.75 },
+  // 도시 말: 길을 어슬렁거리고, 가까이 가서 E를 누르면 바로 올라탄다 (잡거나 다치게 할 수 없다)
+  steed: { name: '도시 말', emoji: '🐎', hp: 160, speed: 2.4, livestock: true, city: true, region: [], loot: [], n: 14, r: 1.1, h: 2.0 },
 };
 
 // 포획해서 타고 다닐 때: walk/run 땅 속도(m/s), jump 점프력, swim 헤엄 속도, fly/flyRun 날기 속도, seat 등 높이(크기 1 기준), scale 탈 때 크기

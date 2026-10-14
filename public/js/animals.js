@@ -122,6 +122,7 @@ export function makeAnimalMesh(kind, variant = 0) {
       for (const sx of [-1, 1]) { const h = new THREE.Mesh(G.cone(), toon('#fff8e1')); h.scale.set(0.05, 0.18, 0.05); h.position.set(sx * 0.22, 0.32, 0); h.rotation.z = -sx * 0.6; m.head.add(h); } break;
     case 'sheep': m = quad({ len: 1.1, wid: 0.8, hgt: 0.75, leg: 0.5, legR: 0.07, color: '#fafafa', legColor: '#424242', headColor: '#424242', headR: 0.25, headUp: 0.9 });
       for (let i = 0; i < 10; i++) S(m.body, '#ffffff', Math.sin(i * 2.4) * 0.35, 0.95 + Math.cos(i * 1.7) * 0.25, Math.cos(i * 2.4) * 0.4, 0.25, 0.25, 0.25); break;
+    case 'steed': { m = quad({ len: 1.9, wid: 0.65, hgt: 0.8, leg: 1.1, legR: 0.1, color: ['#8d5a3a', '#f5f5f5', '#3e2723', '#bcaaa4'][variant % 4], snout: '#6d4c41', headR: 0.3, headUp: 1.65, tail: 0.8, tailColor: '#3e2723', hoof: '#212121' }); const saddle = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.16, 0.8), new THREE.MeshToonMaterial({ color: '#b71c1c' })); saddle.position.set(0, 1.62, 0); m.body.add(saddle); break; }
     case 'horse': m = quad({ len: 1.9, wid: 0.65, hgt: 0.8, leg: 1.1, legR: 0.1, color: '#8d5a3a', snout: '#6d4c41', headR: 0.3, headUp: 1.65, tail: 0.8, tailColor: '#3e2723', hoof: '#212121' });
       C(m.body, '#8d5a3a', 0, 1.75, 0.85, 0.16, 0.8, -0.55);
       B(m.body, '#3e2723', 0, 2.0, 0.75, 0.06, 0.6, 0.35); break;
@@ -217,7 +218,7 @@ function makeBar() {
   g.userData = { fill, hint };
   return g;
 }
-export const capturable = (a) => a.alive && !a.gone && (a.def.livestock || a.hp <= 50);
+export const capturable = (a) => a.alive && !a.gone && !a.def.city && (a.def.livestock || a.hp <= 50);
 
 export class AnimalsView {
   constructor(scene, kinds, groundY) {
@@ -267,7 +268,7 @@ export class AnimalsView {
       // 체력바 + 포획 안내 (가까이 있을 때만)
       const dMe = Math.hypot(a.pos.x - me.x, a.pos.z - me.z, (a.pos.y - me.y) * 0.5);
       const bar = a.bar;
-      bar.visible = a.alive && dMe < 70;
+      bar.visible = a.alive && dMe < 70 && !a.def.city;
       if (bar.visible) {
         bar.position.set(a.pos.x, a.pos.y + a.def.h * m.size + 0.7 + m.body.position.y, a.pos.z);
         bar.quaternion.copy(this.camQuat || bar.quaternion);
