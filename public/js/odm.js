@@ -140,6 +140,12 @@ export class Odm {
     }
     return true;
   }
+  // 지금 조준점이 갈고리를 걸 수 있는 곳인지 (0.1초마다 한 번만 계산)
+  canHook() {
+    const now = performance.now();
+    if (now - (this.canT || 0) > 100) { this.canT = now; const { o, d } = this.g.combat.aimRay(); this.canV = this.g.mode === 'city' && !!this.cast(o, d); }
+    return this.canV;
+  }
   // 우클릭을 떼면: 갈고리를 풀고 그 기세로 날아간다
   release() {
     const p = this.g.player;

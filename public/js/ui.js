@@ -225,8 +225,10 @@ export class UI {
     $('stars').classList.toggle('hidden', !g.stars);
     const sel = g.inv.selected();
     const d = sel ? itemDef(sel.id) : ITEMS.fist;
-    const aim = !!g.player.inCar ? ['tank', 'heli'].includes(g.player.inCar.kind) : ['gun', 'launcher', 'throw', 'wand'].includes(d.cat);
+    const aim = !!g.player.inCar ? ['tank', 'heli'].includes(g.player.inCar.kind) : ['gun', 'launcher', 'throw', 'wand'].includes(d.cat) || !!d.odm;
     $('crosshair').classList.toggle('hidden', !(aim && this.locked));
+    // 젤리병단 장비: 갈고리가 닿는 곳(95m 안의 건물 · 거대 젤리)을 겨누면 초록
+    $('crosshair').classList.toggle('hookable', !!d.odm && !g.player.inCar && !!g.odm?.canHook());
     const ammoTxt = d.ammo ? ` · ${ammoName(d.ammo)} ${g.inv.count(d.ammo)}발` : d.cat === 'wand' ? ` · 💧${d.mana} · ${d.skill}` : d.skill ? ` · ${d.skill}` : '';
     const tmpTxt = sel?.expiresAt ? ` · ⏳ ${Math.max(0, Math.ceil((sel.expiresAt - Date.now()) / 60000))}분 남음` : '';
     $('weapon-name').textContent = g.player.inCar ? (g.player.inCar.kind === 'tank' ? '🪖 전차 주포' : g.player.inCar.kind === 'heli' ? '🚀 헬기 미사일' : '🚗 운전 중') : `${d.emoji} ${d.name}${sel?.gems?.length ? ' ' + sel.gems.map((x) => GEMS[x] ? '◆' : '').join('') : ''}${ammoTxt}${tmpTxt}`;
