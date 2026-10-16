@@ -1896,6 +1896,7 @@ function toggleFly() {
   const p = game.player;
   if (p.inCar) return;
   if (game.jail && !p.flying) { ui.toast('🔒 감옥 안에서는 날 수 없어요'); return; }
+  if (!p.flying && game.odm?.has() && !p.mount?.ride.fly) { ui.toast('🪝 젤리병단 장비를 든 동안엔 날개로 못 날아요 — 우클릭 갈고리로 날아요!'); return; }
   if (p.mount && !p.mount.ride.fly) { ui.toast(`${p.mount.def.emoji} ${p.mount.def.name}은(는) 날 수 없어요. F로 내려서 날아요`); return; }
   if (p.flying) { p.flying = false; p.vy = 0; p.onGround = false; p.jumps = p.maxJumps; ui.toast('🪽 날개를 접었어요 — 떨어진다!'); return; }
   if (p.takeOff()) ui.toast('🪽 날기! Space 꾹 위로 · X 아래로 · Shift 빠르게 · Space 두 번 = 날개 접기');
@@ -2423,6 +2424,7 @@ function frame() {
   updateMoveSounds(dt);
   updateShopMarkers(t);
   if (p.odm && (game.mode !== 'city' || game.dead || game.busy || game.jail)) { p.odm = null; game.odm.release(); } // 건물 안 · 쓰러짐 · 체포 땐 입체기동 끝
+  if (p.flying && !p.mount && game.odm.has()) { p.flying = false; p.vy = 0; p.onGround = false; p.jumps = p.maxJumps; ui.toast('🪝 젤리병단 장비를 들면 날개를 접어요 — 우클릭 갈고리로 날아요!'); }
   game.titans.update(dt, game.odm.has());
   game.odm.update(dt);
   if (game.emoting) {

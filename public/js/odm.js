@@ -96,49 +96,90 @@ function rayCyl(o, d, base, r, h) {
   return y >= base.y && y <= base.y + h ? t : null;
 }
 
-function makeCable(color = '#3e2723') {
-  const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
-  const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color }));
-  line.frustumCulled = false; line.visible = false;
-  const hook = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.5, 6), new THREE.MeshToonMaterial({ color: '#90a4ae' }));
-  hook.visible = false;
-  return { line, hook };
+// ---------------- 갈고리 (날아가서 · 박히고 · 당기고 · 감겨 돌아온다) ----------------
+const HOOK_SPEED = 150;  // 갈고리가 날아가는 속도 (m/s): 멀수록 늦게 닿는다
+const BACK_SPEED = 200;  // 감겨 돌아오는 속도
+const ropeGeo = new THREE.CylinderGeometry(1, 1, 1, 6, 1, true).translate(0, 0.5, 0); // 0~1 높이로 길이를 늘려 쓴다
+const ropeMat = new THREE.MeshBasicMaterial({ color: '#263238' });
+const clawMat = new THREE.MeshToonMaterial({ color: '#cfd8dc', emissive: '#455a64' });
+const UP = new THREE.Vector3(0, 1, 0);
+// 양쪽 허리에서 줄 하나씩 (진격의 거인처럼 두 가닥), 끝에 세 갈래 갈고리
+function makeClaw() {
+  const g = new THREE.Group();
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.55, 6), clawMat); tip.position.y = 0.1; g.add(tip);
+  for (let i = 0; i < 3; i++) {
+    const prong = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.42, 4), clawMat);
+    const a = (i / 3) * Math.PI * 2;
+    prong.position.set(Math.sin(a) * 0.17, -0.12, Math.cos(a) * 0.17);
+    prong.rotation.set(Math.cos(a) * 2.4, 0, -Math.sin(a) * 2.4); // 뒤로 젖힌 갈퀴
+    g.add(prong);
+  }
+  return g;
+}
+function makeCable() {
+  return [0, 1].map(() => {
+    const rope = new THREE.Mesh(ropeGeo, ropeMat); rope.frustumCulled = false; rope.visible = false;
+    const claw = makeClaw(); claw.visible = false;
+    return { rope, claw };
+  });
 }
 
 // ---------------- 젤리병단 장비 ----------------
 export class Odm {
   constructor(game, scene) {
     this.g = game; this.scene = scene;
-    this.mine = makeCable(); scene.add(this.mine.line, this.mine.hook);
-    this.others = new Map(); // 다른 플레이어 id → { cable, a, ti }
-    this.missT = 0;
+    this.mine = { cable: this.addCable(), s: null }; // s: 지금 쏜 갈고리
+    this.others = new Map(); // 다른 플레이어 id → { cable, s }
   }
+  addCable() { const c = makeCable(); for (const x of c) this.scene.add(x.rope, x.claw); return c; }
   has() { return this.g.inv?.selected()?.id === 'odm_gear'; }
-  // 우클릭: 카메라 가운데가 가리키는 건물·거대 젤리에 갈고리를 박는다
+  // 우클릭: 카메라 가운데가 가리키는 건물·거대 젤리로 갈고리를 쏜다 → 닿는 순간 박히고 당기기 시작
   fire() {
     const g = this.g, p = g.player;
     if (!this.has() || p.inCar || g.dead || g.busy || g.mode !== 'city') return false;
     const { o, d } = g.combat.aimRay();
     const hit = this.cast(o, d);
     sfx('hook');
-    if (!hit) { this.missT = 0.18; this.missTo = o.clone().addScaledVector(d, HOOK_RANGE); return true; }
+    if (p.odm?.hook) p.odm.hook = null; // 새로 쏘면 앞의 갈고리는 풀린다
+    let s;
+    if (!hit) s = { miss: true, p: o.clone().addScaledVector(d, HOOK_RANGE) };
+    else if (hit.titan) {
+      // 움직이는 거대 젤리: 몸에 붙은 자리(젤리 기준 좌표)를 기억했다가 매 순간 다시 계산
+      const t = hit.titan, ca = Math.cos(-t.h), sa = Math.sin(-t.h);
+      const dx = hit.point.x - t.x, dz = hit.point.z - t.z;
+      s = { ti: { x: dx * ca + dz * sa, y: hit.point.y - t.y, z: -dx * sa + dz * ca, id: t.id }, p: hit.point.clone(), color: TITAN.colors[t.c] || '#ff8fb1' };
+    } else s = { p: hit.point.clone() };
+    this.mine.s = this.launch(s, this.hip(p.pos, p.heading));
+    const a = [s.p.x, s.p.y, s.p.z].map((v) => +v.toFixed(2));
+    g.net.send({ t: 'fx', k: 'odm', a, ...(s.ti ? { ti: [s.ti.id, s.ti.x, s.ti.y, s.ti.z] } : {}), ...(s.miss ? { miss: 1 } : {}) });
+    return true;
+  }
+  launch(s, from) { return Object.assign(s, { phase: 'out', d: 0, len: from.distanceTo(s.p), held: true, latchT: 0 }); }
+  // 박혔다: 내 갈고리면 이때부터 당겨진다
+  latch(s, isMine) {
+    s.phase = 'hold'; s.latchT = 0.25;
+    const at = this.anchor(s);
+    sfx('latch', at);
+    this.latchFx(at, s.color);
+    if (!isMine) return;
+    const g = this.g, p = g.player;
+    if (!s.held) { s.phase = 'back'; return; } // 닿기 전에 버튼을 뗐으면 박히자마자 감아들인다
     let v = null;
     if (p.mount) { v = new THREE.Vector3(Math.sin(p.heading) * p.speed, 3, Math.cos(p.heading) * p.speed); g.dismountForOdm?.(); }
     if (g.emoting) g.stopEmote();
     p.odmStart(v);
     const chest = p.pos.clone(); chest.y += 1.1;
-    if (hit.titan) {
-      // 움직이는 거대 젤리: 몸에 붙은 자리(젤리 기준 좌표)를 기억했다가 매 순간 다시 계산
-      const t = hit.titan, ca = Math.cos(-t.h), sa = Math.sin(-t.h);
-      const dx = hit.point.x - t.x, dz = hit.point.z - t.z;
-      const loc = { x: dx * ca + dz * sa, y: hit.point.y - t.y, z: -dx * sa + dz * ca, id: t.id };
-      p.odm.hook = { get: () => this.titanPoint(loc), len: chest.distanceTo(hit.point) };
-      g.net.send({ t: 'fx', k: 'odm', a: [hit.point.x, hit.point.y, hit.point.z], ti: [loc.id, loc.x, loc.y, loc.z] });
-    } else {
-      p.odm.hook = { p: hit.point.clone(), len: chest.distanceTo(hit.point) };
-      g.net.send({ t: 'fx', k: 'odm', a: [hit.point.x, hit.point.y, hit.point.z] });
-    }
-    return true;
+    p.odm.hook = s.ti ? { get: () => this.titanPoint(s.ti), len: chest.distanceTo(at) } : { p: s.p.clone(), len: chest.distanceTo(at) };
+    p.odm.vel.addScaledVector(at.clone().sub(chest).normalize(), 4); // 박히는 순간 '훅' 끌려간다
+    g.shake?.(0.35);
+  }
+  // 불꽃 + 먼지 (거대 젤리는 젤리가 튄다)
+  latchFx(at, color) {
+    const fx = this.g.combat?.fx;
+    if (!fx) return;
+    for (let i = 0; i < 14; i++) fx.part(at, new THREE.Vector3((Math.random() - 0.5) * 9, Math.random() * 7, (Math.random() - 0.5) * 9), color || (Math.random() < 0.5 ? '#ffe0b2' : '#ffab40'), 0.4, 0.25, 0, { grav: 16 });
+    for (let i = 0; i < 4; i++) fx.part(at, new THREE.Vector3((Math.random() - 0.5) * 2, Math.random() * 1.5, (Math.random() - 0.5) * 2), color || '#bcaaa4', 0.9, 0.8, 2, { normal: true, op: 0.6, drag: 2 });
+    fx.part(at, new THREE.Vector3(), '#ffffff', 0.15, 2.2, 0.4);
   }
   // 지금 조준점이 갈고리를 걸 수 있는 곳인지 (0.1초마다 한 번만 계산)
   canHook() {
@@ -146,11 +187,15 @@ export class Odm {
     if (now - (this.canT || 0) > 100) { this.canT = now; const { o, d } = this.g.combat.aimRay(); this.canV = this.g.mode === 'city' && !!this.cast(o, d); }
     return this.canV;
   }
-  // 우클릭을 떼면: 갈고리를 풀고 그 기세로 날아간다
+  // 우클릭을 떼면: 갈고리를 풀고(감겨 돌아온다) 그 기세로 날아간다
   release() {
-    const p = this.g.player;
-    if (p.odm?.hook) { p.odm.hook = null; this.g.net.send({ t: 'fx', k: 'odm', a: null }); }
+    const p = this.g.player, s = this.mine.s;
+    if (s) { s.held = false; if (s.phase === 'hold') this.retract(s); }
+    if (p.odm?.hook) p.odm.hook = null;
+    if (s) this.g.net.send({ t: 'fx', k: 'odm', a: null });
   }
+  retract(s) { if (s.phase !== 'back') { s.phase = 'back'; s.p = this.anchor(s) || s.p; s.d = Math.min(s.d, s.len); sfx('reel', s.p); } }
+  anchor(s) { return s.ti ? this.titanPoint(s.ti) || s.p : s.p; }
   titanPoint(loc) {
     const t = this.g.titans.list.get(loc.id);
     if (!t || t.state === 2) return null;
@@ -173,30 +218,80 @@ export class Odm {
     if (bt >= HOOK_RANGE) return null;
     return { point: o.clone().addScaledVector(d, bt), titan: best };
   }
-  // 다른 플레이어의 갈고리
+  // 다른 플레이어의 갈고리: 똑같이 날아가고 박히고 감겨 돌아오는 모습
   remote(m) {
-    const o = this.others.get(m.pid);
-    if (!Array.isArray(m.a)) { if (o) { this.scene.remove(o.cable.line, o.cable.hook); this.others.delete(m.pid); } return; }
-    const e = o || { cable: makeCable() };
-    if (!o) { this.scene.add(e.cable.line, e.cable.hook); this.others.set(m.pid, e); }
-    e.a = new THREE.Vector3(+m.a[0], +m.a[1], +m.a[2]);
-    e.ti = Array.isArray(m.ti) ? { id: +m.ti[0], x: +m.ti[1], y: +m.ti[2], z: +m.ti[3] } : null;
+    let e = this.others.get(m.pid);
+    if (!Array.isArray(m.a)) { if (e?.s) { e.s.held = false; this.retract(e.s); } return; }
+    if (!e) { e = { cable: this.addCable(), s: null }; this.others.set(m.pid, e); }
+    const pl = this.g.players.list.get(m.pid);
+    if (!pl) return;
+    const s = { p: new THREE.Vector3(+m.a[0], +m.a[1], +m.a[2]), miss: !!m.miss };
+    if (Array.isArray(m.ti)) { s.ti = { id: +m.ti[0], x: +m.ti[1], y: +m.ti[2], z: +m.ti[3] }; const t = this.g.titans.list.get(s.ti.id); s.color = TITAN.colors[t?.c] || '#ff8fb1'; }
+    e.s = this.launch(s, this.hip(pl.roach.root.position, pl.roach.root.rotation.y));
+    sfx('hook', s.p.clone().lerp(pl.roach.root.position, 0.9));
   }
-  drawCable(c, from, to) {
-    const pos = c.line.geometry.attributes.position;
-    pos.setXYZ(0, from.x, from.y, from.z); pos.setXYZ(1, to.x, to.y, to.z); pos.needsUpdate = true;
-    c.line.visible = true;
-    c.hook.visible = true; c.hook.position.copy(to);
-    c.hook.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
+  // 허리 (줄이 나오는 곳)
+  hip(pos, h) { const v = pos.clone(); v.y += 0.95; v.h = h; return v; }
+  // 갈고리 한 번 움직이기 (날아감 → 박힘 → 감김). 끝나면 false
+  step(s, from, dt, isMine) {
+    s.latchT = Math.max(0, s.latchT - dt);
+    if (s.phase === 'out') {
+      const to = this.anchor(s);
+      s.len = from.distanceTo(to);
+      s.d += HOOK_SPEED * dt;
+      if (s.d >= s.len) { s.d = s.len; if (s.miss) this.retract(s); else this.latch(s, isMine); }
+    } else if (s.phase === 'hold') {
+      if (s.ti && !this.titanPoint(s.ti)) this.retract(s); // 거대 젤리가 쓰러졌다
+      else if (isMine && !this.g.player.odm?.hook) this.retract(s);
+      else s.len = s.d = from.distanceTo(this.anchor(s));
+    } else {
+      s.len = from.distanceTo(s.p);
+      s.d = Math.min(s.d, s.len) - BACK_SPEED * dt;
+      if (s.d <= 0.3) return false;
+    }
+    return true;
   }
+  // 두 가닥 줄과 갈고리 그리기
+  draw(cable, s, from) {
+    const to = s.phase === 'back' ? s.p : this.anchor(s);
+    const dir = to.clone().sub(from); const L = dir.length() || 1; dir.divideScalar(L);
+    const rx = Math.cos(from.h || 0), rz = -Math.sin(from.h || 0);
+    const cam = this.g.camera?.position;
+    const flying = s.phase !== 'hold';
+    for (let i = 0; i < 2; i++) {
+      const side = i ? 1 : -1;
+      const a = from.clone(); a.x += rx * 0.26 * side; a.z += rz * 0.26 * side;
+      // 두 갈고리는 걸린 곳 양옆에 조금 떨어져 박힌다
+      const end = to.clone(); end.x += rx * 0.35 * side; end.z += rz * 0.35 * side;
+      const v = end.sub(a); const full = v.length() || 1; v.divideScalar(full);
+      const len = Math.max(0.05, full * Math.min(1, s.d / L));
+      const head = a.clone().addScaledVector(v, len);
+      // 날아가는 동안은 줄이 살짝 출렁인다 · 박힌 직후엔 팽팽하게 떨린다
+      if (flying) head.y -= Math.sin(Math.min(1, s.d / L) * Math.PI) * Math.min(1.5, len * 0.03);
+      if (s.latchT > 0) { const k = s.latchT * 0.6; head.x += (Math.random() - 0.5) * k; head.y += (Math.random() - 0.5) * k; }
+      const seg = head.clone().sub(a); const sl = seg.length() || 0.01;
+      const thick = Math.max(0.035, cam ? cam.distanceTo(head.clone().lerp(a, 0.5)) * 0.0018 : 0.04); // 멀리서도 보이게
+      const { rope, claw } = cable[i];
+      rope.visible = claw.visible = true;
+      rope.position.copy(a); rope.scale.set(thick, sl, thick);
+      rope.quaternion.setFromUnitVectors(UP, seg.divideScalar(sl));
+      claw.position.copy(head);
+      claw.quaternion.setFromUnitVectors(UP, s.phase === 'back' ? v.clone().negate() : v);
+      claw.scale.setScalar(Math.max(1, thick / 0.035 * 0.6));
+    }
+    // 날아가는 갈고리 뒤로 반짝이는 꼬리
+    if (s.phase === 'out' && this.g.combat?.fx) this.g.combat.fx.part(from.clone().addScaledVector(dir, Math.min(s.d, L)), new THREE.Vector3(), '#ffffff', 0.2, 0.45, 0.05);
+  }
+  hide(cable) { for (const x of cable) x.rope.visible = x.claw.visible = false; }
   update(dt) {
     const g = this.g, p = g.player;
-    // 내 갈고리줄 (허리에서 걸린 곳까지)
-    const hip = p.pos.clone(); hip.y += 1.0;
-    const a = p.odm?.hook ? (p.odm.hook.get ? p.odm.hook.get() : p.odm.hook.p) : null;
-    if (a) this.drawCable(this.mine, hip, a);
-    else if (this.missT > 0) { this.missT -= dt; this.drawCable(this.mine, hip, this.missTo); this.mine.hook.visible = false; }
-    else { this.mine.line.visible = false; this.mine.hook.visible = false; }
+    // 내 갈고리
+    const M = this.mine;
+    if (M.s) {
+      const from = this.hip(p.pos, p.roach.root.rotation.y);
+      if (g.mode !== 'city' || g.loc() !== -1 || !this.step(M.s, from, dt, true)) { M.s = null; this.hide(M.cable); }
+      else this.draw(M.cable, M.s, from);
+    } else this.hide(M.cable);
     // 가스: 당기거나 Space를 누르면 등 뒤로 하얀 가스 + 쉭 소리
     const O = p.odm;
     const gas = O && (O.pulling || O.gas > 0);
@@ -205,18 +300,19 @@ export class Odm {
       this.puffT = (this.puffT || 0) - dt;
       if (this.puffT <= 0) {
         this.puffT = 0.05;
+        const hip = p.pos.clone(); hip.y += 0.8;
         const back = O.vel.clone().normalize().multiplyScalar(-3);
-        g.combat.fx.part(hip.clone().add(new THREE.Vector3(0, -0.2, 0)), back.add(new THREE.Vector3((Math.random() - 0.5), Math.random() * 0.5, (Math.random() - 0.5))), '#eceff1', 0.6, 0.35, 1.2, { normal: true, op: 0.55 });
+        g.combat.fx.part(hip, back.add(new THREE.Vector3((Math.random() - 0.5), Math.random() * 0.5, (Math.random() - 0.5))), '#eceff1', 0.6, 0.35, 1.2, { normal: true, op: 0.55 });
       }
     }
-    // 다른 플레이어 갈고리줄
+    // 다른 플레이어 갈고리
     for (const [pid, e] of this.others) {
       const pl = g.players.list.get(pid);
-      if (!pl || pl.loc !== -1 || g.loc() !== -1) { e.cable.line.visible = false; e.cable.hook.visible = false; continue; }
-      const to = e.ti ? this.titanPoint(e.ti) : e.a;
-      if (!to) { e.cable.line.visible = false; e.cable.hook.visible = false; continue; }
-      const from = pl.roach.root.position.clone(); from.y += 1.0;
-      this.drawCable(e.cable, from, to);
+      if (!pl) { this.hide(e.cable); for (const x of e.cable) this.scene.remove(x.rope, x.claw); this.others.delete(pid); continue; }
+      if (!e.s || pl.loc !== -1 || g.loc() !== -1) { this.hide(e.cable); continue; }
+      const from = this.hip(pl.roach.root.position, pl.roach.root.rotation.y);
+      if (!this.step(e.s, from, dt, false)) { e.s = null; this.hide(e.cable); }
+      else this.draw(e.cable, e.s, from);
     }
   }
 }
