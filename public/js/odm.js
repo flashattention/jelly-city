@@ -197,6 +197,7 @@ export class Odm {
     p.odmStart(v);
     const chest = p.pos.clone(); chest.y += 1.1;
     p.odm.hook = s.ti ? { get: () => this.titanPoint(s.ti), len: chest.distanceTo(at) } : { p: s.p.clone(), len: chest.distanceTo(at) };
+    p.odm.jumps = 0; // 다시 놓으면 2단 점프를 또 쓸 수 있다
     p.odm.vel.addScaledVector(at.clone().sub(chest).normalize(), 4); // 박히는 순간 '훅' 끌려간다
     g.shake?.(0.35);
   }

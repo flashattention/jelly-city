@@ -66,7 +66,7 @@ export const ITEMS = {
   // ---------------- 은하 무기상 (미래형) ----------------
   saber_blue: { name: '광선검 (푸른빛)', emoji: '🔵', cat: 'melee', shop: 'armory_sf', price: 4000, dmg: 58, rate: 0.38, range: 2.4, kind: 'melee', held: 'saber:#40c4ff', sockets: 2, charm: 10 },
   // 젤리병단 장비 (진격의 거인 입체기동장치처럼): 좌클릭 쌍검 · 우클릭 갈고리를 걸고 날아간다. 거대 젤리는 이걸로 뒷목을 베어야만 쓰러진다
-  odm_gear: { name: '젤리병단 장비', emoji: '🪝', cat: 'melee', shop: 'armory_mil', price: 3500, dmg: 34, rate: 0.42, range: 2.6, kind: 'melee', held: 'odm', sockets: 2, odm: true, skill: '좌클릭 쌍검 · 우클릭 갈고리(꾹 = 당기기) · Space 가스 · 거대 젤리는 뒷목!' },
+  odm_gear: { name: '젤리병단 장비', emoji: '🪝', cat: 'melee', shop: 'armory_mil', price: 3500, dmg: 34, rate: 0.42, range: 2.6, kind: 'melee', held: 'odm', sockets: 2, odm: true, skill: '좌클릭 쌍검 · 우클릭 갈고리(꾹 = 당기기) · 걸고 Space 가스 · 놓고 Space 2단 점프 · 거대 젤리는 뒷목!' },
   saber_red: { name: '광선검 (붉은빛)', emoji: '🔴', cat: 'melee', shop: 'armory_sf', price: 4400, dmg: 64, rate: 0.4, range: 2.4, kind: 'melee', held: 'saber:#ff1744', sockets: 2, charm: 10 },
   saber_green: { name: '광선검 (초록빛)', emoji: '🟢', cat: 'melee', shop: 'armory_sf', price: 4200, dmg: 60, rate: 0.38, range: 2.4, kind: 'melee', held: 'saber:#76ff03', sockets: 3, charm: 10 },
   blaster: { name: '블래스터 권총', emoji: '🔫', cat: 'gun', shop: 'armory_sf', price: 1500, dmg: 24, rate: 0.3, range: 55, ammo: 'ammo_cell', kind: 'hitscan', held: 'blaster', tracer: '#ff5252', sockets: 2 },

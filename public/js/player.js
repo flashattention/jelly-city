@@ -212,8 +212,15 @@ export class Player {
       const yaw = this.cam.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
       const f = (input.forward ? 1 : 0) - (input.back ? 1 : 0), sd = (input.right ? 1 : 0) - (input.left ? 1 : 0);
       V.x += (fx * f + rx * sd) * 14 * dt; V.z += (fz * f + rz * sd) * 14 * dt;
-      // Space: 가스 분사 (바라보는 쪽으로)
-      if (input.jump) {
+      // 갈고리를 놓은 뒤 Space: 바로 2단 점프 (옥상 가장자리에서 훌쩍 올라서기)
+      if (!O.hook && input.jumpPressed && (O.jumps || 0) < 2) {
+        O.jumps = (O.jumps || 0) + 1;
+        V.y = Math.max(V.y, 0) + 11;
+        if (f > 0) { V.x += fx * 4; V.z += fz * 4; } // W를 누르고 있으면 앞으로도 조금
+        this.roach.jumpSquash = 1; this.airJump = 0.3; this.onSfx?.('jump', O.jumps);
+      }
+      // 갈고리를 건 동안 Space: 가스 분사 (바라보는 쪽으로)
+      if (input.jump && O.hook) {
         const cp = Math.cos(this.cam.pitch);
         V.x += fx * cp * 24 * dt; V.z += fz * cp * 24 * dt; V.y += (-Math.sin(this.cam.pitch) * 24 + 6) * dt;
         O.gas = 0.12;
