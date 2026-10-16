@@ -1265,6 +1265,16 @@ export class Combat {
     else if (m.k === 'swing') { const p = g.players.list.get(m.pid); if (p && p.visible) { p.roach.attack('melee'); this.fx.slash(p.pos, p.heading, typeof m.w === 'string' && itemDef(m.w) ? m.w : 'fist'); } }
     else if (m.k === 'odm') g.odm?.remote(m);
     else if (m.k === 'noeffect' && Array.isArray(m.p)) g.ui.floatText(v3(m.p), `🛡️ ${m.text || '효과 없음'}`, '#ffab40');
+    else if (m.k === 'napehit' && Array.isArray(m.p)) {
+      // 큰 거대 젤리: 뒷목이 깊게 패였지만 아직 버틴다
+      const n = v3(m.p), t = g.titans?.list.get(m.id);
+      if (t) g.titans.setHp(t, +m.hp, +m.max);
+      for (let i = 0; i < 18; i++) this.fx.part(n.clone(), new THREE.Vector3((Math.random() - 0.5) * 9, Math.random() * 6, (Math.random() - 0.5) * 9), Math.random() < 0.6 ? '#ff8fb1' : '#ffffff', 0.6, 0.7, 0.1, { grav: 10 });
+      this.fx.ring(n, '#ff8fb1', 3, 0.35, { face: g.player?.pos.clone().setY(n.y) });
+      sfx('napecut', n);
+      t?.r.hurt?.();
+      if (m.pid === g.myId) { g.ui.floatText(n.clone().setY(n.y + 2), `⚔️ 뒷목 명중! ${m.hp}번 더!`, '#ffd54f'); g.shake?.(0.3); }
+    }
     else if (m.k === 'titandown' && Array.isArray(m.p)) {
       // 뒷목을 베었다! 피가 아니라 젤리 증기가 피어오른다
       const n = v3(m.p);

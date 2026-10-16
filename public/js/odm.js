@@ -20,13 +20,28 @@ function napeTex() {
   return _napeTex;
 }
 
+// 거대 젤리 머리 위 체력바: 뒷목을 벨 때마다 한 칸씩 줄어든다
+function hpCanvas(hp, max) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+  const x = c.getContext('2d');
+  x.fillStyle = 'rgba(20,10,20,0.75)'; x.beginPath(); x.roundRect(2, 2, 252, 60, 14); x.fill();
+  x.font = 'bold 22px sans-serif'; x.textAlign = 'center'; x.fillStyle = '#fff';
+  x.fillText(`🧸 거대 젤리 · 뒷목 ${hp}/${max}`, 128, 24);
+  const gap = 4, w = (232 - gap * (max - 1)) / max;
+  for (let i = 0; i < max; i++) {
+    x.fillStyle = i < hp ? (hp === 1 ? '#ff5252' : '#ff8fb1') : 'rgba(255,255,255,0.18)';
+    x.beginPath(); x.roundRect(12 + i * (w + gap), 34, w, 18, 6); x.fill();
+  }
+  return c;
+}
+
 // ---------------- 거대 젤리 ----------------
 export class TitansView {
   constructor(scene, groundY) { this.scene = scene; this.groundY = groundY; this.list = new Map(); }
-  // 서버 스냅샷: [id, x, z, 방향, 크기, 상태, 색] × n
+  // 서버 스냅샷: [id, x, z, 방향, 크기, 상태, 색, 남은 뒷목, 최대] × n
   apply(arr) {
     const seen = new Set();
-    for (let i = 0; i + 6 < arr.length; i += 7) {
+    for (let i = 0; i + 8 < arr.length; i += 9) {
       const id = arr[i]; seen.add(id);
       const x = arr[i + 1] / 10, z = arr[i + 2] / 10, h = arr[i + 3] / 100, s = arr[i + 4] / 10, st = arr[i + 5], c = arr[i + 6];
       const t = this.list.get(id) || this.make(id, s, c, x, z, h);
@@ -34,8 +49,9 @@ export class TitansView {
       if (st === 1 && t.state !== 1) t.r.attack('melee');
       if (st === 2 && t.state !== 2) { t.r.setDead(true); t.r.setEmotion('sad', 999); }
       t.state = st;
+      this.setHp(t, arr[i + 7], arr[i + 8]);
     }
-    for (const [id, t] of this.list) if (!seen.has(id)) { this.scene.remove(t.r.root); this.scene.remove(t.mark); this.list.delete(id); }
+    for (const [id, t] of this.list) if (!seen.has(id)) { this.scene.remove(t.r.root, t.mark, t.bar); t.bar.material.map?.dispose(); this.list.delete(id); }
   }
   make(id, s, c, x, z, h) {
     // 히죽 웃는 거대 곰돌이 젤리
@@ -48,9 +64,18 @@ export class TitansView {
     const mark = new THREE.Sprite(new THREE.SpriteMaterial({ map: napeTex(), transparent: true, depthWrite: false, depthTest: false }));
     mark.scale.setScalar(1.6 + s * 0.12); mark.renderOrder = 60;
     this.scene.add(mark);
-    const t = { id, s, r, mark, x, z, h, y: this.groundY(x, z), tx: x, tz: z, th: h, state: 0, base: new THREE.Vector3(x, 0, z) };
+    const bar = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false, depthTest: false }));
+    const bw = 10 + s * 1.0; bar.scale.set(bw, bw / 4, 1); bar.renderOrder = 61; // 멀리서도 읽히게
+    this.scene.add(bar);
+    const t = { id, s, r, mark, bar, hp: -1, max: -1, x, z, h, y: this.groundY(x, z), tx: x, tz: z, th: h, state: 0, base: new THREE.Vector3(x, 0, z) };
     this.list.set(id, t);
     return t;
+  }
+  setHp(t, hp, max) {
+    if (t.hp === hp && t.max === max) return;
+    t.hp = hp; t.max = max;
+    t.bar.material.map?.dispose();
+    t.bar.material.map = new THREE.CanvasTexture(hpCanvas(hp, max)); t.bar.material.needsUpdate = true;
   }
   update(dt, showMarks) {
     const k = Math.min(1, dt * 4), now = performance.now();
@@ -66,6 +91,8 @@ export class TitansView {
       t.mark.position.set(n.x, n.y, n.z);
       t.mark.visible = showMarks && t.state !== 2;
       t.mark.material.opacity = 0.6 + Math.sin(now / 180) * 0.35;
+      t.bar.position.set(t.x, t.y + TITAN.top * t.s + 1.5 + t.s * 0.1, t.z);
+      t.bar.visible = t.state !== 2 && t.max > 0;
     }
   }
   // 총알·갈고리가 맞는 몸통 (원기둥)

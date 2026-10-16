@@ -17,3 +17,5 @@ export function napePos(t, out = {}) {
 }
 // 뒷목을 벤 것으로 칠 거리: 큰 젤리일수록 조금 넉넉하게
 export const napeReach = (s) => 3 + TITAN.napeR * s;
+// 뒷목을 몇 번 베어야 쓰러지나: 작은 것 한 번 · 중간 두 번 · 큰 것 세 번 · 아주 큰 것(키 51m 넘게) 네 번
+export const napeHits = (s) => (s < 11.3 ? 1 : s < 14.7 ? 2 : s < 17 ? 3 : 4);
