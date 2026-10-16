@@ -679,10 +679,11 @@ export class Combat {
       for (const v of this.w.players.values()) {
         if (v === driver || v.dead || v.loc !== -1 || v.car >= 0 || v.emote) continue; // 춤추는 사람은 차도 못 친다
         const dx = v.pos.x - car.pos.x, dz = v.pos.z - car.pos.z, d = Math.hypot(dx, dz);
-        if (d > r || now - (v.lastCarHit || 0) < 1200) continue;
+        // 차 높이 위로 떠 있으면(날기 · 입체기동 · 점프) 차에 안 치인다
+        if (d > r || v.pos.y - (car.pos.y || 0) > (car.height || 2.4) || now - (v.lastCarHit || 0) < 1200) continue;
         v.lastCarHit = now;
         const k = sp * 0.7;
-        this.w.send(v, { t: 'knock', x: (dx / (d || 1)) * k, z: (dz / (d || 1)) * k, up: Math.min(9, 3 + sp * 0.3) });
+        this.w.send(v, { t: 'knock', kind: 'car', x: (dx / (d || 1)) * k, z: (dz / (d || 1)) * k, up: Math.min(9, 3 + sp * 0.3) });
         this.damagePlayer(v, dmg, driver ? { name: driver.name, token: driver.token, id: driver.id } : { name: '자동차' }, car.pos);
         this.w.broadcast({ t: 'fx', k: 'carhit', p: [v.pos.x, v.pos.y + 1, v.pos.z], loc: -1 });
         this.scream(v.pos, -1, `p${v.id}`);

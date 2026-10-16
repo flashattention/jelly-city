@@ -277,6 +277,7 @@ async function startGame(session, char) {
   const others = game.players.list.size;
   ui.toast(`젤리시티에 오신 걸 환영해요, ${game.profile.name}! 🎉`);
   if (others) ui.toast(`👥 지금 ${others}명의 플레이어가 함께 있어요`);
+  if (game.gotOdm) setTimeout(() => ui.lootBanner('🪝 젤리병단 장비를 받았어요!', '핫바에서 골라 쓰세요 · 우클릭 갈고리(꾹 = 당기기) · 좌클릭 칼 · Space 가스 · 거대 젤리는 뒷목!', '#2f5d3e', ''), 1500);
   if (welcome.homeId == null) setTimeout(() => ui.toast('🏨 아직 집이 없어서 호텔에서 지내요. 부동산 🏘️ 에서 집을 살 수 있어요!'), 2000);
   if (!welcome.stats) setTimeout(() => ui.toast('시청 🏛️ 에서 일자리를 구해보세요. 숫자키로 핫바, I키로 가방!'), 4500);
 }
@@ -421,6 +422,8 @@ function enterGame(w) {
   game.inv = new Inventory(game);
   // 새 캐릭터: 고른 기본 악세서리를 가방에 넣고 착용
   if (w.starter) for (const id of Object.values(w.starter)) { const it = game.inv.add(id); if (it) game.inv.equip(it.uid); }
+  // 거대 젤리와 싸울 수 있게: 접속하면 젤리병단 장비를 준다 (없을 때만, 빈 핫바 칸에 들어간다)
+  game.gotOdm = !game.inv.count('odm_gear') && !!game.inv.add('odm_gear', 1);
   syncKeys();
   game.stats.level ||= 1; game.stats.exp ||= 0;
   game.maxMana = levelStats(game.stats.level).mana; game.mana = game.maxMana;
@@ -555,7 +558,7 @@ function setupNet() {
   net.on('rideNo', () => { if (game.player.mountSteed != null) { game.player.mountSteed = null; dismount(false); ui.toast('🐎 다른 사람이 먼저 탔어요'); } });
   net.on('titanNew', (m) => { ui.toast(`🧸 거대 젤리가 한 마리 더 나타났어요! (지금 ${m.n}마리)`); sfx('stomp', null, 10); });
   net.on('titanRaid', (m) => {
-    ui.lootBanner(`🚨 거대 젤리 ${m.n}마리 습격!`, '젤리병단 장비(🛒 젤리 택티컬)를 들고 우클릭 갈고리로 날아가 뒷목을 베세요!', '#c62828', '');
+    ui.lootBanner(`🚨 거대 젤리 ${m.n}마리 습격!`, '🪝 젤리병단 장비(가방·핫바에 있어요)를 들고 우클릭 갈고리로 날아가 뒷목을 베세요!', '#c62828', '');
     sfx('raid');
   });
   net.on('rpos', (m) => game.runners.applyPos(m.a || []));
@@ -629,11 +632,13 @@ function setupNet() {
   net.on('knock', (m) => {
     const p = game.player;
     if (p.inCar) return;
+    if (p.odm) { p.odm.vel.x += m.x; p.odm.vel.z += m.z; p.odm.vel.y += m.up; return; } // 입체기동 중엔 밀려날 뿐 뒤집히지 않는다
     p.knock = { x: m.x, z: m.z, t: 0.45 };
     if (p.flying) p.flying = false;
     p.vy = m.up; p.onGround = false;
     p.roach.jumpSquash = 1;
     if (m.wind) { ui.toast('🌪️ 돌풍에 날아갔어요!'); return; }
+    if (m.kind === 'titan') { ui.toast('🧸💥 거대 젤리에게 짓밟혀 날아갔어요!'); return; }
     // 차에 치이면 벌러덩 뒤집힌다 → ← → 번갈아 눌러서 일어나기
     p.flipped = true;
     game.flip = { n: 0, need: 10, last: null };

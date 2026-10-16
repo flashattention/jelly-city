@@ -43,7 +43,7 @@ export class Titans {
       this.spawn(this.rng.range(lo, hi));
     }
     this.addT = EVERY; this.refillT = REFILL;
-    this.w.broadcast({ t: 'sys', text: `🚨 거대 젤리 ${n}마리가 도시를 습격합니다! ${EVERY}초마다 한 마리씩 늘어나요 (최대 ${MAX}마리) · 젤리병단 장비로 뒷목을 노리세요!` });
+    this.w.broadcast({ t: 'sys', text: `🚨 거대 젤리 ${n}마리가 도시를 습격합니다! ${EVERY}초마다 한 마리씩 늘어나요 (최대 ${MAX}마리) · 젤리병단 장비(🪝 가방·핫바에 있어요, 없으면 U 상점 → 젤리 택티컬)로 뒷목을 노리세요!` });
     this.w.broadcast({ t: 'titanRaid', n });
   }
   spawn(size = this.rng.range(TITAN.minS, TITAN.maxS)) {
@@ -81,10 +81,10 @@ export class Titans {
         const ax = t.x + Math.sin(t.h) * 0.6 * t.s, az = t.z + Math.cos(t.h) * 0.6 * t.s;
         this.w.broadcast({ t: 'fx', k: 'boom', p: [ax, t.y + 0.5, az], r: 0.5 * t.s, loc: -1 });
         for (const p of outside) {
-          if (p.car >= 0 || Math.hypot(p.pos.x - ax, p.pos.z - az) > 0.55 * t.s || p.pos.y - t.y > H * 0.45) continue;
+          if (p.car >= 0 || Math.hypot(p.pos.x - ax, p.pos.z - az) > 0.55 * t.s || p.pos.y - t.y > 6) continue; // 발로 짓밟기: 땅 가까이만
           this.w.combat.damagePlayer(p, 45, { name: '🧸 거대 젤리' }, { x: t.x, y: t.y, z: t.z });
           const dx = p.pos.x - ax, dz = p.pos.z - az, L = Math.hypot(dx, dz) || 1;
-          if (!p.emote) this.w.send(p, { t: 'knock', x: (dx / L) * 14, z: (dz / L) * 14, up: 9 });
+          if (!p.emote) this.w.send(p, { t: 'knock', kind: 'titan', x: (dx / L) * 14, z: (dz / L) * 14, up: 9 });
         }
       }
     } else {
@@ -105,10 +105,9 @@ export class Titans {
     const fx = Math.sin(t.h), fz = Math.cos(t.h);
     const behind = (p.pos.x - t.x) * fx + (p.pos.z - t.z) * fz < 0.3 * t.s; // 몸 앞쪽(얼굴 쪽)만 아니면
     if (msg.w === 'odm_gear' && dn < napeReach(t.s) + 2 && behind) return this.kill(t, p);
-    if (t.noEffT > 0) return;
+    if (msg.w !== 'odm_gear' || t.noEffT > 0) return; // 다른 무기는 쏜 사람 화면에서 바로 '효과 없음'을 보여 준다
     t.noEffT = 0.6;
-    const why = msg.w !== 'odm_gear' ? '효과 없음! 젤리병단 장비로만 쓰러뜨릴 수 있어요' : '뒷목을 베어야 해요!';
-    this.w.send(p, { t: 'fx', k: 'noeffect', p: [chest.x, chest.y + 1.5, chest.z], text: why, loc: -1 });
+    this.w.send(p, { t: 'fx', k: 'noeffect', p: [chest.x, chest.y + 1.5, chest.z], text: '뒷목(빨간 과녁)을 뒤에서 베어야 해요!', loc: -1 });
   }
   kill(t, p) {
     t.dead = true; t.deadT = 14; t.state = 2;

@@ -1356,6 +1356,12 @@ export class UI {
     $('flip').classList.remove('hidden');
     $('flip-fill').style.width = `${(n / need) * 100}%`;
   }
+  // 맞혔을 때 조준점에 ✕ (block: 거대 젤리처럼 막힘)
+  hitMarker(block = false) {
+    const el = $('hitmarker');
+    el.classList.toggle('block', block);
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  }
   applyCrosshair() {
     const c = /^#[0-9a-fA-F]{6}$/.test(settings.crosshairColor || '') ? settings.crosshairColor : '#ffffff';
     $('crosshair').style.setProperty('--crosshair', c);

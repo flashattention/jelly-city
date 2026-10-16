@@ -642,3 +642,11 @@ body.bug-mode .cute-bear { display: none !important; }
 /* 상점 목록 */
 .sd-group h4 { margin: 12px 0 6px; font-family: 'Jua'; font-size: 15px; }
 .sd-row .acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* 맞힘 표시: 조준점 위에 잠깐 뜨는 ✕ (거대 젤리에 막히면 주황) */
+#hitmarker { position: fixed; left: 50%; top: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px; pointer-events: none; z-index: 12; opacity: 0; }
+#hitmarker::before, #hitmarker::after { content: ''; position: absolute; left: 50%; top: 50%; width: 30px; height: 3px; margin: -1.5px 0 0 -15px; background: linear-gradient(90deg, #fff 0 35%, transparent 35% 65%, #fff 65%); box-shadow: 0 0 3px #000; }
+#hitmarker::before { transform: rotate(45deg); } #hitmarker::after { transform: rotate(-45deg); }
+#hitmarker.block::before, #hitmarker.block::after { background: linear-gradient(90deg, #ffab40 0 35%, transparent 35% 65%, #ffab40 65%); }
+#hitmarker.show { animation: hitmark 0.22s ease-out; }
+@keyframes hitmark { 0% { opacity: 1; transform: scale(1.3); } 100% { opacity: 0; transform: scale(0.9); } }

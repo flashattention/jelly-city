@@ -722,6 +722,14 @@ export class Combat {
   // 상대 피해 보정 (활 당긴 정도 등)
   sendHit(t, w, extra = {}) {
     if (t.tt === 'rtarget') { this.g.hitRangeTarget?.(t.rt, extra.point); return; }
+    // 거대 젤리: 젤리병단 장비가 아니면 맞아도 튕겨 나간다 (맞았는지 빗나갔는지 알 수 있게 불꽃 · 문구)
+    const blocked = t.tt === 'titan' && !itemDef(w.id).odm;
+    this.g.ui.hitMarker(blocked);
+    if (blocked) {
+      const at = (extra.point || t.point)?.clone?.() || t.base.clone().setY(t.base.y + t.h * 0.5);
+      for (let i = 0; i < 10; i++) this.fx.part(at, new THREE.Vector3((Math.random() - 0.5) * 8, Math.random() * 6, (Math.random() - 0.5) * 8), Math.random() < 0.5 ? '#ffe082' : '#ffffff', 0.35, 0.3, 0, { grav: 12 });
+      if (performance.now() - (this.blockMsgT || 0) > 900) { this.blockMsgT = performance.now(); this.g.ui.floatText(at, '🛡️ 효과 없음 · 젤리병단 장비로 뒷목을!', '#ffab40'); }
+    }
     const { point, ...rest } = extra;
     void point;
     this.g.net.send({ t: 'hit', tt: t.tt, id: t.id, w: w.id, gems: w.gems, ...rest });
