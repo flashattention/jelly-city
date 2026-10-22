@@ -36,12 +36,13 @@ const game = window.attack = { me, ray: rayBoxes, // 점검용
 // ---------- 무기 · 탄 ----------
 const slots = () => [game.load.p, game.load.s, 'knife', 'nade'];
 let cur = 0, ammo = {}, nextFire = 0, reloadEnd = 0, fireLatch = false, nadeCount = 1, kickBack = 0;
-function refill() { ammo = {}; for (const id of slots()) { const w = weapon(id); if (w?.mag) ammo[id] = { mag: w.mag, res: w.mag * 3 }; } nadeCount = 1; }
+// 예비 탄은 무한: 장전만 하면 계속 쏠 수 있다
+function refill() { ammo = {}; for (const id of slots()) { const w = weapon(id); if (w?.mag) ammo[id] = { mag: w.mag }; } nadeCount = 1; }
 function curW() { return weapon(slots()[cur]); }
 // 게임 중 무기를 바꾸면: 새 무기 탄을 채우고 바로 손에 든다 (탄이 없어 쏠 때마다 멈추던 문제)
 //   이미 쓰던 무기는 남은 탄 그대로 (바꿨다 돌아와서 탄을 다시 채우지 못하게)
 function armNew() {
-  for (const id of slots()) { const w = weapon(id); if (w?.mag && !ammo[id]) ammo[id] = { mag: w.mag, res: w.mag * 3 }; }
+  for (const id of slots()) { const w = weapon(id); if (w?.mag && !ammo[id]) ammo[id] = { mag: w.mag }; }
   reloadEnd = 0; if (vm) vm.setWeapon(curW(), game.color);
   shell.send({ t: 'wpn', w: slots()[cur] }); renderSlots();
 }
@@ -53,7 +54,7 @@ function switchTo(i) {
 }
 function reload() {
   const w = curW(), a = ammo[w.id];
-  if (!a || reloadEnd || a.mag >= w.mag || a.res <= 0) return;
+  if (!a || reloadEnd || a.mag >= w.mag) return;
   reloadEnd = performance.now() + w.reload * 1000; vm.reload(w.reload); sfx('reload');
 }
 
@@ -423,7 +424,7 @@ function hud(now) {
   const w = curW(), a = ammo[w?.id];
   $('hp-n').textContent = Math.max(0, Math.round(me.hp)); $('hp-bar').firstElementChild.style.width = `${Math.max(0, me.hp)}%`;
   $('w-name').textContent = `${w?.emoji || ''} ${w?.name || ''}${reloadEnd ? ' · 장전 중…' : ''}`;
-  $('ammo-n').textContent = a ? a.mag : w?.cls === 'nade' ? nadeCount : '∞'; $('ammo-r').textContent = a ? `/ ${a.res}` : '';
+  $('ammo-n').textContent = a ? a.mag : w?.cls === 'nade' ? nadeCount : '∞'; $('ammo-r').textContent = a ? '/ ∞' : '';
   const left = Math.max(0, (game.endAt - now) / 1000);
   $('timer').textContent = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
   if (game.opts?.mode === 'tdm') { $('sc-red').textContent = `${TEAMS.red.name} ${game.score.red}`; $('sc-blue').textContent = `${game.score.blue} ${TEAMS.blue.name}`; $('sc-red').classList.remove('hidden'); $('sc-blue').classList.remove('hidden'); }
@@ -472,7 +473,7 @@ function frame() {
   const dt = Math.min(0.05, clock.getDelta()), now = performance.now();
   t += dt;
   if (game.mode === 'play') {
-    if (reloadEnd && now >= reloadEnd) { const w = curW(), a = ammo[w.id]; if (a) { const need = w.mag - a.mag, take = Math.min(need, a.res); a.mag += take; a.res -= take; } reloadEnd = 0; }
+    if (reloadEnd && now >= reloadEnd) { const w = curW(), a = ammo[w.id]; if (a) a.mag = w.mag; reloadEnd = 0; }
     const typing = !locked();
     const inp = { f: typing ? 0 : (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0), s: typing ? 0 : (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0), jump: keys.has('Space'), crouch: keys.has('KeyC') || keys.has('ControlLeft'), walk: keys.has('ShiftLeft'), ads: mouseR };
     if (me.alive) {
