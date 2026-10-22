@@ -61,9 +61,19 @@ export function poseBear(b, st, dt) {
   }
 }
 
+// 젤리 몸이 반투명이면 뒤에서 볼 때 앞쪽 주둥이 · 코가 비쳐서, 뒤로 달리는 것처럼 보인다
+// → 드림 러너에서는 몸을 불투명하게 (반짝이는 하이라이트만 반투명으로 남긴다)
+const solid = new Map();
+function opaque(m) {
+  if (!m?.transparent || m.opacity < 0.65) return m;
+  let c = solid.get(m.uuid);
+  if (!c) { c = m.clone(); c.transparent = false; c.opacity = 1; c.depthWrite = true; solid.set(m.uuid, c); }
+  return c;
+}
 export function makeBear(p = {}) {
   const r = new Roach({ own: true, seed: p.name || 'dream', color: p.color || '#8a5634', age: 25, gender: p.gender, look: p.look, accessories: p.acc || [] });
-  r.root.traverse((o) => { if (o.isMesh) { o.castShadow = false; } });
+  r.root.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.material = Array.isArray(o.material) ? o.material.map(opaque) : opaque(o.material); } });
+  r.bodyM = opaque(r.bodyM);
   return r;
 }
 
