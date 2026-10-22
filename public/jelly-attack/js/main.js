@@ -108,7 +108,7 @@ function optsUI(el, o, editable, set) {
 }
 function renderTitleOpts() { optsUI($('title-opts'), game.pick, true, (o) => { Object.assign(game.pick, o); store.set(PICK_KEY, JSON.stringify(game.pick)); renderTitleOpts(); previewMap(); }); }
 const shell = new Shell({
-  key: 'jellyattack', title: '🔫 젤리어택', subtitle: '젤리시티 무기로 겨루는 곰돌이 팀 슈팅! 딸기팀 vs 소다팀', wsPath: '/attack-ws', max: 12,
+  key: 'jellyattack', title: '🔫 젤리어택', subtitle: '젤리시티 무기로 겨루는 곰돌이 팀 슈팅!<br>딸기팀 vs 소다팀', wsPath: '/attack-ws', max: 12,
   multiLabel: '👥 같이 하기', roomIcon: '🔫', startLabel: '🔫 작전 시작!',
   keysHelp: 'WASD 이동 · 마우스 조준 · 클릭 사격 · 우클릭 조준경 · R 장전 · 1~4 무기 · G 수류탄 · Space 점프 · Shift 달리기 · C/Ctrl 앉기 · Tab 점수 · B 무기 고르기',
   buttons: [{ id: 'practice-btn', label: '🎯 연습전 <small>봇과 바로 대결</small>', onClick: () => practice() }],
