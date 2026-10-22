@@ -30,7 +30,7 @@ export class Kart {
     this.idx = 0; this.lap = 0; this.half = false; this.done = false; this.time = 0; this.finishT = 0;
     this.drift = false; this.driftDir = 0; this.driftT = 0; this.gauge = 0; this.nitro = 0; this.boostT = 0; this.boostP = 0;
     this.spinT = 0; this.items = []; this.eff = { shield: 0, ghost: 0, magnet: 0, shrink: 0 };
-    this.wrongT = 0; this.bumpT = 0; this.steer = 0;
+    this.wrongT = 0; this.bumpT = 0; this.steer = 0; this.yawRate = 0;
     this.buildModel(o.profile || {});
   }
   // ---------- 모델 ----------
@@ -108,24 +108,29 @@ export class Kart {
     if (this.spinT > 0) { this.spinT -= dt; this.v *= Math.exp(-dt * 2.5); this.drift = false; inp = { dir: 0 }; }
     const fwd = Math.sign(this.v) || 1;
     // 핸들: 빠를수록 조금 덜 돈다 · 드리프트면 더 많이
-    this.steer += ((inp.dir || 0) - this.steer) * Math.min(1, dt * 10);
+    this.steer += ((inp.dir || 0) - this.steer) * Math.min(1, dt * (this.drift ? 6 : 9));
     const sp = Math.abs(this.v), grip = Math.min(1, sp / 10) * (1 - 0.35 * sp / MAX);
     let turn = this.steer * TURN * grip * fwd;
     // 드리프트 시작 · 유지 · 끝
     if (inp.drift && Math.abs(inp.dir || 0) > 0.2 && sp > 12 && !this.drift && this.spinT <= 0) { this.drift = true; this.driftDir = Math.sign(inp.dir); this.driftT = 0; fx?.('drift'); }
     if (this.drift) {
       this.driftT += dt;
-      turn = (this.steer * 0.9 + this.driftDir * 0.75) * TURN * 1.05;
-      this.vl += (-this.driftDir * sp * 0.32 - this.vl) * Math.min(1, dt * 4);
+      // 드리프트: 0.35초에 걸쳐 서서히 들어가고, 핸들을 안쪽으로 꺾으면 조금 더 · 바깥쪽이면 풀린다 (너무 급하지 않게)
+      const dk = Math.min(1, this.driftT / 0.35);
+      const dturn = (this.steer * 0.55 + this.driftDir * 0.45) * TURN * Math.max(0.6, grip) * 1.25; // 안쪽으로 꺾으면 보통보다 조금 더 (급하진 않게)
+      turn += (dturn - turn) * dk;
+      this.vl += (-this.driftDir * sp * 0.2 - this.vl) * Math.min(1, dt * 3); // 바깥으로 살짝 미끄러진다 (너무 세면 벽에 붙는다)
       this.v *= Math.exp(-dt * 0.1);
       if (mode !== 'item') this.gauge += dt * 0.32 * (sp / MAX) * (1 + this.driftT * 0.4);
       if (!inp.drift || sp < 8) {
         this.drift = false;
         if (this.driftT > 0.5) { this.boostT = Math.max(this.boostT, 0.55); this.boostP = Math.max(this.boostP, 0.22); fx?.('miniboost'); } // 드리프트 끝 순간 부스터
       }
-    } else this.vl *= Math.exp(-dt * 6);
+    } else this.vl *= Math.exp(-dt * 2.8); // 드리프트를 풀어도 옆으로 미끄러지던 힘이 서서히 줄어든다
     if (this.gauge >= 1) { this.gauge = 0; if (this.nitro < 2) { this.nitro++; fx?.('gauge'); } }
-    this.yaw += turn * dt;
+    // 도는 빠르기도 부드럽게 바뀐다 (확 꺾이지 않게)
+    this.yawRate += (turn - this.yawRate) * Math.min(1, dt * (this.bot ? 14 : this.drift ? 5 : 7)); // AI 는 빠르게 반응 (사람 손맛은 부드럽게)
+    this.yaw += this.yawRate * dt;
     // 니트로
     if (inp.use && mode !== 'item' && this.nitro > 0 && this.boostT < 0.3) { this.nitro--; this.boostT = 2.2; this.boostP = 0.5; fx?.('nitro'); }
     // 속도
@@ -180,8 +185,8 @@ export class Kart {
     g.position.copy(this.pos); g.rotation.y = this.yaw;
     const sp = Math.abs(this.v);
     // 몸통: 드리프트면 옆으로 돌아 미끄러지는 느낌, 핸들 따라 기울기, 맞으면 빙글빙글
-    const want = this.drift ? this.driftDir * 0.45 : 0;
-    this.body.rotation.y += (want - this.body.rotation.y) * Math.min(1, dt * 8);
+    const want = this.drift ? this.driftDir * 0.32 * Math.min(1, this.driftT / 0.35) : 0;
+    this.body.rotation.y += (want - this.body.rotation.y) * Math.min(1, dt * 4.5);
     if (this.spinT > 0) this.body.rotation.y += dt * 14;
     this.body.rotation.z += ((-this.steer * 0.08 * Math.min(1, sp / 15)) - this.body.rotation.z) * Math.min(1, dt * 6);
     this.body.position.y = Math.sin(t * 30) * 0.015 * Math.min(1, sp / 10);

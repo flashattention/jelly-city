@@ -344,7 +344,7 @@ function followCam(dt) {
   const sx = Math.sin(k.yaw), sz = Math.cos(k.yaw);
   const back = 7 + Math.min(2, Math.abs(k.v) / 20), up = 2.9;
   camPos.set(k.pos.x - sx * back, k.pos.y + up, k.pos.z - sz * back);
-  const kk = 1 - Math.exp(-dt * (game.mode === 'race' ? 7 : 3));
+  const kk = 1 - Math.exp(-dt * (game.mode === 'race' ? 4.5 : 3)); // 카메라는 살짝 늦게 따라와서 드리프트가 부드럽게 보인다
   camera.position.lerp(camPos, kk);
   camLook.set(k.pos.x + sx * 6, k.pos.y + 1, k.pos.z + sz * 6);
   camera.lookAt(camLook);
