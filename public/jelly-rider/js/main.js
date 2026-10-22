@@ -70,7 +70,7 @@ function readInput() {
   // 오른쪽 = 핸들 오른쪽. 카트 기준으로는 yaw 를 줄이는 쪽
   return { up: keys.has('ArrowUp') || keys.has('KeyW') || (coarse && !touch.has('brake')), down: keys.has('ArrowDown') || keys.has('KeyS') || touch.has('brake'), dir: (L ? 1 : 0) - (R ? 1 : 0), drift: keys.has('ShiftLeft') || keys.has('ShiftRight') || touch.has('drift'), use: usePressed };
 }
-function muteBtn() { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; if (sound.muted) engine(0); }
+function muteBtn() { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; if (sound.muted) engine(0); shell.syncSound(); }
 $('b-mute').onclick = muteBtn;
 $('b-mute').textContent = sound.muted ? '🔇' : '🔊';
 $('b-quit').onclick = () => { if (game.multi) { shell.send({ t: 'leave' }); shell.room = null; endRace(); shell.afterLeave(); } else toTitle(); };
@@ -94,6 +94,7 @@ function renderTitleOpts() {
   modeSeg(el, game.pick, true, (o) => { Object.assign(game.pick, o); store.set(MODE_KEY, game.pick.mode); renderTitleOpts(); }, false);
 }
 const shell = new Shell({
+  sound: { muted: () => sound.muted, toggle: () => { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; if (sound.muted) engine(0); } },
   key: 'jellyrider', title: '🏁 젤리라이더', subtitle: '꿈나라 트랙을 곰돌이 카트로 질주!<br>드리프트로 니트로를 모아 역전해요', wsPath: '/rider-ws', max: 12,
   multiLabel: '👥 같이 달리기', roomIcon: '🏁', startLabel: '🏁 다 같이 출발!',
   keysHelp: '↑ 가속 · ↓ 브레이크 · ← → 핸들 · Shift 드리프트(→ 니트로) · Ctrl/Space 니트로·아이템 (↓+아이템: 물폭탄 뒤로 떨구기) · R 트랙으로 · M 소리',

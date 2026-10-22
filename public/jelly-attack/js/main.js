@@ -88,11 +88,12 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyQ' && me.alive) switchTo(cur === 0 ? 1 : 0);
   if (e.code === 'KeyG' && me.alive && nadeCount > 0) { const was = cur; switchTo(3); throwNade(); setTimeout(() => switchTo(was === 3 ? 0 : was), 400); }
   if (e.code === 'KeyB') openLoadout();
-  if (e.code === 'KeyM') { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; }
+  if (e.code === 'KeyM') muteBtn();
 });
 window.addEventListener('keyup', (e) => { keys.delete(e.code); if (e.code === 'Tab') $('scoreboard').classList.add('hidden'); });
 window.addEventListener('blur', () => { keys.clear(); mouseL = mouseR = false; });
-$('b-mute').onclick = () => { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; };
+function muteBtn() { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; shell.syncSound(); }
+$('b-mute').onclick = muteBtn;
 $('b-mute').textContent = sound.muted ? '🔇' : '🔊';
 $('b-quit').onclick = () => quit();
 
@@ -108,6 +109,7 @@ function optsUI(el, o, editable, set) {
 }
 function renderTitleOpts() { optsUI($('title-opts'), game.pick, true, (o) => { Object.assign(game.pick, o); store.set(PICK_KEY, JSON.stringify(game.pick)); renderTitleOpts(); previewMap(); }); }
 const shell = new Shell({
+  sound: { muted: () => sound.muted, toggle: () => { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; } },
   key: 'jellyattack', title: '🔫 젤리어택', subtitle: '젤리시티 무기로 겨루는 곰돌이 팀 슈팅!<br>딸기팀 vs 소다팀', wsPath: '/attack-ws', max: 12,
   multiLabel: '👥 같이 하기', roomIcon: '🔫', startLabel: '🔫 작전 시작!',
   keysHelp: 'WASD 이동 · 마우스 조준 · 클릭 사격 · 우클릭 조준경 · R 장전 · 1~4 무기 · G 수류탄 · Space 점프 · Shift 달리기 · C/Ctrl 앉기 · Tab 점수 · B 무기 고르기',

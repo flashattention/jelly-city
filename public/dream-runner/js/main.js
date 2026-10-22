@@ -93,9 +93,11 @@ function show(id) { for (const s of screens) $(s).classList.toggle('hidden', s !
 function hideScreens() { for (const s of screens) $(s).classList.add('hidden'); }
 function toast(text, ms = 1600) { const t = $('toast'); t.textContent = text; t.classList.remove('hidden'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.add('hidden'), ms); }
 function err(text) { $('err').textContent = text || ''; }
-function muteBtn() { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; }
-$('b-mute').onclick = muteBtn;
-$('b-mute').textContent = sound.muted ? '🔇' : '🔊';
+// 소리 단추: 게임 화면(b-mute) · 처음 화면 · 방(data-snd) 모두 같이
+function syncSound() { document.querySelectorAll('#b-mute, [data-snd]').forEach((b) => { b.textContent = sound.muted ? '🔇' : '🔊'; }); }
+function muteBtn() { toggleMute(); syncSound(); }
+document.querySelectorAll('#b-mute, [data-snd]').forEach((b) => { b.onclick = muteBtn; });
+syncSound();
 $('b-quit').onclick = () => { if (game.multi) { net.send({ t: 'leave' }); leaveRun(); } else toTitle(); };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 

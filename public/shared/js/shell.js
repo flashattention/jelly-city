@@ -24,7 +24,7 @@ function deHangul(str) {
 export const codeOf = (v) => deHangul(v).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
 
 export class Shell {
-  // o = { key, title, subtitle, wsPath, max, keysHelp, multiLabel, buttons: [{ id, label, cls, solo }], options: { title(el, shell), room(el, opts, host, shell) }, onStart(m), onFinish(m), extraRow: [{ label, onClick }] }
+  // o = { key, title, subtitle, sound: { muted(), toggle() }, wsPath, max, keysHelp, multiLabel, buttons: [{ id, label, cls, solo }], options: { title(el, shell), room(el, opts, host, shell) }, onStart(m), onFinish(m), extraRow: [{ label, onClick }] }
   constructor(o) {
     this.o = o;
     this.KEY = { char: `${o.key}.char`, nick: `${o.key}.nick` };
@@ -41,6 +41,7 @@ export class Shell {
     wrap.innerHTML = `
     <div id="title" class="screen"><div class="card">
       <a href="/" class="home-btn" title="메인으로">🏠</a>
+      ${o.sound ? '<button class="home-btn snd-btn" data-snd title="소리 켜기 · 끄기 (M)">🔊</button>' : ''}
       <div class="logo">${o.title}</div>
       <div class="sub">${o.subtitle || ''}</div>
       <div id="login-box" class="hidden">
@@ -63,7 +64,7 @@ export class Shell {
       <div id="err"></div>
     </div></div>
     <div id="lobby" class="screen hidden"><div class="card wide">
-      <h2>${o.multiLabel || '👥 같이 하기'}</h2>
+      ${o.sound ? '<button class="home-btn snd-btn" data-snd title="소리 켜기 · 끄기 (M)">🔊</button>' : ''}<h2>${o.multiLabel || '👥 같이 하기'}</h2>
       <div class="sub">방을 만들거나 빠른 참가 · 초대 코드로 친구를 불러요</div>
       <div class="row"><button id="quick-btn" class="btn big">⚡ 빠른 참가</button><input id="room-name" maxlength="20" placeholder="새 방 이름" /><button id="create-btn" class="btn alt">＋ 방 만들기</button></div>
       <div class="row"><input id="code-in2" maxlength="6" placeholder="초대 코드 6자리" autocomplete="off" /><button id="code-btn2" class="btn ghost">🎟️ 코드로 참가</button></div>
@@ -71,7 +72,7 @@ export class Shell {
       <div class="row2"><button id="lobby-back" class="btn ghost">← 돌아가기</button></div>
     </div></div>
     <div id="room" class="screen hidden"><div class="card wide">
-      <h2 id="room-title"></h2>
+      ${o.sound ? '<button class="home-btn snd-btn" data-snd title="소리 켜기 · 끄기 (M)">🔊</button>' : ''}<h2 id="room-title"></h2>
       <div id="room-opts"></div>
       <div id="room-code"><span>초대 코드</span><b id="code-txt"></b><button id="copy-link" class="btn alt">🔗 링크 복사</button><button id="copy-code" class="btn ghost">코드 복사</button></div>
       <div class="note">링크를 보내거나 코드를 알려 주면 로그인 안 한 친구도 들어올 수 있어요</div>
@@ -85,8 +86,12 @@ export class Shell {
     document.body.append(...wrap.children);
   }
   // ---------- 동작 ----------
+  // 소리 단추 (o.sound = { muted(), toggle() }): 처음 화면 · 방 · 게임 화면 단추 모두 같은 모양으로
+  syncSound() { if (!this.o.sound) return; const m = this.o.sound.muted(); document.querySelectorAll('[data-snd]').forEach((b) => { b.textContent = m ? '🔇' : '🔊'; }); }
   wire() {
     const o = this.o;
+    document.querySelectorAll('[data-snd]').forEach((b) => { b.onclick = () => { o.sound.toggle(); this.syncSound(); }; });
+    this.syncSound();
     $('pw').addEventListener('input', () => { store.set('roachcity.pw', $('pw').value); this.err(''); });
     $('guest-btn').onclick = async () => { try { await account.login({ guest: true }); this.renderAccount(); } catch (e) { this.err(e.message); } };
     $('dev-btn').onclick = async () => { try { await account.login({ dev: $('dev-name').value || '젤리' }); this.renderAccount(); } catch (e) { this.err(e.message); } };
