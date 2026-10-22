@@ -21,13 +21,16 @@ jobs:
           cache: npm
       - run: npm ci
       - name: 문법 검사
-        run: for f in server/*.js public/js/*.js; do node --check "$f"; done
+        run: for f in server/*.js server/*/*.js public/*/js/*.js; do node --check "$f" || exit 1; done
       - name: 서버 기동 테스트
         run: |
           PORT=8123 DATA_DIR=/tmp/rc node server/index.js &
           for i in $(seq 1 30); do curl -sf localhost:8123/healthz && break; sleep 1; done
           curl -sf localhost:8123/api/status
           curl -sf localhost:8123/ > /dev/null
+          curl -sf localhost:8123/jelly-city/ > /dev/null
+          curl -sf localhost:8123/dream-runner/ > /dev/null
+          curl -sf localhost:8123/api/dream/board
 
   deploy:
     needs: check
