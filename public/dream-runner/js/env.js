@@ -274,10 +274,11 @@ export class Env {
       const m = P.pts.material;
       m.opacity += ((P.dying ? 0 : 1) - m.opacity) * Math.min(1, dt * 2);
       const pos = P.pts.geometry.attributes.position, a = pos.array, d = P.d;
-      const box = d.high ? { x: 220, y0: 60, y1: 220, z0: 60, z1: 600 } : { x: 28, y0: -8, y1: 24, z0: -6, z1: 110 };
+      // centered: 카메라 둘레 전체 (방향이 계속 바뀌는 젤리라이더) · 아니면 달리는 앞쪽(드림 러너)
+      const box = d.high ? { x: 220, y0: 60, y1: 220, z0: 60, z1: 600 } : this.centered ? { x: 45, y0: -6, y1: 26, z0: -45, z1: 45 } : { x: 28, y0: -8, y1: 24, z0: -6, z1: 110 };
       for (let i = 0; i < P.n; i++) {
         let x = a[i * 3], y = a[i * 3 + 1], z = a[i * 3 + 2];
-        const out = !P.init || z > cp.z + box.z0 + 6 || z < cp.z - box.z1 - 10 || y < cp.y + box.y0 - 2 || y > cp.y + box.y1 + 2 || Math.abs(x - cp.x) > box.x + 2;
+        const out = !P.init || (this.centered && !d.high ? Math.abs(z - cp.z) > 47 : z > cp.z + box.z0 + 6 || z < cp.z - box.z1 - 10) || y < cp.y + box.y0 - 2 || y > cp.y + box.y1 + 2 || Math.abs(x - cp.x) > box.x + 2;
         if (out) {
           x = cp.x + (R() * 2 - 1) * box.x;
           z = cp.z - box.z0 - R() * (box.z1 - box.z0);

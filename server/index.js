@@ -17,6 +17,8 @@ import { llmEnabled, MODEL } from './jelly-city/llm.js';
 import { GOOGLE_CLIENT_ID, DEV_LOGIN, verifyGoogle, readJson } from './auth.js';
 import { DreamBoard, dreamApi } from './dream-runner/leaderboard.js';
 import { DreamRooms } from './dream-runner/rooms.js';
+import { RiderRooms } from './jelly-rider/rooms.js';
+import { Records } from './shared/records.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
@@ -36,6 +38,13 @@ try {
 const world = new World({ dataDir: DATA_DIR });
 const dreamBoard = new DreamBoard(DATA_DIR); // 드림 러너 리더보드
 const dreamRooms = new DreamRooms((sid) => world.userOf(sid)); // 드림 러너 같이 달리기 방
+// 젤리라이더: 방 · 트랙별 최고 기록 (짧을수록 좋다)
+const RIDER_TRACKS = ['candy', 'cloud', 'neon', 'lava', 'sakura', 'synth', 'snow', 'deep'];
+const riderRooms = new RiderRooms((sid) => world.userOf(sid));
+const riderRecords = new Records(DATA_DIR, 'jelly-rider', {
+  boards: RIDER_TRACKS, better: (a, b) => a.value < b.value, value: (b) => Math.round(Number(b.time) * 1000) / 1000,
+  check: (b) => (Number.isFinite(Number(b.time)) && Number(b.time) >= 40 && Number(b.time) <= 3600 ? null : '기록이 이상해요'),
+});
 // 옛 주소: REDIRECT_TO 가 있으면 모든 요청을 새 주소로 보낸다
 const REDIRECT_TO = (process.env.REDIRECT_TO || '').replace(/\/$/, '');
 
@@ -76,6 +85,7 @@ async function api(req, res, url) {
   }
   // 드림 러너 (계정 · 로그인은 젤리시티와 같이 쓴다)
   if (url.pathname.startsWith('/api/dream/')) return dreamApi(req, res, url, world.userOf(sid), dreamBoard, json);
+  if (url.pathname.startsWith('/api/rider/')) return riderRecords.api(req, res, url, world.userOf(sid), json, '/api/rider');
   const who = world.userOf(sid);
   if (!who) return json(res, 401, { error: 'login' });
   if (url.pathname === '/api/me') return json(res, 200, { user: world.publicUser(who.user), chars: world.charList(who.sub), admin: isAdmin(who.user) });
@@ -123,6 +133,10 @@ async function api(req, res, url) {
     const body = await readJson(req);
     try { return json(res, 200, { char: world.createChar(who.sub, body), chars: world.charList(who.sub) }); } catch (e) { return json(res, 400, { error: e.message }); }
   }
+  if (/^\/api\/chars\/[0-9a-f]+\/look$/.test(url.pathname) && req.method === 'POST') {
+    const body = await readJson(req);
+    try { world.restyleChar(who.sub, url.pathname.split('/')[3], body); return json(res, 200, { chars: world.charList(who.sub) }); } catch (e) { return json(res, 400, { error: e.message }); }
+  }
   if (url.pathname.startsWith('/api/chars/') && req.method === 'DELETE') {
     try { world.deleteChar(who.sub, url.pathname.slice('/api/chars/'.length)); return json(res, 200, { chars: world.charList(who.sub) }); } catch (e) { return json(res, 400, { error: e.message }); }
   }
@@ -169,10 +183,12 @@ const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024, perMess
 // 드림 러너 방(최대 12명): 따로 연결
 const dreamWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
 dreamWss.on('connection', (ws) => dreamRooms.connect(ws));
+const riderWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
+riderWss.on('connection', (ws) => riderRooms.connect(ws));
 // 주소로 나눠 받는다: /ws = 젤리시티 · /dream-ws = 드림 러너
 server.on('upgrade', (req, socket, head) => {
   const p = new URL(req.url, 'http://x').pathname;
-  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : null;
+  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/rider-ws' ? riderWss : null;
   if (!target) { socket.destroy(); return; }
   target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
 });
@@ -227,7 +243,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
     stopping = true;
     world.broadcast({ t: 'sys', text: '🔧 서버가 업데이트돼요! 잠시 후 자동으로 다시 접속해요' });
     try { world.save(); console.log('💾 세계를 저장했어요'); } catch (e) { console.error('저장 실패', e); }
-    dreamBoard.save();
+    dreamBoard.save(); riderRecords.save();
     setTimeout(() => process.exit(0), 500);
   });
 }

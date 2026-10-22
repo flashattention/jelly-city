@@ -87,6 +87,22 @@ function schedule() {
   }
 }
 
+// 젤리라이더: 엔진 소리 (속도 0~1, 부스터면 더 높게). 0 이면 끈다
+let eng = null;
+export function engine(level, boost = 0) {
+  if (!ensure() || sound.muted) { if (eng) eng.g.gain.value = 0; return; }
+  if (!eng) {
+    const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    o1.type = 'sawtooth'; o2.type = 'square'; f.type = 'lowpass'; f.frequency.value = 700; g.gain.value = 0;
+    o1.connect(f); o2.connect(f); f.connect(g); g.connect(sfxBus); o1.start(); o2.start();
+    eng = { o1, o2, f, g };
+  }
+  const t = ctx.currentTime;
+  eng.o1.frequency.setTargetAtTime(55 + level * 120 + boost * 60, t, 0.08);
+  eng.o2.frequency.setTargetAtTime(27 + level * 60 + boost * 30, t, 0.08);
+  eng.f.frequency.setTargetAtTime(500 + level * 900 + boost * 800, t, 0.1);
+  eng.g.gain.setTargetAtTime(level > 0.001 ? 0.035 + level * 0.03 : 0, t, 0.1);
+}
 export function sfx(name, arg) {
   if (!ensure() || sound.muted) return;
   const t = ctx.currentTime;
@@ -113,6 +129,18 @@ export function sfx(name, arg) {
     case 'use_teleport': for (let i = 0; i < 8; i++) tone(sfxBus, t + i * 0.03, 0.2, midi(96 - i * 3), { type: 'sine', vol: 0.06 }); hiss(sfxBus, t, 0.4, { f: 6000, vol: 0.08, f2: 1500 }); break;
     case 'shieldbreak': tone(sfxBus, t, 0.3, midi(88), { type: 'triangle', vol: 0.12, f2: midi(76) }); hiss(sfxBus, t, 0.3, { f: 5000, vol: 0.1 }); break;
     case 'trapped': tone(sfxBus, t, 0.5, 180, { type: 'sine', vol: 0.18, f2: 80 }); hiss(sfxBus, t, 0.4, { f: 700, vol: 0.1, type: 'lowpass' }); break;
+    case 'drift': hiss(sfxBus, t, 0.25, { f: 2500, vol: 0.06, type: 'bandpass' }); break;
+    case 'nitro': hiss(sfxBus, t, 1.4, { f: 400, vol: 0.25, type: 'bandpass', f2: 5000 }); tone(sfxBus, t, 1, 80, { type: 'sawtooth', vol: 0.08, f2: 320, lp: 1500 }); break;
+    case 'gauge': for (let i = 0; i < 3; i++) tone(sfxBus, t + i * 0.06, 0.2, midi(84 + i * 4), { type: 'square', vol: 0.05, lp: 3000 }); break;
+    case 'lap': for (let i = 0; i < 3; i++) tone(sfxBus, t + i * 0.1, 0.25, midi(76 + i * 5), { type: 'triangle', vol: 0.1 }); break;
+    case 'finalLap': for (let i = 0; i < 5; i++) tone(sfxBus, t + i * 0.09, 0.3, midi(72 + [0, 4, 7, 12, 16][i]), { type: 'square', vol: 0.07, lp: 3000 }); break;
+    case 'finish': for (let i = 0; i < 8; i++) tone(sfxBus, t + i * 0.08, 0.5, midi(72 + [0, 4, 7, 12, 7, 12, 16, 19][i]), { type: 'triangle', vol: 0.1 }); break;
+    case 'bump': tone(sfxBus, t, 0.15, 110, { type: 'square', vol: 0.12, f2: 50, lp: 700 }); hiss(sfxBus, t, 0.1, { f: 900, vol: 0.12, type: 'lowpass' }); break;
+    case 'spin': for (let i = 0; i < 6; i++) tone(sfxBus, t + i * 0.08, 0.12, 600 - i * 60, { type: 'triangle', vol: 0.08 }); break;
+    case 'missile': hiss(sfxBus, t, 0.8, { f: 1500, vol: 0.12, type: 'bandpass', f2: 3500 }); break;
+    case 'boom': tone(sfxBus, t, 0.6, 80, { type: 'sine', vol: 0.35, f2: 30 }); hiss(sfxBus, t, 0.5, { f: 1500, vol: 0.25, type: 'lowpass', f2: 200 }); break;
+    case 'zap': for (let i = 0; i < 5; i++) hiss(sfxBus, t + i * 0.05, 0.05, { f: 6000, vol: 0.15 }); tone(sfxBus, t, 0.4, 900, { type: 'sawtooth', vol: 0.06, f2: 120, lp: 3000 }); break;
+    case 'light': tone(sfxBus, t, 0.25, arg ? 1046 : 523, { type: 'square', vol: 0.08, lp: 3000 }); break;
     case 'beep': tone(sfxBus, t, 0.18, arg ? 880 : 520, { type: 'square', vol: 0.08, lp: 3000 }); break;
     case 'best': for (let i = 0; i < 6; i++) tone(sfxBus, t + i * 0.09, 0.4, midi(72 + [0, 4, 7, 12, 16, 19][i]), { type: 'triangle', vol: 0.1 }); break;
   }

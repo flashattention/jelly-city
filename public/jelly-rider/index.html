@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>젤리라이더</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/css/shell.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="speedlines"></div>
+  <!-- 달리는 동안 -->
+  <div id="hud" class="hidden">
+    <div class="hud-l"><div id="h-pos">1<small>/6</small></div><div id="h-lap">LAP 1/3</div><div id="h-time">0:00.000</div></div>
+    <canvas id="minimap" width="170" height="170"></canvas>
+    <div class="hud-r"><button id="b-mute" title="소리 (M)">🔊</button><button id="b-quit" title="그만하기">✕</button></div>
+    <div id="speedo"><b id="h-speed">0</b><small>km/h</small></div>
+    <div id="nitro"><div class="ns" id="ns0"></div><div class="ns" id="ns1"></div><div id="gauge"><i></i></div><span class="key">Ctrl</span></div>
+    <div id="itembar" class="hidden"><div class="slot" id="slot0"></div><div class="slot" id="slot1"></div><span class="key">Ctrl</span></div>
+    <div id="teamrace" class="hidden"></div>
+  </div>
+  <div id="lights" class="hidden"><i></i><i></i><i></i><i class="go"></i></div>
+  <div id="banner" class="hidden"></div>
+  <div id="wrong" class="hidden">⛔ 역주행!</div>
+  <div id="howto" class="hidden">
+    <div><kbd>↑</kbd><kbd>W</kbd> 가속 · <kbd>↓</kbd><kbd>S</kbd> 브레이크</div>
+    <div><kbd>←</kbd><kbd>→</kbd><kbd>A</kbd><kbd>D</kbd> 핸들</div>
+    <div><kbd class="wide">Shift</kbd> 꾹 + 핸들 = 드리프트 → 게이지 → 니트로</div>
+    <div><kbd>Ctrl</kbd><kbd class="wide">Space</kbd> 니트로 · 아이템 · <kbd>R</kbd> 트랙으로</div>
+  </div>
+  <div id="touch" class="hidden">
+    <div class="t-l"><button data-k="left">◀</button><button data-k="right">▶</button></div>
+    <div class="t-r"><button data-k="brake">⏬</button><button data-k="drift">〰️</button><button data-k="use" class="big">⚡</button></div>
+  </div>
+  <!-- 결과 -->
+  <div id="over" class="screen hidden"><div class="card wide">
+    <div id="ov-title"></div>
+    <div id="ov-me"></div>
+    <div id="ov-team"></div>
+    <div id="ov-rank" class="board"></div>
+    <div id="ov-save" class="hidden"><div class="sub">로그인하지 않았어요. 기록판에 남길 임시 닉네임을 정해 주세요</div><div class="row"><input id="ov-nick" maxlength="14" placeholder="임시 닉네임" /><button id="ov-save-btn" class="btn alt">🏆 기록 남기기</button></div></div>
+    <div id="ov-best"></div>
+    <div class="row2"><button id="again-btn" class="btn big">🔁 다시 달리기</button><button id="home-btn" class="btn ghost">처음으로</button></div>
+  </div></div>
+  <!-- 기록판 -->
+  <div id="board" class="screen hidden"><div class="card wide">
+    <h2>🏆 트랙 최고 기록</h2>
+    <div class="sub">스피드전 3바퀴 기록 · 짧을수록 좋아요</div>
+    <div id="board-tracks" class="track-pick small"></div>
+    <div id="board-list" class="board"></div>
+    <div class="row2"><button id="board-close" class="btn ghost">닫기</button></div>
+  </div></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

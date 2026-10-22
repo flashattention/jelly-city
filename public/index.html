@@ -7,95 +7,75 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet" />
-  <style>
-    :root { --ink: #fffaf3; --soft: rgba(255, 250, 243, 0.72); }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; min-height: 100%; }
-    body {
-      font-family: 'Gowun Dodum', sans-serif; color: var(--ink);
-      background: radial-gradient(120% 90% at 20% 10%, #ff9ec4 0%, transparent 55%), radial-gradient(110% 80% at 85% 20%, #8fa8ff 0%, transparent 55%), radial-gradient(120% 100% at 50% 110%, #2b1d5c 0%, #140d2e 70%);
-      background-color: #140d2e; min-height: 100vh; overflow-x: hidden;
-    }
-    .bubbles span { position: fixed; border-radius: 50%; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.55), rgba(255,255,255,.05) 60%); animation: float linear infinite; pointer-events: none; }
-    @keyframes float { from { transform: translateY(110vh); } to { transform: translateY(-20vh); } }
-    header { text-align: center; padding: 56px 16px 4px; }
-    h1 { font-family: 'Jua', sans-serif; font-size: clamp(40px, 8vw, 72px); margin: 0; letter-spacing: 1px; text-shadow: 0 6px 0 rgba(0,0,0,.18), 0 0 30px rgba(255,180,220,.6); }
-    header p { color: var(--soft); margin: 10px 0 0; font-size: 17px; }
-    .games { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 980px; margin: 32px auto 48px; padding: 0 16px; }
-    .card { position: relative; display: block; text-decoration: none; color: var(--ink); border-radius: 28px; overflow: hidden; min-height: 360px; box-shadow: 0 20px 50px rgba(0,0,0,.35); transition: transform .25s, box-shadow .25s; isolation: isolate; }
-    .card:hover, .card:focus-visible { transform: translateY(-6px) rotate(-.4deg); box-shadow: 0 30px 70px rgba(0,0,0,.45); outline: none; }
-    .art { position: absolute; inset: 0; z-index: -1; }
-    .city .art { background: linear-gradient(180deg, #8fd3ff 0%, #c8ecff 55%, #9be39b 56%, #6cc46c 100%); }
-    .city .art i { position: absolute; bottom: 44%; border-radius: 6px 6px 0 0; }
-    .city .bear { position: absolute; left: 50%; bottom: 18%; width: 120px; height: 140px; transform: translateX(-50%); animation: bob 1.4s ease-in-out infinite; }
-    .dream .art { background: linear-gradient(180deg, #120a35 0%, #3b1f7a 45%, #ff8fb8 100%); overflow: hidden; }
-    .dream .art .moon { position: absolute; right: 14%; top: 12%; width: 70px; height: 70px; border-radius: 50%; box-shadow: -14px 6px 0 0 #fff4c2; }
-    .dream .art .star { position: absolute; width: 3px; height: 3px; background: #fff; border-radius: 50%; animation: tw 2.4s ease-in-out infinite; }
-    .dream .art .road { position: absolute; left: 50%; bottom: -10%; width: 70%; height: 70%; transform: translateX(-50%) perspective(260px) rotateX(58deg); background: repeating-linear-gradient(180deg, #ffd1ec 0 18px, #c9a7ff 18px 36px); border-radius: 10px; animation: run 0.6s linear infinite; box-shadow: 0 0 40px rgba(255,180,230,.8); }
-    .dream .bear { position: absolute; left: 50%; bottom: 20%; width: 96px; height: 112px; transform: translateX(-50%); animation: hop .6s ease-in-out infinite; }
-    @keyframes run { from { background-position-y: 0; } to { background-position-y: 36px; } }
-    @keyframes tw { 50% { opacity: .2; } }
-    @keyframes bob { 50% { transform: translateX(-50%) translateY(-6px); } }
-    @keyframes hop { 50% { transform: translateX(-50%) translateY(-14px); } }
-    .info { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 22px 20px; background: linear-gradient(180deg, transparent, rgba(10,6,30,.82) 40%); }
-    .info h2 { font-family: 'Jua', sans-serif; font-size: 32px; margin: 0 0 4px; }
-    .info p { margin: 0; color: var(--soft); line-height: 1.5; font-size: 15px; }
-    .play { display: inline-block; margin-top: 12px; font-family: 'Jua', sans-serif; font-size: 18px; padding: 10px 20px; border-radius: 999px; background: #fff; color: #2b1d5c; }
-    .top3 { margin-top: 10px; font-size: 13px; color: var(--soft); min-height: 18px; }
-    footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; font-size: 14px; }
-  </style>
+  <link rel="stylesheet" href="/hub/hub.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
 </head>
 <body>
   <div class="bubbles" aria-hidden="true"></div>
   <header>
     <h1>🍬 젤리 게임즈</h1>
+    <div id="account"></div>
   </header>
-  <main class="games">
-    <a class="card city" href="/jelly-city/">
-      <div class="art" aria-hidden="true">
-        <i style="left:8%;width:16%;height:30%;background:#ffb3c7"></i><i style="left:27%;width:12%;height:42%;background:#b3d4ff"></i>
-        <i style="left:42%;width:18%;height:24%;background:#ffe0a3"></i><i style="left:63%;width:13%;height:38%;background:#c5f0c0"></i><i style="left:79%;width:14%;height:28%;background:#e2c6ff"></i>
-        <svg class="bear" viewBox="0 0 120 140"><circle cx="30" cy="30" r="16" fill="#a86b3d"/><circle cx="90" cy="30" r="16" fill="#a86b3d"/><ellipse cx="60" cy="95" rx="42" ry="44" fill="#b8784a"/><circle cx="60" cy="52" r="36" fill="#c4875a"/><ellipse cx="60" cy="64" rx="15" ry="11" fill="#e9c29f"/><circle cx="46" cy="48" r="4.5" fill="#2b1a10"/><circle cx="74" cy="48" r="4.5" fill="#2b1a10"/><ellipse cx="60" cy="59" rx="5" ry="3.5" fill="#2b1a10"/><circle cx="36" cy="60" r="6" fill="#ff9fb2" opacity=".7"/><circle cx="84" cy="60" r="6" fill="#ff9fb2" opacity=".7"/></svg>
-      </div>
-      <div class="info">
-        <h2>🐻 젤리시티</h2>
-        <p>곰돌이 젤리들이 사는 도시에서 일하고, 먹고, 친구를 사귀고, 거대 젤리와 싸워요.</p>
-        <span class="play">입장하기 →</span>
-      </div>
-    </a>
-    <a class="card dream" href="/dream-runner/">
-      <div class="art" aria-hidden="true"><div class="moon"></div><div class="road"></div>
-        <svg class="bear" viewBox="0 0 120 140"><circle cx="30" cy="30" r="16" fill="#ff8fb1"/><circle cx="90" cy="30" r="16" fill="#ff8fb1"/><ellipse cx="60" cy="95" rx="42" ry="44" fill="#ff9fc0"/><circle cx="60" cy="52" r="36" fill="#ffadc9"/><ellipse cx="60" cy="64" rx="15" ry="11" fill="#ffe3ee"/><path d="M42 48 q4 -6 8 0" stroke="#2b1a10" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M70 48 q4 -6 8 0" stroke="#2b1a10" stroke-width="4" fill="none" stroke-linecap="round"/><ellipse cx="60" cy="59" rx="5" ry="3.5" fill="#2b1a10"/></svg>
-      </div>
-      <div class="info">
-        <h2>🌙 드림 러너</h2>
-        <p>잠든 곰돌이가 꿈속을 끝없이 달려요. 20초마다 바뀌는 100가지가 넘는 꿈의 세계에서 최고 기록에 도전!</p>
-        <div class="top3" id="top3"></div>
-        <span class="play">달리러 가기 →</span>
-      </div>
-    </a>
-  </main>
+
+  <!-- 내 캐릭터 -->
+  <section id="chars-sec">
+    <div class="sec-head"><h2>🐻 내 캐릭터</h2><span class="sec-sub" id="chars-sub">만든 캐릭터는 모든 게임에서 써요 · ⭐ 대표 캐릭터가 게임의 기본이에요</span></div>
+    <div id="login-box" class="hidden">
+      <p class="lead">로그인하면 나만의 곰돌이를 만들어 모든 게임에서 쓸 수 있어요</p>
+      <div id="pw-row" class="hidden"><input id="pw" type="password" placeholder="🔒 입장 비밀번호" autocomplete="current-password" /></div>
+      <div class="login-btns"><div id="g-btn"></div><button id="guest-btn" class="btn ghost">🎮 체험판으로 시작 <small>구글 로그인 없이</small></button></div>
+      <div id="dev-box" class="hidden"><input id="dev-name" placeholder="개발용 이름" /><button id="dev-btn" class="btn">입장</button></div>
+    </div>
+    <div id="nick-box" class="hidden"><span>구글 이름 대신 쓸 닉네임을 정해 주세요 (모든 게임에서 써요)</span><input id="nick-in" maxlength="12" placeholder="닉네임 (2~12글자)" /><button id="nick-save" class="btn">저장</button></div>
+    <div id="char-list"></div>
+    <div id="err"></div>
+  </section>
+
+  <!-- 게임 -->
+  <section>
+    <div class="sec-head"><h2>🎮 게임</h2></div>
+    <main class="games">
+      <a class="card city" href="/jelly-city/">
+        <div class="art" aria-hidden="true">
+          <i style="left:8%;width:16%;height:30%;background:#ffb3c7"></i><i style="left:27%;width:12%;height:42%;background:#b3d4ff"></i>
+          <i style="left:42%;width:18%;height:24%;background:#ffe0a3"></i><i style="left:63%;width:13%;height:38%;background:#c5f0c0"></i><i style="left:79%;width:14%;height:28%;background:#e2c6ff"></i>
+        </div>
+        <div class="info"><h3>🐻 젤리시티</h3><p>곰돌이 젤리 도시에서 일하고, 먹고, 친구를 사귀고, 거대 젤리와 싸워요.</p><span class="play">입장하기 →</span></div>
+      </a>
+      <a class="card dream" href="/dream-runner/">
+        <div class="art" aria-hidden="true"><div class="moon"></div><div class="road"></div></div>
+        <div class="info"><h3>🌙 드림 러너</h3><p>20초마다 바뀌는 100가지가 넘는 꿈속을 끝없이 달려요. 아이템전 · 팀전도!</p><div class="top3" id="top3"></div><span class="play">달리러 가기 →</span></div>
+      </a>
+      <a class="card attack" href="/jelly-attack/">
+        <div class="art" aria-hidden="true"><div class="cross"></div><div class="crates"><i></i><i></i><i></i></div></div>
+        <div class="info"><h3>🔫 젤리어택</h3><p>젤리시티 무기로 겨루는 팀 슈팅. 보급창고 · 사막 마을 · 젤리 공장에서 딸기팀 vs 소다팀!</p><span class="play">출격하기 →</span></div>
+      </a>
+      <a class="card rider" href="/jelly-rider/">
+        <div class="art" aria-hidden="true"><div class="track"></div><div class="kart">🏎️</div></div>
+        <div class="info"><h3>🏁 젤리라이더</h3><p>꿈나라 트랙을 카트로 질주! 드리프트로 부스터를 모으고 아이템으로 역전해요.</p><span class="play">출발하기 →</span></div>
+      </a>
+    </main>
+  </section>
   <footer>더 많은 게임이 곧 찾아와요 ✨</footer>
-  <script>
-    // 떠다니는 비눗방울
-    const b = document.querySelector('.bubbles');
-    for (let i = 0; i < 18; i++) {
-      const s = document.createElement('span'), d = 10 + Math.random() * 46;
-      Object.assign(s.style, { width: d + 'px', height: d + 'px', left: Math.random() * 100 + 'vw', animationDuration: 14 + Math.random() * 18 + 's', animationDelay: -Math.random() * 30 + 's' });
-      b.appendChild(s);
-    }
-    const art = document.querySelector('.dream .art');
-    for (let i = 0; i < 40; i++) {
-      const s = document.createElement('i'); s.className = 'star';
-      Object.assign(s.style, { left: Math.random() * 100 + '%', top: Math.random() * 45 + '%', animationDelay: -Math.random() * 3 + 's' });
-      art.appendChild(s);
-    }
-    // 드림 러너 최고 기록 1~3위
-    fetch('/api/dream/board').then((r) => r.json()).then((d) => {
-      const t = (d.top || []).slice(0, 3);
-      if (!t.length) return;
-      document.getElementById('top3').textContent = '🏆 ' + t.map((e, i) => `${['🥇', '🥈', '🥉'][i]} ${e.name} ${e.score.toLocaleString()}점`).join('  ');
-    }).catch(() => {});
-  </script>
+
+  <!-- 캐릭터 만들기 · 꾸미기 -->
+  <div id="studio" class="hidden">
+    <div class="studio-card">
+      <h2 id="studio-title">새 캐릭터 만들기</h2>
+      <div class="creator">
+        <div id="create-preview" title="드래그해서 돌려보세요"></div>
+        <div class="creator-side"><div id="create-tabs"></div><div id="create-body"></div></div>
+      </div>
+      <div class="create-foot">
+        <span id="studio-err"></span>
+        <button class="btn ghost" id="create-back">← 돌아가기</button>
+        <button class="btn ghost" id="create-random">🎲 랜덤</button>
+        <button class="btn hot" id="create-ok">만들기 ✨</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/hub/hub.js"></script>
 </body>
 </html>

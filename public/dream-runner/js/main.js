@@ -137,7 +137,7 @@ function renderAccount() {
   $('acct-nick').classList.toggle('hidden', !(on && account.user.needNick) && !game.editNick);
   $('acct-nick-hint').textContent = on && account.user.needNick ? '구글 이름 대신 쓸 닉네임을 정해 주세요 (모든 게임에서 써요)' : '새 닉네임';
   const chars = on ? account.chars || [] : [];
-  let sel = store.get(CHAR_KEY) || (chars[0]?.token ?? 'default');
+  let sel = store.get(CHAR_KEY) || store.get('jelly.char') || (chars[0]?.token ?? 'default'); // 메인 화면의 대표 캐릭터가 기본
   if (sel !== 'default' && !chars.some((c) => c.token === sel)) sel = chars[0]?.token ?? 'default';
   const box = $('chars'); box.innerHTML = '';
   const chip = (token, name, color) => {
@@ -148,6 +148,7 @@ function renderAccount() {
     box.appendChild(b);
   };
   if (on) { for (const c of chars) chip(c.token, c.name, c.profile?.color || '#8a5634'); chip('default', '🐻 기본 곰돌이', '#8a5634'); }
+  if (on && chars.length < 4) { const a = document.createElement('a'); a.className = 'chip'; a.href = '/?create=1&back=/dream-runner/'; a.textContent = '＋ 새 캐릭터'; a.style.textDecoration = 'none'; box.appendChild(a); }
   const c = chars.find((x) => x.token === sel);
   $('nick-row').classList.toggle('hidden', !!c || on); // 로그인했으면 계정 닉네임을 쓴다
   if (!$('nick').value) {

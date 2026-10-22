@@ -195,6 +195,17 @@ export class World {
     this.dirty = true;
     return this.charSummary(token);
   }
+  // 메인 화면 캐릭터 꾸미기: 색 · 얼굴 · 날개만 (이름 · 성격 · 가방 · 집은 그대로)
+  restyleChar(sub, token, body) {
+    const u = this.users[sub];
+    if (!u || !u.chars.includes(token)) throw new Error('내 캐릭터가 아니에요');
+    const a = this.accounts[token];
+    if (!a) throw new Error('캐릭터가 없어요');
+    a.profile = sanitizeProfile({ ...a.profile, color: body.color, look: body.look });
+    for (const p of this.players.values()) if (p.token === token) this.send(p, { t: 'sys', text: '🎨 메인 화면에서 바꾼 모습은 다시 접속하면 보여요' });
+    this.dirty = true;
+    return this.charSummary(token);
+  }
   deleteChar(sub, token) {
     const u = this.users[sub];
     if (!u || !u.chars.includes(token)) throw new Error('내 캐릭터가 아니에요');
