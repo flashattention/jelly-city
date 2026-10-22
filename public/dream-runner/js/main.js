@@ -44,14 +44,14 @@ game.runner = runner; game.track = track; game.env = env; window.__THEMES = THEM
 
 // ---------- 입력 ----------
 const keys = new Set();
-const input = { dir: 0, jump: false, slide: false, slideHeld: false, shove: false };
+const input = { dir: 0, jump: false, slide: false, slideHeld: false, shove: false, boost: false };
 const isTyping = () => ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
 window.addEventListener('keydown', (e) => {
   if (isTyping()) return;
   unlock();
   if (e.repeat) { if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault(); return; }
   keys.add(e.code);
-  if (['Space', 'KeyW', 'ArrowUp'].includes(e.code)) input.jump = true;
+  if (e.code === 'Space') input.jump = true; // 점프는 Space (↑ · W 는 가속)
   if (['KeyS', 'ArrowDown'].includes(e.code)) input.slide = true;
   if (['KeyE', 'ShiftLeft', 'ShiftRight'].includes(e.code)) input.shove = true;
   if (e.code === 'KeyM') muteBtn();
@@ -65,6 +65,7 @@ function readInput() {
   const Rt = keys.has('KeyD') || keys.has('ArrowRight') || touchHeld.has('right');
   input.dir = (Rt ? 1 : 0) - (L ? 1 : 0);
   input.slideHeld = keys.has('KeyS') || keys.has('ArrowDown') || touchHeld.has('slide');
+  input.boost = keys.has('KeyW') || keys.has('ArrowUp') || touchHeld.has('boost');
 }
 // 휴대폰: 버튼 + 밀어서(스와이프) 점프·숙이기
 const touchHeld = new Set();
@@ -202,6 +203,9 @@ function countdown(ms) {
   $('hud').classList.remove('hidden');
   if (document.body.classList.contains('touch')) $('touch').classList.remove('hidden');
   showDreamCard(0);
+  // 조작법: 가운데 흐리게 떴다가 사라진다
+  $('t-shove-row').classList.toggle('hidden', !game.multi);
+  const h = $('howto'); h.classList.remove('show'); void h.offsetWidth; h.classList.add('show');
 }
 function goRun() { game.mode = 'run'; $('countdown').classList.add('hidden'); }
 function toTitle() {
@@ -403,7 +407,7 @@ function multiTick(dt) {
   game.sendT -= dt;
   if (game.sendT <= 0 && runner.alive && game.mode === 'run') {
     game.sendT = 1 / 15;
-    const f = (runner.slideT > 0 && runner.onGround ? 1 : 0) | (runner.onGround ? 0 : 2) | (runner.shoveT > 0 ? 4 : 0) | (runner.flipT > 0 ? 8 : 0);
+    const f = (runner.slideT > 0 && runner.onGround ? 1 : 0) | (runner.onGround ? 0 : 2) | (runner.shoveT > 0 ? 4 : 0) | (runner.flipT > 0 ? 8 : 0) | (runner.boost > 0.5 ? 16 : 0);
     net.send({ t: 'st', p: [runner.s, runner.x, runner.y, f] });
   }
   for (const g of game.ghosts.values()) g.update(dt, track.origin);
@@ -504,7 +508,7 @@ function followCamera(dt) {
   const s = w ? w.s : runner.s, x = w ? w.x : runner.x, y = w ? w.y : runner.y;
   const z = track.origin - s;
   const k = 1 - Math.exp(-dt * 7);
-  const v = speedAt(s);
+  const v = w ? speedAt(s) : runner.v;
   const dead = game.mode === 'dead' && !w;
   const cx = x * 0.85, cy = Math.max(y, -6) + 3.3;
   camera.position.x += (cx - camera.position.x) * k;
@@ -519,6 +523,9 @@ function hud() {
   $('h-score').textContent = score().toLocaleString();
   $('h-dist').textContent = `${Math.floor(runner.s).toLocaleString()}m`;
   $('h-stars').textContent = runner.stars;
+  $('h-speed').textContent = `${Math.round(runner.v * 3.6)}km/h`;
+  $('h-speed').classList.toggle('on', runner.boost > 0.3);
+  $('speedlines').style.opacity = game.mode === 'run' ? (runner.boost * 0.9).toFixed(2) : '0';
   const b0 = track.bounds[game.dream] ?? 0, b1 = track.nextBoundary(runner.s);
   $('h-next').firstElementChild.style.width = `${Math.max(0, Math.min(1, (runner.s - b0) / Math.max(1, b1 - b0))) * 100}%`;
   if (game.multi) $('h-alive').textContent = `🐻 ${(runner.alive ? 1 : 0) + [...game.ghosts.values()].filter((g) => g.alive).length}/${game.members.length}`;

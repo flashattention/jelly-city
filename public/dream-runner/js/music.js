@@ -101,6 +101,7 @@ export function sfx(name, arg) {
     case 'bonk': tone(sfxBus, t, 0.2, 200, { type: 'square', vol: 0.12, f2: 70, lp: 900 }); hiss(sfxBus, t, 0.12, { f: 1200, vol: 0.12, type: 'lowpass' }); break;
     case 'shove': hiss(sfxBus, t, 0.2, { f: 600, vol: 0.18, type: 'bandpass', f2: 1800 }); tone(sfxBus, t, 0.15, 180, { type: 'sine', vol: 0.15, f2: 90 }); break;
     case 'shoved': tone(sfxBus, t, 0.3, 300, { type: 'triangle', vol: 0.15, f2: 700 }); hiss(sfxBus, t, 0.25, { f: 2000, vol: 0.1 }); break;
+    case 'boost': hiss(sfxBus, t, 0.7, { f: 500, vol: 0.16, type: 'bandpass', f2: 3500 }); tone(sfxBus, t, 0.6, 90, { type: 'sawtooth', vol: 0.06, f2: 260, lp: 900 }); break;
     case 'beep': tone(sfxBus, t, 0.18, arg ? 880 : 520, { type: 'square', vol: 0.08, lp: 3000 }); break;
     case 'best': for (let i = 0; i < 6; i++) tone(sfxBus, t + i * 0.09, 0.4, midi(72 + [0, 4, 7, 12, 16, 19][i]), { type: 'triangle', vol: 0.1 }); break;
   }

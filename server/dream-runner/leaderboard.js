@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readJson } from '../auth.js';
 
-const MAX_SPEED = 40;      // 게임 속 최고 속도(m/s)보다 넉넉하게: 이보다 빠른 기록은 조작으로 본다
+const MAX_SPEED = 50;      // 게임 속 최고 속도(30m/s × 가속 1.5)보다 넉넉하게: 이보다 빠른 기록은 조작으로 본다
 const TOP = 50;
 const STAR_PTS = 10;       // 별사탕 하나 = 10점
 

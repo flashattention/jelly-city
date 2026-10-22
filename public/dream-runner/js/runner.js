@@ -4,6 +4,78 @@ import { Roach } from '../../shared/js/roach.js';
 import { speedAt } from './track.js';
 
 const GRAV = 30, JUMP = 11.5, JUMP2 = 10.5, SIDE = 8.5;
+export const BOOST = 0.5;  // ↑ · W 를 누르고 있으면 최대 50% 빨라진다
+const BOOST_UP = 2, BOOST_DOWN = 2.5; // 꽉 차기까지 · 원래 속도로 돌아오기까지 (초)
+
+// ---------- 부스터: 등 뒤에서 뿜는 제트 불꽃 + 흩날리는 불꽃 가루 ----------
+const FLAME_G = new THREE.ConeGeometry(1, 1, 12, 1, true).translate(0, -0.5, 0); // 꼭짓점이 원점, 몸통은 아래로
+let _glowTex = null;
+function glowTex() {
+  if (_glowTex) return _glowTex;
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.4, 'rgba(255,255,255,.6)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  return (_glowTex = new THREE.CanvasTexture(c));
+}
+class Booster {
+  constructor(scene) {
+    this.scene = scene;
+    this.g = new THREE.Group();
+    const mat = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    // 양쪽 엉덩이 뒤로 두 줄기 (바깥 주황 · 안쪽 하늘빛)
+    this.flames = [-0.2, 0.2].map((x) => {
+      const f = new THREE.Group(); f.position.set(x, 0, 0); f.rotation.x = Math.PI / 2; // 아래(-y) 로 뻗던 불꽃을 뒤(-z)로
+      const outer = new THREE.Mesh(FLAME_G, mat('#ff8a3d', 0.75)); outer.scale.set(0.2, 1, 0.2);
+      const inner = new THREE.Mesh(FLAME_G, mat('#9be7ff', 0.95)); inner.scale.set(0.1, 0.65, 0.1);
+      f.add(outer, inner); this.g.add(f);
+      return { f, outer, inner };
+    });
+    this.halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: '#ffb36b', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.halo.position.set(0, 0, -0.1); this.g.add(this.halo);
+    this.g.visible = false;
+    this.sparks = []; this.emitT = 0;
+  }
+  attach(bear) { bear.root.add(this.g); this.g.position.set(0, 0.88, -0.42); }
+  update(dt, k, t) {
+    this.g.visible = k > 0.03;
+    if (this.g.visible) {
+      for (const [i, fl] of this.flames.entries()) {
+        const fk = 0.75 + Math.sin(t * 40 + i * 2) * 0.15 + Math.random() * 0.1;
+        fl.outer.scale.set(0.2 + 0.08 * k, (0.5 + 1.4 * k) * fk, 0.2 + 0.08 * k);
+        fl.inner.scale.set(0.1, (0.35 + 0.9 * k) * fk, 0.1);
+        fl.outer.material.opacity = 0.75 * Math.min(1, k * 1.5);
+      }
+      this.halo.scale.setScalar(0.6 + 0.9 * k); this.halo.material.opacity = 0.8 * k;
+      // 불꽃 가루: 세게 뿜을수록 많이
+      this.emitT -= dt;
+      if (this.emitT <= 0) { this.emitT = 0.025 / Math.max(0.2, k); this.spark(k); }
+    }
+    for (const p of this.sparks) {
+      if (p.life <= 0) continue;
+      p.life -= dt; p.m.position.addScaledVector(p.v, dt); p.v.y -= 3 * dt;
+      p.m.material.opacity = Math.max(0, p.life / p.max);
+      p.m.scale.setScalar(p.size * (0.5 + p.life / p.max));
+      p.m.visible = p.life > 0;
+    }
+  }
+  spark(k) {
+    let p = this.sparks.find((q) => q.life <= 0);
+    if (!p) {
+      if (this.sparks.length > 60) return;
+      p = { m: new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })), v: new THREE.Vector3(), life: 0 };
+      this.scene.add(p.m); this.sparks.push(p);
+    }
+    this.g.updateWorldMatrix(true, false);
+    p.m.position.setFromMatrixPosition(this.g.matrixWorld);
+    p.m.position.x += (Math.random() - 0.5) * 0.4; p.m.position.y += (Math.random() - 0.5) * 0.3;
+    p.v.set((Math.random() - 0.5) * 2, Math.random() * 1.5, 3 + Math.random() * 4); // 뒤(+z)로 흩날린다
+    p.max = p.life = 0.25 + Math.random() * 0.3; p.size = 0.25 + Math.random() * 0.25 * k;
+    p.m.material.color.set(Math.random() < 0.5 ? '#ffd27a' : '#ff8a3d');
+    p.m.visible = true;
+  }
+  dispose() { this.g.removeFromParent(); for (const p of this.sparks) this.scene.remove(p.m); }
+}
 export const H_STAND = 1.45, H_SLIDE = 0.7;
 
 export const FLIP_T = 0.45; // 2단 점프 공중제비 시간
@@ -82,24 +154,29 @@ export class Runner {
     this.scene = scene;
     this.bear = makeBear(profile);
     scene.add(this.bear.root);
+    this.booster = new Booster(scene); this.booster.attach(this.bear);
     // 발밑 그림자 (동그란 얼룩)
     this.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.55, 20), new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.28, depthWrite: false }));
     this.shadow.rotation.x = -Math.PI / 2; scene.add(this.shadow);
     this.reset();
   }
-  setLook(profile) { this.scene.remove(this.bear.root); this.bear = makeBear(profile); this.scene.add(this.bear.root); }
+  setLook(profile) { this.scene.remove(this.bear.root); this.bear = makeBear(profile); this.scene.add(this.bear.root); this.booster.attach(this.bear); }
   reset(s = 0, x = 0) {
-    Object.assign(this, { s, x, y: 0, vx: 0, vy: 0, knock: 0, onGround: true, jumps: 0, coyote: 0, jbuf: 0, slideT: 0, flipT: 0, shoveT: 0, alive: true, dead: null, stars: 0, plat: null, t: 0 });
+    Object.assign(this, { s, x, y: 0, boost: 0, vx: 0, vy: 0, knock: 0, onGround: true, jumps: 0, coyote: 0, jbuf: 0, slideT: 0, flipT: 0, shoveT: 0, alive: true, dead: null, stars: 0, plat: null, t: 0 });
     this.bear.inner.rotation.set(0, 0, 0); this.bear.root.scale.setScalar(1); this.bear.root.visible = true;
   }
-  get v() { return speedAt(this.s); }
+  get v() { return speedAt(this.s) * (1 + BOOST * this.boost); }
   get h() { return this.slideT > 0 ? H_SLIDE : H_STAND; }
 
-  // input: { dir(-1~1), jump(눌림), slide(눌림), slideHeld }
+  // input: { dir(-1~1), jump(눌림), slide(눌림), slideHeld, boost(누르는 중) }
   update(dt, input, track, fx) {
     if (!this.alive) return this.updateDead(dt);
     this.t += dt;
     const prevS = this.s, prevY = this.y;
+    // 가속: 누르고 있으면 점점 빨라지고, 떼면 서서히 원래 속도로
+    const wasB = this.boost;
+    this.boost = input.boost ? Math.min(1, this.boost + dt / BOOST_UP) : Math.max(0, this.boost - dt / BOOST_DOWN);
+    if (input.boost && wasB < 0.02 && this.boost > 0) fx?.('boost');
     this.s += this.v * dt;
     // 좌우: 손 떼면 바로 멈추는 느낌 + 밀쳐진 힘은 서서히 줄어든다
     this.vx += ((input.dir || 0) * SIDE - this.vx) * Math.min(1, dt * 14);
@@ -168,6 +245,7 @@ export class Runner {
     const sliding = this.slideT > 0 && this.onGround;
     b.update(dt, this.alive && this.onGround && !sliding ? Math.min(12, this.v * 0.55) : 0, { airborne: !this.onGround, noCrawl: true });
     poseBear(b, { alive: this.alive, ground: this.onGround, slide: sliding, flip: this.flipT > 0 ? 1 - this.flipT / FLIP_T : null, vy: this.vy }, dt);
+    this.booster.update(dt, this.alive ? this.boost : 0, this.t);
     if (this.shoveT > 0) for (const a of b.arms.slice(0, 2)) a.rotation.x = -1.6;
     if (!this.alive) { this.shadow.visible = false; return; }
     this.shadow.visible = true;
@@ -183,6 +261,7 @@ export class Ghost {
     this.scene = scene; this.id = m.id; this.name = m.name;
     this.bear = makeBear(m);
     scene.add(this.bear.root);
+    this.booster = new Booster(scene); this.booster.attach(this.bear); this.bk = 0; this.t = 0;
     this.tag = nameTag(m.name, m.color);
     scene.add(this.tag);
     this.s = 0; this.x = 0; this.y = 0; this.f = 0; this.at = 0; this.ts = 0; this.tx = 0; this.ty = 0; this.alive = true; this.flipT = 0; this.shoveT = 0; this.pf = 0;
@@ -196,7 +275,7 @@ export class Ghost {
   update(dt, origin) {
     // 받은 뒤 지난 시간만큼 앞으로 (모두 같은 속도 규칙이라 잘 맞는다)
     const lag = Math.min(0.3, (performance.now() - this.at) / 1000);
-    const want = this.ts + (this.alive ? speedAt(this.ts) * lag : 0);
+    const want = this.ts + (this.alive ? speedAt(this.ts) * (this.f & 16 ? 1 + BOOST : 1) * lag : 0);
     this.s += (want - this.s) * Math.min(1, dt * 12); if (Math.abs(want - this.s) > 8) this.s = want;
     this.x += (this.tx - this.x) * Math.min(1, dt * 12);
     this.y += (this.ty - this.y) * Math.min(1, dt * 14);
@@ -207,13 +286,16 @@ export class Ghost {
     b.update(dt, !air && !slide && this.alive ? 10 : 0, { airborne: air, noCrawl: true });
     this.flipT = Math.max(0, this.flipT - dt);
     poseBear(b, { alive: this.alive, ground: !air, slide, flip: this.flipT > 0 ? 1 - this.flipT / FLIP_T : null, vy: this.ty - this.y }, dt);
+    this.t += dt;
+    this.bk = this.f & 16 && this.alive ? Math.min(1, this.bk + dt / BOOST_UP) : Math.max(0, this.bk - dt / BOOST_DOWN);
+    this.booster.update(dt, this.bk, this.t);
     this.shoveT = Math.max(0, this.shoveT - dt);
     if (this.shoveT > 0) for (const a of b.arms.slice(0, 2)) a.rotation.x = -1.6;
     b.root.visible = this.alive || this.y > -30;
     this.tag.position.set(this.x, this.y + 2.5, origin - this.s);
     this.tag.visible = b.root.visible;
   }
-  remove() { this.scene.remove(this.bear.root, this.tag); }
+  remove() { this.booster.dispose(); this.scene.remove(this.bear.root, this.tag); }
 }
 
 function nameTag(name, color) {

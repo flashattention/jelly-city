@@ -119,3 +119,19 @@ h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 #ov-save .sub { margin: 0 0 8px; }
 .pulse { animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(255,143,196,.35); } }
+
+/* 가속 */
+#h-speed { transition: color .2s; }
+#h-speed.on { color: #ffd84d; font-weight: bold; }
+#speedlines { position: fixed; inset: 0; pointer-events: none; z-index: 2; opacity: 0; transition: opacity .15s;
+  background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(255,255,255,0) 0deg 5deg, rgba(255,255,255,.22) 5deg 5.5deg);
+  -webkit-mask-image: radial-gradient(ellipse at center, transparent 38%, #000 80%); mask-image: radial-gradient(ellipse at center, transparent 38%, #000 80%); }
+/* 시작할 때 조작법 (가운데 흐리게 떴다가 사라짐) */
+#howto { position: fixed; left: 50%; bottom: 5%; transform: translateX(-50%); z-index: 5; pointer-events: none; opacity: 0;
+  display: grid; gap: 6px; padding: 14px 20px; border-radius: 20px; background: rgba(20,8,50,.45); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  font-family: 'Jua', sans-serif; font-size: 17px; text-shadow: 0 2px 6px rgba(0,0,0,.4); white-space: nowrap; }
+#howto.show { animation: howto 6s ease forwards; }
+@keyframes howto { 0% { opacity: 0; } 10% { opacity: .85; } 72% { opacity: .85; } 100% { opacity: 0; } }
+kbd { display: inline-block; min-width: 26px; padding: 2px 7px; margin-right: 2px; border-radius: 7px; border: 1px solid rgba(255,255,255,.5); border-bottom-width: 3px; background: rgba(255,255,255,.12); font-family: 'Jua', sans-serif; font-size: 14px; text-align: center; }
+kbd.wide { min-width: 64px; }
+@media (pointer: coarse) { #howto { display: none; } }

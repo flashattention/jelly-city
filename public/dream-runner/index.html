@@ -26,7 +26,7 @@
   <div id="hud" class="hidden">
     <div class="hud-l">
       <div id="h-score">0</div>
-      <div id="h-sub"><span id="h-dist">0m</span> · ⭐ <span id="h-stars">0</span></div>
+      <div id="h-sub"><span id="h-dist">0m</span> · ⭐ <span id="h-stars">0</span> · <span id="h-speed">0km/h</span></div>
     </div>
     <div class="hud-c">
       <div id="h-dream"><span id="h-dream-n">꿈 #1</span> <span id="h-dream-name"></span></div>
@@ -40,11 +40,19 @@
   </div>
   <div id="dream-card" class="hidden"><div class="dc-n"></div><div class="dc-e"></div><div class="dc-name"></div></div>
   <div id="countdown" class="hidden"></div>
+  <div id="speedlines"></div>
+  <div id="howto">
+    <div><kbd>←</kbd><kbd>→</kbd> <kbd>A</kbd><kbd>D</kbd> 좌우</div>
+    <div><kbd class="wide">Space</kbd> 점프 · 두 번 = 2단 점프</div>
+    <div><kbd>↑</kbd> <kbd>W</kbd> 꾹 = 가속</div>
+    <div><kbd>↓</kbd> <kbd>S</kbd> 숙이기</div>
+    <div id="t-shove-row"><kbd>E</kbd> 밀치기</div>
+  </div>
   <div id="toast" class="hidden"></div>
   <div id="spectate" class="hidden"></div>
   <div id="touch" class="hidden">
     <div class="t-l"><button data-k="left">◀</button><button data-k="right">▶</button></div>
-    <div class="t-r"><button data-k="shove" id="t-shove" class="hidden">🫸</button><button data-k="slide">⤓</button><button data-k="jump" class="big">⤒</button></div>
+    <div class="t-r"><button data-k="shove" id="t-shove" class="hidden">🫸</button><button data-k="slide">⤓</button><button data-k="boost">⏫</button><button data-k="jump" class="big">⤒</button></div>
   </div>
 
   <!-- 처음 화면 -->
@@ -70,7 +78,7 @@
         <div class="row code-row"><input id="code-in" maxlength="6" placeholder="초대 코드 6자리" autocomplete="off" /><button id="code-btn" class="btn alt">🎟️ 코드로 참가</button></div>
       </div>
       <div class="row2"><button id="board-btn" class="btn ghost">🏆 순위표</button><a href="/" class="link">← 게임 고르기</a></div>
-      <div class="keys">A·D / ← → 좌우 · Space·W / ↑ 점프 (두 번 = 2단 점프) · S / ↓ 숙이기 · E·Shift 밀치기 (같이 달리기) · M 소리</div>
+      <div class="keys">← → / A·D 좌우 · Space 점프 (두 번 = 2단 점프) · ↑ / W 꾹 = 가속 · ↓ / S 숙이기 · E 밀치기 (같이 달리기) · M 소리</div>
       <div id="err"></div>
     </div>
   </div>
