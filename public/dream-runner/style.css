@@ -98,7 +98,7 @@ h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 #countdown { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-family: 'Jua', sans-serif; font-size: 140px; z-index: 6; pointer-events: none; text-shadow: 0 0 40px rgba(255,170,230,.9), 0 6px 0 rgba(0,0,0,.25); }
 #countdown.pop { animation: pop .9s ease; }
 @keyframes pop { 0% { transform: scale(1.6); opacity: 0; } 25% { transform: scale(1); opacity: 1; } 100% { transform: scale(.85); opacity: .2; } }
-#toast { position: fixed; left: 50%; bottom: 22%; transform: translateX(-50%); font-family: 'Jua', sans-serif; font-size: 22px; padding: 10px 18px; border-radius: 999px; background: rgba(20,8,50,.6); z-index: 6; pointer-events: none; }
+#toast { position: fixed; left: 50%; bottom: 22%; transform: translateX(-50%); font-family: 'Jua', sans-serif; font-size: 22px; padding: 10px 18px; border-radius: 999px; background: rgba(20,8,50,.85); z-index: 20; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
 #spectate { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); padding: 10px 18px; border-radius: 999px; background: rgba(20,8,50,.6); z-index: 6; font-family: 'Jua', sans-serif; }
 
 /* 휴대폰 버튼 */
@@ -107,3 +107,15 @@ h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 #touch button { width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); background: rgba(20,8,50,.4); color: #fff; font-size: 26px; touch-action: none; }
 #touch button.big { width: 80px; height: 80px; }
 @media (max-width: 520px) { .btns { grid-template-columns: 1fr; } #h-score { font-size: 32px; } #h-dream { font-size: 14px; } }
+
+/* 초대 코드 */
+.code-row { margin-top: 12px; }
+.code-row input, #code-in2 { text-transform: uppercase; letter-spacing: 4px; text-align: center; font-family: 'Jua', sans-serif; }
+.btns.one { grid-template-columns: 1fr; }
+#room-code { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 8px 0 4px; }
+#room-code span { color: var(--soft); }
+#code-txt { font-family: 'Jua', sans-serif; font-size: 30px; letter-spacing: 6px; color: var(--gold); }
+#ov-save { margin-top: 14px; padding: 12px; border-radius: 18px; background: rgba(255,216,77,.12); }
+#ov-save .sub { margin: 0 0 8px; }
+.pulse { animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(255,143,196,.35); } }

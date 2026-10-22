@@ -9,7 +9,14 @@ import { THEMES } from './themes.js';
 import { sfx, setMusic, unlock, toggleMute, sound } from './music.js';
 
 const $ = (id) => document.getElementById(id);
-const CHAR_KEY = 'dreamrunner.char', NICK_KEY = 'dreamrunner.nick';
+const CHAR_KEY = 'dreamrunner.char', NICK_KEY = 'dreamrunner.nick', ANON_KEY = 'dreamrunner.anon';
+// 비로그인: 이 브라우저의 임시 아이디 (순위표에서 내 기록을 찾는 데만 쓴다)
+function anonId() {
+  let a = store.get(ANON_KEY);
+  if (!/^[a-f0-9]{24}$/.test(a || '')) { a = [...crypto.getRandomValues(new Uint8Array(12))].map((b) => b.toString(16).padStart(2, '0')).join(''); store.set(ANON_KEY, a); }
+  return a;
+}
+const logged = () => !!account.session && !!account.user;
 
 // ---------- 3D ----------
 const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, powerPreference: 'high-performance' });
@@ -85,7 +92,7 @@ function err(text) { $('err').textContent = text || ''; }
 function muteBtn() { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; }
 $('b-mute').onclick = muteBtn;
 $('b-mute').textContent = sound.muted ? '🔇' : '🔊';
-$('b-quit').onclick = () => { if (game.multi) { net.send({ t: 'leave' }); leaveRun(); show('lobby'); net.send({ t: 'list' }); } else toTitle(); };
+$('b-quit').onclick = () => { if (game.multi) { net.send({ t: 'leave' }); leaveRun(); } else toTitle(); };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- 로그인 · 캐릭터 ----------
@@ -98,20 +105,27 @@ async function boot() {
   const q = new URLSearchParams(location.search);
   if (!ok && q.has('autostart') && status.devLogin) { try { await account.login({ dev: q.get('name') || '러너' }); } catch (e) { err(e.message); } }
   renderAccount();
+  const inv = codeOf(q.get('room'));
+  if (inv.length === 6) {
+    $('code-in').value = inv; $('code-btn').classList.add('pulse');
+    $('play-btns').before($('code-in').parentElement); // 초대받았으면 참가 버튼을 위로
+    toast(`🎟️ 초대받은 방 ${inv} · 이름을 확인하고 '코드로 참가'를 눌러요`, 4000);
+  }
 }
 function renderAccount() {
-  const logged = !!account.session && !!account.user;
-  $('login-box').classList.toggle('hidden', logged);
-  $('me-box').classList.toggle('hidden', !logged);
-  if (!logged) {
+  const on = logged();
+  $('login-box').classList.toggle('hidden', on);
+  $('who-row').classList.toggle('hidden', !on);
+  $('chars-label').classList.toggle('hidden', !on);
+  $('multi-btn').classList.toggle('hidden', !on); // 방 만들기 · 빠른 참가는 로그인한 사람만 (비로그인은 초대 코드로)
+  $('play-btns').classList.toggle('one', !on);
+  if (!on) {
     const s = game.status || {};
     if (s.googleClientId) account.googleButton($('g-btn'), s.googleClientId, () => renderAccount(), (e) => err(e.message)).catch(() => err('구글 로그인 버튼을 불러오지 못했어요'));
     else $('g-btn').innerHTML = '';
     $('dev-box').classList.toggle('hidden', !s.devLogin);
-    return;
-  }
-  $('me-name').textContent = account.user.name;
-  const chars = account.chars || [];
+  } else $('me-name').textContent = account.user.name;
+  const chars = on ? account.chars || [] : [];
   let sel = store.get(CHAR_KEY) || (chars[0]?.token ?? 'default');
   if (sel !== 'default' && !chars.some((c) => c.token === sel)) sel = chars[0]?.token ?? 'default';
   const box = $('chars'); box.innerHTML = '';
@@ -122,14 +136,13 @@ function renderAccount() {
     b.onclick = () => { store.set(CHAR_KEY, token); renderAccount(); };
     box.appendChild(b);
   };
-  for (const c of chars) chip(c.token, c.name, c.profile?.color || '#8a5634');
-  chip('default', '🐻 기본 곰돌이', '#8a5634');
+  if (on) { for (const c of chars) chip(c.token, c.name, c.profile?.color || '#8a5634'); chip('default', '🐻 기본 곰돌이', '#8a5634'); }
   const c = chars.find((x) => x.token === sel);
   $('nick-row').classList.toggle('hidden', !!c);
   if (!$('nick').value) {
     // 기본 이름: 체험판은 손님 이름, 아니면 번호 붙은 곰돌이 (구글 실명은 순위표에 안 보이게)
     let nick = store.get(NICK_KEY);
-    if (!nick) { nick = account.user.name?.startsWith('체험판') ? account.user.name : `꿈꾸는 곰돌이 ${1000 + Math.floor(Math.random() * 9000)}`; store.set(NICK_KEY, nick); }
+    if (!nick) { nick = on && account.user.name?.startsWith('체험판') ? account.user.name : `꿈꾸는 곰돌이 ${1000 + Math.floor(Math.random() * 9000)}`; store.set(NICK_KEY, nick); }
     $('nick').value = nick;
   }
   game.profile = c ? { name: c.name, color: c.profile?.color || '#8a5634', look: c.profile?.look, acc: c.profile?.accessories || [], gender: c.profile?.gender } : { name: $('nick').value.trim() || '꿈꾸는 곰돌이', color: '#8a5634' };
@@ -139,6 +152,13 @@ $('nick').addEventListener('input', () => { store.set(NICK_KEY, $('nick').value.
 $('guest-btn').onclick = async () => { try { await account.login({ guest: true }); renderAccount(); } catch (e) { err(e.message); } };
 $('dev-btn').onclick = async () => { try { await account.login({ dev: $('dev-name').value || '러너' }); renderAccount(); } catch (e) { err(e.message); } };
 $('logout').onclick = async () => { await account.logout(); renderAccount(); };
+// 초대 코드로 참가 (로그인 안 해도 된다)
+const codeOf = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+for (const id of ['code-in', 'code-in2']) $(id).addEventListener('input', () => { $(id).value = codeOf($(id).value); });
+$('code-btn').onclick = () => joinByCode($('code-in').value);
+$('code-btn2').onclick = () => joinByCode($('code-in2').value);
+$('code-in').onkeydown = (e) => { if (e.key === 'Enter') $('code-btn').click(); };
+$('code-in2').onkeydown = (e) => { if (e.key === 'Enter') $('code-btn2').click(); };
 $('solo-btn').onclick = () => { unlock(); startSolo(); };
 $('multi-btn').onclick = () => { unlock(); openLobby(); };
 $('board-btn').onclick = async () => { show('board'); renderBoard($('board-list'), await loadBoard()); };
@@ -147,11 +167,11 @@ $('home-btn').onclick = () => { if (game.multi) { net.send({ t: 'leave' }); game
 $('again-btn').onclick = () => { if (game.multi) { leaveRun(); show('room'); } else startSolo(); };
 
 // ---------- 순위표 ----------
-async function loadBoard() { try { return await account.api('/api/dream/board'); } catch { return { top: [] }; } }
+async function loadBoard() { try { return await account.api('/api/dream/board' + (logged() ? '' : `?anon=${anonId()}`)); } catch { return { top: [] }; } }
 function renderBoard(el, d, hl) {
   const top = d.top || [], me = d.me;
   const myId = me?.id;
-  const row = (e) => `<div class="brow${e.id === myId ? ' me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.name)}${e.guest ? ' <span class="guest">체험판</span>' : ''}</span><span class="sc">${e.score.toLocaleString()}<small>${e.dist.toLocaleString()}m · ⭐${e.stars}</small></span></div>`;
+  const row = (e) => `<div class="brow${e.id === myId ? ' me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.name)}${e.guest ? ' <span class="guest">체험판</span>' : e.anon ? ' <span class="guest">비로그인</span>' : ''}</span><span class="sc">${e.score.toLocaleString()}<small>${e.dist.toLocaleString()}m · ⭐${e.stars}</small></span></div>`;
   let html = top.slice(0, hl ? 10 : 50).map(row).join('');
   if (me && me.rank > (hl ? 10 : 50)) html += '<div class="brow gap">⋯</div>' + row(me);
   el.innerHTML = html || '<div class="empty">아직 기록이 없어요. 첫 번째 주인공이 되어 보세요!</div>';
@@ -172,7 +192,6 @@ function newRun(seed) {
   $('t-shove').classList.toggle('hidden', !game.multi);
 }
 function startSolo() {
-  if (!account.session) { show('title'); err('먼저 로그인하거나 체험판으로 시작해 주세요'); return; }
   game.multi = false;
   newRun((Math.random() * 2 ** 31) | 0);
   countdown(3000);
@@ -204,6 +223,8 @@ async function died(why) {
   game.mode = 'dead'; game.deadT = 0; game.why = why;
   const rec = { dist: Math.floor(runner.s), stars: runner.stars, themes: game.dreamsSeen, time: game.runT, name: game.profile.name, color: game.profile.color };
   if (game.multi) net.send({ t: 'dead', dist: rec.dist, stars: rec.stars, why });
+  game.rec = rec;
+  if (!logged()) { game.submitted = { anonPending: true }; return; } // 비로그인: 탈락 화면에서 임시 닉네임을 정해 남긴다
   try { game.submitted = await account.api('/api/dream/score', { method: 'POST', body: rec }); } catch (e) { game.submitted = { error: e.message }; }
 }
 async function showOver() {
@@ -214,11 +235,30 @@ async function showOver() {
   $('ov-score').textContent = score().toLocaleString();
   $('ov-detail').textContent = `${Math.floor(runner.s).toLocaleString()}m 달림 · 별사탕 ${runner.stars}개 · 꿈 ${game.dreamsSeen}개를 지났어요 · ${Math.floor(game.runT)}초`;
   const r = game.submitted;
+  $('ov-save').classList.toggle('hidden', !r?.anonPending);
+  if (r?.anonPending) { $('ov-nick').value = store.get(NICK_KEY) || game.profile.name; $('ov-save-btn').disabled = false; }
   $('ov-best').textContent = r?.error ? `기록을 올리지 못했어요 (${r.error})` : r?.newBest ? `🎉 내 최고 기록! 전체 ${r.me?.rank}위` : r?.me ? `내 최고 ${r.me.score.toLocaleString()}점 · 전체 ${r.me.rank}위` : '';
+  if (r?.anonPending) $('ov-best').textContent = '';
   if (r?.newBest) sfx('best');
   $('again-btn').textContent = game.multi ? '👥 방으로 돌아가기' : '🔁 다시 달리기';
   renderBoard($('ov-board'), r?.top ? r : await loadBoard(), true);
 }
+
+$('ov-save-btn').onclick = async () => {
+  const name = $('ov-nick').value.trim();
+  if (!name) { $('ov-nick').focus(); toast('닉네임을 정해 주세요'); return; }
+  store.set(NICK_KEY, name);
+  $('ov-save-btn').disabled = true;
+  try {
+    const r = await account.api('/api/dream/score', { method: 'POST', body: { ...game.rec, name, anon: anonId() } });
+    game.submitted = r;
+    $('ov-save').classList.add('hidden');
+    $('ov-best').textContent = r.newBest ? `🎉 내 최고 기록! 전체 ${r.me?.rank}위` : `내 최고 ${r.me.score.toLocaleString()}점 · 전체 ${r.me.rank}위`;
+    if (r.newBest) sfx('best');
+    renderBoard($('ov-board'), r, true);
+  } catch (e) { $('ov-save-btn').disabled = false; toast(`기록을 남기지 못했어요 (${e.message})`); }
+};
+$('ov-nick').onkeydown = (e) => { if (e.key === 'Enter') $('ov-save-btn').click(); };
 
 // ---------- 꿈이 바뀔 때 ----------
 function showDreamCard(d) {
@@ -248,19 +288,28 @@ const net = {
   connect() {
     if (this.ws && this.ws.readyState <= 1) return;
     this.ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/dream-ws`);
-    this.ws.onopen = () => { this.open = true; this.send({ t: 'hello', session: account.session, name: game.profile.name, color: game.profile.color, look: game.profile.look, acc: game.profile.acc }); };
+    this.ws.onopen = () => { this.open = true; hello(); };
     this.ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch { return; } this.handlers[m.t]?.(m); };
     this.ws.onclose = () => { this.open = false; if (game.multi && game.mode !== 'title') { toast('연결이 끊겼어요'); setTimeout(() => { if (game.multi) toTitle(); }, 800); } };
   },
   send(m) { if (this.ws?.readyState === 1) this.ws.send(JSON.stringify(m)); },
   on(t, f) { this.handlers[t] = f; },
 };
+function hello() { net.send({ t: 'hello', session: logged() ? account.session : null, name: game.profile.name, color: game.profile.color, look: game.profile.look, acc: game.profile.acc }); }
 function openLobby() {
-  if (!account.session) { err('먼저 로그인하거나 체험판으로 시작해 주세요'); return; }
-  game.multi = true;
+  if (!logged()) { err('방 만들기 · 빠른 참가는 로그인이 필요해요. 초대 코드로는 바로 참가할 수 있어요'); return; }
+  game.multi = true; net.pendingJoin = null;
   show('lobby'); $('rooms').innerHTML = '<div class="empty">방 목록을 불러오는 중…</div>';
-  if (net.open) { net.send({ t: 'hello', session: account.session, name: game.profile.name, color: game.profile.color, look: game.profile.look, acc: game.profile.acc }); }
-  else net.connect();
+  if (net.open) hello(); else net.connect();
+}
+function joinByCode(v) {
+  const code = codeOf(v);
+  if (code.length !== 6) { toast('초대 코드 6자리를 넣어 주세요'); return; }
+  unlock();
+  if (!game.profile.name?.trim()) { toast('달리기 이름을 정해 주세요'); return; }
+  game.multi = true; net.pendingJoin = code;
+  toast(`🎟️ ${code} 방에 들어가는 중…`, 1200);
+  if (net.open) hello(); else net.connect();
 }
 function renderRooms(list) {
   const el = $('rooms');
@@ -278,6 +327,7 @@ function renderRooms(list) {
 function renderRoom(rank) {
   const r = game.room; if (!r) return;
   $('room-title').textContent = `🌙 ${r.name}`;
+  $('code-txt').textContent = r.id;
   const me = game.members.find((m) => m.id === game.myId);
   const host = !!me?.host;
   const el = $('members'); el.innerHTML = '';
@@ -295,12 +345,20 @@ function renderRoom(rank) {
     $('room-rank').innerHTML = '<h3>🏁 지난 판 순위</h3>' + rank.map((e) => `<div class="brow${e.id === game.myId ? ' me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.name)}</span><span class="sc">${e.dist.toLocaleString()}m<small>⭐${e.stars}</small></span></div>`).join('');
   }
 }
-net.on('hello', (m) => { game.myId = m.id; renderRooms(m.rooms); });
+net.on('hello', (m) => {
+  game.myId = m.id;
+  if (net.pendingJoin) { net.send({ t: 'join', id: net.pendingJoin }); net.pendingJoin = null; return; }
+  renderRooms(m.rooms);
+});
 net.on('rooms', (m) => { if (!game.room) renderRooms(m.rooms); });
-net.on('error', (m) => { if (m.code === 'login') { toast('로그인이 필요해요'); toTitle(); } else toast(m.text || '문제가 생겼어요'); });
+net.on('error', (m) => {
+  toast(m.text || '문제가 생겼어요', 2600);
+  // 코드로 들어가다 실패했는데 방 밖이면: 로그인 안 했으면 처음 화면으로
+  if (!game.room && !logged() && game.mode !== 'run') { game.multi = false; show('title'); }
+});
 net.on('joined', (m) => { game.room = m.room; game.members = m.members; $('room-rank').classList.add('hidden'); show('room'); renderRoom(); });
 net.on('room', (m) => { game.room = m.room; game.members = m.members; if (game.mode !== 'run' && game.mode !== 'count' && game.mode !== 'dead') { if (!$('room').classList.contains('hidden') || !$('over').classList.contains('hidden')) renderRoom(); } });
-net.on('left', () => { game.room = null; show('lobby'); net.send({ t: 'list' }); });
+net.on('left', () => { game.room = null; if (!game.multi) return; if (logged()) { show('lobby'); net.send({ t: 'list' }); } else { game.multi = false; toTitle(); } });
 net.on('start', (m) => {
   game.members = m.members;
   newRun(m.seed);
@@ -333,6 +391,12 @@ $('create-btn').onclick = () => net.send({ t: 'create', name: $('room-name').val
 $('lobby-back').onclick = () => { game.multi = false; show('title'); };
 $('leave-btn').onclick = () => { net.send({ t: 'leave' }); game.room = null; $('ov-room').classList.add('hidden'); };
 $('start-btn').onclick = () => net.send({ t: 'start' });
+async function copy(text, label) {
+  try { await navigator.clipboard.writeText(text); toast(`📋 ${label} 복사했어요`); }
+  catch { window.prompt(`${label}을(를) 복사해 주세요`, text); }
+}
+$('copy-link').onclick = () => copy(`${location.origin}/dream-runner/?room=${game.room?.id}`, '초대 링크');
+$('copy-code').onclick = () => copy(game.room?.id || '', '초대 코드');
 
 // ---------- 밀치기 · 부딪힘 ----------
 function multiTick(dt) {
@@ -412,6 +476,7 @@ function frame() {
     runner.pose(dt, track.origin - runner.s);
     if (game.multi) multiTick(dt);
     followCamera(dt);
+    game.camHook?.(camera, runner, track); // 점검용: 카메라를 옆에 두고 동작 보기
     hud();
   }
   input.jump = input.slide = input.shove = false;

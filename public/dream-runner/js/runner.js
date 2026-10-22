@@ -6,6 +6,61 @@ import { speedAt } from './track.js';
 const GRAV = 30, JUMP = 11.5, JUMP2 = 10.5, SIDE = 8.5;
 export const H_STAND = 1.45, H_SLIDE = 0.7;
 
+export const FLIP_T = 0.45; // 2단 점프 공중제비 시간
+
+// 곰돌이 자세 (나 · 같은 방 사람 모두): Roach.update 로 달리기 동작을 만든 다음에 덮어쓴다
+//   st = { ground, slide, flip(0~1 진행 · 없으면 null), vy, alive }
+//   돌리는 축을 몸 안쪽(공중제비 = 배, 숙이기 = 엉덩이)으로 옮겨서 발끝을 축으로 빙 도는 어색함이 없게
+const ease = (p) => (p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2);
+const lerp = (a, b, k) => a + (b - a) * k;
+export function poseBear(b, st, dt) {
+  const u = (b.poseState ||= { rx: 0, low: 0, slide: 0, air: 0, tuck: 0, flipping: false });
+  const k = Math.min(1, dt * 16);
+  let h = 0.85;
+  if (!st.alive) {
+    u.rx += dt * 7; // 탈락: 몸 가운데를 축으로 데굴데굴
+    u.slide = lerp(u.slide, 0, k); u.low = lerp(u.low, 0, k); u.tuck = lerp(u.tuck, 1, k);
+  } else if (st.flip != null) {
+    // 공중제비: 천천히 시작해서 천천히 끝나게, 앞으로 한 바퀴
+    u.flipping = true;
+    u.rx = ease(Math.min(1, st.flip)) * Math.PI * 2;
+    u.tuck = Math.sin(Math.min(1, st.flip) * Math.PI);
+    u.slide = lerp(u.slide, 0, k); u.low = lerp(u.low, 0, k);
+  } else {
+    // 한 바퀴 다 돌았으면 0 으로 (되감기 없이)
+    if (u.flipping) { u.flipping = false; u.rx = ((u.rx % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2); if (u.rx > Math.PI) u.rx -= Math.PI * 2; }
+    u.slide = lerp(u.slide, st.slide ? 1 : 0, k);
+    u.air = lerp(u.air, !st.ground && !st.slide ? 1 : 0, Math.min(1, dt * 12));
+    u.tuck = lerp(u.tuck, 0, k);
+    const lean = st.slide ? -1.0 : !st.ground ? (st.vy > 0 ? 0.14 : 0.04) : 0.06; // 달릴 땐 살짝 앞으로
+    u.rx = lerp(u.rx, lean, k);
+    u.low = lerp(u.low, st.slide ? 0.36 : 0, k);
+    h = lerp(0.85, 0.62, u.slide); // 숙일 땐 엉덩이를 축으로
+  }
+  const a = u.rx;
+  b.inner.rotation.x = a;
+  b.inner.position.y += h - h * Math.cos(a) - u.low;
+  b.inner.position.z = -h * Math.sin(a);
+  const [L0, L1] = b.legs, arms = b.arms.slice(0, 2);
+  // 숙이기: 다리는 앞으로 쭉, 팔은 벌려 균형
+  if (u.slide > 0.01) {
+    for (const l of b.legs) l.rotation.x = lerp(l.rotation.x, -0.35, u.slide);
+    for (const ar of arms) { ar.rotation.z = lerp(ar.rotation.z, ar.userData.baseZ * 2.3, u.slide); ar.rotation.x = lerp(ar.rotation.x, 0.35, u.slide); }
+  }
+  // 점프: 다리를 앞뒤로 벌리고 팔을 들어 올린다
+  if (u.air > 0.01) {
+    L0.rotation.x = lerp(L0.rotation.x, -0.75, u.air); L1.rotation.x = lerp(L1.rotation.x, 0.45, u.air);
+    for (const ar of arms) { ar.rotation.z = lerp(ar.rotation.z, ar.userData.baseZ * (st.vy > 0 ? 1.7 : 2.1), u.air); ar.rotation.x = lerp(ar.rotation.x, -0.45, u.air); }
+  }
+  // 공중제비: 무릎을 가슴으로 · 팔로 끌어안고 몸을 동그랗게
+  if (u.tuck > 0.01) {
+    for (const l of b.legs) l.rotation.x = lerp(l.rotation.x, -1.35, u.tuck);
+    for (const ar of arms) { ar.rotation.x = lerp(ar.rotation.x, -1.1, u.tuck); ar.rotation.z = lerp(ar.rotation.z, ar.userData.baseZ * 0.5, u.tuck); }
+    const sq = 1 - 0.1 * u.tuck;
+    b.inner.scale.set(b.inner.scale.x * (2 - sq), b.inner.scale.y * sq, b.inner.scale.z * (2 - sq));
+  }
+}
+
 export function makeBear(p = {}) {
   const r = new Roach({ own: true, seed: p.name || 'dream', color: p.color || '#8a5634', age: 25, gender: p.gender, look: p.look, accessories: p.acc || [] });
   r.root.traverse((o) => { if (o.isMesh) { o.castShadow = false; } });
@@ -45,7 +100,7 @@ export class Runner {
     this.jbuf -= dt; this.coyote -= dt;
     if (this.jbuf > 0) {
       if (this.onGround || this.coyote > 0) { this.vy = JUMP; this.jumps = 1; this.onGround = false; this.coyote = 0; this.jbuf = 0; this.slideT = 0; fx?.('jump'); }
-      else if (this.jumps < 2) { this.vy = JUMP2; this.jumps = 2; this.jbuf = 0; this.flipT = 0.5; fx?.('jump2'); }
+      else if (this.jumps < 2) { this.vy = JUMP2; this.jumps = 2; this.jbuf = 0; this.flipT = FLIP_T; fx?.('jump2'); }
     }
     // 숙이기 (공중에서 누르면 빨리 내려온다)
     if (input.slide) { if (this.onGround) { if (this.slideT <= 0) fx?.('slide'); this.slideT = 0.75; } else this.vy = Math.min(this.vy, -14); }
@@ -59,7 +114,7 @@ export class Runner {
     const g = track.ground(this.s, this.x, Math.max(this.y, prevY));
     this.onGround = false;
     if (g && this.vy <= 0 && this.y <= g.y + 0.02 && prevY >= g.y - 0.5) {
-      this.y = g.y; this.vy = 0; this.onGround = true; this.jumps = 0; this.flipT = 0;
+      this.y = g.y; this.vy = 0; this.onGround = true; this.jumps = 0;
       if (!was) { fx?.('land'); this.bear.jumpSquash = 1; }
       if (g.mv) this.x += g.dx; // 움직이는 발판에 실려 간다
     }
@@ -93,7 +148,6 @@ export class Runner {
     const D = this.dead; D.t += dt;
     D.vy -= GRAV * dt; this.y += D.vy * dt;
     if (!D.fall) this.s -= 3 * dt * Math.max(0, 1 - D.t); // 부딪히면 뒤로 튕긴다
-    this.bear.inner.rotation.x -= dt * 6;
   }
 
   // 모습 맞추기 (z = 화면 위치)
@@ -101,17 +155,11 @@ export class Runner {
     const b = this.bear;
     b.root.position.set(this.x, this.y, z);
     b.root.rotation.y = Math.PI - (this.vx + this.knock) * 0.035;
-    if (!this.alive) { b.update(dt, 0, { airborne: true }); this.shadow.visible = false; return; }
     const sliding = this.slideT > 0 && this.onGround;
-    b.update(dt, this.onGround && !sliding ? Math.min(12, this.v * 0.55) : 0, { airborne: !this.onGround, noCrawl: true });
-    // 숙이기: 뒤로 눕듯이 미끄러진다 · 2단 점프: 앞으로 한 바퀴
-    let rx = 0;
-    if (sliding) rx = -1.15;
-    else if (this.flipT > 0) rx = -(1 - this.flipT / 0.5) * Math.PI * 2;
-    else if (!this.onGround) rx = -0.15;
-    b.inner.rotation.x += (rx - b.inner.rotation.x) * (this.flipT > 0 ? 1 : Math.min(1, dt * 14));
-    b.inner.position.y = sliding ? -0.25 : b.inner.position.y;
-    if (this.shoveT > 0) for (const a of b.arms.slice(0, 2)) { a.rotation.x = -1.6; }
+    b.update(dt, this.alive && this.onGround && !sliding ? Math.min(12, this.v * 0.55) : 0, { airborne: !this.onGround, noCrawl: true });
+    poseBear(b, { alive: this.alive, ground: this.onGround, slide: sliding, flip: this.flipT > 0 ? 1 - this.flipT / FLIP_T : null, vy: this.vy }, dt);
+    if (this.shoveT > 0) for (const a of b.arms.slice(0, 2)) a.rotation.x = -1.6;
+    if (!this.alive) { this.shadow.visible = false; return; }
     this.shadow.visible = true;
     const gy = this.plat ? this.plat.y : this.y - 0.5;
     this.shadow.position.set(this.x, (this.plat ? this.plat.y : -99) + 0.03, z);
@@ -127,12 +175,13 @@ export class Ghost {
     scene.add(this.bear.root);
     this.tag = nameTag(m.name, m.color);
     scene.add(this.tag);
-    this.s = 0; this.x = 0; this.y = 0; this.f = 0; this.at = 0; this.ts = 0; this.tx = 0; this.ty = 0; this.alive = true; this.flipT = 0; this.shoveT = 0;
+    this.s = 0; this.x = 0; this.y = 0; this.f = 0; this.at = 0; this.ts = 0; this.tx = 0; this.ty = 0; this.alive = true; this.flipT = 0; this.shoveT = 0; this.pf = 0;
   }
   snap(s, x, y, f, dead) {
     this.ts = s; this.tx = x; this.ty = y; this.f = f; this.at = performance.now();
     if (dead && this.alive) { this.alive = false; }
-    if (f & 8 && this.flipT <= 0) this.flipT = 0.5;
+    if (f & 8 && !(this.pf & 8)) this.flipT = FLIP_T; // 2단 점프를 막 시작했을 때만
+    this.pf = f;
   }
   update(dt, origin) {
     // 받은 뒤 지난 시간만큼 앞으로 (모두 같은 속도 규칙이라 잘 맞는다)
@@ -147,8 +196,7 @@ export class Ghost {
     const air = !!(this.f & 2), slide = !!(this.f & 1);
     b.update(dt, !air && !slide && this.alive ? 10 : 0, { airborne: air, noCrawl: true });
     this.flipT = Math.max(0, this.flipT - dt);
-    const rx = !this.alive ? b.inner.rotation.x - dt * 6 : slide ? -1.15 : this.flipT > 0 ? -(1 - this.flipT / 0.5) * Math.PI * 2 : air ? -0.15 : 0;
-    b.inner.rotation.x += (rx - b.inner.rotation.x) * (this.flipT > 0 || !this.alive ? 1 : Math.min(1, dt * 14));
+    poseBear(b, { alive: this.alive, ground: !air, slide, flip: this.flipT > 0 ? 1 - this.flipT / FLIP_T : null, vy: this.ty - this.y }, dt);
     this.shoveT = Math.max(0, this.shoveT - dt);
     if (this.shoveT > 0) for (const a of b.arms.slice(0, 2)) a.rotation.x = -1.6;
     b.root.visible = this.alive || this.y > -30;
