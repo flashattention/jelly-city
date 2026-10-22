@@ -110,7 +110,7 @@ function renderTitleOpts() { optsUI($('title-opts'), game.pick, true, (o) => { O
 const shell = new Shell({
   key: 'jellyattack', title: '🔫 젤리어택', subtitle: '젤리시티 무기로 겨루는 곰돌이 팀 슈팅! 딸기팀 vs 소다팀', wsPath: '/attack-ws', max: 12,
   multiLabel: '👥 같이 하기', roomIcon: '🔫', startLabel: '🔫 작전 시작!',
-  keysHelp: 'WASD 이동 · 마우스 조준 · 클릭 사격 · 우클릭 조준경 · R 장전 · 1~4 무기 · G 수류탄 · Space 점프 · C 앉기 · Shift 걷기 · Tab 점수 · B 무기 고르기',
+  keysHelp: 'WASD 이동 · 마우스 조준 · 클릭 사격 · 우클릭 조준경 · R 장전 · 1~4 무기 · G 수류탄 · Space 점프 · Shift 달리기 · C/Ctrl 앉기 · Tab 점수 · B 무기 고르기',
   buttons: [{ id: 'practice-btn', label: '🎯 연습전 <small>봇과 바로 대결</small>', onClick: () => practice() }],
   extraRow: [{ label: '🎒 무기 고르기', onClick: () => openLoadout() }],
   screens: ['over', 'loadout'],
@@ -475,7 +475,7 @@ function frame() {
   if (game.mode === 'play') {
     if (reloadEnd && now >= reloadEnd) { const w = curW(), a = ammo[w.id]; if (a) a.mag = w.mag; reloadEnd = 0; }
     const typing = !locked();
-    const inp = { f: typing ? 0 : (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0), s: typing ? 0 : (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0), jump: keys.has('Space'), crouch: keys.has('KeyC') || keys.has('ControlLeft'), walk: keys.has('ShiftLeft'), ads: mouseR };
+    const inp = { f: typing ? 0 : (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0), s: typing ? 0 : (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0), jump: keys.has('Space'), crouch: keys.has('KeyC') || keys.has('ControlLeft') || keys.has('ControlRight'), sprint: (keys.has('ShiftLeft') || keys.has('ShiftRight')) && !mouseL, ads: mouseR };
     if (me.alive) {
       for (const e of me.update(dt, inp, game.map)) sfx(e, null, e === 'step' ? 0.6 : 1);
       if (mouseL && locked()) shoot(now);
@@ -488,7 +488,7 @@ function frame() {
     const eye = me.eye();
     camera.position.copy(eye); camera.rotation.set(me.alive ? me.pitch : -0.5, me.yaw, 0);
     const w = curW(), zoom = mouseR && me.alive && w?.cls !== 'knife' && w?.cls !== 'nade' ? (w.scope ? w.zoom : Math.min(1.6, w.zoom)) : 1;
-    const fov = 72 / zoom;
+    const fov = (me.sprinting && me.alive ? 80 : 72) / zoom; // 달릴 때 시야가 살짝 넓어진다
     if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 14); camera.updateProjectionMatrix(); }
     vm.update(dt, camera.aspect, Math.hypot(me.vel.x, me.vel.z) > 1.5 && me.onGround, mouseR && me.alive, t);
     sendT -= dt;

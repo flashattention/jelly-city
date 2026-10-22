@@ -9,11 +9,13 @@ export class Player {
   get height() { return H_STAND + (H_CROUCH - H_STAND) * this.crouch; }
   eye(out = new THREE.Vector3()) { return out.set(this.pos.x, this.pos.y + this.eyeH, this.pos.z); }
   forward(out = new THREE.Vector3()) { const cp = Math.cos(this.pitch); return out.set(-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp); }
-  // inp = { f, s (앞뒤 · 좌우 -1~1), jump, crouch, walk, ads }  돌려주는 값: 소리 낼 일
+  // inp = { f, s (앞뒤 · 좌우 -1~1), jump, crouch, sprint, ads }  돌려주는 값: 소리 낼 일
   update(dt, inp, map) {
     const ev = [];
     this.crouch += ((inp.crouch ? 1 : 0) - this.crouch) * Math.min(1, dt * 12);
-    const speed = (inp.walk ? 3 : 6.2) * (inp.crouch ? 0.45 : 1) * (inp.ads ? 0.65 : 1);
+    // 달리기: Shift + 앞으로 (앉거나 조준하는 중엔 안 된다)
+    this.sprinting = !!inp.sprint && inp.f > 0 && !inp.crouch && !inp.ads && this.crouch < 0.5;
+    const speed = (this.sprinting ? 9.2 : 6.2) * (inp.crouch ? 0.45 : 1) * (inp.ads ? 0.65 : 1);
     const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw), rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
     let wx = fx * inp.f + rx * inp.s, wz = fz * inp.f + rz * inp.s;
     const L = Math.hypot(wx, wz); if (L > 1) { wx /= L; wz /= L; }
@@ -33,7 +35,7 @@ export class Player {
     else if (this.pos.y > fl + 0.05) this.onGround = false;
     // 발소리
     const sp = Math.hypot(this.vel.x, this.vel.z);
-    if (this.onGround && sp > 2 && !inp.walk && !inp.crouch) { this.stepT -= dt * sp; if (this.stepT <= 0) { this.stepT = 2.2; ev.push('step'); } }
+    if (this.onGround && sp > 2 && !inp.crouch) { this.stepT -= dt * sp; if (this.stepT <= 0) { this.stepT = 2.2; ev.push('step'); } }
     return ev;
   }
   inXZ(b, r = R) { return this.pos.x > b.x - b.w / 2 - r && this.pos.x < b.x + b.w / 2 + r && this.pos.z > b.z - b.d / 2 - r && this.pos.z < b.z + b.d / 2 + r; }
