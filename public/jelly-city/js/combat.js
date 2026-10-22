@@ -334,6 +334,26 @@ export class FX {
     }
   }
 
+  // 1인칭 휘두르기: 눈앞에서 화면을 가로질러 베는 궤적 (카메라에 붙어 다녀서 빨리 날아도 보인다)
+  //   젤리병단 장비(쌍검)는 두 칼이 X자로 교차한다
+  fpSlash(cam, wid = 'fist') {
+    const saber = SABER_COL[wid], tier = wid === 'fist' ? -1 : saber ? 3 : TIER[rarityOf(wid)] ?? 0;
+    const twin = !!itemDef(wid)?.odm;
+    const col = twin ? '#bfefff' : saber || ['#eceff1', '#40c4ff', '#e040fb', '#ffab00'][Math.max(0, tier)];
+    const blade = (roll, dir, delay, color, tube, op, add) => {
+      const m = new THREE.Mesh(new THREE.TorusGeometry(0.62, tube, 4, 28, Math.PI * 0.75), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, depthWrite: false, depthTest: false, blending: add ? THREE.AdditiveBlending : THREE.NormalBlending }));
+      m.renderOrder = 999; m.visible = false; this.scene.add(m);
+      const life = 0.28 + delay;
+      this.items.push({ m, t: life, life, delay, kind: 'fpsweep', cam, roll, dir, op, ownGeo: true });
+    };
+    const one = (roll, dir, delay) => {
+      blade(roll, dir, delay, '#ffffff', 0.022, 0.95, false);       // 칼날
+      blade(roll, dir, delay, col, 0.075, 0.55, true);              // 빛 번짐
+    };
+    if (twin) { one(2.2, 1, 0); one(0.9, -1, 0.07); }               // 오른쪽 위 → 왼쪽 아래, 왼쪽 위 → 오른쪽 아래
+    else { this.fpFlip = !this.fpFlip; if (this.fpFlip) one(2.2, 1, 0); else one(0.9, -1, 0); } // 한 손 무기: 번갈아 반대로
+  }
+
   update(dt) {
     for (let i = this.items.length - 1; i >= 0; i--) {
       const it = this.items[i];
@@ -346,6 +366,15 @@ export class FX {
         const u = (el - it.delay) / (it.life - it.delay);
         it.m.rotation.z = it.r0 - u * 1.4; // 휙 쓸고 지나간다
         it.m.material.opacity = it.op * (1 - u);
+      } else if (it.kind === 'fpsweep') {
+        const el = it.life - it.t;
+        if (el < it.delay) continue;
+        const u = (el - it.delay) / (it.life - it.delay), c = it.cam;
+        it.m.visible = true;
+        it.m.position.set(0, -0.08, -1.05).applyQuaternion(c.quaternion).add(c.position);
+        it.m.quaternion.copy(c.quaternion);
+        it.m.rotateZ(it.roll - it.dir * u * 1.7); // 휙 가로지른다
+        it.m.material.opacity = it.op * (u < 0.15 ? u / 0.15 : 1 - (u - 0.15) / 0.85);
       } else if (it.kind === 'boom') { it.m.scale.setScalar(0.3 + (1 - k) * it.r); it.m.material.opacity = k; }
       else if (it.kind === 'fly') {
         const u = Math.min(1, Math.max(0, (it.life - it.t - (it.delay || 0)) / (it.life - (it.delay || 0)) * 1.4));
@@ -882,6 +911,7 @@ export class Combat {
     const g = this.g, p = g.player;
     p.roach.attack('melee');
     this.fx.slash(p.pos, p.heading, w.id);
+    if (p.fp && !p.inCar) this.fx.fpSlash(g.camera, w.id); // 1인칭이면 눈앞에도
     g.net.send({ t: 'fx', k: 'swing', w: w.id });
     const fwd = new THREE.Vector3(Math.sin(p.heading), 0, Math.cos(p.heading));
     let n = 0;

@@ -2410,6 +2410,7 @@ function frame() {
   const canZoom = !p.inCar && selD?.zoom && !blocked;
   p.aim += ((canZoom && game.aimHeld ? 1 : 0) - p.aim) * Math.min(1, dt * 10);
   p.adsFP = !!selD && ['gun', 'launcher'].includes(selD.cat); // 총·활은 우클릭하면 1인칭 조준
+  p.odmHeld = !!selD?.odm; // 젤리병단 장비: 카메라를 조금 더 가까이
   const maxZoom = scopeZoomOf(selId) ?? selD?.zoom ?? 1;
   game.zoomNow = 1 + (maxZoom - 1) * p.aim;
   const fov = 55 / game.zoomNow;

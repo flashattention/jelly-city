@@ -348,7 +348,9 @@ export class Player {
       this.snap = false;
       return;
     }
-    const dist0 = this.mount ? c.dist + this.mount.scale * this.mount.ride.seat * (this.mount.ride.fly ? 2.2 : 1.4) : this.inCar ? Math.max(c.dist, this.inCar.kind === 'heli' || this.inCar.kind === 'tank' ? 16 : this.inCar.kind === 'bus' || this.inCar.kind === 'truck' ? 14 : 11) : c.dist;
+    // 젤리병단 장비를 들면 3인칭 카메라가 곰돌이에게 조금 더 붙는다 (부드럽게)
+    this.odmK = (this.odmK || 0) + ((this.odmHeld && !this.mount && !this.inCar ? 1 : 0) - (this.odmK || 0)) * Math.min(1, dt * 4);
+    const dist0 = this.mount ? c.dist + this.mount.scale * this.mount.ride.seat * (this.mount.ride.fly ? 2.2 : 1.4) : this.inCar ? Math.max(c.dist, this.inCar.kind === 'heli' || this.inCar.kind === 'tank' ? 16 : this.inCar.kind === 'bus' || this.inCar.kind === 'truck' ? 14 : 11) : c.dist * (1 - 0.38 * this.odmK);
     // 총·활 조준(우클릭)은 1인칭으로 부드럽게 넘어가고, 마법봉 조준은 살짝 가까이
     const dist = this.inCar || this.adsFP ? dist0 : dist0 + (Math.min(dist0, 3.4) - dist0) * this.aim;
     const cp = Math.cos(c.pitch);
