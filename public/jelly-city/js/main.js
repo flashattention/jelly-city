@@ -942,6 +942,8 @@ function findFocus() {
   opts.sort((a, b) => a.d - b.d);
   const f = opts[0] || null;
   if (f) f.key = 'E';
+  // 탄 동물에서 내리는 법이 늘 보이게
+  if (p.mount) return { ...(f || {}), carLabel: `${p.mount.def?.emoji || '🐎'} ${p.mount.def?.name || '탈것'}에서 내리기` }; // F 줄로 따로 보인다
   if (game.mode === 'city') {
     const car = game.traffic.nearestCar(pos, 3.6);
     if (car) return { ...(f || {}), car, carLabel: car.mode === 'ai' ? (car.occ ? '자동차 빼앗기 🚗' : '자동차 타기 🚗') : car.kind === 'tank' ? '전차 타기 🪖' : car.kind === 'heli' ? '헬기 타기 🚁' : '자동차 타기 🚗' };
@@ -1600,14 +1602,14 @@ function releaseCapture() {
   cancelCapture(ok ? '🪢 휙! 밧줄을 던졌어요…' : null);
 }
 game.startCapture = startCapture; game.releaseCapture = releaseCapture; game.toggleMount = (k) => toggleMount(k); // 테스트용
-game.test = { enterBuilding: (b) => enterBuilding(b), exitBuilding: () => exitBuilding(), toggleCar: () => toggleCar(), toggleFly: () => toggleFly(), interact: () => interact(), startRide: (r) => startRide(r), endRide: () => endRide(true), eatFood: (id) => eatFood(id, 1.5, false), dismount: () => dismount(true) }; // 점검용
+game.test = { enterBuilding: (b) => enterBuilding(b), exitBuilding: () => exitBuilding(), toggleCar: () => toggleCar(), toggleFly: () => toggleFly(), interact: () => interact(), startRide: (r) => startRide(r), endRide: () => endRide(true), eatFood: (id) => eatFood(id, 1.5, false), dismount: () => dismount(true), mount: (k, v) => toggleMount(k, null, v) }; // 점검용
 
-function toggleMount(kind, it) {
+function toggleMount(kind, it, variantOf = null) {
   const p = game.player;
   if (p.mount?.kind === kind) { if (!p.mount.ride.fly) dismount(true); return; }
   if (game.mode !== 'city' || p.inCar) { ui.toast('🐾 탈것은 바깥에서만 탈 수 있어요'); return; }
   if (p.mount) dismount(false);
-  const variant = it?.uid ? [...it.uid].reduce((s, ch) => s + ch.charCodeAt(0), 0) : 0;
+  const variant = variantOf ?? (it?.uid ? [...it.uid].reduce((s, ch) => s + ch.charCodeAt(0), 0) : 0);
   p.mount = makeMount(kind, variant);
   scene.add(p.mount.mesh.g);
   const d = ANIMALS[kind];
@@ -1619,7 +1621,7 @@ function rideSteed(a) {
   const p = game.player;
   if (p.mount || p.inCar) return;
   game.net.send({ t: 'rideSteed', id: a.id });
-  toggleMount('horse');
+  toggleMount('horse', null, a.id); // 타기 전 그 말의 털색 그대로
   p.mountSteed = a.id; a.gone = true;
 }
 game.dismountForOdm = () => dismount(false);

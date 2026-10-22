@@ -32,6 +32,75 @@ function quad(o) {
   return { g, body, legs, head, tail };
 }
 
+// 말: 근육진 가슴 · 둥근 엉덩이 · 휘어진 목 · 긴 얼굴 · 갈기 · 흩날리는 꼬리 · 가는 다리와 발굽 (탈것이면 안장 · 고삐)
+const HORSE_SPH = new THREE.SphereGeometry(1, 20, 14), HORSE_CYL = new THREE.CylinderGeometry(1, 1, 1, 14);
+const HORSE_COAT = [['#8b4a26', '#2b1a12', true], ['#f3f0ea', '#cfc8bd', false], ['#24191a', '#0d0a0a', false], ['#9e9a96', '#ece9e4', true]]; // 밤색 · 백마 · 흑마 · 회색
+function horseMesh(variant = 0, ride = false) {
+  variant = Number.isFinite(+variant) ? Math.abs(Math.round(+variant)) : [...String(variant)].reduce((a, ch) => a + ch.charCodeAt(0), 0);
+  const [coat, mane, blaze] = HORSE_COAT[variant % HORSE_COAT.length];
+  const dark = new THREE.Color(coat).multiplyScalar(0.72).getStyle();
+  const E = (par, col, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0) => { const m = new THREE.Mesh(HORSE_SPH, toon(col)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.set(rx, ry, rz); m.castShadow = true; par.add(m); return m; };
+  const T = (par, col, x, y, z, r, h, rx = 0, rz = 0) => { const m = new THREE.Mesh(HORSE_CYL, toon(col)); m.position.set(x, y, z); m.scale.set(r, h, r); m.rotation.set(rx, 0, rz); m.castShadow = true; par.add(m); return m; };
+  const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+  // 몸통: 가슴 · 배 · 엉덩이
+  E(body, coat, 0, 1.47, 0.0, 0.36, 0.4, 0.92);
+  E(body, coat, 0, 1.5, 0.55, 0.37, 0.43, 0.42);
+  E(body, coat, 0, 1.55, -0.6, 0.39, 0.42, 0.46);
+  E(body, dark, 0, 1.28, 0.0, 0.3, 0.22, 0.6);
+  // 다리: 어깨 · 엉덩이에서 흔들린다 (허벅지 · 무릎 · 정강이 · 발목 · 발굽)
+  const legs = [];
+  for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
+    const back = sz < 0, piv = new THREE.Group(); piv.position.set(sx * 0.21, 1.32, sz * 0.62); body.add(piv);
+    E(piv, coat, 0, -0.16, back ? -0.05 : 0.02, back ? 0.16 : 0.14, 0.4, back ? 0.24 : 0.17);
+    T(piv, coat, 0, -0.42, back ? -0.07 : 0.01, 0.075, 0.32);
+    E(piv, coat, 0, -0.58, back ? -0.07 : 0, 0.08, 0.085, 0.085);
+    T(piv, sock(variant, sx, sz) ? '#f4f1ea' : coat, 0, -0.84, back ? -0.06 : 0, 0.06, 0.52);
+    E(piv, sock(variant, sx, sz) ? '#f4f1ea' : dark, 0, -1.1, back ? -0.05 : 0.01, 0.075, 0.07, 0.08);
+    T(piv, '#2a2420', 0, -1.25, back ? -0.04 : 0.02, 0.085, 0.12);
+    legs.push(piv);
+  }
+  // 목: 위로 휘어 올라간다
+  E(body, coat, 0, 1.92, 0.88, 0.2, 0.44, 0.26, 0.62);
+  E(body, coat, 0, 2.2, 1.06, 0.16, 0.3, 0.2, 0.35);
+  // 머리 (목 끝에서 끄덕인다)
+  const head = new THREE.Group(); head.position.set(0, 2.36, 1.14); body.add(head);
+  const face = new THREE.Group(); face.rotation.x = 0.85; head.add(face); // 얼굴은 아래 앞쪽을 본다
+  E(face, coat, 0, 0, 0.05, 0.16, 0.18, 0.2);
+  E(face, coat, 0, 0, 0.36, 0.12, 0.13, 0.3);
+  E(face, dark, 0, -0.02, 0.62, 0.115, 0.115, 0.12);
+  if (blaze) E(face, '#f4f1ea', 0, 0.09, 0.3, 0.05, 0.03, 0.32);
+  for (const sx of [-1, 1]) {
+    E(face, '#120c0a', sx * 0.06, 0.02, 0.72, 0.025, 0.035, 0.02);       // 콧구멍
+    E(face, '#ffffff', sx * 0.145, 0.06, 0.08, 0.04, 0.045, 0.035);       // 눈 (옆을 본다)
+    E(face, '#140e0c', sx * 0.158, 0.06, 0.09, 0.03, 0.035, 0.03);
+    E(face, '#ffffff', sx * 0.168, 0.075, 0.1, 0.008, 0.01, 0.008);
+    const ear = new THREE.Mesh(G.cone(), toon(coat)); ear.scale.set(0.05, 0.16, 0.035); ear.position.set(sx * 0.08, 0.2, -0.04); ear.rotation.set(-0.5, 0, -sx * 0.18); face.add(ear);
+  }
+  // 갈기: 목 뒤를 따라 늘어진다 + 앞머리
+  for (let i = 0; i < 7; i++) {
+    const u = i / 6;
+    E(body, mane, 0, 2.38 - u * 0.62, 1.0 - u * 0.36, 0.05, 0.17, 0.12, 0.5, 0, (i % 2 ? 1 : -1) * 0.16);
+  }
+  E(face, mane, 0, 0.17, 0.12, 0.05, 0.12, 0.09, -0.3);
+  // 꼬리: 엉덩이에서 아래로 흩날린다
+  const tail = new THREE.Group(); tail.position.set(0, 1.78, -1.0); body.add(tail);
+  E(tail, mane, 0, -0.05, -0.08, 0.09, 0.14, 0.12, -0.6);
+  for (let i = 0; i < 5; i++) E(tail, mane, (i - 2) * 0.02, -0.4 - (i % 2) * 0.06, -0.2 - (i % 3) * 0.03, 0.06, 0.44, 0.07, -0.3 + (i - 2) * 0.06, 0, (i - 2) * 0.03);
+  if (ride) {
+    // 안장 · 안장 깔개 · 등자 · 고삐
+    E(body, '#1e3a6b', 0, 1.8, -0.02, 0.4, 0.06, 0.42);
+    E(body, '#d4a537', 0, 1.79, -0.02, 0.41, 0.03, 0.43);
+    E(body, '#5d3a1f', 0, 1.88, -0.02, 0.27, 0.07, 0.3);
+    E(body, '#5d3a1f', 0, 1.95, 0.22, 0.1, 0.08, 0.06);
+    E(body, '#5d3a1f', 0, 1.97, -0.27, 0.22, 0.09, 0.05);
+    for (const sx of [-1, 1]) { T(body, '#3b2614', sx * 0.36, 1.55, 0, 0.012, 0.5); T(body, '#c9c9c9', sx * 0.37, 1.29, 0, 0.05, 0.035, 0, Math.PI / 2); }
+    for (const sx of [-1, 1]) T(body, '#3b2614', sx * 0.12, 1.94, 0.88, 0.012, 1.32, 1.55); // 고삐: 안장 앞 → 입
+    E(face, '#3b2614', 0, 0.0, 0.5, 0.125, 0.135, 0.03);
+  }
+  return { g, body, legs, head, tail };
+}
+const sock = (v, sx, sz) => (v % 4 === 0 && sz < 0) || (v % 4 === 3 && sx > 0 && sz > 0);
+
 // 드래곤: 긴 목, 뿔, 등 가시, 큰 박쥐 날개, 마디진 꼬리. 입에서 불을 뿜는다
 const DRAGON_COL = [['#c62828', '#ffcc80', '#4e342e', '#ef9a9a'], ['#2e7d32', '#dce775', '#1b5e20', '#a5d6a7'], ['#37474f', '#b0bec5', '#212121', '#78909c'], ['#f9a825', '#fff3e0', '#e65100', '#ffe082'], ['#6a1b9a', '#e1bee7', '#311b92', '#ce93d8']];
 function wingGeo(sx) {
@@ -74,7 +143,7 @@ function dragonMesh(variant) {
   return m;
 }
 
-export function makeAnimalMesh(kind, variant = 0) {
+export function makeAnimalMesh(kind, variant = 0, mounted = false) {
   let m;
   switch (kind) {
     case 'dragon': case 'baby_dragon': m = dragonMesh(kind === 'baby_dragon' ? variant + 4 : variant); break;
@@ -122,10 +191,8 @@ export function makeAnimalMesh(kind, variant = 0) {
       for (const sx of [-1, 1]) { const h = new THREE.Mesh(G.cone(), toon('#fff8e1')); h.scale.set(0.05, 0.18, 0.05); h.position.set(sx * 0.22, 0.32, 0); h.rotation.z = -sx * 0.6; m.head.add(h); } break;
     case 'sheep': m = quad({ len: 1.1, wid: 0.8, hgt: 0.75, leg: 0.5, legR: 0.07, color: '#fafafa', legColor: '#424242', headColor: '#424242', headR: 0.25, headUp: 0.9 });
       for (let i = 0; i < 10; i++) S(m.body, '#ffffff', Math.sin(i * 2.4) * 0.35, 0.95 + Math.cos(i * 1.7) * 0.25, Math.cos(i * 2.4) * 0.4, 0.25, 0.25, 0.25); break;
-    case 'steed': { m = quad({ len: 1.9, wid: 0.65, hgt: 0.8, leg: 1.1, legR: 0.1, color: ['#8d5a3a', '#f5f5f5', '#3e2723', '#bcaaa4'][variant % 4], snout: '#6d4c41', headR: 0.3, headUp: 1.65, tail: 0.8, tailColor: '#3e2723', hoof: '#212121' }); const saddle = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.16, 0.8), new THREE.MeshToonMaterial({ color: '#b71c1c' })); saddle.position.set(0, 1.62, 0); m.body.add(saddle); break; }
-    case 'horse': m = quad({ len: 1.9, wid: 0.65, hgt: 0.8, leg: 1.1, legR: 0.1, color: '#8d5a3a', snout: '#6d4c41', headR: 0.3, headUp: 1.65, tail: 0.8, tailColor: '#3e2723', hoof: '#212121' });
-      C(m.body, '#8d5a3a', 0, 1.75, 0.85, 0.16, 0.8, -0.55);
-      B(m.body, '#3e2723', 0, 2.0, 0.75, 0.06, 0.6, 0.35); break;
+    case 'steed': m = horseMesh(variant, true); break;
+    case 'horse': m = horseMesh(variant, mounted); break; // 올라탄 말은 안장 · 고삐
     default: m = quad({ color: '#9e9e9e' });
   }
   m.g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
@@ -163,7 +230,7 @@ export function animateAnimal(m, dt, st, kind) {
 // ---------------- 탈것 (포획한 동물) ----------------
 export function makeMount(kind, variant = 0) {
   const ride = RIDE[kind];
-  const mesh = makeAnimalMesh(kind, variant);
+  const mesh = makeAnimalMesh(kind, variant, true);
   const scale = (ride.scale || 1) * mesh.size;
   mesh.g.scale.setScalar(scale);
   return { kind, def: ANIMALS[kind], ride, mesh, scale, st: { id: 0, mv: 0, t: 0, alive: true } };

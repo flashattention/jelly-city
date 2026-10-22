@@ -121,7 +121,7 @@ const shell = new Shell({
   onProfile: (p) => { game.color = p.color; },
   onStart: (m) => start(m),
   onFinish: (m) => results(m),
-  onDisconnect: () => { if (game.mode === 'play') { shell.toast('연결이 끊겼어요'); toTitle(); } },
+  onDisconnect: () => { if (game.mode === 'play') { shell.toast('🔧 서버 업데이트 중... 20초 안에 복구돼요. 잠시 뒤 다시 들어와 주세요', 5000); toTitle(); } },
 });
 shell.pickOpts = () => ({ map: game.pick.map, mode: game.pick.mode, bots: game.pick.bots });
 function practice() {

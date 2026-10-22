@@ -362,7 +362,7 @@ const net = {
     this.ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/dream-ws`);
     this.ws.onopen = () => { this.open = true; hello(); };
     this.ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch { return; } this.handlers[m.t]?.(m); };
-    this.ws.onclose = () => { this.open = false; if (game.multi && game.mode !== 'title') { toast('연결이 끊겼어요'); setTimeout(() => { if (game.multi) toTitle(); }, 800); } };
+    this.ws.onclose = () => { this.open = false; if (game.multi && game.mode !== 'title') { toast('🔧 서버 업데이트 중... 20초 안에 복구돼요. 잠시 뒤 다시 들어와 주세요', 5000); setTimeout(() => { if (game.multi) toTitle(); }, 800); } };
   },
   send(m) { if (this.ws?.readyState === 1) this.ws.send(JSON.stringify(m)); },
   on(t, f) { this.handlers[t] = f; },

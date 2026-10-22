@@ -151,7 +151,7 @@ export class Shell {
     const ws = this.net.ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${this.o.wsPath}`);
     ws.onopen = () => { this.net.open = true; this.hello(); };
     ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch { return; } this.net.handlers[m.t]?.(m); };
-    ws.onclose = () => { this.net.open = false; if (this.multi) { this.toast('연결이 끊겼어요'); this.o.onDisconnect?.(this); } };
+    ws.onclose = () => { this.net.open = false; if (this.multi) { this.toast('🔧 서버 업데이트 중... 20초 안에 복구돼요. 잠시 뒤 다시 들어와 주세요', 5000); this.o.onDisconnect?.(this); } };
   }
   hello() { const p = this.profile; this.send({ t: 'hello', session: this.logged() ? account.session : null, name: p.name, color: p.color, look: p.look, acc: p.acc }); }
   openLobby() {

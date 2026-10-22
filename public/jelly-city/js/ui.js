@@ -651,7 +651,7 @@ export class UI {
   disconnected() {
     $('fade').classList.remove('hidden');
     $('fade').style.opacity = '1';
-    $('fade-text').innerHTML = '📡 서버와 연결이 끊겼어요<br><small>서버가 돌아오면 자동으로 다시 접속해요...</small>';
+    $('fade-text').innerHTML = '🔧 서버 업데이트 중...<br><small>20초 안에 복구돼요 · 돌아오면 자동으로 다시 접속해요</small>';
     $('fade-bar').style.display = 'none';
     try { sessionStorage.setItem('roachcity.resume', '1'); } catch { /* 무시 */ }
     this.game.net.send({ t: 'stats', stats: this.game.stats });
