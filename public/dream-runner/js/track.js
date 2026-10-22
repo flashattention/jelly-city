@@ -222,25 +222,25 @@ export class Track {
         for (let i = 0, n = r.int(3, 6); i < n; i++) { this.cx = Math.max(-9, Math.min(9, this.cx + (i % 2 ? 1 : -1) * r.range(1.2, 2.6))); const len = r.range(4, 6.5); this.plat(at, at + len, this.cx, r.range(2.6, 3.6), this.cy, { thin: true }); this.star(at + len / 2, this.cx, this.cy + 1); at += len + v * r.range(0.14, 0.24); }
         flat(r.range(12, 20)); break;
       }
-      case 'up': { const g = v * 0.18; this.cy = Math.min(8, this.cy + r.range(1.1, 1.6)); flat(r.range(16, 26), W(), g); break; }
+      case 'up': { const g = v * 0.18; this.cy = Math.min(8, this.cy + r.range(0.8, 1.2)); flat(r.range(16, 26), W(), g); break; }
       case 'down': { const g = v * r.range(0.25, 0.4); this.cy = Math.max(-4, this.cy - r.range(1.5, 3)); drift(); flat(r.range(16, 26), W(), g); break; }
       case 'hurdles': {
         const n = r.int(2, 4), sp = Math.max(v * 0.9, 9), w = W();
         const p = flat(sp * (n + 1), w);
-        for (let i = 1; i <= n; i++) this.obstacle('hurdle', p.s0 + sp * i, this.cx - w / 2, this.cx + w / 2, this.cy, this.cy + r.range(0.8, 1.0));
+        for (let i = 1; i <= n; i++) this.obstacle('hurdle', p.s0 + sp * i, this.cx - w / 2, this.cx + w / 2, this.cy, this.cy + r.range(0.55, 0.7));
         break;
       }
       case 'bars': {
         const n = r.int(2, 3), sp = Math.max(v * 1.0, 10), w = W();
         const p = flat(sp * (n + 1), w);
-        for (let i = 1; i <= n; i++) this.obstacle('bar', p.s0 + sp * i, this.cx - w / 2, this.cx + w / 2, this.cy + 1.0, this.cy + 2.8, 0.5);
+        for (let i = 1; i <= n; i++) this.obstacle('bar', p.s0 + sp * i, this.cx - w / 2, this.cx + w / 2, this.cy + 1.0, this.cy + 2.0, 0.5);
         break;
       }
       case 'walls': {
         const n = r.int(2, 4), sp = Math.max(v * 0.85, 9), w = Math.max(6, W() + 2);
         const p = flat(sp * (n + 1), w);
         let side = r.chance(0.5) ? 1 : -1;
-        for (let i = 1; i <= n; i++) { const half = w * r.range(0.5, 0.62); const x0 = side > 0 ? this.cx + w / 2 - half : this.cx - w / 2, x1 = x0 + half; this.obstacle('wall', p.s0 + sp * i, x0, x1, this.cy, this.cy + 2.6, 1.2); this.star(p.s0 + sp * i, side > 0 ? this.cx - w / 2 + (w - half) / 2 : this.cx + w / 2 - (w - half) / 2, this.cy + 1); if (r.chance(0.7)) side = -side; }
+        for (let i = 1; i <= n; i++) { const half = w * r.range(0.5, 0.62); const x0 = side > 0 ? this.cx + w / 2 - half : this.cx - w / 2, x1 = x0 + half; this.obstacle('wall', p.s0 + sp * i, x0, x1, this.cy, this.cy + 1.5, 1.2); this.star(p.s0 + sp * i, side > 0 ? this.cx - w / 2 + (w - half) / 2 : this.cx + w / 2 - (w - half) / 2, this.cy + 1); if (r.chance(0.7)) side = -side; }
         break;
       }
       case 'spikes': {
@@ -249,8 +249,8 @@ export class Track {
         for (let i = 1; i <= n; i++) {
           // 빈 줄 하나를 남기고 가시 (뛰어넘어도 된다)
           const lane = r.range(this.cx - w / 2 + 1.2, this.cx + w / 2 - 1.2), lw = 1.4;
-          if (lane - lw / 2 > this.cx - w / 2) this.obstacle('spike', p.s0 + sp * i, this.cx - w / 2, lane - lw / 2, this.cy, this.cy + 0.6, 1.2);
-          if (lane + lw / 2 < this.cx + w / 2) this.obstacle('spike', p.s0 + sp * i, lane + lw / 2, this.cx + w / 2, this.cy, this.cy + 0.6, 1.2);
+          if (lane - lw / 2 > this.cx - w / 2) this.obstacle('spike', p.s0 + sp * i, this.cx - w / 2, lane - lw / 2, this.cy, this.cy + 0.45, 1.2);
+          if (lane + lw / 2 < this.cx + w / 2) this.obstacle('spike', p.s0 + sp * i, lane + lw / 2, this.cx + w / 2, this.cy, this.cy + 0.45, 1.2);
         }
         break;
       }
@@ -265,7 +265,7 @@ export class Track {
         at += gapS() * 0.5;
         for (const sd of [-1, 1]) {
           this.plat(at, at + len, this.cx + sd * off, 1.9, this.cy, { thin: true });
-          for (let k = sp; k < len - 4; k += sp) this.obstacle(sd < 0 ? 'hurdle' : 'bar', at + k, this.cx + sd * off - 0.95, this.cx + sd * off + 0.95, sd < 0 ? this.cy : this.cy + 1.0, sd < 0 ? this.cy + 0.9 : this.cy + 2.8, 0.5);
+          for (let k = sp; k < len - 4; k += sp) this.obstacle(sd < 0 ? 'hurdle' : 'bar', at + k, this.cx + sd * off - 0.95, this.cx + sd * off + 0.95, sd < 0 ? this.cy : this.cy + 1.0, sd < 0 ? this.cy + 0.65 : this.cy + 2.0, 0.5);
         }
         at += len; flat(r.range(10, 16)); break;
       }

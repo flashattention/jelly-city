@@ -130,8 +130,12 @@ h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 #howto { position: fixed; left: 50%; bottom: 5%; transform: translateX(-50%); z-index: 5; pointer-events: none; opacity: 0;
   display: grid; gap: 6px; padding: 14px 20px; border-radius: 20px; background: rgba(20,8,50,.45); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
   font-family: 'Jua', sans-serif; font-size: 17px; text-shadow: 0 2px 6px rgba(0,0,0,.4); white-space: nowrap; }
-#howto.show { animation: howto 6s ease forwards; }
-@keyframes howto { 0% { opacity: 0; } 10% { opacity: .85; } 72% { opacity: .85; } 100% { opacity: 0; } }
+#howto.show { animation: howto 1s ease forwards; }
+@keyframes howto { 0% { opacity: 0; } 100% { opacity: .85; } }
+/* 몇 초 뒤엔 왼쪽 아래 구석에 작고 흐리게 계속 남는다 */
+#howto.dock { left: 16px; bottom: 16px; transform: none; font-size: 13px; gap: 3px; padding: 8px 12px; opacity: .55 !important; animation: none; transition: all .8s ease; }
+#howto.dock kbd { font-size: 11px; min-width: 20px; padding: 1px 5px; }
+#howto.dock kbd.wide { min-width: 44px; }
 kbd { display: inline-block; min-width: 26px; padding: 2px 7px; margin-right: 2px; border-radius: 7px; border: 1px solid rgba(255,255,255,.5); border-bottom-width: 3px; background: rgba(255,255,255,.12); font-family: 'Jua', sans-serif; font-size: 14px; text-align: center; }
 kbd.wide { min-width: 64px; }
 @media (pointer: coarse) { #howto { display: none; } }

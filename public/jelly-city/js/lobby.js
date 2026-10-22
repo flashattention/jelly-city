@@ -143,10 +143,26 @@ export class Lobby {
     }
   }
 
+  // 닉네임 정하기 · 바꾸기 (모든 게임에서 같이 쓴다)
+  editNick(first) {
+    const box = $('who-name');
+    box.innerHTML = `${first ? '<div class="nick-hint">구글 이름 대신 쓸 닉네임을 정해 주세요</div>' : ''}<input id="nick-in" maxlength="12" placeholder="닉네임 (2~12글자)" value="${esc(this.user?.nick || '')}" /> <button id="nick-save" class="btn mini">저장</button>`;
+    const inp = $('nick-in'); inp.focus();
+    const save = async () => {
+      try { const r = await this.api('/api/nick', { method: 'POST', body: { nick: inp.value } }); this.user = r.user; this.error(''); this.renderSelect(); }
+      catch (e) { this.error(e.message); inp.focus(); }
+    };
+    $('nick-save').onclick = save;
+    inp.onkeydown = (e) => { if (e.key === 'Enter') save(); };
+  }
+
   // ---------------- 캐릭터 고르기 ----------------
   renderSelect() {
     this.show('v-select');
-    $('who-name').innerHTML = `👋 <b>${esc(this.user?.name)}</b>${this.user?.email ? ` <small>${esc(this.user.email)}</small>` : ''}`;
+    // 구글 실명 대신 직접 정한 닉네임 (처음이면 정하게 한다)
+    $('who-name').innerHTML = `👋 <b>${esc(this.user?.name)}</b> <button id="nick-edit" class="btn ghost mini" title="닉네임 바꾸기">✏️</button>`;
+    $('nick-edit').onclick = () => this.editNick(false);
+    if (this.user?.needNick) this.editNick(true);
     $('logout-btn').onclick = async () => {
       try { await this.api('/api/logout', { method: 'POST' }); } catch { /* 무시 */ }
       this.session = null; store.set(SESSION_KEY, null);

@@ -109,8 +109,9 @@ async function boot() {
   const inv = codeOf(q.get('room'));
   if (inv.length === 6) {
     $('code-in').value = inv; $('code-btn').classList.add('pulse');
-    $('play-btns').before($('code-in').parentElement); // 초대받았으면 참가 버튼을 위로
-    toast(`🎟️ 초대받은 방 ${inv} · 이름을 확인하고 '코드로 참가'를 눌러요`, 4000);
+    $('play-btns').before($('code-in').parentElement); // 초대받았으면 참가 버튼을 위로 (자동 참가가 안 되면 눌러서)
+    history.replaceState(null, '', location.pathname); // 새로고침해도 다시 들어가지 않게
+    joinByCode(inv); // 링크로 들어오면 바로 그 방으로
   }
 }
 function renderAccount() {
@@ -125,7 +126,13 @@ function renderAccount() {
     if (s.googleClientId) account.googleButton($('g-btn'), s.googleClientId, () => renderAccount(), (e) => err(e.message)).catch(() => err('구글 로그인 버튼을 불러오지 못했어요'));
     else $('g-btn').innerHTML = '';
     $('dev-box').classList.toggle('hidden', !s.devLogin);
+    // 서버에 입장 비밀번호가 있으면 (젤리시티와 같은 비밀번호 · 같은 저장값)
+    $('pw-row').classList.toggle('hidden', !s.password);
+    if (s.password && !$('pw').value) $('pw').value = store.get('roachcity.pw') || '';
   } else $('me-name').textContent = account.user.name;
+  // 구글 계정은 실명 대신 닉네임: 처음이면 정하게 한다
+  $('acct-nick').classList.toggle('hidden', !(on && account.user.needNick) && !game.editNick);
+  $('acct-nick-hint').textContent = on && account.user.needNick ? '구글 이름 대신 쓸 닉네임을 정해 주세요 (모든 게임에서 써요)' : '새 닉네임';
   const chars = on ? account.chars || [] : [];
   let sel = store.get(CHAR_KEY) || (chars[0]?.token ?? 'default');
   if (sel !== 'default' && !chars.some((c) => c.token === sel)) sel = chars[0]?.token ?? 'default';
@@ -139,23 +146,54 @@ function renderAccount() {
   };
   if (on) { for (const c of chars) chip(c.token, c.name, c.profile?.color || '#8a5634'); chip('default', '🐻 기본 곰돌이', '#8a5634'); }
   const c = chars.find((x) => x.token === sel);
-  $('nick-row').classList.toggle('hidden', !!c);
+  $('nick-row').classList.toggle('hidden', !!c || on); // 로그인했으면 계정 닉네임을 쓴다
   if (!$('nick').value) {
     // 기본 이름: 체험판은 손님 이름, 아니면 번호 붙은 곰돌이 (구글 실명은 순위표에 안 보이게)
     let nick = store.get(NICK_KEY);
     if (!nick) { nick = on && account.user.name?.startsWith('체험판') ? account.user.name : `꿈꾸는 곰돌이 ${1000 + Math.floor(Math.random() * 9000)}`; store.set(NICK_KEY, nick); }
     $('nick').value = nick;
   }
-  game.profile = c ? { name: c.name, color: c.profile?.color || '#8a5634', look: c.profile?.look, acc: c.profile?.accessories || [], gender: c.profile?.gender } : { name: $('nick').value.trim() || '꿈꾸는 곰돌이', color: '#8a5634' };
+  game.profile = c ? { name: c.name, color: c.profile?.color || '#8a5634', look: c.profile?.look, acc: c.profile?.accessories || [], gender: c.profile?.gender } : { name: (on && account.user.nick) || $('nick').value.trim() || '꿈꾸는 곰돌이', color: '#8a5634' };
   runner.setLook(game.profile);
 }
+$('nick-edit').onclick = () => { game.editNick = true; $('acct-nick-in').value = account.user?.nick || ''; renderAccount(); $('acct-nick-in').focus(); };
+async function saveNick() {
+  try { const r = await account.api('/api/nick', { method: 'POST', body: { nick: $('acct-nick-in').value } }); account.user = r.user; game.editNick = false; err(''); renderAccount(); toast(`😊 이제부터 '${r.user.nick}'(으)로 불러요`); }
+  catch (e) { err(e.message); $('acct-nick-in').focus(); }
+}
+$('acct-nick-save').onclick = saveNick;
+$('acct-nick-in').onkeydown = (e) => { if (e.key === 'Enter') saveNick(); };
+$('pw').addEventListener('input', () => { store.set('roachcity.pw', $('pw').value); err(''); });
 $('nick').addEventListener('input', () => { store.set(NICK_KEY, $('nick').value.trim()); if (!$('nick-row').classList.contains('hidden')) game.profile.name = $('nick').value.trim() || '꿈꾸는 곰돌이'; });
 $('guest-btn').onclick = async () => { try { await account.login({ guest: true }); renderAccount(); } catch (e) { err(e.message); } };
 $('dev-btn').onclick = async () => { try { await account.login({ dev: $('dev-name').value || '러너' }); renderAccount(); } catch (e) { err(e.message); } };
 $('logout').onclick = async () => { await account.logout(); renderAccount(); };
 // 초대 코드로 참가 (로그인 안 해도 된다)
-const codeOf = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
-for (const id of ['code-in', 'code-in2']) $(id).addEventListener('input', () => { $(id).value = codeOf($(id).value); });
+// 초대 코드: 한글 자판 그대로 쳐도 (ㅗㅠㄹㅇㅜㅇ → HBFDND) 같은 자리의 영문으로 바꾼다
+const KO_KEY = { ㅂ: 'Q', ㅈ: 'W', ㄷ: 'E', ㄱ: 'R', ㅅ: 'T', ㅛ: 'Y', ㅕ: 'U', ㅑ: 'I', ㅐ: 'O', ㅔ: 'P', ㅁ: 'A', ㄴ: 'S', ㅇ: 'D', ㄹ: 'F', ㅎ: 'G', ㅗ: 'H', ㅓ: 'J', ㅏ: 'K', ㅣ: 'L', ㅋ: 'Z', ㅌ: 'X', ㅊ: 'C', ㅍ: 'V', ㅠ: 'B', ㅜ: 'N', ㅡ: 'M',
+  ㅃ: 'Q', ㅉ: 'W', ㄸ: 'E', ㄲ: 'R', ㅆ: 'T', ㅒ: 'O', ㅖ: 'P', ㅘ: 'HK', ㅙ: 'HO', ㅚ: 'HL', ㅝ: 'NJ', ㅞ: 'NP', ㅟ: 'NL', ㅢ: 'ML',
+  ㄳ: 'RT', ㄵ: 'SW', ㄶ: 'SG', ㄺ: 'FR', ㄻ: 'FA', ㄼ: 'FQ', ㄽ: 'FT', ㄾ: 'FX', ㄿ: 'FV', ㅀ: 'FG', ㅄ: 'QT' };
+const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ', JUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ', JONG = ['', ...'ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ'];
+function deHangul(str) {
+  let out = '';
+  for (const ch of String(str || '')) {
+    const c = ch.charCodeAt(0) - 0xac00;
+    if (c >= 0 && c < 11172) { const j = [CHO[Math.floor(c / 588)], JUNG[Math.floor((c % 588) / 28)], JONG[c % 28]]; for (const x of j) out += KO_KEY[x] || ''; } // 완성된 글자는 자모로 풀어서
+    else out += KO_KEY[ch] || ch;
+  }
+  return out;
+}
+const codeOf = (v) => deHangul(v).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+for (const id of ['code-in', 'code-in2']) {
+  const el = $(id);
+  // 글자를 조합하는 중(한글 자판 · 휴대폰)엔 건드리지 않고, 다 친 뒤에 영문 대문자로 정리
+  let composing = false;
+  el.setAttribute('autocapitalize', 'characters'); el.setAttribute('spellcheck', 'false'); el.setAttribute('autocorrect', 'off');
+  el.addEventListener('compositionstart', () => { composing = true; });
+  el.addEventListener('compositionend', () => { composing = false; el.value = codeOf(el.value); });
+  el.addEventListener('input', () => { if (!composing) { const v = codeOf(el.value); if (v !== el.value) el.value = v; } });
+  el.addEventListener('blur', () => { el.value = codeOf(el.value); });
+}
 $('code-btn').onclick = () => joinByCode($('code-in').value);
 $('code-btn2').onclick = () => joinByCode($('code-in2').value);
 $('code-in').onkeydown = (e) => { if (e.key === 'Enter') $('code-btn').click(); };
@@ -205,10 +243,12 @@ function countdown(ms) {
   showDreamCard(0);
   // 조작법: 가운데 흐리게 떴다가 사라진다
   $('t-shove-row').classList.toggle('hidden', !game.multi);
-  const h = $('howto'); h.classList.remove('show'); void h.offsetWidth; h.classList.add('show');
+  const h = $('howto'); h.classList.remove('show', 'dock', 'hidden'); void h.offsetWidth; h.classList.add('show');
+  clearTimeout(game.howtoT); game.howtoT = setTimeout(() => h.classList.add('dock'), 5500);
 }
 function goRun() { game.mode = 'run'; $('countdown').classList.add('hidden'); }
 function toTitle() {
+  $('howto').classList.add('hidden');
   game.mode = 'title'; game.multi = false;
   for (const g of game.ghosts.values()) g.remove(); game.ghosts.clear();
   $('hud').classList.add('hidden'); $('touch').classList.add('hidden'); $('spectate').classList.add('hidden'); $('countdown').classList.add('hidden');
@@ -217,6 +257,7 @@ function toTitle() {
   show('title'); renderAccount();
 }
 function leaveRun() {
+  $('howto').classList.add('hidden');
   game.mode = 'over';
   $('hud').classList.add('hidden'); $('touch').classList.add('hidden'); $('spectate').classList.add('hidden');
 }
@@ -233,7 +274,7 @@ async function died(why) {
 }
 async function showOver() {
   game.mode = 'over';
-  $('hud').classList.add('hidden'); $('touch').classList.add('hidden'); $('spectate').classList.add('hidden');
+  $('hud').classList.add('hidden'); $('touch').classList.add('hidden'); $('spectate').classList.add('hidden'); $('howto').classList.add('hidden');
   show('over');
   $('ov-why').textContent = `💤 ${game.why || '꿈에서 깼어요'}`;
   $('ov-score').textContent = score().toLocaleString();
@@ -362,7 +403,7 @@ net.on('error', (m) => {
 });
 net.on('joined', (m) => { game.room = m.room; game.members = m.members; $('room-rank').classList.add('hidden'); show('room'); renderRoom(); });
 net.on('room', (m) => { game.room = m.room; game.members = m.members; if (game.mode !== 'run' && game.mode !== 'count' && game.mode !== 'dead') { if (!$('room').classList.contains('hidden') || !$('over').classList.contains('hidden')) renderRoom(); } });
-net.on('left', () => { game.room = null; if (!game.multi) return; if (logged()) { show('lobby'); net.send({ t: 'list' }); } else { game.multi = false; toTitle(); } });
+net.on('left', () => { const was = game.room; game.room = null; if (!game.multi || !was) return; afterLeave(); });
 net.on('start', (m) => {
   game.members = m.members;
   newRun(m.seed);
@@ -393,7 +434,9 @@ net.on('finish', (m) => {
 $('quick-btn').onclick = () => net.send({ t: 'quick' });
 $('create-btn').onclick = () => net.send({ t: 'create', name: $('room-name').value });
 $('lobby-back').onclick = () => { game.multi = false; show('title'); };
-$('leave-btn').onclick = () => { net.send({ t: 'leave' }); game.room = null; $('ov-room').classList.add('hidden'); };
+$('leave-btn').onclick = () => { net.send({ t: 'leave' }); game.room = null; $('ov-room').classList.add('hidden'); afterLeave(); };
+// 방에서 나온 뒤: 로그인했으면 방 목록, 아니면 처음 화면
+function afterLeave() { if (logged()) { show('lobby'); net.send({ t: 'list' }); } else { game.multi = false; toTitle(); } }
 $('start-btn').onclick = () => net.send({ t: 'start' });
 async function copy(text, label) {
   try { await navigator.clipboard.writeText(text); toast(`📋 ${label} 복사했어요`); }

@@ -127,15 +127,15 @@ export class DreamRooms {
   }
   leave(c, tell) {
     const r = c.room;
-    if (!r) return;
+    if (!r) { if (tell) this.send(c, { t: 'left' }); return; }
     r.players = r.players.filter((p) => p !== c);
     c.room = null;
+    if (tell) this.send(c, { t: 'left' }); // 혼자 있던 방이어도 꼭 알려 준다 (안 알려서 못 나가던 문제)
     if (!r.players.length) { this.rooms.delete(r.id); this.broadcastList(); return; }
     if (r.host === c) r.host = r.players[0];
     if (r.state === 'run') { this.toRoom(r, { t: 'dead', id: c.id, result: null, left: true }); if (r.players.every((p) => p.dead)) this.finish(r); }
     this.roomUpdate(r);
     this.broadcastList();
-    if (tell) this.send(c, { t: 'left' });
   }
   // 모두 탈락: 방 안 순위 (멀리 간 순서)
   finish(r) {

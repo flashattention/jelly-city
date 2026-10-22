@@ -17,7 +17,7 @@ export const account = {
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) { const e = new Error(data.error || `HTTP ${res.status}`); e.status = res.status; throw e; }
+    if (!res.ok) { const e = new Error(data.error === 'password' ? '입장 비밀번호가 맞지 않아요' : data.error || `HTTP ${res.status}`); e.status = res.status; e.code = data.error; throw e; }
     return data;
   },
   status() { return this.api('/api/status'); },

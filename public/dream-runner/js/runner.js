@@ -210,7 +210,7 @@ export class Runner {
     // 앞을 막는 발판 옆면: 조금 높으면 훌쩍 올라서고, 많이 높으면 쾅
     const w = track.wall(prevS, this.s, this.x, this.y);
     if (w) {
-      if (w.y - this.y < 0.95) { this.y = w.y; this.vy = Math.max(0, this.vy); this.onGround = true; this.jumps = 0; }
+      if (w.y - this.y < 1.3) { /* 1.3m 아래 턱은 훌쩍 올라선다 */ this.y = w.y; this.vy = Math.max(0, this.vy); this.onGround = true; this.jumps = 0; }
       else return this.die('벽에 쾅! 부딪혔어요', track);
     }
     // 장애물

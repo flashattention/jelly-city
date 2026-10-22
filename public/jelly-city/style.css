@@ -653,3 +653,7 @@ body.bug-mode .cute-bear { display: none !important; }
 
 /* 젤리병단 장비: 갈고리가 닿는 곳을 겨누면 조준점이 초록 */
 #crosshair.hookable { color: #69f0ae !important; text-shadow: 0 0 6px #00c853, 0 0 3px #000; }
+
+/* 닉네임 정하기 */
+#who-name input { padding: 6px 12px; border-radius: 999px; border: 2px solid #f3c6d6; font-family: inherit; font-size: 15px; width: 170px; }
+#who-name .nick-hint { font-size: 13px; color: #c2185b; margin-bottom: 4px; }

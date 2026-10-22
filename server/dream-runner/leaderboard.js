@@ -49,7 +49,7 @@ export class DreamBoard {
     if (dist > time * MAX_SPEED + 30 || stars > dist / 2 + 5 || themes > time / 15 + 3) throw new Error('기록이 이상해요');
     const score = dist + stars * STAR_PTS;
     this.runs++; this.dirty = true;
-    const name = clean(b.name, 14) || (who.user.anon ? '' : clean(who.user.name, 14)) || '꿈꾸는 곰돌이';
+    const name = clean(b.name, 14) || clean(who.user.nick || (who.user.guest ? who.user.name : ''), 14) || '꿈꾸는 곰돌이'; // 구글 실명은 쓰지 않는다
     const color = /^#[0-9a-fA-F]{6}$/.test(b.color || '') ? b.color : '#8a5634';
     const old = this.best[who.sub];
     const newBest = !old || score > old.score;

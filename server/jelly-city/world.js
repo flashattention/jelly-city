@@ -137,6 +137,19 @@ export class World {
     this.dirty = true;
     return sid;
   }
+  // 화면에 보여 줄 계정 정보: 구글 실명 · 이메일은 보내지 않고 직접 정한 닉네임만
+  publicUser(u) {
+    if (!u) return null;
+    return { name: u.nick || (u.guest ? u.name : '곰돌이'), nick: u.nick || '', needNick: !u.nick && !u.guest, guest: !!u.guest };
+  }
+  setNick(sub, nick) {
+    const u = this.users[sub];
+    if (!u) throw new Error('로그인이 필요해요');
+    const n = String(nick || '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim();
+    if ([...n].length < 2 || [...n].length > 12) throw new Error('닉네임은 2~12글자로 정해 주세요');
+    u.nick = n; this.dirty = true;
+    return this.publicUser(u);
+  }
   guestCount() { return Object.values(this.users).filter((u) => u.guest).length; }
   // 이틀 넘게 안 들어온 체험판 계정·캐릭터 정리 (집·차도 함께 풀린다)
   purgeGuests() {
@@ -263,7 +276,7 @@ export class World {
     const hi = this.homesInfo();
     this.send(p, {
       t: 'welcome', you: p.id, token, homeId: acc.homeId, homeUnit: acc.homeUnit, myHomes: acc.homes || [], homes: hi.homes, owned: hi.owned, safe: hi.safe,
-      stats: acc.stats, starter: acc.stats ? null : acc.starter, profile: acc.profile, user: { name: who.user.name, email: who.user.email }, admin: isAdmin(who.user),
+      stats: acc.stats, starter: acc.stats ? null : acc.starter, profile: acc.profile, user: this.publicUser(who.user), admin: isAdmin(who.user),
       phone: acc.phone, contacts: acc.contacts, sms: acc.sms.slice(-100),
       minutes: this.minutes, timeSpeed: this.timeSpeed, weather: this.weather, llm: llmEnabled,
       affinity: aff, memories: mem, players: [...this.players.values()].map(playerMeta),

@@ -72,13 +72,15 @@ async function api(req, res, url) {
     }
     else return json(res, 400, { error: '구글 로그인이 필요해요' });
     const session = world.login(info, Array.isArray(body.legacy) ? body.legacy : []);
-    return json(res, 200, { session, user: { name: info.name, email: info.email, picture: info.picture }, chars: world.charList(info.sub) });
+    return json(res, 200, { session, user: world.publicUser(world.users[info.sub]), chars: world.charList(info.sub) });
   }
   // 드림 러너 (계정 · 로그인은 젤리시티와 같이 쓴다)
   if (url.pathname.startsWith('/api/dream/')) return dreamApi(req, res, url, world.userOf(sid), dreamBoard, json);
   const who = world.userOf(sid);
   if (!who) return json(res, 401, { error: 'login' });
-  if (url.pathname === '/api/me') return json(res, 200, { user: { name: who.user.name, email: who.user.email, picture: who.user.picture }, chars: world.charList(who.sub), admin: isAdmin(who.user) });
+  if (url.pathname === '/api/me') return json(res, 200, { user: world.publicUser(who.user), chars: world.charList(who.sub), admin: isAdmin(who.user) });
+  // 닉네임 정하기 · 바꾸기 (구글 실명 대신 모든 게임에서 쓴다)
+  if (url.pathname === '/api/nick' && req.method === 'POST') { const b = await readJson(req); try { return json(res, 200, { user: world.setNick(who.sub, b.nick) }); } catch (e) { return json(res, 400, { error: e.message }); } }
   const char = url.searchParams.get('char') || '';
   try {
     // 사진
