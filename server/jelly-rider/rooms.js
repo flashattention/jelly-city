@@ -1,12 +1,12 @@
-// 젤리라이더 방: 최대 8명 · 트랙 · 스피드전/아이템전 · 개인전/팀전. 모두 들어오면(또는 1등 뒤 25초) 끝
+// 젤리라이더 방: 최대 12명 · 트랙 · 스피드전/아이템전 · 개인전/팀전. 모두 들어오면(또는 1등 뒤 25초) 끝
 import { BaseRooms } from '../shared/rooms.js';
 
 const TRACK_IDS = ['candy', 'cloud', 'neon', 'lava', 'sakura', 'synth', 'snow', 'deep'];
 const ITEM_KINDS = ['trap', 'bomb', 'missile', 'zap'];
-const POINTS = [10, 8, 6, 5, 4, 3, 2, 1];
+const POINTS = [12, 10, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0]; // 팀전 순위 점수 (12등까지)
 
 export class RiderRooms extends BaseRooms {
-  constructor(userOf) { super(userOf, { max: 8, hz: 15, countdown: 4000, defaults: { track: 'candy', mode: 'speed', team: false } }); }
+  constructor(userOf) { super(userOf, { max: 12, hz: 15, countdown: 4000, defaults: { track: 'candy', mode: 'speed', team: false } }); }
   allow(cur, n) {
     return {
       track: TRACK_IDS.includes(n.track) ? n.track : cur.track,

@@ -1,4 +1,4 @@
-// 젤리라이더: 꿈나라 트랙을 곰돌이 카트로 달린다 (혼자: AI 5대 · 타임어택 · 같이: 최대 8명, 스피드전/아이템전 · 개인전/팀전)
+// 젤리라이더: 꿈나라 트랙을 곰돌이 카트로 달린다 (혼자: AI 5대 · 타임어택 · 같이: 최대 12명, 스피드전/아이템전 · 개인전/팀전)
 import * as THREE from 'three';
 import { account, store } from '../../shared/js/account.js';
 import { Shell, esc, TEAMS } from '../../shared/js/shell.js';
@@ -94,7 +94,7 @@ function renderTitleOpts() {
   modeSeg(el, game.pick, true, (o) => { Object.assign(game.pick, o); store.set(MODE_KEY, game.pick.mode); renderTitleOpts(); }, false);
 }
 const shell = new Shell({
-  key: 'jellyrider', title: '🏁 젤리라이더', subtitle: '꿈나라 트랙을 곰돌이 카트로 질주! 드리프트로 니트로를 모아 역전해요', wsPath: '/rider-ws', max: 8,
+  key: 'jellyrider', title: '🏁 젤리라이더', subtitle: '꿈나라 트랙을 곰돌이 카트로 질주! 드리프트로 니트로를 모아 역전해요', wsPath: '/rider-ws', max: 12,
   multiLabel: '👥 같이 달리기', roomIcon: '🏁', startLabel: '🏁 다 같이 출발!',
   keysHelp: '↑ 가속 · ↓ 브레이크 · ← → 핸들 · Shift 드리프트(→ 니트로) · Ctrl/Space 니트로·아이템 · R 트랙으로 · M 소리',
   buttons: [
@@ -364,7 +364,7 @@ function hud() {
   if (!game.itemMode) { $('gauge').firstElementChild.style.width = `${me.gauge * 100}%`; $('ns0').classList.toggle('on', me.nitro > 0); $('ns1').classList.toggle('on', me.nitro > 1); }
   $('wrong').classList.toggle('hidden', !(me.wrongT > 1.2 && game.mode === 'race'));
   if (game.team) {
-    const pts = { red: 0, blue: 0 }, P = [10, 8, 6, 5, 4, 3, 2, 1];
+    const pts = { red: 0, blue: 0 }, P = [12, 10, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0];
     R.forEach((k, i) => { if (k.team) pts[k.team] += P[i] || 0; });
     $('teamrace').innerHTML = `<span style="background:${TEAMS.red.color}88">${TEAMS.red.name} ${pts.red}</span><span style="background:${TEAMS.blue.color}88">${TEAMS.blue.name} ${pts.blue}</span>`;
   }
