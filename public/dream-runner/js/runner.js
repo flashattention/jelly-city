@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { Roach } from '../../shared/js/roach.js';
 import { speedAt } from './track.js';
+import { ITEMS, MAX_ITEMS, randomItem, EffectFx } from './items.js';
 
 const GRAV = 30, JUMP = 11.5, JUMP2 = 10.5, SIDE = 8.5;
 export const BOOST = 0.5;  // ↑ · W 를 누르고 있으면 최대 50% 빨라진다
@@ -155,17 +156,20 @@ export class Runner {
     this.bear = makeBear(profile);
     scene.add(this.bear.root);
     this.booster = new Booster(scene); this.booster.attach(this.bear);
+    this.efx = new EffectFx(); this.efx.attach(this.bear);
     // 발밑 그림자 (동그란 얼룩)
     this.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.55, 20), new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.28, depthWrite: false }));
     this.shadow.rotation.x = -Math.PI / 2; scene.add(this.shadow);
     this.reset();
   }
-  setLook(profile) { this.scene.remove(this.bear.root); this.bear = makeBear(profile); this.scene.add(this.bear.root); this.booster.attach(this.bear); }
+  setLook(profile) { this.scene.remove(this.bear.root); this.bear = makeBear(profile); this.scene.add(this.bear.root); this.booster.attach(this.bear); this.efx.attach(this.bear); }
   reset(s = 0, x = 0) {
+    // 아이템: 들고 있는 것(최대 2개) · 켜져 있는 효과(남은 초)
+    this.items = []; this.eff = { rocket: 0, shield: 0, cloud: 0, magnet: 0, ghost: 0, slow: 0 }; this.rocketK = 0; this.cloudY = 0; this.lastGroundY = 0;
     Object.assign(this, { s, x, y: 0, boost: 0, vx: 0, vy: 0, knock: 0, onGround: true, jumps: 0, coyote: 0, jbuf: 0, slideT: 0, flipT: 0, shoveT: 0, alive: true, dead: null, stars: 0, plat: null, t: 0 });
     this.bear.inner.rotation.set(0, 0, 0); this.bear.root.scale.setScalar(1); this.bear.root.visible = true;
   }
-  get v() { return speedAt(this.s) * (1 + BOOST * this.boost); }
+  get v() { return speedAt(this.s) * (1 + BOOST * this.boost) * (1 + 0.8 * this.rocketK) * (this.eff.slow > 0 ? 0.6 : 1); }
   get h() { return this.slideT > 0 ? H_SLIDE : H_STAND; }
 
   // input: { dir(-1~1), jump(눌림), slide(눌림), slideHeld, boost(누르는 중) }
@@ -177,6 +181,9 @@ export class Runner {
     const wasB = this.boost;
     this.boost = input.boost ? Math.min(1, this.boost + dt / BOOST_UP) : Math.max(0, this.boost - dt / BOOST_DOWN);
     if (input.boost && wasB < 0.02 && this.boost > 0) fx?.('boost');
+    // 아이템 효과 시간
+    for (const k in this.eff) this.eff[k] = Math.max(0, this.eff[k] - dt);
+    this.rocketK += ((this.eff.rocket > 0 ? 1 : 0) - this.rocketK) * Math.min(1, dt * 4);
     this.s += this.v * dt;
     // 좌우: 손 떼면 바로 멈추는 느낌 + 밀쳐진 힘은 서서히 줄어든다
     this.vx += ((input.dir || 0) * SIDE - this.vx) * Math.min(1, dt * 14);
@@ -203,20 +210,32 @@ export class Runner {
     if (g && this.vy <= 0 && this.y <= g.y + 0.02 && prevY >= g.y - 0.5) {
       this.y = g.y; this.vy = 0; this.onGround = true; this.jumps = 0;
       if (!was) { fx?.('land'); this.bear.jumpSquash = 1; }
+      this.lastGroundY = g.y;
       if (g.mv) this.x += g.dx; // 움직이는 발판에 실려 간다
     }
+    // 구름발판: 떨어지지 않고 마지막 발판 높이에 떠 있는다
+    if (!this.onGround && this.eff.cloud > 0 && this.vy <= 0 && this.y <= this.cloudY) { this.y = this.cloudY; this.vy = 0; this.onGround = true; this.jumps = 0; }
     if (was && !this.onGround && this.vy <= 0) this.coyote = 0.1;
     this.plat = this.onGround ? g : null;
     // 앞을 막는 발판 옆면: 조금 높으면 훌쩍 올라서고, 많이 높으면 쾅
     const w = track.wall(prevS, this.s, this.x, this.y);
     if (w) {
-      if (w.y - this.y < 1.3) { /* 1.3m 아래 턱은 훌쩍 올라선다 */ this.y = w.y; this.vy = Math.max(0, this.vy); this.onGround = true; this.jumps = 0; }
+      if (w.y - this.y < 1.3 || this.eff.ghost > 0 || this.eff.shield > 0) { /* 1.3m 아래 턱은 훌쩍 올라선다 (유령 · 방어막이면 어떤 턱이든) */ if (w.y - this.y >= 1.3 && this.eff.ghost <= 0) { this.eff.shield = 0; fx?.('shieldbreak'); } this.y = w.y; this.vy = Math.max(0, this.vy); this.onGround = true; this.jumps = 0; }
       else return this.die('벽에 쾅! 부딪혔어요', track);
     }
     // 장애물
-    const o = track.hit(this.s, this.x, this.y, this.h);
-    if (o) return this.die(o.kind === 'spike' ? '가시를 밟았어요' : o.kind === 'bar' ? '가로대에 머리를 쿵!' : '장애물에 부딪혔어요', track);
+    const o = this.eff.ghost > 0 ? null : track.hit(this.s, this.x, this.y, this.h);
+    if (o && this.eff.shield > 0) { this.eff.shield = 0; track.breakOne(o); fx?.('shieldbreak'); }
+    else if (o) return this.die(o.kind === 'spike' ? '가시를 밟았어요' : o.kind === 'bar' ? '가로대에 머리를 쿵!' : '장애물에 부딪혔어요', track);
     // 별사탕
+    // 아이템전: ? 상자 · 함정 · 자석
+    if (track.itemMode) {
+      const b = track.takeBox(this.s, this.x, this.y);
+      if (b) { if (this.items.length < MAX_ITEMS) { const id = randomItem(this.multi); this.items.push(id); fx?.('item', id); } else fx?.('itemfull'); }
+      const tr = track.hitTrap(this.s, this.x, this.y);
+      if (tr) { if (this.eff.shield > 0) { this.eff.shield = 0; fx?.('shieldbreak'); } else if (this.eff.ghost <= 0) { this.eff.slow = 1.6; this.knock += (Math.random() < 0.5 ? -1 : 1) * 7; fx?.('trapped'); } }
+      if (this.eff.magnet > 0) track.magnet(this.s, this.x, this.y, dt);
+    }
     const n = track.takeStars(this.s, this.x, this.y);
     if (n) { this.stars += n; fx?.('star', n); }
     // 꿈 밖으로 떨어짐
@@ -224,7 +243,18 @@ export class Runner {
     this.flipT = Math.max(0, this.flipT - dt);
     this.shoveT = Math.max(0, this.shoveT - dt);
   }
-  shoved(dir) { this.knock = dir * 14; this.vy = Math.max(this.vy, 5.5); this.onGround = false; this.slideT = 0; }
+  // Q: 앞의 아이템부터 쓴다. 돌려주는 값 = 쓴 아이템 (같이 달리기 알림은 main 이 한다)
+  useItem(track, fx) {
+    if (!this.alive || !this.items.length) return null;
+    const id = this.items.shift(), d = ITEMS[id];
+    if (d.dur) this.eff[id] = d.dur;
+    if (id === 'cloud') this.cloudY = this.onGround ? this.y : this.lastGroundY;
+    if (id === 'wave') track.breakAhead(this.s, this.s + 30);
+    if (id === 'teleport') { const t = track.teleport(this.s, 35); if (t) { Object.assign(this, { s: t.s, x: t.x, y: t.y, vy: 0, onGround: true, jumps: 0 }); } }
+    fx?.('use', id);
+    return id;
+  }
+  shoved(dir) { if (this.eff.shield > 0) { this.eff.shield = 0; return 'blocked'; } if (this.eff.ghost > 0) return 'blocked'; this.knock = dir * 14; this.vy = Math.max(this.vy, 5.5); this.onGround = false; this.slideT = 0; }
   bump(dir) { this.knock += dir * 4.5; }
   die(why, track) {
     this.alive = false; this.dead = { why, t: 0, vy: Math.max(this.vy, 0), fall: why.includes('떨어') };
@@ -245,7 +275,8 @@ export class Runner {
     const sliding = this.slideT > 0 && this.onGround;
     b.update(dt, this.alive && this.onGround && !sliding ? Math.min(12, this.v * 0.55) : 0, { airborne: !this.onGround, noCrawl: true });
     poseBear(b, { alive: this.alive, ground: this.onGround, slide: sliding, flip: this.flipT > 0 ? 1 - this.flipT / FLIP_T : null, vy: this.vy }, dt);
-    this.booster.update(dt, this.alive ? this.boost : 0, this.t);
+    this.booster.update(dt, this.alive ? Math.max(this.boost, this.rocketK * 1.6) : 0, this.t);
+    this.efx.update(dt, this.t, this.alive ? { shield: this.eff.shield > 0, ghost: this.eff.ghost > 0, cloud: this.eff.cloud > 0 && this.onGround && this.y <= this.cloudY + 0.01 && !this.plat, magnet: this.eff.magnet > 0, slow: this.eff.slow > 0 } : {});
     if (this.shoveT > 0) for (const a of b.arms.slice(0, 2)) a.rotation.x = -1.6;
     if (!this.alive) { this.shadow.visible = false; return; }
     this.shadow.visible = true;
@@ -262,6 +293,7 @@ export class Ghost {
     this.bear = makeBear(m);
     scene.add(this.bear.root);
     this.booster = new Booster(scene); this.booster.attach(this.bear); this.bk = 0; this.t = 0;
+    this.efx = new EffectFx(); this.efx.attach(this.bear);
     this.tag = nameTag(m.name, m.color);
     scene.add(this.tag);
     this.s = 0; this.x = 0; this.y = 0; this.f = 0; this.at = 0; this.ts = 0; this.tx = 0; this.ty = 0; this.alive = true; this.flipT = 0; this.shoveT = 0; this.pf = 0;
@@ -288,7 +320,9 @@ export class Ghost {
     poseBear(b, { alive: this.alive, ground: !air, slide, flip: this.flipT > 0 ? 1 - this.flipT / FLIP_T : null, vy: this.ty - this.y }, dt);
     this.t += dt;
     this.bk = this.f & 16 && this.alive ? Math.min(1, this.bk + dt / BOOST_UP) : Math.max(0, this.bk - dt / BOOST_DOWN);
-    this.booster.update(dt, this.bk, this.t);
+    this.booster.update(dt, Math.max(this.bk, this.f & 512 ? 1.6 : 0), this.t);
+    const f = this.alive ? this.f : 0;
+    this.efx.update(dt, this.t, { shield: f & 32, ghost: f & 64, cloud: f & 128, magnet: f & 256, slow: f & 1024 });
     this.shoveT = Math.max(0, this.shoveT - dt);
     if (this.shoveT > 0) for (const a of b.arms.slice(0, 2)) a.rotation.x = -1.6;
     b.root.visible = this.alive || this.y > -30;

@@ -41,18 +41,21 @@
   <div id="dream-card" class="hidden"><div class="dc-n"></div><div class="dc-e"></div><div class="dc-name"></div></div>
   <div id="countdown" class="hidden"></div>
   <div id="speedlines"></div>
+  <div id="itembar" class="hidden"><div class="slot" id="slot0"></div><div class="slot" id="slot1"></div><div class="key">Q</div></div>
+  <div id="effects"></div>
   <div id="howto">
     <div><kbd>←</kbd><kbd>→</kbd> <kbd>A</kbd><kbd>D</kbd> 좌우</div>
     <div><kbd class="wide">Space</kbd> 점프 · 두 번 = 2단 점프</div>
     <div><kbd>↑</kbd> <kbd>W</kbd> 꾹 = 가속</div>
     <div><kbd>↓</kbd> <kbd>S</kbd> 숙이기</div>
+    <div id="t-item-row"><kbd>Q</kbd> 아이템 쓰기 (2개까지 보관)</div>
     <div id="t-shove-row"><kbd>E</kbd> 밀치기</div>
   </div>
   <div id="toast" class="hidden"></div>
   <div id="spectate" class="hidden"></div>
   <div id="touch" class="hidden">
     <div class="t-l"><button data-k="left">◀</button><button data-k="right">▶</button></div>
-    <div class="t-r"><button data-k="shove" id="t-shove" class="hidden">🫸</button><button data-k="slide">⤓</button><button data-k="boost">⏫</button><button data-k="jump" class="big">⤒</button></div>
+    <div class="t-r"><button data-k="item" id="t-item" class="hidden">🎁</button><button data-k="shove" id="t-shove" class="hidden">🫸</button><button data-k="slide">⤓</button><button data-k="boost">⏫</button><button data-k="jump" class="big">⤒</button></div>
   </div>
 
   <!-- 처음 화면 -->
@@ -73,6 +76,7 @@
         <div id="chars-label" class="label hidden">누구로 달릴까요?</div>
         <div id="chars"></div>
         <div id="nick-row" class="hidden"><input id="nick" maxlength="14" placeholder="달리기 이름 (순위표 · 방에 보여요)" /></div>
+        <div class="seg" id="mode-pick"><button data-m="speed">⚡ 스피드전</button><button data-m="item">🎁 아이템전</button></div>
         <div class="btns" id="play-btns">
           <button id="solo-btn" class="btn big">🏃 혼자 달리기</button>
           <button id="multi-btn" class="btn big alt">👥 같이 달리기 <small>최대 12명</small></button>
@@ -80,7 +84,7 @@
         <div class="row code-row"><input id="code-in" maxlength="6" placeholder="초대 코드 6자리" autocomplete="off" /><button id="code-btn" class="btn alt">🎟️ 코드로 참가</button></div>
       </div>
       <div class="row2"><button id="board-btn" class="btn ghost">🏆 순위표</button><a href="/" class="link">← 게임 고르기</a></div>
-      <div class="keys">← → / A·D 좌우 · Space 점프 (두 번 = 2단 점프) · ↑ / W 꾹 = 가속 · ↓ / S 숙이기 · E 밀치기 (같이 달리기) · M 소리</div>
+      <div class="keys">← → / A·D 좌우 · Space 점프 (두 번 = 2단 점프) · ↑ / W 꾹 = 가속 · ↓ / S 숙이기 · Q 아이템 (아이템전) · E 밀치기 (같이 달리기) · M 소리</div>
       <div id="err"></div>
     </div>
   </div>
@@ -105,6 +109,7 @@
   <div id="room" class="screen hidden">
     <div class="card wide">
       <h2 id="room-title"></h2>
+      <div class="seg" id="room-mode"><button data-m="speed">⚡ 스피드전</button><button data-m="item">🎁 아이템전</button></div>
       <div id="room-code"><span>초대 코드</span><b id="code-txt"></b><button id="copy-link" class="btn alt">🔗 링크 복사</button><button id="copy-code" class="btn ghost">코드 복사</button></div>
       <div class="note">링크를 보내거나 코드를 알려 주면 로그인 안 한 친구도 들어올 수 있어요</div>
       <div id="members"></div>
@@ -126,7 +131,7 @@
         <div class="row"><input id="ov-nick" maxlength="14" placeholder="임시 닉네임" /><button id="ov-save-btn" class="btn alt">🏆 기록 남기기</button></div>
       </div>
       <div id="ov-room" class="hidden"></div>
-      <h3>🏆 꿈나라 최고 기록</h3>
+      <h3 id="ov-board-title">🏆 꿈나라 최고 기록</h3>
       <div id="ov-board" class="board"></div>
       <div class="row2"><button id="again-btn" class="btn big">🔁 다시 달리기</button><button id="home-btn" class="btn ghost">처음으로</button></div>
     </div>
@@ -136,6 +141,7 @@
   <div id="board" class="screen hidden">
     <div class="card wide">
       <h2>🏆 꿈나라 최고 기록</h2>
+      <div class="seg" id="board-mode"><button data-m="speed">⚡ 스피드전</button><button data-m="item">🎁 아이템전</button></div>
       <div class="sub">점수 = 달린 거리(m) + 별사탕 × 10</div>
       <div id="board-list" class="board"></div>
       <div class="row2"><button id="board-close" class="btn ghost">닫기</button></div>

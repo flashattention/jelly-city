@@ -29,7 +29,7 @@ export class DreamRooms {
   }
   send(c, m) { if (c.ws.readyState === 1) c.ws.send(JSON.stringify(m)); }
   toRoom(room, m, except) { const s = JSON.stringify(m); for (const p of room.players) if (p !== except && p.ws.readyState === 1) p.ws.send(s); }
-  roomInfo(r) { return { id: r.id, name: r.name, n: r.players.length, max: MAX, state: r.state, host: r.host?.name || '' }; }
+  roomInfo(r) { return { id: r.id, name: r.name, n: r.players.length, max: MAX, state: r.state, host: r.host?.name || '', mode: r.mode }; }
   list() { return [...this.rooms.values()].map((r) => this.roomInfo(r)); }
   members(r) { return r.players.map((p) => ({ id: p.id, name: p.name, color: p.color, look: p.look, acc: p.acc, host: p === r.host, dead: p.dead, result: p.result })); }
   roomUpdate(r) { this.toRoom(r, { t: 'room', room: this.roomInfo(r), you: null, members: this.members(r) }); }
@@ -51,7 +51,7 @@ export class DreamRooms {
       case 'create': {
         if (!c.who) return this.needLogin(c);
         this.leave(c);
-        const r = { id: this.newCode(), name: clean(m.name, 20) || `${c.name}의 꿈`, players: [], host: c, state: 'wait', seed: 0, startAt: 0 };
+        const r = { id: this.newCode(), name: clean(m.name, 20) || `${c.name}의 꿈`, players: [], host: c, state: 'wait', seed: 0, startAt: 0, mode: m.mode === 'item' ? 'item' : 'speed' };
         this.rooms.set(r.id, r);
         return this.join(c, r);
       }
@@ -74,7 +74,7 @@ export class DreamRooms {
         if (!r || r.host !== c || r.state !== 'wait') return;
         r.state = 'run'; r.seed = crypto.randomInt(1, 2 ** 31 - 1); r.startAt = Date.now() + COUNTDOWN;
         for (const p of r.players) { p.dead = false; p.st = null; p.result = null; }
-        this.toRoom(r, { t: 'start', seed: r.seed, in: COUNTDOWN, members: this.members(r) });
+        this.toRoom(r, { t: 'start', seed: r.seed, in: COUNTDOWN, members: this.members(r), mode: r.mode });
         return this.broadcastList();
       }
       case 'st': {
@@ -108,6 +108,26 @@ export class DreamRooms {
         c.result = { dist: Math.max(0, Math.floor(+m.dist || 0)), stars: Math.max(0, Math.floor(+m.stars || 0)), why: clean(m.why, 30), at: Date.now() - r.startAt };
         this.toRoom(r, { t: 'dead', id: c.id, result: c.result });
         if (r.players.every((p) => p.dead)) this.finish(r);
+        return;
+      }
+      case 'mode': {
+        // 스피드전 · 아이템전은 방장이 기다리는 동안 바꾼다
+        const r = c.room;
+        if (!r || r.host !== c || r.state !== 'wait') return;
+        r.mode = m.mode === 'item' ? 'item' : 'speed';
+        this.roomUpdate(r); this.broadcastList();
+        return;
+      }
+      case 'item': {
+        // 아이템전: 충격파 · 젤리 함정을 같은 방 사람들에게 (효과는 받는 쪽이 계산)
+        const r = c.room;
+        if (!r || r.state !== 'run' || r.mode !== 'item' || c.dead || !['wave', 'trap'].includes(m.k) || !Array.isArray(m.p)) return;
+        const now = Date.now();
+        if (now - (c.lastItem || 0) < 400) return;
+        c.lastItem = now;
+        const p = m.p.slice(0, 3).map(Number);
+        if (!p.every(Number.isFinite)) return;
+        this.toRoom(r, { t: 'item', by: c.id, k: m.k, p }, c);
         return;
       }
       case 'emote': { const r = c.room; if (r) this.toRoom(r, { t: 'emote', id: c.id, e: clean(m.e, 4) }, c); return; }

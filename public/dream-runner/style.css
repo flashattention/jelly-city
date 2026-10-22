@@ -139,3 +139,20 @@ h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 kbd { display: inline-block; min-width: 26px; padding: 2px 7px; margin-right: 2px; border-radius: 7px; border: 1px solid rgba(255,255,255,.5); border-bottom-width: 3px; background: rgba(255,255,255,.12); font-family: 'Jua', sans-serif; font-size: 14px; text-align: center; }
 kbd.wide { min-width: 64px; }
 @media (pointer: coarse) { #howto { display: none; } }
+
+/* 모드 고르기 (스피드전 · 아이템전) */
+.seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(255,255,255,.1); margin: 12px auto 0; }
+.seg button { border: 0; border-radius: 999px; padding: 8px 16px; font-family: 'Jua', sans-serif; font-size: 15px; background: transparent; color: var(--soft); }
+.seg button.on { background: #fff; color: #2b1d5c; }
+.seg button:disabled { cursor: default; }
+#mode-pick { display: flex; width: fit-content; }
+/* 아이템 칸 */
+#itembar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; z-index: 4; pointer-events: none; }
+#itembar .slot { width: 62px; height: 62px; border-radius: 18px; background: rgba(20,8,50,.55); border: 2px solid rgba(255,255,255,.35); display: flex; align-items: center; justify-content: center; font-size: 34px; }
+#itembar .slot:first-child { width: 74px; height: 74px; font-size: 42px; border-color: var(--gold); box-shadow: 0 0 18px rgba(255,216,77,.45); }
+#itembar .slot.spin { animation: spin .08s linear infinite; }
+@keyframes spin { 50% { transform: translateY(-3px) scale(1.05); } }
+#itembar .key { font-family: 'Jua', sans-serif; padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.5); border-bottom-width: 3px; background: rgba(20,8,50,.5); }
+#effects { position: fixed; left: 16px; top: 112px; display: flex; flex-direction: column; gap: 4px; z-index: 3; pointer-events: none; font-family: 'Jua', sans-serif; font-size: 17px; text-shadow: 0 2px 6px rgba(0,0,0,.45); }
+#effects span { background: rgba(20,8,50,.45); padding: 3px 10px; border-radius: 999px; width: fit-content; }
+@media (pointer: coarse) { #itembar { bottom: 110px; } }

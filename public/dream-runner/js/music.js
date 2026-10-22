@@ -102,6 +102,17 @@ export function sfx(name, arg) {
     case 'shove': hiss(sfxBus, t, 0.2, { f: 600, vol: 0.18, type: 'bandpass', f2: 1800 }); tone(sfxBus, t, 0.15, 180, { type: 'sine', vol: 0.15, f2: 90 }); break;
     case 'shoved': tone(sfxBus, t, 0.3, 300, { type: 'triangle', vol: 0.15, f2: 700 }); hiss(sfxBus, t, 0.25, { f: 2000, vol: 0.1 }); break;
     case 'boost': hiss(sfxBus, t, 0.7, { f: 500, vol: 0.16, type: 'bandpass', f2: 3500 }); tone(sfxBus, t, 0.6, 90, { type: 'sawtooth', vol: 0.06, f2: 260, lp: 900 }); break;
+    case 'item': for (let i = 0; i < 6; i++) tone(sfxBus, t + i * 0.07, 0.1, midi(76 + (i % 3) * 4), { type: 'square', vol: 0.05, lp: 3000 }); tone(sfxBus, t + 0.45, 0.4, midi(88), { type: 'triangle', vol: 0.1 }); break;
+    case 'use_rocket': hiss(sfxBus, t, 1.2, { f: 300, vol: 0.22, type: 'bandpass', f2: 4000 }); tone(sfxBus, t, 0.9, 70, { type: 'sawtooth', vol: 0.08, f2: 300, lp: 1200 }); break;
+    case 'use_shield': for (let i = 0; i < 4; i++) tone(sfxBus, t + i * 0.05, 0.5, midi(79 + i * 5), { type: 'sine', vol: 0.07 }); break;
+    case 'use_cloud': hiss(sfxBus, t, 0.6, { f: 1200, vol: 0.08, type: 'lowpass', f2: 400 }); tone(sfxBus, t, 0.5, midi(72), { type: 'sine', vol: 0.07, f2: midi(79) }); break;
+    case 'use_magnet': tone(sfxBus, t, 0.6, 220, { type: 'square', vol: 0.05, f2: 440, lp: 1500 }); tone(sfxBus, t + 0.1, 0.5, 330, { type: 'square', vol: 0.04, f2: 660, lp: 1500 }); break;
+    case 'use_ghost': tone(sfxBus, t, 0.8, midi(74), { type: 'sine', vol: 0.1, f2: midi(62) }); tone(sfxBus, t + 0.05, 0.8, midi(78), { type: 'sine', vol: 0.05, f2: midi(66) }); break;
+    case 'use_wave': case 'wave': tone(sfxBus, t, 0.6, 90, { type: 'sine', vol: 0.3, f2: 40 }); hiss(sfxBus, t, 0.5, { f: 2000, vol: 0.18, type: 'lowpass', f2: 200 }); break;
+    case 'use_trap': tone(sfxBus, t, 0.3, 300, { type: 'triangle', vol: 0.12, f2: 120 }); break;
+    case 'use_teleport': for (let i = 0; i < 8; i++) tone(sfxBus, t + i * 0.03, 0.2, midi(96 - i * 3), { type: 'sine', vol: 0.06 }); hiss(sfxBus, t, 0.4, { f: 6000, vol: 0.08, f2: 1500 }); break;
+    case 'shieldbreak': tone(sfxBus, t, 0.3, midi(88), { type: 'triangle', vol: 0.12, f2: midi(76) }); hiss(sfxBus, t, 0.3, { f: 5000, vol: 0.1 }); break;
+    case 'trapped': tone(sfxBus, t, 0.5, 180, { type: 'sine', vol: 0.18, f2: 80 }); hiss(sfxBus, t, 0.4, { f: 700, vol: 0.1, type: 'lowpass' }); break;
     case 'beep': tone(sfxBus, t, 0.18, arg ? 880 : 520, { type: 'square', vol: 0.08, lp: 3000 }); break;
     case 'best': for (let i = 0; i < 6; i++) tone(sfxBus, t + i * 0.09, 0.4, midi(72 + [0, 4, 7, 12, 16, 19][i]), { type: 'triangle', vol: 0.1 }); break;
   }

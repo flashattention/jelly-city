@@ -7,8 +7,10 @@ import { Track, speedAt, V0 } from './track.js';
 import { Runner, Ghost } from './runner.js';
 import { THEMES } from './themes.js';
 import { sfx, setMusic, unlock, toggleMute, sound } from './music.js';
+import { ITEMS } from './items.js';
 
 const $ = (id) => document.getElementById(id);
+const MODE_KEY = 'dreamrunner.mode';
 const CHAR_KEY = 'dreamrunner.char', NICK_KEY = 'dreamrunner.nick', ANON_KEY = 'dreamrunner.anon';
 // 비로그인: 이 브라우저의 임시 아이디 (순위표에서 내 기록을 찾는 데만 쓴다)
 function anonId() {
@@ -44,7 +46,7 @@ game.runner = runner; game.track = track; game.env = env; window.__THEMES = THEM
 
 // ---------- 입력 ----------
 const keys = new Set();
-const input = { dir: 0, jump: false, slide: false, slideHeld: false, shove: false, boost: false };
+const input = { dir: 0, jump: false, slide: false, slideHeld: false, shove: false, boost: false, item: false };
 const isTyping = () => ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
 window.addEventListener('keydown', (e) => {
   if (isTyping()) return;
@@ -55,6 +57,7 @@ window.addEventListener('keydown', (e) => {
   if (['KeyS', 'ArrowDown'].includes(e.code)) input.slide = true;
   if (['KeyE', 'ShiftLeft', 'ShiftRight'].includes(e.code)) input.shove = true;
   if (e.code === 'KeyM') muteBtn();
+  if (e.code === 'KeyQ') input.item = true;
   if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
   if (game.mode === 'over' && (e.code === 'Space' || e.code === 'Enter') && !game.multi) { e.preventDefault(); startSolo(); }
 });
@@ -72,7 +75,7 @@ const touchHeld = new Set();
 if (matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
 for (const b of document.querySelectorAll('#touch button')) {
   const k = b.dataset.k;
-  b.addEventListener('pointerdown', (e) => { e.preventDefault(); unlock(); touchHeld.add(k); if (k === 'jump') input.jump = true; if (k === 'slide') input.slide = true; if (k === 'shove') input.shove = true; });
+  b.addEventListener('pointerdown', (e) => { e.preventDefault(); unlock(); touchHeld.add(k); if (k === 'jump') input.jump = true; if (k === 'slide') input.slide = true; if (k === 'shove') input.shove = true; if (k === 'item') input.item = true; });
   for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) b.addEventListener(ev, () => touchHeld.delete(k));
 }
 let swipe = null;
@@ -200,13 +203,22 @@ $('code-in').onkeydown = (e) => { if (e.key === 'Enter') $('code-btn').click(); 
 $('code-in2').onkeydown = (e) => { if (e.key === 'Enter') $('code-btn2').click(); };
 $('solo-btn').onclick = () => { unlock(); startSolo(); };
 $('multi-btn').onclick = () => { unlock(); openLobby(); };
-$('board-btn').onclick = async () => { show('board'); renderBoard($('board-list'), await loadBoard()); };
+// ---------- 스피드전 · 아이템전 ----------
+const modeName = (m) => (m === 'item' ? '🎁 아이템전' : '⚡ 스피드전');
+function segSet(id, m) { for (const b of $(id).children) b.classList.toggle('on', b.dataset.m === m); }
+game.pickMode = store.get(MODE_KEY) === 'item' ? 'item' : 'speed';
+segSet('mode-pick', game.pickMode);
+for (const b of $('mode-pick').children) b.onclick = () => { game.pickMode = b.dataset.m; store.set(MODE_KEY, game.pickMode); segSet('mode-pick', game.pickMode); };
+for (const b of $('room-mode').children) b.onclick = () => net.send({ t: 'mode', mode: b.dataset.m });
+game.boardMode = 'speed';
+for (const b of $('board-mode').children) b.onclick = async () => { game.boardMode = b.dataset.m; segSet('board-mode', game.boardMode); renderBoard($('board-list'), await loadBoard(game.boardMode)); };
+$('board-btn').onclick = async () => { game.boardMode = game.pickMode; segSet('board-mode', game.boardMode); show('board'); renderBoard($('board-list'), await loadBoard(game.boardMode)); };
 $('board-close').onclick = () => show('title');
 $('home-btn').onclick = () => { if (game.multi) { net.send({ t: 'leave' }); game.multi = false; } toTitle(); };
 $('again-btn').onclick = () => { if (game.multi) { leaveRun(); show('room'); } else startSolo(); };
 
 // ---------- 순위표 ----------
-async function loadBoard() { try { return await account.api('/api/dream/board' + (logged() ? '' : `?anon=${anonId()}`)); } catch { return { top: [] }; } }
+async function loadBoard(mode = 'speed') { try { return await account.api(`/api/dream/board?mode=${mode}` + (logged() ? '' : `&anon=${anonId()}`)); } catch { return { top: [] }; } }
 function renderBoard(el, d, hl) {
   const top = d.top || [], me = d.me;
   const myId = me?.id;
@@ -217,22 +229,27 @@ function renderBoard(el, d, hl) {
 }
 
 // ---------- 시작 · 끝 ----------
-function newRun(seed) {
+function newRun(seed, itemMode = false) {
+  game.itemMode = itemMode;
   game.seed = seed;
   for (const g of game.ghosts.values()) g.remove();
   game.ghosts.clear();
   env.clear();
-  track.reset(seed);
+  track.reset(seed, itemMode);
   runner.reset(0, 0);
+  runner.multi = game.multi;
+  renderItems(true);
   game.dream = 0; game.dreamsSeen = 1; game.runT = 0; game.submitted = null;
   env.setTheme(track.themeOf(0), true);
   setMusic(track.themeOf(0).mus);
   $('h-alive').classList.toggle('hidden', !game.multi);
   $('t-shove').classList.toggle('hidden', !game.multi);
+  $('t-item').classList.toggle('hidden', !itemMode);
+  $('itembar').classList.toggle('hidden', !itemMode);
 }
 function startSolo() {
   game.multi = false;
-  newRun((Math.random() * 2 ** 31) | 0);
+  newRun((Math.random() * 2 ** 31) | 0, game.pickMode === 'item');
   countdown(3000);
 }
 function countdown(ms) {
@@ -243,12 +260,13 @@ function countdown(ms) {
   showDreamCard(0);
   // 조작법: 가운데 흐리게 떴다가 사라진다
   $('t-shove-row').classList.toggle('hidden', !game.multi);
+  $('t-item-row').classList.toggle('hidden', !game.itemMode);
   const h = $('howto'); h.classList.remove('show', 'dock', 'hidden'); void h.offsetWidth; h.classList.add('show');
   clearTimeout(game.howtoT); game.howtoT = setTimeout(() => h.classList.add('dock'), 5500);
 }
 function goRun() { game.mode = 'run'; $('countdown').classList.add('hidden'); }
 function toTitle() {
-  $('howto').classList.add('hidden');
+  $('howto').classList.add('hidden'); $('itembar').classList.add('hidden');
   game.mode = 'title'; game.multi = false;
   for (const g of game.ghosts.values()) g.remove(); game.ghosts.clear();
   $('hud').classList.add('hidden'); $('touch').classList.add('hidden'); $('spectate').classList.add('hidden'); $('countdown').classList.add('hidden');
@@ -257,7 +275,7 @@ function toTitle() {
   show('title'); renderAccount();
 }
 function leaveRun() {
-  $('howto').classList.add('hidden');
+  $('howto').classList.add('hidden'); $('itembar').classList.add('hidden');
   game.mode = 'over';
   $('hud').classList.add('hidden'); $('touch').classList.add('hidden'); $('spectate').classList.add('hidden');
 }
@@ -266,7 +284,7 @@ function score() { return Math.floor(runner.s) + runner.stars * 10; }
 async function died(why) {
   sfx(why.includes('떨어') ? 'die' : 'bonk');
   game.mode = 'dead'; game.deadT = 0; game.why = why;
-  const rec = { dist: Math.floor(runner.s), stars: runner.stars, themes: game.dreamsSeen, time: game.runT, name: game.profile.name, color: game.profile.color };
+  const rec = { dist: Math.floor(runner.s), stars: runner.stars, themes: game.dreamsSeen, time: game.runT, name: game.profile.name, color: game.profile.color, mode: game.itemMode ? 'item' : 'speed' };
   if (game.multi) net.send({ t: 'dead', dist: rec.dist, stars: rec.stars, why });
   game.rec = rec;
   if (!logged()) { game.submitted = { anonPending: true }; return; } // 비로그인: 탈락 화면에서 임시 닉네임을 정해 남긴다
@@ -274,7 +292,7 @@ async function died(why) {
 }
 async function showOver() {
   game.mode = 'over';
-  $('hud').classList.add('hidden'); $('touch').classList.add('hidden'); $('spectate').classList.add('hidden'); $('howto').classList.add('hidden');
+  $('hud').classList.add('hidden'); $('touch').classList.add('hidden'); $('spectate').classList.add('hidden'); $('howto').classList.add('hidden'); $('itembar').classList.add('hidden'); $('effects').innerHTML = ''; game.effHtml = '';
   show('over');
   $('ov-why').textContent = `💤 ${game.why || '꿈에서 깼어요'}`;
   $('ov-score').textContent = score().toLocaleString();
@@ -286,7 +304,8 @@ async function showOver() {
   if (r?.anonPending) $('ov-best').textContent = '';
   if (r?.newBest) sfx('best');
   $('again-btn').textContent = game.multi ? '👥 방으로 돌아가기' : '🔁 다시 달리기';
-  renderBoard($('ov-board'), r?.top ? r : await loadBoard(), true);
+  $('ov-board-title').textContent = `🏆 ${modeName(game.itemMode ? 'item' : 'speed')} 최고 기록`;
+  renderBoard($('ov-board'), r?.top ? r : await loadBoard(game.itemMode ? 'item' : 'speed'), true);
 }
 
 $('ov-save-btn').onclick = async () => {
@@ -362,7 +381,7 @@ function renderRooms(list) {
   el.innerHTML = '';
   for (const r of list) {
     const d = document.createElement('div'); d.className = 'room';
-    d.innerHTML = `<span class="nm">${esc(r.name)}</span><span class="meta">👑 ${esc(r.host)} · ${r.n}/${r.max}</span><span class="tag ${r.state === 'run' ? 'run' : ''}">${r.state === 'run' ? '달리는 중' : '기다리는 중'}</span>`;
+    d.innerHTML = `<span class="nm">${esc(r.name)}</span><span class="meta">${modeName(r.mode)} · 👑 ${esc(r.host)} · ${r.n}/${r.max}</span><span class="tag ${r.state === 'run' ? 'run' : ''}">${r.state === 'run' ? '달리는 중' : '기다리는 중'}</span>`;
     const b = document.createElement('button'); b.className = 'btn'; b.textContent = '들어가기';
     b.disabled = r.state === 'run' || r.n >= r.max;
     b.onclick = () => net.send({ t: 'join', id: r.id });
@@ -373,6 +392,7 @@ function renderRoom(rank) {
   const r = game.room; if (!r) return;
   $('room-title').textContent = `🌙 ${r.name}`;
   $('code-txt').textContent = r.id;
+  segSet('room-mode', r.mode || 'speed');
   const me = game.members.find((m) => m.id === game.myId);
   const host = !!me?.host;
   const el = $('members'); el.innerHTML = '';
@@ -384,6 +404,7 @@ function renderRoom(rank) {
     el.appendChild(d);
   }
   $('start-btn').classList.toggle('hidden', !host);
+  for (const b of $('room-mode').children) b.disabled = !host; // 모드는 방장이 정한다
   $('room-hint').textContent = host ? `${game.members.length}명이 모였어요. 준비되면 출발을 눌러요! (혼자서도 시작할 수 있어요)` : '방장이 출발을 누르면 다 같이 달려요 🌙';
   if (rank) {
     $('room-rank').classList.remove('hidden');
@@ -406,7 +427,7 @@ net.on('room', (m) => { game.room = m.room; game.members = m.members; if (game.m
 net.on('left', () => { const was = game.room; game.room = null; if (!game.multi || !was) return; afterLeave(); });
 net.on('start', (m) => {
   game.members = m.members;
-  newRun(m.seed);
+  newRun(m.seed, m.mode === 'item');
   for (const mem of m.members) if (mem.id !== game.myId) game.ghosts.set(mem.id, new Ghost(scene, mem));
   game.alive = m.members.length;
   countdown(m.in);
@@ -423,7 +444,21 @@ net.on('dead', (m) => {
   if (g) { g.alive = false; if (m.left) { g.remove(); game.ghosts.delete(m.id); } }
   if (m.id !== game.myId && game.mode !== 'over') { const who = game.members.find((x) => x.id === m.id); if (who) toast(`💤 ${who.name} 탈락${m.result ? ` · ${m.result.dist}m` : ''}`, 1400); }
 });
-net.on('shoved', (m) => { if (game.mode !== 'run' || !runner.alive) return; runner.shoved(m.dir); sfx('shoved'); const who = game.members.find((x) => x.id === m.by); toast(`🫸 ${who?.name || '누군가'}에게 밀쳐졌어요!`, 1000); });
+net.on('shoved', (m) => { if (game.mode !== 'run' || !runner.alive) return; if (runner.shoved(m.dir) === 'blocked') { toast('🛡️ 밀치기를 막았어요!', 1000); return; } sfx('shoved'); const who = game.members.find((x) => x.id === m.by); toast(`🫸 ${who?.name || '누군가'}에게 밀쳐졌어요!`, 1000); });
+// 다른 사람이 쓴 아이템: 충격파는 가까우면 밀려나고, 함정은 그 자리에 생긴다
+net.on('item', (m) => {
+  if (!Array.isArray(m.p) || game.mode === 'title') return;
+  const [s, x, y] = m.p.map(Number);
+  const who = game.members.find((q) => q.id === m.by)?.name || '누군가';
+  if (m.k === 'trap') track.trap(s, x, y, false);
+  if (m.k === 'wave') {
+    sfx('wave');
+    if (game.mode === 'run' && runner.alive && Math.abs(s - runner.s) < 8 && Math.abs(x - runner.x) < 7) {
+      const r = runner.shoved(Math.sign(runner.x - x) || 1);
+      toast(r === 'blocked' ? '🛡️ 충격파를 막았어요!' : `💥 ${who}의 충격파에 밀려났어요!`, 1200);
+    }
+  }
+});
 net.on('shovefx', (m) => { const g = game.ghosts.get(m.by); if (g) g.shoveT = 0.3; });
 net.on('finish', (m) => {
   // 모두 탈락: 방 안 순위 + 전체 순위표
@@ -432,7 +467,7 @@ net.on('finish', (m) => {
   if (game.mode === 'dead' && game.deadT < 1.4) setTimeout(show2, (1.4 - game.deadT) * 1000); else show2();
 });
 $('quick-btn').onclick = () => net.send({ t: 'quick' });
-$('create-btn').onclick = () => net.send({ t: 'create', name: $('room-name').value });
+$('create-btn').onclick = () => net.send({ t: 'create', name: $('room-name').value, mode: game.pickMode });
 $('lobby-back').onclick = () => { game.multi = false; show('title'); };
 $('leave-btn').onclick = () => { net.send({ t: 'leave' }); game.room = null; $('ov-room').classList.add('hidden'); afterLeave(); };
 // 방에서 나온 뒤: 로그인했으면 방 목록, 아니면 처음 화면
@@ -450,7 +485,7 @@ function multiTick(dt) {
   game.sendT -= dt;
   if (game.sendT <= 0 && runner.alive && game.mode === 'run') {
     game.sendT = 1 / 15;
-    const f = (runner.slideT > 0 && runner.onGround ? 1 : 0) | (runner.onGround ? 0 : 2) | (runner.shoveT > 0 ? 4 : 0) | (runner.flipT > 0 ? 8 : 0) | (runner.boost > 0.5 ? 16 : 0);
+    const f = (runner.slideT > 0 && runner.onGround ? 1 : 0) | (runner.onGround ? 0 : 2) | (runner.shoveT > 0 ? 4 : 0) | (runner.flipT > 0 ? 8 : 0) | (runner.boost > 0.5 ? 16 : 0) | (runner.eff.shield > 0 ? 32 : 0) | (runner.eff.ghost > 0 ? 64 : 0) | (runner.eff.cloud > 0 ? 128 : 0) | (runner.eff.magnet > 0 ? 256 : 0) | (runner.eff.rocket > 0 ? 512 : 0) | (runner.eff.slow > 0 ? 1024 : 0);
     net.send({ t: 'st', p: [runner.s, runner.x, runner.y, f] });
   }
   for (const g of game.ghosts.values()) g.update(dt, track.origin);
@@ -506,7 +541,8 @@ function frame() {
     }
     if (game.mode === 'run') {
       game.runT += dt;
-      const why = runner.update(dt, input, track, (n, a) => sfx(n, a));
+      const why = runner.update(dt, input, track, onFx);
+      if (input.item && runner.alive) useItem();
       if (why) died(why);
     } else if (game.mode === 'dead') {
       runner.update(dt, input, track);
@@ -526,7 +562,7 @@ function frame() {
     game.camHook?.(camera, runner, track); // 점검용: 카메라를 옆에 두고 동작 보기
     hud();
   }
-  input.jump = input.slide = input.shove = false;
+  input.jump = input.slide = input.shove = input.item = false;
   env.update(dt, t, camera, runner.s, runner.x, runner.y);
   renderer.render(scene, camera);
 }
@@ -562,7 +598,47 @@ function followCamera(dt) {
   const fov = 60 + (v - V0) * 0.55;
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * k; camera.updateProjectionMatrix(); }
 }
+// 달리는 중 생기는 일 (소리 · 아이템 칸)
+function onFx(n, a) {
+  if (n === 'item') { sfx('item'); renderItems(false, true); return; }
+  if (n === 'itemfull') { toast('🎒 아이템은 2개까지 들 수 있어요 (Q로 쓰기)', 1000); return; }
+  if (n === 'use') return;
+  if (n === 'shieldbreak') { sfx('shieldbreak'); toast('🛡️ 방어막이 막아 줬어요!', 900); return; }
+  if (n === 'trapped') { sfx('trapped'); toast('🍯 끈적! 젤리 함정을 밟았어요', 1000); return; }
+  sfx(n, a);
+}
+function useItem() {
+  const id = runner.useItem(track);
+  if (!id) return;
+  const d = ITEMS[id];
+  sfx('use_' + id);
+  toast(`${d.emoji} ${d.name}!`, 800);
+  if (id === 'teleport') { const f = $('flash'); f.style.transition = 'none'; f.style.opacity = '0.7'; void f.offsetWidth; f.style.transition = 'opacity .5s'; f.style.opacity = '0'; }
+  if (id === 'trap') { track.trap(runner.s - 1.5, runner.x, runner.y, true); if (game.multi) net.send({ t: 'item', k: 'trap', p: [runner.s - 1.5, runner.x, runner.y] }); }
+  if (id === 'wave' && game.multi) net.send({ t: 'item', k: 'wave', p: [runner.s, runner.x, runner.y] });
+  renderItems();
+}
+// 아이템 칸 (먹으면 잠깐 룰렛처럼 돌다가 멈춘다)
+const EMOJIS = Object.values(ITEMS).map((d) => d.emoji);
+function renderItems(reset, roll) {
+  if (reset) { clearInterval(game.rollT); game.rolling = false; }
+  const slots = [$('slot0'), $('slot1')];
+  if (roll) {
+    clearInterval(game.rollT); game.rolling = true;
+    const i = runner.items.length - 1, el = slots[i];
+    el.classList.add('spin'); let n = 0;
+    game.rollT = setInterval(() => { el.textContent = EMOJIS[n++ % EMOJIS.length]; if (n > 10) { clearInterval(game.rollT); game.rolling = false; el.classList.remove('spin'); renderItems(); } }, 70);
+    return;
+  }
+  if (game.rolling) return;
+  slots.forEach((el, i) => { el.textContent = runner.items[i] ? ITEMS[runner.items[i]].emoji : ''; el.classList.remove('spin'); });
+}
 function hud() {
+  // 켜져 있는 아이템 효과와 남은 시간
+  if (game.itemMode) {
+    const on = Object.entries(runner.eff).filter(([k, v]) => v > 0 && ITEMS[k]).map(([k, v]) => `<span>${ITEMS[k].emoji} ${Math.ceil(v)}</span>`).join('') + (runner.eff.slow > 0 ? '<span>🍯 끈적</span>' : '');
+    if (on !== game.effHtml) { game.effHtml = on; $('effects').innerHTML = on; }
+  } else if (game.effHtml) { game.effHtml = ''; $('effects').innerHTML = ''; }
   $('h-score').textContent = score().toLocaleString();
   $('h-dist').textContent = `${Math.floor(runner.s).toLocaleString()}m`;
   $('h-stars').textContent = runner.stars;

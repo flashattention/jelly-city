@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { RNG } from '../../shared/js/utils.js';
 import { THEMES } from './themes.js';
 import { glow, starG } from './kits.js';
+import { makeBox, makeTrap } from './items.js';
 
 export const V0 = 13, VMAX = 30;
 export const speedAt = (s) => Math.min(VMAX, V0 + Math.max(0, s) / 220); // 달릴수록 빨라진다
@@ -83,13 +84,16 @@ export class Track {
     this.root = new THREE.Group(); scene.add(this.root);
     this.reset(seed);
   }
-  reset(seed) {
+  reset(seed, itemMode = false) {
+    this.itemMode = itemMode;
+    this.irng = new RNG(seed ^ 0x2545f491); // 아이템 상자 자리 (길 모양과 따로라서 스피드전 길이 바뀌지 않는다)
+    this.nextBox = 120;
     for (const c of [...this.root.children]) this.drop(c);
     this.seed = seed;
     this.rng = new RNG(seed);
     // 꿈 순서: 전부 섞어서 차례로 (다 보면 처음 순서로 다시)
     this.order = new RNG(seed ^ 0x5bd1e995).shuffle([...THEMES.keys()]);
-    this.plats = []; this.obs = []; this.stars = []; this.portals = [];
+    this.plats = []; this.obs = []; this.stars = []; this.portals = []; this.boxes = []; this.traps = [];
     this.origin = 0;
     this.gs = 0; this.cx = 0; this.cy = 0;
     this.dream = 0;                 // 지금 만들고 있는 꿈 번호
@@ -120,6 +124,12 @@ export class Track {
     else if (len > 3 && !opts.thin) { const c = new THREE.Mesh(G_HANG, platMats(th)[3]); const r = Math.min(w, len) * 0.42; c.scale.set(r, Math.min(9, 2 + len * 0.18), r); c.position.set(0, -thick / 2 - c.scale.y / 2, 0); c.rotation.y = Math.random() * 3; m.add(c); }
     const p = { s0, s1, x, cx: x, w, y, th: thick, mesh: m, mv: opts.mv || null, dx: 0, dream: this.dream };
     this.plats.push(p);
+    // 아이템전: 넓고 긴 발판 위에 ? 상자를 한 줄로 (모두 같은 자리)
+    if (this.itemMode && len >= 12 && !opts.mv && s0 >= this.nextBox) {
+      const n = w >= 6 ? 3 : w >= 3 ? 2 : 1, sb = s0 + len * 0.45;
+      for (let i = 0; i < n; i++) this.box(sb, x + (n === 1 ? 0 : (i / (n - 1) - 0.5) * Math.min(w - 1.2, 5)), y + 1.1);
+      this.nextBox = sb + this.irng.range(70, 120);
+    }
     this.env?.decorate(s0, s1, x, w, y, th, this);
     return p;
   }
@@ -181,6 +191,8 @@ export class Track {
     this.obs = this.obs.filter((o) => { if (o.s1 < cut) { this.drop(o.mesh); return false; } return true; });
     this.stars = this.stars.filter((o) => { if (o.s < cut) { this.drop(o.mesh); return false; } return true; });
     this.portals = this.portals.filter((o) => { if (o.s < cut - 30) { this.drop(o.mesh); return false; } return true; });
+    this.boxes = this.boxes.filter((o) => { if (o.s < cut) { this.root.remove(o.mesh); return false; } return true; });
+    this.traps = this.traps.filter((o) => { if (o.s < cut) { this.root.remove(o.mesh); return false; } return true; });
   }
   drop(m) { this.root.remove(m); m.traverse?.((o) => { if (o.geometry && o.geometry !== G_BOX && o.geometry !== G_EDGE && o.geometry !== G_PUFF && o.geometry !== G_HANG && o.geometry !== G_SPIKE && o.geometry.type !== 'ExtrudeGeometry') o.geometry.dispose(); }); }
 
@@ -287,6 +299,7 @@ export class Track {
     }
     for (const st of this.stars) if (!st.got) { st.mesh.rotation.y = t * 2.5 + st.s; }
     for (const po of this.portals) po.mesh.userData.anim(po.mesh, t);
+    for (const b of this.boxes) if (!b.got) { b.mesh.children[0].rotation.set(t * 1.3, t * 1.8, 0); b.mesh.position.y = b.y + Math.sin(t * 2.5 + b.s) * 0.15; }
     // 아주 멀리 달리면 숫자가 커져서 떨리지 않게 원점을 옮긴다
     if (playerS - this.origin > 1500) this.shift(1500);
   }
@@ -314,6 +327,62 @@ export class Track {
       if (y + h > o.y0 + 0.05 && y < o.y1 - 0.05) return o;
     }
     return null;
+  }
+  // ---------- 아이템전 ----------
+  box(s, x, y) {
+    const m = makeBox(); m.position.set(x, y, this.z(s)); m.userData.s = s;
+    this.root.add(m);
+    this.boxes.push({ s, x, y, mesh: m, got: false });
+  }
+  takeBox(s, x, y) {
+    for (const b of this.boxes) {
+      if (b.got || Math.abs(b.s - s) > 1.1 || Math.abs(b.x - x) > 1.1 || Math.abs(b.y - (y + 0.8)) > 1.5) continue;
+      b.got = true; b.mesh.visible = false;
+      return b;
+    }
+    return null;
+  }
+  // 충격파: 앞쪽 장애물을 부순다
+  breakAhead(s0, s1) {
+    let n = 0;
+    this.obs = this.obs.filter((o) => { if (o.s1 >= s0 && o.s0 <= s1) { this.drop(o.mesh); n++; return false; } return true; });
+    return n;
+  }
+  breakOne(o) { this.obs = this.obs.filter((x) => x !== o); this.drop(o.mesh); }
+  // 순간이동: dist 앞쪽에서 가장 가까운 발판 위
+  teleport(s, dist) {
+    const want = s + dist;
+    const cand = this.plats.filter((p) => !p.mv && p.s1 > want + 2 && p.s1 - p.s0 > 4).sort((a, b) => Math.max(a.s0, want) - Math.max(b.s0, want))[0];
+    if (!cand) return null;
+    const ts = Math.max(cand.s0 + 1.5, want);
+    // 장애물 바로 위에 떨어지지 않게 조금 비켜서
+    let ss = ts;
+    for (const o of this.obs) if (ss > o.s0 - 1.5 && ss < o.s1 + 1.5) ss = o.s1 + 1.6;
+    return { s: Math.min(ss, cand.s1 - 1), x: cand.cx, y: cand.y };
+  }
+  // 젤리 함정
+  trap(s, x, y, mine) {
+    const m = makeTrap(); m.position.set(x, y, this.z(s)); m.userData.s = s;
+    this.root.add(m);
+    this.traps.push({ s, x, y, mesh: m, mine, hit: false });
+  }
+  hitTrap(s, x, y) {
+    for (const t of this.traps) {
+      if (t.mine || t.hit || Math.abs(t.s - s) > 1.1 || Math.abs(t.x - x) > 1.1 || Math.abs(t.y - y) > 0.6) continue;
+      t.hit = true; return t;
+    }
+    return null;
+  }
+  // 자석: 가까운 별사탕을 끌어온다
+  magnet(s, x, y, dt) {
+    for (const st of this.stars) {
+      if (st.got) continue;
+      const ds = st.s - s, dx = st.x - x, dy = st.y - (y + 0.8);
+      if (ds < -2 || ds > 12 || Math.abs(dx) > 9) continue;
+      const k = Math.min(1, dt * 7);
+      st.s -= ds * k; st.x -= dx * k; st.y -= dy * k;
+      st.mesh.position.set(st.x, st.y, this.z(st.s));
+    }
   }
   takeStars(s, x, y) {
     let n = 0;
