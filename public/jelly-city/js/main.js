@@ -13,19 +13,19 @@ import { itemDef, CLUB_CHARM, ENCHANT_FEE, RARITY, SHOPS, TEMP_MINUTES } from '.
 import { routeTo, routeLength } from './citizens.js';
 import { Net } from './net.js';
 import { UI } from './ui.js';
-import { settings, saveSettings } from './settings.js';
+import { settings, saveSettings } from '../../shared/js/settings.js';
 import { getJob } from './data.js';
-import { DAYS, clamp, lerp, angleLerp, windowMaterials, retitleSign, initBrand, cityText, brand } from './utils.js';
+import { DAYS, clamp, lerp, angleLerp, windowMaterials, retitleSign, initBrand, cityText, brand } from '../../shared/js/utils.js';
 import { expNeed, levelStats, addExp } from './level.js';
 import { dailyQuests, questDef } from './quests.js';
 import { SPORT_KINDS, vehicleName, CAR_KINDS, BIKES } from './traffic.js';
 import { DROP_POOL, FISH } from './items.js';
 import { buildWilds, renderWorldImage } from './wilds.js';
 import { AnimalsView, makeMount, mouthPos } from './animals.js';
-import { Roach } from './roach.js';
+import { Roach } from '../../shared/js/roach.js';
 import { buildPark } from './park.js';
 import { TitansView, Odm } from './odm.js';
-import { unlockAudio, setListener, sfx, loop, duckMusic } from './audio.js';
+import { unlockAudio, setListener, sfx, loop, duckMusic } from '../../shared/js/audio.js';
 // 브라우저는 처음 누르거나 키를 칠 때부터 소리를 낼 수 있다
 for (const ev of ['pointerdown', 'keydown']) window.addEventListener(ev, unlockAudio, true);
 initBrand(); // 화면의 '바퀴시티' → '젤리시티' (바퀴 모드면 그대로)

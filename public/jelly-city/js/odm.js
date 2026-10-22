@@ -1,8 +1,8 @@
 // 젤리병단 장비(입체기동)와 거대 젤리 (브라우저)
 import * as THREE from 'three';
-import { Roach } from './roach.js';
+import { Roach } from '../../shared/js/roach.js';
 import { TITAN, napePos } from './titans.js';
-import { sfx, loop } from './audio.js';
+import { sfx, loop } from '../../shared/js/audio.js';
 
 const HOOK_RANGE = 95;
 

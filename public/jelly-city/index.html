@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>젤리시티 Jelly City</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- 이름표 & 말풍선 -->
+  <div id="labels"></div>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div class="card" id="clock-card">
+      <div id="clock-day">1일차 · 월요일</div>
+      <div id="clock-time">오전 7:30</div>
+      <div id="lv-row"><b id="lv">Lv.1</b><div id="xp-bar"><div id="xp-fill"></div></div><span id="xp-txt">0/80</span></div>
+      <div id="money-row"><span id="money">₩100</span> · <span id="job-label">무직</span></div>
+      <div id="charm">✨ 매력 0</div>
+      <div id="stars" class="hidden"></div>
+    </div>
+    <div class="card" id="needs-card"></div>
+    <div class="card" id="quest-card"></div>
+  </div>
+
+  <!-- 접속 중인 유저 (화면 상단, 많으면 줄바꿈) -->
+  <div id="online-bar" class="hidden"></div>
+  <!-- 상단 버튼 -->
+  <div id="topbar" class="hidden">
+    <button id="tb-mode" title="곰돌이 젤리 ↔ 바퀴벌레 모습 바꾸기">🪳 바퀴 모드로</button>
+    <button id="tb-shops" title="상점 목록 · 바로 구매 (U)">🛒 상점 <kbd>U</kbd></button>
+    <button id="tb-music" title="배경음악 켜기/끄기">🎵 음악</button>
+    <button id="tb-badges" title="이름표 훈장 고르기">🏅 훈장</button>
+    <button id="tb-map" title="지도 (M)">🗺️ 지도 <kbd>M</kbd></button>
+    <button id="tb-phone" title="휴대폰 (K 또는 Tab)">📱 휴대폰 <kbd>K</kbd></button>
+    <button id="tb-feedback" title="개발자에게 건의하기">💡 건의하기</button>
+    <button id="tb-exit" title="저장하고 캐릭터 선택으로">💾 저장하고 나가기</button>
+  </div>
+  <div id="flip" class="hidden"><div class="fl-t">🙃 뒤집혔어요!</div><div class="fl-k"><kbd>←</kbd><kbd>→</kbd> 번갈아 빠르게 눌러서 일어나세요</div><div class="fl-bar"><div id="flip-fill"></div></div></div>
+  <div id="scope" class="hidden"><div id="scope-zoom"></div></div>
+  <!-- 이모트 휠 (J 꾹) -->
+  <div id="emote-wheel" class="hidden"><div id="ew-items"></div><div id="ew-center"><b id="ew-name">💃 이모트</b><small>마우스로 고르고 J를 떼요</small></div><div id="ew-cursor"></div></div>
+  <!-- 이모트 노래 (YouTube 공식 플레이어) -->
+  <div id="emote-song" class="hidden"><div id="es-head"><span id="es-title"></span><button id="es-close" title="노래 끄기">✕</button></div><div id="es-box"><div id="es-player"></div></div></div>
+  <div id="draw-meter" class="hidden"><div id="draw-fill"></div></div>
+  <div id="xp-pops"></div>
+  <div id="range-hud" class="hidden"></div>
+  <div id="score-pop"></div>
+  <div id="shutter"></div>
+
+  <div id="minimap-wrap" class="hidden">
+    <canvas id="minimap" width="200" height="200"></canvas>
+    <div id="location-label">젤리시티</div>
+    <div id="map-hint" title="지도 열기"><kbd>M</kbd> 지도</div>
+  </div>
+
+  <div id="prompt" class="hidden"></div>
+  <div id="crosshair" class="hidden">＋</div>
+  <div id="hitmarker"></div>
+  <div id="hurt"></div>
+  <div id="course" class="hidden"></div>
+  <div id="celebrate" class="hidden"></div>
+  <div id="loot" class="hidden"></div>
+  <div id="death" class="hidden"><div id="death-text"></div></div>
+  <div id="hotbar-wrap" class="hidden"><div id="weapon-name"></div><div id="hotbar-row"><div id="hotbar"></div><button id="bag-btn" title="가방 (I)">🎒<small>I</small></button></div></div>
+  <div id="confirm" class="hidden"><div id="confirm-inner"><div id="confirm-text"></div><div><button class="btn" id="confirm-yes">버리기</button> <button class="btn ghost" id="confirm-no">취소</button></div></div></div>
+  <div id="toasts"></div>
+  <button id="keys-btn" class="hidden" title="조작법 (H)">⌨️ 조작법 <b>H</b></button>
+  <div id="help-hint" class="hidden">
+    <b>WASD</b> 이동 · <b>Space</b> 점프 · <b>클릭</b> 공격/사용 · <b>우클릭</b> 조준 · <b>Space 두 번</b> 날기 · <b>V</b> 1인칭 · <b>Z</b> 포획 · <b>B</b> 플러팅 · <b>J</b> 이모트 · <b>U</b> 상점 · <b>P</b> 사진 · <b>E</b> 대화/입장 · <b>F</b> 차 · <b>K</b> 휴대폰 · <b>I</b> 가방 · <b>M</b> 지도 · <b>Enter</b> 채팅
+  </div>
+
+  <!-- 플레이어 채팅 -->
+  <div id="pchat" class="hidden">
+    <div id="pchat-log"></div>
+    <div id="pchat-head">💬 전체 채팅 <small>Enter로 말하기 · Tab으로 익명 전환</small> <button id="pchat-anon" type="button" title="익명으로 말하기 (Tab)">🕶️ 익명 끔</button></div>
+    <input id="pchat-input" placeholder="모두에게 말하기... (Enter 전송 · Esc 닫기)" maxlength="120" autocomplete="off" />
+  </div>
+
+  <!-- 잠 -->
+  <div id="sleep" class="hidden"><div id="sleep-text"></div><button id="sleep-wake">☀️ 일어나기</button></div>
+
+  <!-- 대화창 -->
+  <div id="chat" class="hidden">
+    <div id="chat-head">
+      <div id="chat-avatar"></div>
+      <div id="chat-info">
+        <div id="chat-name"></div>
+        <div id="chat-sub"></div>
+        <div id="chat-affinity"><div id="chat-affinity-bar"></div></div>
+      </div>
+      <button id="chat-close" title="닫기 (Esc)">✕</button>
+    </div>
+    <div id="chat-profile"></div>
+    <div id="chat-log"></div>
+    <div id="chat-foot">
+      <select id="chat-gift" title="선물하기"><option value="">🎁 선물</option></select>
+      <input id="chat-input" placeholder="말을 걸어보세요... (Enter)" autocomplete="off" maxlength="200" />
+      <button id="chat-send">전송</button>
+    </div>
+  </div>
+
+  <!-- 휴대폰 (오른쪽 아래, 아이폰처럼) -->
+  <div id="phone" class="hidden">
+    <div id="iphone">
+      <div class="island"></div>
+      <div class="ph-status"><span id="ph-time">9:41</span><span class="ph-icons">📶 <span id="ph-batt">🔋</span></span></div>
+      <div id="phone-screen">
+        <div id="phone-home"><div id="ph-clock"></div><div id="ph-apps"></div><div id="ph-dock"></div></div>
+        <div id="phone-app" class="hidden">
+          <div class="app-bar"><button id="app-back">‹ 홈</button><b id="app-title"></b><button id="phone-close">✕</button></div>
+          <div id="phone-body"></div>
+        </div>
+      </div>
+      <div class="homebar" id="homebar" title="홈 화면"></div>
+    </div>
+  </div>
+
+  <!-- 범용 모달 -->
+  <div id="modal" class="hidden"><div id="modal-inner"></div></div>
+
+  <!-- 시간 건너뛰기 연출 -->
+  <div id="fade" class="hidden"><div id="fade-text"></div><div id="fade-bar"><div></div></div></div>
+
+  <!-- 로딩 -->
+  <div id="loading" class="hidden"><div class="spinner"><svg class="cute-roach" viewBox="0 0 120 130" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M46 34 Q30 6 14 8" stroke="#5d3a24" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M74 34 Q90 6 106 8" stroke="#5d3a24" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <circle cx="14" cy="8" r="6" fill="#a86b3e"/><circle cx="106" cy="8" r="6" fill="#a86b3e"/>
+  <ellipse cx="60" cy="98" rx="30" ry="28" fill="#8a5634"/>
+  <ellipse cx="60" cy="102" rx="19" ry="19" fill="#c08a5c"/>
+  <path d="M30 92 l-14 10 M30 104 l-14 8 M90 92 l14 10 M90 104 l14 8" stroke="#5d3a24" stroke-width="5" stroke-linecap="round"/>
+  <ellipse cx="60" cy="52" rx="34" ry="31" fill="#8a5634"/>
+  <ellipse cx="46" cy="52" rx="10" ry="12" fill="#fff"/><ellipse cx="74" cy="52" rx="10" ry="12" fill="#fff"/>
+  <ellipse cx="47" cy="54" rx="6" ry="7.5" fill="#1d1410"/><ellipse cx="75" cy="54" rx="6" ry="7.5" fill="#1d1410"/>
+  <circle cx="45" cy="50" r="2.4" fill="#fff"/><circle cx="73" cy="50" r="2.4" fill="#fff"/>
+  <ellipse cx="34" cy="64" rx="6" ry="3.6" fill="#ff9fb2"/><ellipse cx="86" cy="64" rx="6" ry="3.6" fill="#ff9fb2"/>
+  <path d="M53 66 Q60 73 67 66" stroke="#1d1410" stroke-width="3" fill="none" stroke-linecap="round"/>
+</svg><svg class="cute-bear" viewBox="0 0 120 130" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">  <circle cx="30" cy="26" r="15" fill="#ff7eb6" opacity=".9"/><circle cx="90" cy="26" r="15" fill="#ff7eb6" opacity=".9"/>  <circle cx="30" cy="27" r="7" fill="#ffc1dc"/><circle cx="90" cy="27" r="7" fill="#ffc1dc"/>  <ellipse cx="60" cy="100" rx="31" ry="27" fill="#ff7eb6" opacity=".92"/>  <ellipse cx="60" cy="104" rx="19" ry="17" fill="#ffc1dc"/>  <ellipse cx="28" cy="96" rx="9" ry="14" fill="#ff7eb6"/><ellipse cx="92" cy="96" rx="9" ry="14" fill="#ff7eb6"/>  <ellipse cx="60" cy="54" rx="35" ry="31" fill="#ff7eb6" opacity=".95"/>  <ellipse cx="60" cy="66" rx="14" ry="10" fill="#ffc1dc"/><ellipse cx="60" cy="62" rx="5" ry="3.6" fill="#7a2848"/>  <ellipse cx="45" cy="50" rx="7" ry="8.5" fill="#1d1410"/><ellipse cx="75" cy="50" rx="7" ry="8.5" fill="#1d1410"/>  <circle cx="43" cy="47" r="2.4" fill="#fff"/><circle cx="73" cy="47" r="2.4" fill="#fff"/>  <ellipse cx="34" cy="64" rx="6" ry="3.6" fill="#ff4f8f" opacity=".6"/><ellipse cx="86" cy="64" rx="6" ry="3.6" fill="#ff4f8f" opacity=".6"/>  <path d="M54 71 Q60 76 66 71" stroke="#7a2848" stroke-width="2.6" fill="none" stroke-linecap="round"/>  <ellipse cx="44" cy="36" rx="6" ry="10" fill="#fff" opacity=".45" transform="rotate(-25 44 36)"/></svg></div><div id="loading-text">도시를 짓는 중...</div></div>
+
+  <!-- 시작 화면 -->
+  <div id="start">
+    <div id="start-card">
+      <div id="title"><span class="title-icon"><svg class="cute-roach" viewBox="0 0 120 130" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M46 34 Q30 6 14 8" stroke="#5d3a24" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M74 34 Q90 6 106 8" stroke="#5d3a24" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <circle cx="14" cy="8" r="6" fill="#a86b3e"/><circle cx="106" cy="8" r="6" fill="#a86b3e"/>
+  <ellipse cx="60" cy="98" rx="30" ry="28" fill="#8a5634"/>
+  <ellipse cx="60" cy="102" rx="19" ry="19" fill="#c08a5c"/>
+  <path d="M30 92 l-14 10 M30 104 l-14 8 M90 92 l14 10 M90 104 l14 8" stroke="#5d3a24" stroke-width="5" stroke-linecap="round"/>
+  <ellipse cx="60" cy="52" rx="34" ry="31" fill="#8a5634"/>
+  <ellipse cx="46" cy="52" rx="10" ry="12" fill="#fff"/><ellipse cx="74" cy="52" rx="10" ry="12" fill="#fff"/>
+  <ellipse cx="47" cy="54" rx="6" ry="7.5" fill="#1d1410"/><ellipse cx="75" cy="54" rx="6" ry="7.5" fill="#1d1410"/>
+  <circle cx="45" cy="50" r="2.4" fill="#fff"/><circle cx="73" cy="50" r="2.4" fill="#fff"/>
+  <ellipse cx="34" cy="64" rx="6" ry="3.6" fill="#ff9fb2"/><ellipse cx="86" cy="64" rx="6" ry="3.6" fill="#ff9fb2"/>
+  <path d="M53 66 Q60 73 67 66" stroke="#1d1410" stroke-width="3" fill="none" stroke-linecap="round"/>
+</svg><svg class="cute-bear" viewBox="0 0 120 130" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">  <circle cx="30" cy="26" r="15" fill="#ff7eb6" opacity=".9"/><circle cx="90" cy="26" r="15" fill="#ff7eb6" opacity=".9"/>  <circle cx="30" cy="27" r="7" fill="#ffc1dc"/><circle cx="90" cy="27" r="7" fill="#ffc1dc"/>  <ellipse cx="60" cy="100" rx="31" ry="27" fill="#ff7eb6" opacity=".92"/>  <ellipse cx="60" cy="104" rx="19" ry="17" fill="#ffc1dc"/>  <ellipse cx="28" cy="96" rx="9" ry="14" fill="#ff7eb6"/><ellipse cx="92" cy="96" rx="9" ry="14" fill="#ff7eb6"/>  <ellipse cx="60" cy="54" rx="35" ry="31" fill="#ff7eb6" opacity=".95"/>  <ellipse cx="60" cy="66" rx="14" ry="10" fill="#ffc1dc"/><ellipse cx="60" cy="62" rx="5" ry="3.6" fill="#7a2848"/>  <ellipse cx="45" cy="50" rx="7" ry="8.5" fill="#1d1410"/><ellipse cx="75" cy="50" rx="7" ry="8.5" fill="#1d1410"/>  <circle cx="43" cy="47" r="2.4" fill="#fff"/><circle cx="73" cy="47" r="2.4" fill="#fff"/>  <ellipse cx="34" cy="64" rx="6" ry="3.6" fill="#ff4f8f" opacity=".6"/><ellipse cx="86" cy="64" rx="6" ry="3.6" fill="#ff4f8f" opacity=".6"/>  <path d="M54 71 Q60 76 66 71" stroke="#7a2848" stroke-width="2.6" fill="none" stroke-linecap="round"/>  <ellipse cx="44" cy="36" rx="6" ry="10" fill="#fff" opacity=".45" transform="rotate(-25 44 36)"/></svg></span>젤리시티 <small>Jelly City</small></div>
+      <div id="v-login" class="view">
+        <p class="tagline">말랑한 🐻 곰돌이 젤리(원하면 🪳 바퀴벌레!)들이 사는 도시에 새로 이사 온 당신!<br />동료들과 함께 일하고, 먹고, 이웃을 사귀며 말랑말랑한 새 인생을 살아보세요.</p>
+        <label id="pw-row" class="hidden pw">🔒 입장 비밀번호 <input id="p-password" type="password" autocomplete="current-password" /></label>
+        <div id="g-btn"></div>
+        <button id="guest-btn" class="btn ghost guest-btn">🎮 체험판으로 바로 시작 <small>구글 로그인 없이 · 이틀 동안 안 들어오면 사라져요</small></button>
+        <div id="dev-login" class="hidden">
+          <input id="dev-name" maxlength="16" placeholder="이름 (개발용 로그인)" />
+          <button id="dev-btn" class="btn">개발용 로그인</button>
+        </div>
+      </div>
+      <div id="v-select" class="view hidden">
+        <div class="who"><span id="who-name"></span> <button id="logout-btn" class="btn ghost mini">로그아웃</button></div>
+        <div id="char-list"></div>
+      </div>
+      <div id="v-create" class="view hidden">
+        <div class="creator">
+          <div id="create-preview" title="드래그해서 돌려보세요"></div>
+          <div class="creator-side">
+            <div id="create-tabs"></div>
+            <div id="create-body"></div>
+          </div>
+        </div>
+        <div class="create-foot">
+          <button class="btn ghost" id="create-back">← 돌아가기</button>
+          <button class="btn ghost" id="create-random">🎲 랜덤</button>
+          <button id="create-ok">이 캐릭터로 시작 🏠</button>
+        </div>
+      </div>
+      <div id="start-error" class="hidden"></div>
+      <div id="llm-status"></div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

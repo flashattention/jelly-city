@@ -1,7 +1,7 @@
 // 가로등·나무 같은 소품을 인스턴스 메쉬로 그린다 (수천 개도 가볍게).
 // 차로 들이받으면 쓰러지고, 1분 뒤 서버 신호로 다시 선다.
 import * as THREE from 'three';
-import { toon } from './utils.js';
+import { toon } from '../../shared/js/utils.js';
 
 const TILE = 460; // 화면 밖 타일은 통째로 안 그린다
 

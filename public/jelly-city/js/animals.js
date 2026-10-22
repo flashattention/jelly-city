@@ -1,7 +1,7 @@
 // 야생동물 모습과 움직임 (브라우저)
 import * as THREE from 'three';
 import { ANIMALS, ANIMAL_KINDS, RIDE } from './fauna.js';
-import { toon, G } from './utils.js';
+import { toon, G } from '../../shared/js/utils.js';
 import { WATER_Y } from './terrain.js';
 
 const S = (parent, color, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(G.sphereLow(), toon(color)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; parent.add(m); return m; };

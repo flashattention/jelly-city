@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { Roach } from './roach.js';
-import { clamp, angleLerp } from './utils.js';
+import { Roach } from '../../shared/js/roach.js';
+import { clamp, angleLerp } from '../../shared/js/utils.js';
 import { updateMount } from './animals.js';
 
 export class Player {

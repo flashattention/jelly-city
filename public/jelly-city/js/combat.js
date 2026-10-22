@@ -1,10 +1,10 @@
 // 브라우저 전투: 조준, 타격 판정, 투사체, 이펙트
 import * as THREE from 'three';
 import { itemDef, weaponStats, ammoName, ITEMS, SHOPS, rarityOf } from './items.js';
-import { G } from './utils.js';
+import { G } from '../../shared/js/utils.js';
 import { levelStats } from './level.js';
 import { mouthPos } from './animals.js';
-import { scream, sfx } from './audio.js';
+import { scream, sfx } from '../../shared/js/audio.js';
 
 const ELEMENT_COLOR = { fire: '#ff5722', ice: '#4fc3f7', thunder: '#ffee58', wind: '#a5d6a7', poison: '#9ccc65', holy: '#fff59d', dark: '#7e57c2' };
 const BASE_SPREAD = { m4: 0.022, revolver: 0.012, deagle: 0.016, uzi: 0.05, mp5: 0.028, ak47: 0.035, scar: 0.02, m249: 0.045, barrett: 0.003, plasma_smg: 0.025, hunting_rifle: 0.006, pistol: 0.018, blaster: 0.015, rifle: 0.03, blaster_rifle: 0.026, minigun: 0.045, sniper: 0.012 };

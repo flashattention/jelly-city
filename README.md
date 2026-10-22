@@ -1,9 +1,29 @@
+# 🍬 젤리 게임즈 — 🐻 젤리시티 · 🌙 드림 러너
+
+한 서버 · 한 계정(구글 · 체험판)으로 여러 게임을 즐기는 곰돌이 젤리 게임 모음이에요. https://jelly-city.fly.dev 에 들어가면 게임을 고를 수 있어요.
+
+| 게임 | 주소 | 한 줄 소개 |
+|---|---|---|
+| 🐻 젤리시티 | `/jelly-city/` | 곰돌이 젤리 도시의 멀티플레이 라이프 시뮬레이션 |
+| 🌙 드림 러너 | `/dream-runner/` | 꿈속을 끝없이 달리는 3D 러너. 혼자 또는 최대 12명이 한 방에서 |
+
+## 🌙 드림 러너
+
+- 곰돌이가 저절로 앞으로 달리고, **좌우 이동 · 점프(2단 점프 = 공중제비) · 숙이기**로 낭떠러지 · 허들 · 가로대 · 벽 · 가시 · 움직이는 발판을 피해요.
+- **20초쯤마다 꿈이 바뀌어요.** 중세 마을 · 전쟁터 · 사탕 공장 · 끝없는 지하철 · 무한히 떨어지는 하늘 · 귀신 나오는 폐교 · 추상의 공간 … **116가지 꿈**(`public/dream-runner/js/themes.js`)이 무작위 순서로 나와요. 꿈마다 하늘 · 안개 · 빛 · 발판 무늬 · 아래(용암 · 바다 · 구름 …) · 떠다니는 알갱이 · 풍경 · 음악이 달라요.
+- 떨어지거나(용암 · 하늘 · 바다 …) 장애물에 부딪히면 탈락. **점수 = 달린 거리(m) + 별사탕 × 10**, 탈락하면 바로 **최고 기록 순위표**가 떠요 (계정마다 최고 기록 하나, 체험판도 순위에 올라요).
+- **같이 달리기**: 방을 만들거나 빠른 참가로 최대 12명. 방장이 출발을 누르면 모두 **같은 씨앗으로 같은 길 · 같은 꿈 순서**를 달려요. 몸이 닿으면 서로 밀리고, **E / Shift로 밀치기**. 탈락하면 남은 사람을 관전하고, 모두 끝나면 방 안 순위가 나와요.
+- 젤리시티 캐릭터를 골라서 그 모습 그대로 달릴 수 있어요.
+- 조작: A·D / ← → 좌우 · Space·W / ↑ 점프 · S / ↓ 숙이기(공중에선 빨리 내려오기) · E·Shift 밀치기 · M 소리. 휴대폰은 화면 버튼과 위/아래로 밀기.
+
+---
+
 # 🐻 젤리시티 (Jelly City)
 
 말랑말랑한 **곰돌이 젤리들이 사는 3D 도시**에서 동료들과 함께 살아가는 멀티플레이 라이프 시뮬레이션 웹 게임입니다.
 GTA처럼 3인칭으로 걷고, 날고, 차를 빼앗아 운전하고, 건물에 들어가고, LLM으로 대화하는 이웃 젤리들과 친해질 수 있어요.
 
-플레이: **https://jelly-city.fly.dev** (입장 비밀번호 필요 · 구글 로그인 또는 체험판)
+플레이: **https://jelly-city.fly.dev/jelly-city/** (구글 로그인 또는 체험판)
 
 ## 무엇을 할 수 있나요
 
@@ -125,23 +145,36 @@ git push origin main
 ## 구조
 
 ```
-server/index.js        HTTP(정적 파일·API) + WebSocket 서버, 시뮬레이션 루프(20Hz), 스냅샷(10Hz)
-server/world.js        공유 세계: 계정·캐릭터·로그인(구글·체험판), 시계, 시민·차량, 집, 휴대폰·튄더, NPC 대화(LLM), 저장
-server/combat.js       전투·헤드샷·화상·수배·체포·경찰/군대 AI·바닥 아이템·리스폰 존
-server/wildlife.js     야생동물·드래곤 AI, 포획
-server/llm.js          OpenAI 호환 API 호출 (서버 전용)
-public/index.html      UI 뼈대 (import map으로 three.js 로드)
-public/js/
-  main.js              렌더러, 낮밤, 입력, 상호작용, 욕구, 탈것·포획·놀이기구, 네트워크 처리
-  roach.js             캐릭터 모델 (곰돌이 젤리 / 바퀴벌레 모드)
-  views.js             서버 스냅샷으로 시민·다른 플레이어·경찰을 그리는 레이어
-  terrain.js, wilds.js 넓은 세계의 지형·지역·도로·대교·놀이공원 터 / 지형 메쉬·나무·소품
-  animals.js, fauna.js 동물·드래곤 모델과 움직임, 체력바 / 동물 데이터·탈것 속도
-  park.js              젤리랜드 놀이공원 놀이기구
-  traffic.js           차량·이륜차 AI와 메쉬, 내 차 운전
-  combat.js            조준·타격·투사체·불꽃·총알 자국·젤리 이펙트
-  items.js             무기·방어구·치장·음식·낚시·전리품·탈것 데이터베이스
-  ui.js, phone.js      HUD·창·지도 / 휴대폰 앱
-  city.js, interior.js, player.js, lobby.js, data.js, config.js, utils.js ...
-docs/기능정리.md        전체 기능 정리
+server/
+  index.js             HTTP(정적 파일·API) + WebSocket(/ws 젤리시티 · /dream-ws 드림 러너), 시뮬레이션 루프
+  auth.js, env.js      구글 로그인 확인 · .env 읽기 (모든 게임이 같이 씀)
+  jelly-city/          젤리시티 서버
+    world.js           공유 세계: 계정·캐릭터·로그인 세션(모든 게임 공용), 시계, 시민·차량, 집, 휴대폰, NPC 대화, 저장
+    combat.js          전투·수배·체포·경찰/군대 AI·바닥 아이템
+    wildlife.js        야생동물·드래곤·도시 말
+    titans.js          거대 젤리의 습격
+    llm.js             OpenAI 호환 API 호출
+  dream-runner/
+    leaderboard.js     최고 기록 순위표 (DATA_DIR/dream-runner.json)
+    rooms.js           같이 달리기 방 (최대 12명, 출발 신호 · 위치 중계 · 밀치기)
+public/
+  index.html           게임 고르기 (/)
+  shared/js/           여러 게임이 같이 쓰는 모듈
+    roach.js           곰돌이 젤리 캐릭터 모델
+    look.js, utils.js  캐릭터 모양 데이터 · 3D 도우미
+    account.js         로그인 세션(구글·체험판) · API 호출
+    audio.js, settings.js  젤리시티 소리·설정 (다른 게임이 써도 되는 엔진)
+  jelly-city/          젤리시티 (index.html, admin.html, style.css, js/…)
+    js/main.js         렌더러, 낮밤, 입력, 상호작용, 탈것·포획·놀이기구, 네트워크
+    js/views.js, city.js, interior.js, player.js, combat.js, items.js, ui.js, phone.js, odm.js …
+  dream-runner/        드림 러너 (index.html, style.css, js/…)
+    js/main.js         화면 흐름 · 입력 · 카메라 · 같이 달리기 · 순위표
+    js/track.js        씨앗으로 만드는 꿈길(발판·장애물·별사탕·꿈의 문) · 충돌
+    js/runner.js       달리는 곰돌이 · 같은 방 사람(유령) 그리기
+    js/env.js          하늘·안개·빛·아래·알갱이·풍경 놓기 · 꿈 바뀜
+    js/kits.js         풍경 조각 100여 종 (나무·성·사탕·탱크·책장·고래·행성 …)
+    js/themes.js       꿈 116가지
+    js/music.js        꿈마다 바뀌는 음악 · 효과음
+docs/기능정리.md        젤리시티 전체 기능 정리
 ```
+새 게임을 더할 때: `public/<게임>/` 과 (필요하면) `server/<게임>/` 를 만들고, 게임 고르기(`public/index.html`)에 카드를 하나 더해요. 로그인은 `public/shared/js/account.js` 를 쓰면 같은 계정이 이어져요.

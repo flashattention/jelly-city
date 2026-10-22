@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GRID, roadC, LANE_OFF, ASPHALT_HALF, HALF, signalPhase } from './config.js';
 import { WORLD_HALF, WATER_Y } from './terrain.js';
-import { toon, box, cyl, sph, RNG, angleLerp, signMesh } from './utils.js';
+import { toon, box, cyl, sph, RNG, angleLerp, signMesh } from '../../shared/js/utils.js';
 
 const STOP = ASPHALT_HALF + 1.6; // 교차로 중심 → 정지선
 // 24가지 자동차 색

@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { INTERIOR_ORIGIN } from './config.js';
 import { ACTIONS } from './data.js';
-import { toon, box, cyl, sph, G, windowPlane, signMesh, RNG, roundRect, toonGradient } from './utils.js';
-import { Roach } from './roach.js';
+import { toon, box, cyl, sph, G, windowPlane, signMesh, RNG, roundRect, toonGradient } from '../../shared/js/utils.js';
+import { Roach } from '../../shared/js/roach.js';
 import { makeCarMesh } from './traffic.js';
 
 const WALL_H = 5.5;

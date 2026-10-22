@@ -1,9 +1,9 @@
 // 휴대폰 앱들: 퀘스트, 카메라, 갤러리, 인스타그램, 연락처, 문자, 112, 건의함
-import { escapeHtml, brand } from './utils.js';
+import { escapeHtml, brand } from '../../shared/js/utils.js';
 import { questDef } from './quests.js';
 import { expNeed, levelStats } from './level.js';
 import * as THREE from 'three';
-import { Roach } from './roach.js';
+import { Roach } from '../../shared/js/roach.js';
 
 // 캐릭터 사진 (튄더 카드용)
 let thumbR = null, thumbScene = null, thumbCam = null;

@@ -8,7 +8,7 @@ import {
   JOBS, SPECIAL_JOBS, PERSONALITIES, SURNAMES, NAMES_M, NAMES_F, NAMES_N, OLD_M, OLD_F,
   SOCIAL_ROLES, HOBBIES, WORRIES, DREAMS, BODY_COLORS, SMALL_TALK, BUILDING_TYPES,
 } from './data.js';
-import { RNG } from './utils.js';
+import { RNG } from '../../shared/js/utils.js';
 
 // 주말에 쉬는 직장
 const WEEKDAY_ONLY = new Set(['school', 'kindergarten', 'university', 'office', 'bank', 'court', 'cityhall', 'postoffice', 'lab', 'factory', 'construction', 'realestate']);

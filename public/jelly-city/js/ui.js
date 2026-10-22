@@ -8,7 +8,7 @@ import { SLOTS } from './inventory.js';
 const XH_COLORS = ['#ffffff', '#ff3b30', '#ffcc00', '#4cd964', '#00e5ff', '#ff4fd8', '#000000'];
 const APP_TITLES = { quests: '퀘스트', camera: '카메라', gallery: '사진', insta: 'Jellystagram', tinder: '튄더', contacts: '연락처', sms: '메시지', police: '112 신고', map: '지도', me: '내 정보', feedback: '건의하기', help: '도움말', settings: '설정', admin: '건의함' };
 const SKILL_NAMES = { jump2: '2단 점프', jump3: '3단 점프', dash: '대쉬 거리 강화', jumpboost: '점프력 강화', dashlong: '대쉬 거리 강화' };
-import { LOOK_PARTS, LOOK_COLORS, DEFAULT_LOOK } from './look.js';
+import { LOOK_PARTS, LOOK_COLORS, DEFAULT_LOOK } from '../../shared/js/look.js';
 import { PHONE_APPS } from './phone.js';
 import { expNeed } from './level.js';
 import { questDef } from './quests.js';
@@ -16,10 +16,10 @@ import { CAR_COLORS, MODELS, BIKES } from './traffic.js';
 import { DEALER_CARS } from './items.js';
 import { housePrice, freeUnits, homeLabel, isHomeType } from './world-setup.js';
 import { moodLabel, moodEmoji } from './citizens.js';
-import { Roach } from './roach.js';
-import { settings, saveSettings } from './settings.js';
-import { setMusic, applyVolumes } from './audio.js';
-import { fmtTime, DAYS, escapeHtml, cityText, setBrand } from './utils.js';
+import { Roach } from '../../shared/js/roach.js';
+import { settings, saveSettings } from '../../shared/js/settings.js';
+import { setMusic, applyVolumes } from '../../shared/js/audio.js';
+import { fmtTime, DAYS, escapeHtml, cityText, setBrand } from '../../shared/js/utils.js';
 
 const $ = (id) => document.getElementById(id);
 // 젤리 모드용 귀여운 곰돌이 젤리 아이콘 (바퀴 모드면 CSS로 바퀴벌레 아이콘을 보여준다)
@@ -643,7 +643,7 @@ export class UI {
   kickedOut() {
     $('fade').classList.remove('hidden');
     $('fade').style.opacity = '1';
-    $('fade-text').innerHTML = '🔌 다른 창이나 기기에서 이 캐릭터로 접속해서 연결을 끊었어요<br><small><a href="/" style="color:#ff8a65">처음 화면으로</a></small>';
+    $('fade-text').innerHTML = '🔌 다른 창이나 기기에서 이 캐릭터로 접속해서 연결을 끊었어요<br><small><a href="/jelly-city/" style="color:#ff8a65">처음 화면으로</a></small>';
     $('fade-bar').style.display = 'none';
   }
 

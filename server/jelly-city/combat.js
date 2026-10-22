@@ -1,13 +1,13 @@
 // 전투 · 현상수배 · 경찰/군대 · 바닥 아이템
 import * as THREE from 'three';
-import { HALF } from '../public/js/config.js';
-import { weaponStats, damageTaken, itemDef, RARITY, DROP_GROUPS, rarityOf, TEMP_MINUTES } from '../public/js/items.js';
-import { randomStreetPoint } from '../public/js/citizens.js';
-import { RNG } from '../public/js/utils.js';
-import { levelStats } from '../public/js/level.js';
-import { AI_CARS } from '../public/js/traffic.js';
-import { terrainH } from '../public/js/terrain.js';
-import { ANIMALS } from '../public/js/fauna.js';
+import { HALF } from '../../public/jelly-city/js/config.js';
+import { weaponStats, damageTaken, itemDef, RARITY, DROP_GROUPS, rarityOf, TEMP_MINUTES } from '../../public/jelly-city/js/items.js';
+import { randomStreetPoint } from '../../public/jelly-city/js/citizens.js';
+import { RNG } from '../../public/shared/js/utils.js';
+import { levelStats } from '../../public/jelly-city/js/level.js';
+import { AI_CARS } from '../../public/jelly-city/js/traffic.js';
+import { terrainH } from '../../public/jelly-city/js/terrain.js';
+import { ANIMALS } from '../../public/jelly-city/js/fauna.js';
 
 export const UNIT = {
   cop: { name: '경찰', hp: 120, speed: 6.5, range: 22, rate: 1.1, dmg: 22, acc: 0.6, def: 10 },

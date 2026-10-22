@@ -1,7 +1,7 @@
 // 젤리랜드 놀이공원: 롤러코스터 · 바이킹 · 관람차 · 회전목마 (브라우저)
 // 모든 놀이기구는 "현재 시각"으로 움직임이 정해져서 모든 플레이어 화면에서 똑같이 돈다.
 import * as THREE from 'three';
-import { toon, box, cyl, sph, signMesh } from './utils.js';
+import { toon, box, cyl, sph, signMesh } from '../../shared/js/utils.js';
 import { PARK } from './terrain.js';
 
 const now = () => Date.now() / 1000;

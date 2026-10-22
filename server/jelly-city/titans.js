@@ -1,10 +1,10 @@
 // 거대 젤리의 습격 (서버): 누가 접속해 있으면 늘 최소 TITAN_MIN 마리(작은·중간·큰 것)가 있고,
 // TITAN_EVERY 초마다 한 마리씩 늘어 TITAN_MAX 마리까지. 도시 밖에서 걸어 들어와 플레이어를 쫓아 짓밟는다.
 // 젤리병단 장비로 뒷목을 베어야만 쓰러진다 (총·마법·폭발 등은 효과 없음)
-import { terrainH } from '../public/js/terrain.js';
-import { HALF, GRID, roadC } from '../public/js/config.js';
-import { RNG } from '../public/js/utils.js';
-import { TITAN, napePos, napeReach, titanHeight, napeHits } from '../public/js/titans.js';
+import { terrainH } from '../../public/jelly-city/js/terrain.js';
+import { HALF, GRID, roadC } from '../../public/jelly-city/js/config.js';
+import { RNG } from '../../public/shared/js/utils.js';
+import { TITAN, napePos, napeReach, titanHeight, napeHits } from '../../public/jelly-city/js/titans.js';
 
 // 도시 안에서는 도로(가운데 줄)를 따라서만 걷는다 → 건물 속으로 들어가지 않는다
 const ROADS = Array.from({ length: GRID + 1 }, (_, i) => roadC(i));

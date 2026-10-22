@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>드림 러너</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="flash"></div>
+  <div id="vignette"></div>
+
+  <!-- 달리는 동안 -->
+  <div id="hud" class="hidden">
+    <div class="hud-l">
+      <div id="h-score">0</div>
+      <div id="h-sub"><span id="h-dist">0m</span> · ⭐ <span id="h-stars">0</span></div>
+    </div>
+    <div class="hud-c">
+      <div id="h-dream"><span id="h-dream-n">꿈 #1</span> <span id="h-dream-name"></span></div>
+      <div id="h-next"><i></i></div>
+    </div>
+    <div class="hud-r">
+      <div id="h-alive" class="hidden"></div>
+      <button id="b-mute" title="소리 (M)">🔊</button>
+      <button id="b-quit" title="그만 달리기">✕</button>
+    </div>
+  </div>
+  <div id="dream-card" class="hidden"><div class="dc-n"></div><div class="dc-e"></div><div class="dc-name"></div></div>
+  <div id="countdown" class="hidden"></div>
+  <div id="toast" class="hidden"></div>
+  <div id="spectate" class="hidden"></div>
+  <div id="touch" class="hidden">
+    <div class="t-l"><button data-k="left">◀</button><button data-k="right">▶</button></div>
+    <div class="t-r"><button data-k="shove" id="t-shove" class="hidden">🫸</button><button data-k="slide">⤓</button><button data-k="jump" class="big">⤒</button></div>
+  </div>
+
+  <!-- 처음 화면 -->
+  <div id="title" class="screen">
+    <div class="card">
+      <div class="logo">🌙 드림 러너</div>
+      <div class="sub">잠든 곰돌이가 꿈속을 끝없이 달려요 · 20초마다 바뀌는 100가지가 넘는 꿈</div>
+      <div id="login-box" class="hidden">
+        <div id="g-btn"></div>
+        <button id="guest-btn" class="btn ghost">🎮 체험판으로 시작 <small>구글 로그인 없이</small></button>
+        <div id="dev-box" class="hidden"><input id="dev-name" placeholder="개발용 이름" /><button id="dev-btn" class="btn">입장</button></div>
+        <div class="note">젤리시티 계정 · 캐릭터를 그대로 써요</div>
+      </div>
+      <div id="me-box" class="hidden">
+        <div class="who"><span>안녕, <b id="me-name"></b></span><button id="logout" class="mini">로그아웃</button></div>
+        <div class="label">누구로 달릴까요?</div>
+        <div id="chars"></div>
+        <div id="nick-row" class="hidden"><input id="nick" maxlength="14" placeholder="순위표에 보일 이름" /></div>
+        <div class="btns">
+          <button id="solo-btn" class="btn big">🏃 혼자 달리기</button>
+          <button id="multi-btn" class="btn big alt">👥 같이 달리기 <small>최대 12명</small></button>
+        </div>
+      </div>
+      <div class="row2"><button id="board-btn" class="btn ghost">🏆 순위표</button><a href="/" class="link">← 게임 고르기</a></div>
+      <div class="keys">A·D / ← → 좌우 · Space·W / ↑ 점프 (두 번 = 2단 점프) · S / ↓ 숙이기 · E·Shift 밀치기 (같이 달리기) · M 소리</div>
+      <div id="err"></div>
+    </div>
+  </div>
+
+  <!-- 같이 달리기: 방 고르기 -->
+  <div id="lobby" class="screen hidden">
+    <div class="card wide">
+      <h2>👥 같이 달리기</h2>
+      <div class="sub">같은 방 사람들은 모두 같은 꿈길을 달려요. 부딪히면 밀리고, E로 밀칠 수도 있어요!</div>
+      <div class="row">
+        <button id="quick-btn" class="btn big">⚡ 빠른 참가</button>
+        <input id="room-name" maxlength="20" placeholder="새 방 이름" />
+        <button id="create-btn" class="btn alt">＋ 방 만들기</button>
+      </div>
+      <div id="rooms"></div>
+      <div class="row2"><button id="lobby-back" class="btn ghost">← 돌아가기</button></div>
+    </div>
+  </div>
+
+  <!-- 같이 달리기: 방 안 -->
+  <div id="room" class="screen hidden">
+    <div class="card wide">
+      <h2 id="room-title"></h2>
+      <div id="members"></div>
+      <div id="room-rank" class="hidden"></div>
+      <div id="room-hint" class="sub"></div>
+      <div class="row2"><button id="start-btn" class="btn big hidden">🌙 다 같이 출발!</button><button id="leave-btn" class="btn ghost">방 나가기</button></div>
+    </div>
+  </div>
+
+  <!-- 탈락 -->
+  <div id="over" class="screen hidden">
+    <div class="card wide">
+      <div id="ov-why"></div>
+      <div id="ov-score"></div>
+      <div id="ov-best"></div>
+      <div id="ov-detail"></div>
+      <div id="ov-room" class="hidden"></div>
+      <h3>🏆 꿈나라 최고 기록</h3>
+      <div id="ov-board" class="board"></div>
+      <div class="row2"><button id="again-btn" class="btn big">🔁 다시 달리기</button><button id="home-btn" class="btn ghost">처음으로</button></div>
+    </div>
+  </div>
+
+  <!-- 순위표 -->
+  <div id="board" class="screen hidden">
+    <div class="card wide">
+      <h2>🏆 꿈나라 최고 기록</h2>
+      <div class="sub">점수 = 달린 거리(m) + 별사탕 × 10</div>
+      <div id="board-list" class="board"></div>
+      <div class="row2"><button id="board-close" class="btn ghost">닫기</button></div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

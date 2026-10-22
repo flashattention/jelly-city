@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { BLOCK, ROAD, GRID, CITY, HALF, ASPHALT_HALF, WALK_OFF, roadC, blockMin, signalPhase } from './config.js';
 import { BUILDING_TYPES, CITY_PLAN, CATEGORY_COLORS, isSuburbBlock } from './data.js';
-import { toon, basic, box, cyl, sph, cone, G, signMesh, windowPlane, stripeMat, bakeStatic, RNG } from './utils.js';
-import { Roach } from './roach.js';
+import { toon, basic, box, cyl, sph, cone, G, signMesh, windowPlane, stripeMat, bakeStatic, RNG } from '../../shared/js/utils.js';
+import { Roach } from '../../shared/js/roach.js';
 import { makeCarMesh } from './traffic.js';
 import { OUTER_BUILDINGS, terrainH } from './terrain.js';
 import { Props, defineCommonProps } from './props.js';

@@ -4,7 +4,7 @@ import { HALF } from './config.js';
 import { PIER, onPier } from './terrain.js';
 import { WORLD_HALF, WATER_Y, BRIDGE, REGIONS, ROADS, regionAt, buildHeightGrid, sampleGrid, roadHeight, bridgeDeck, onBridge, roadSigns, distToPolyline, fbm, GRID_STEP, terrainH } from './terrain.js';
 import { Props, defineCommonProps } from './props.js';
-import { toon, signMesh, RNG } from './utils.js';
+import { toon, signMesh, RNG } from '../../shared/js/utils.js';
 
 const CANYON = ['#b5603a', '#d08850', '#9c4a2e', '#c4733f', '#8a3f28'];
 const BIOME_COL = {

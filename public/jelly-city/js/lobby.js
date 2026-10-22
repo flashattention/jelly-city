@@ -1,11 +1,11 @@
 // 첫 화면: 구글 로그인 → 내 캐릭터 고르기 → (새 캐릭터 꾸미기)
 import * as THREE from 'three';
-import { Roach, GUMMY_COLORS } from './roach.js';
+import { Roach, GUMMY_COLORS } from '../../shared/js/roach.js';
 // 젤리 모드에서는 젤리 색을 먼저, 바퀴 모드에서는 원래 피부색
 const bodyColors = () => (Roach.style === 'roach' ? SKIN_COLORS : [...GUMMY_COLORS, ...SKIN_COLORS.filter((c) => !GUMMY_COLORS.includes(c))]);
 import { PERSONALITIES } from './data.js';
 import { ITEMS } from './items.js';
-import { LOOK_PARTS, LOOK_COLORS, SKIN_COLORS, DEFAULT_LOOK, BASIC_ACC } from './look.js';
+import { LOOK_PARTS, LOOK_COLORS, SKIN_COLORS, DEFAULT_LOOK, BASIC_ACC } from '../../shared/js/look.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

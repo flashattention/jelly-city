@@ -1,5 +1,5 @@
 // 아이템 데이터베이스 (서버와 브라우저 공용)
-import { BASIC_ITEMS } from './look.js';
+import { BASIC_ITEMS } from '../../shared/js/look.js';
 import { ANIMALS, RIDE } from './fauna.js';
 // cat: melee | gun | throw | launcher | vehicle | head | face | body | acc | food | doll | gift | gem
 // slot: 장착 부위 (head/face/body/acc), vis: 캐릭터에 그려질 모습, held: 손에 드는 모습

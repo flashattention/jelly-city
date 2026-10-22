@@ -1,6 +1,6 @@
 // TV 방송: 캔버스에 그린 애니메이션을 화면 텍스처로 (채널 전환 가능)
 import * as THREE from 'three';
-import { cityText } from './utils.js';
+import { cityText } from '../../shared/js/utils.js';
 
 export const CHANNELS = [
   { id: 'news', name: 'JBC 9시 뉴스', emoji: '📰' },

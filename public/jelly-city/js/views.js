@@ -1,10 +1,10 @@
 // 서버 스냅샷을 받아 시민/다른 플레이어를 그리는 브라우저 전용 레이어
 import * as THREE from 'three';
-import { Roach } from './roach.js';
+import { Roach } from '../../shared/js/roach.js';
 import { makeMount, updateMount } from './animals.js';
 import { ANIMAL_KINDS } from './fauna.js';
 import { MODES, PLAN_KINDS, NEED_KEYS } from './citizens.js';
-import { angleLerp, G } from './utils.js';
+import { angleLerp, G } from '../../shared/js/utils.js';
 import { makeCarMesh } from './traffic.js';
 import { itemDef, RARITY, ITEMS, shopItems } from './items.js';
 

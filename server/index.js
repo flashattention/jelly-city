@@ -1,5 +1,7 @@
-// 젤리시티 멀티플레이 서버
-//   - public/ 정적 파일 서빙
+// 젤리 게임 서버 (게임 여러 개가 한 서버 · 한 계정을 같이 쓴다)
+//   - public/            정적 파일: / 게임 고르기 · /jelly-city/ · /dream-runner/ · /shared/ (여러 게임이 같이 쓰는 모듈)
+//   - server/jelly-city/ 젤리시티 세계 (계정 · 로그인 세션도 여기 저장)
+//   - server/dream-runner/ 드림 러너 (최고 기록 리더보드)
 //   - /ws  WebSocket: 공유 세계 동기화
 //   - /api/*  구글 로그인 · 캐릭터 목록/생성/삭제
 //   - 환경변수: PORT, GAME_PASSWORD, GOOGLE_CLIENT_ID, OPENAI_API_KEY, OPENAI_MODEL, OPENAI_BASE_URL, TIME_SPEED, DATA_DIR
@@ -10,9 +12,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { World, isAdmin } from './world.js';
-import { llmEnabled, MODEL } from './llm.js';
+import { World, isAdmin } from './jelly-city/world.js';
+import { llmEnabled, MODEL } from './jelly-city/llm.js';
 import { GOOGLE_CLIENT_ID, DEV_LOGIN, verifyGoogle, readJson } from './auth.js';
+import { DreamBoard, dreamApi } from './dream-runner/leaderboard.js';
+import { DreamRooms } from './dream-runner/rooms.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
@@ -30,6 +34,8 @@ try {
   if (fs.existsSync(imp)) { fs.renameSync(imp, path.join(DATA_DIR, 'world.json')); console.log('📦 import.json 으로 세계를 복원했어요'); }
 } catch (e) { console.error('복원 실패', e); }
 const world = new World({ dataDir: DATA_DIR });
+const dreamBoard = new DreamBoard(DATA_DIR); // 드림 러너 리더보드
+const dreamRooms = new DreamRooms((sid) => world.userOf(sid)); // 드림 러너 같이 달리기 방
 // 옛 주소: REDIRECT_TO 가 있으면 모든 요청을 새 주소로 보낸다
 const REDIRECT_TO = (process.env.REDIRECT_TO || '').replace(/\/$/, '');
 
@@ -68,6 +74,8 @@ async function api(req, res, url) {
     const session = world.login(info, Array.isArray(body.legacy) ? body.legacy : []);
     return json(res, 200, { session, user: { name: info.name, email: info.email, picture: info.picture }, chars: world.charList(info.sub) });
   }
+  // 드림 러너 (계정 · 로그인은 젤리시티와 같이 쓴다)
+  if (url.pathname.startsWith('/api/dream/')) return dreamApi(req, res, url, world.userOf(sid), dreamBoard, json);
   const who = world.userOf(sid);
   if (!who) return json(res, 401, { error: 'login' });
   if (url.pathname === '/api/me') return json(res, 200, { user: { name: who.user.name, email: who.user.email, picture: who.user.picture }, chars: world.charList(who.sub), admin: isAdmin(who.user) });
@@ -137,9 +145,15 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  // 옛 주소: 젤리시티가 / 에 있던 시절의 관리자 페이지
+  if (url.pathname === '/admin.html') { res.writeHead(301, { Location: '/jelly-city/admin.html' }); res.end(); return; }
   let file = path.normalize(path.join(PUBLIC, decodeURIComponent(url.pathname)));
   if (!file.startsWith(PUBLIC)) { res.writeHead(403); res.end(); return; }
-  if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
+  if (fs.existsSync(file) && fs.statSync(file).isDirectory()) {
+    // /jelly-city → /jelly-city/ (게임 안의 상대 경로가 맞게)
+    if (!url.pathname.endsWith('/')) { res.writeHead(301, { Location: url.pathname + '/' + url.search }); res.end(); return; }
+    file = path.join(file, 'index.html');
+  }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); res.end('not found'); return; }
     res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
@@ -149,7 +163,17 @@ const server = http.createServer((req, res) => {
 
 // WS_COMPRESS=1 이면 메시지를 압축해서 보낸다 (트래픽 ↓, CPU ↑)
 const COMPRESS = process.env.WS_COMPRESS === '1';
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 64 * 1024, perMessageDeflate: COMPRESS ? { zlibDeflateOptions: { level: 3 }, threshold: 512 } : false });
+const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024, perMessageDeflate: COMPRESS ? { zlibDeflateOptions: { level: 3 }, threshold: 512 } : false });
+// 드림 러너 방(최대 12명): 따로 연결
+const dreamWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
+dreamWss.on('connection', (ws) => dreamRooms.connect(ws));
+// 주소로 나눠 받는다: /ws = 젤리시티 · /dream-ws = 드림 러너
+server.on('upgrade', (req, socket, head) => {
+  const p = new URL(req.url, 'http://x').pathname;
+  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : null;
+  if (!target) { socket.destroy(); return; }
+  target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
+});
 wss.on('connection', (ws) => {
   if (REDIRECT_TO) { ws.close(4000, 'moved'); return; } // 이사 간 서버는 접속을 받지 않는다
   let player = null;
@@ -201,6 +225,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
     stopping = true;
     world.broadcast({ t: 'sys', text: '🔧 서버가 업데이트돼요! 잠시 후 자동으로 다시 접속해요' });
     try { world.save(); console.log('💾 세계를 저장했어요'); } catch (e) { console.error('저장 실패', e); }
+    dreamBoard.save();
     setTimeout(() => process.exit(0), 500);
   });
 }

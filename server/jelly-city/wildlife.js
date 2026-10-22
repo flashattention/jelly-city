@@ -1,9 +1,9 @@
 // 야생동물 AI (서버): 돌아다니고, 사냥감은 도망치고, 맹수는 덤빈다. 쓰러지면 전리품을 떨어뜨리고 잠시 뒤 다시 태어난다
-import { ANIMALS, ANIMAL_KINDS } from '../public/js/fauna.js';
-import { REGIONS, terrainH, WATER_Y, PARK } from '../public/js/terrain.js';
-import { HALF } from '../public/js/config.js';
-import { RNG } from '../public/js/utils.js';
-import { randomStreetPoint } from '../public/js/citizens.js';
+import { ANIMALS, ANIMAL_KINDS } from '../../public/jelly-city/js/fauna.js';
+import { REGIONS, terrainH, WATER_Y, PARK } from '../../public/jelly-city/js/terrain.js';
+import { HALF } from '../../public/jelly-city/js/config.js';
+import { RNG } from '../../public/shared/js/utils.js';
+import { randomStreetPoint } from '../../public/jelly-city/js/citizens.js';
 
 const q = (v, k = 10) => Math.round(v * k);
 
