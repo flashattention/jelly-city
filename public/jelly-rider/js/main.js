@@ -310,11 +310,26 @@ function race(dt) {
     if (!was && k.done) k.finishT = k.time;
   }
   // 카트끼리 부딪힘 (내 화면에서 움직이는 카트만 밀린다)
+  //   앞뒤로는 절대 밀지 않는다 (같이 할 때 서로의 위치가 조금씩 늦게 보여서, 둘 다 뒤로 밀려 멈추던 문제)
+  //   → 트랙 옆 방향으로만 조금씩 벌어지고, 부딪힌 순간 살짝 튕기며 속도가 약간 준다
   const locals = game.karts.filter((k) => !k.remote);
   for (const a of locals) for (const b of game.karts) {
     if (a === b || a.eff.ghost > 0 || b.eff.ghost > 0) continue;
     const dx = a.pos.x - b.pos.x, dz = a.pos.z - b.pos.z, d = Math.hypot(dx, dz);
-    if (d < 2.4 && d > 0.01) { const push = (2.4 - d) * (b.remote ? 1 : 0.5); a.pos.x += (dx / d) * push; a.pos.z += (dz / d) * push; if (a === me && Math.abs(me.v) > 12 && !game.bumpCd) { sfx('bump'); game.bumpCd = 0.4; } }
+    if (d >= 2.4) continue;
+    const n = T.Nrm[a.idx], t = T.T[a.idx];
+    const along = dx * t.x + dz * t.z;           // + 면 내가 앞
+    let side = dx * n.x + dz * n.z;             // 옆으로 얼마나 떨어져 있나
+    if (Math.abs(along) > 1.9 && Math.abs(side) < 1.2) {
+      // 바로 뒤에 붙음: 뒤쪽 카트만 앞 카트 속도보다 조금 느리게 (멈추지는 않는다)
+      if (along < 0 && a.v > b.v) a.v = Math.max(b.v - 0.5, a.v - 20 * dt);
+      continue;
+    }
+    if (Math.abs(side) < 0.05) side = (String(a.id) < String(b.id) ? 1 : -1) * 0.05; // 똑같은 자리면 id 로 방향을 정한다
+    const dir = Math.sign(side), push = Math.min(0.12, (2.4 - d) * 0.25);
+    a.pos.x += n.x * dir * push; a.pos.z += n.z * dir * push;
+    a.vl = Math.max(-6, Math.min(6, a.vl + dir * 10 * dt * (a.v >= 0 ? 1 : -1)));
+    if (a === me && Math.abs(me.v) > 12 && !game.bumpCd) { sfx('bump'); game.bumpCd = 0.5; me.v *= 0.96; }
   }
   game.bumpCd = Math.max(0, (game.bumpCd || 0) - dt);
   // 아이템 상자 · 아이템
