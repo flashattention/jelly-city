@@ -52,11 +52,11 @@ export class RiderItems {
     const m = makeTrap(); m.scale.setScalar(1.5); m.position.set(x, y, z);
     this.group.add(m); this.traps.push({ m, x, z, owner, t: 0 });
   }
-  // 물폭탄: 트랙을 따라 앞으로 날아가다 터진다
-  addBomb(fromIdx, off, owner) {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(0.7, 14, 10), new THREE.MeshToonMaterial({ color: '#4fc3f7', transparent: true, opacity: 0.9 }));
+  // 물폭탄: 트랙을 따라 멀리 날아가 크게 터진다 · back 이면 뒤에 떨궈 두고 지나가는 카트가 닿으면 터진다
+  addBomb(fromIdx, off, owner, back = false) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.8, 14, 10), new THREE.MeshToonMaterial({ color: '#4fc3f7', transparent: true, opacity: 0.9 }));
     this.group.add(m);
-    this.shots.push({ kind: 'bomb', m, idx: fromIdx + 3, off, owner, t: 0, life: 1.4 });
+    this.shots.push({ kind: 'bomb', m, idx: fromIdx + (back ? -2.5 : 3), off, owner, t: 0, life: back ? 12 : 1.7, back });
   }
   // 미사일: 바로 앞 카트를 따라간다 (도착하면 맞음)
   addMissile(from, target, owner) {
@@ -85,14 +85,16 @@ export class RiderItems {
     this.shots = this.shots.filter((s) => {
       s.t += dt;
       if (s.kind === 'bomb') {
-        s.idx += 45 * dt / 2;
+        if (!s.back) s.idx += 34 * dt; // 초당 68m (가장 빠른 카트보다 훨씬 빠르게 · 약 115m 앞까지)
         const p = this.track.at(s.idx, s.off);
-        s.m.position.set(p.x, p.y + 1 + Math.sin(Math.min(1, s.t / s.life) * Math.PI) * 4, p.z);
+        const y = s.back ? 0.8 + Math.abs(Math.sin(s.t * 5)) * 0.15 : 1 + Math.sin(Math.min(1, s.t / s.life) * Math.PI) * 5;
+        s.m.position.set(p.x, p.y + y, p.z);
         let hit = s.t >= s.life;
-        for (const k of locals) if (k.id !== s.owner && (k.pos.x - p.x) ** 2 + (k.pos.z - p.z) ** 2 < 2.2 ** 2) hit = true;
+        for (const k of locals) if ((k.id !== s.owner || (s.back && s.t > 1.2)) && (k.pos.x - p.x) ** 2 + (k.pos.z - p.z) ** 2 < (s.back ? 2.6 : 3.5) ** 2) hit = true;
         if (hit) {
-          this.splash(p, '#4fc3f7');
-          for (const k of locals) if (k.id !== s.owner && (k.pos.x - p.x) ** 2 + (k.pos.z - p.z) ** 2 < 5 ** 2) onHit(k, 'bomb');
+          this.splash(p, '#4fc3f7', 30);
+          this.column(p);
+          for (const k of locals) if ((k.id !== s.owner || s.back) && (k.pos.x - p.x) ** 2 + (k.pos.z - p.z) ** 2 < 7.5 ** 2) onHit(k, 'bomb');
           this.group.remove(s.m); return false;
         }
         return true;
@@ -114,13 +116,26 @@ export class RiderItems {
     this.sparks?.forEach((p) => { p.life -= dt; p.m.position.addScaledVector(p.v, dt); p.v.y -= 9 * dt; p.m.material.opacity = Math.max(0, p.life / 0.6); });
     if (this.sparks) this.sparks = this.sparks.filter((p) => { if (p.life <= 0) { this.group.remove(p.m); return false; } return true; });
   }
-  splash(p, color) {
+  splash(p, color, n = 14) {
     this.sparks ||= [];
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < n; i++) {
       const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
       m.scale.setScalar(0.8 + Math.random()); m.position.copy(p);
       this.group.add(m);
-      this.sparks.push({ m, v: new THREE.Vector3((Math.random() - 0.5) * 10, Math.random() * 8, (Math.random() - 0.5) * 10), life: 0.6 });
+      this.sparks.push({ m, v: new THREE.Vector3((Math.random() - 0.5) * 14, Math.random() * 10, (Math.random() - 0.5) * 14), life: 0.6 });
     }
+  }
+  // 물기둥: 터진 범위만큼 크게 솟았다 사라진다
+  column(p) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(7.5, 7.5, 1, 28, 1, true), new THREE.MeshBasicMaterial({ color: '#7fd6ff', transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide }));
+    m.position.copy(p); this.group.add(m);
+    const t0 = performance.now();
+    const step = () => {
+      const k = (performance.now() - t0) / 700;
+      if (k >= 1) { this.group.remove(m); m.geometry.dispose(); m.material.dispose(); return; }
+      m.scale.set(0.5 + k * 0.5, 1 + Math.sin(k * Math.PI) * 6, 0.5 + k * 0.5); m.position.y = p.y + m.scale.y / 2; m.material.opacity = 0.45 * (1 - k);
+      requestAnimationFrame(step);
+    };
+    step();
   }
 }

@@ -38,6 +38,13 @@ const slots = () => [game.load.p, game.load.s, 'knife', 'nade'];
 let cur = 0, ammo = {}, nextFire = 0, reloadEnd = 0, fireLatch = false, nadeCount = 1, kickBack = 0;
 function refill() { ammo = {}; for (const id of slots()) { const w = weapon(id); if (w?.mag) ammo[id] = { mag: w.mag, res: w.mag * 3 }; } nadeCount = 1; }
 function curW() { return weapon(slots()[cur]); }
+// 게임 중 무기를 바꾸면: 새 무기 탄을 채우고 바로 손에 든다 (탄이 없어 쏠 때마다 멈추던 문제)
+//   이미 쓰던 무기는 남은 탄 그대로 (바꿨다 돌아와서 탄을 다시 채우지 못하게)
+function armNew() {
+  for (const id of slots()) { const w = weapon(id); if (w?.mag && !ammo[id]) ammo[id] = { mag: w.mag, res: w.mag * 3 }; }
+  reloadEnd = 0; if (vm) vm.setWeapon(curW(), game.color);
+  shell.send({ t: 'wpn', w: slots()[cur] }); renderSlots();
+}
 function switchTo(i) {
   if (i === cur && vm.gun) return;
   if (i === 3 && nadeCount <= 0) { shell.toast('💣 수류탄이 없어요 (부활하면 다시 1개)', 900); return; }
@@ -140,7 +147,7 @@ function openLoadout() {
 }
 $('lo-ok').onclick = () => {
   store.set(LOAD_KEY, JSON.stringify(game.load)); $('loadout').classList.add('hidden');
-  if (game.mode === 'play') { if (!me.alive) shell.toast('🎒 다음 부활부터 새 무기를 들어요', 1400); else $('lockmsg').classList.remove('hidden'); }
+  if (game.mode === 'play') { if (!me.alive) shell.toast('🎒 다음 부활부터 새 무기를 들어요', 1400); else { armNew(); $('lockmsg').classList.remove('hidden'); } }
 };
 
 // ---------- 다른 곰돌이 ----------
@@ -232,6 +239,7 @@ function shoot(now) {
   if (w.cls === 'knife') { if (now < nextFire || fireLatch) return; fireLatch = true; nextFire = now + w.rate * 1000; return knife(); }
   if (reloadEnd || now < nextFire || (!w.auto && fireLatch)) return;
   const a = ammo[w.id];
+  if (!a) return armNew();
   if (a.mag <= 0) { if (!fireLatch) sfx('dry'); fireLatch = true; reload(); return; }
   fireLatch = true; nextFire = now + w.rate * 1000;
   a.mag--;
@@ -464,7 +472,7 @@ function frame() {
   const dt = Math.min(0.05, clock.getDelta()), now = performance.now();
   t += dt;
   if (game.mode === 'play') {
-    if (reloadEnd && now >= reloadEnd) { const w = curW(), a = ammo[w.id]; const need = w.mag - a.mag, take = Math.min(need, a.res); a.mag += take; a.res -= take; reloadEnd = 0; }
+    if (reloadEnd && now >= reloadEnd) { const w = curW(), a = ammo[w.id]; if (a) { const need = w.mag - a.mag, take = Math.min(need, a.res); a.mag += take; a.res -= take; } reloadEnd = 0; }
     const typing = !locked();
     const inp = { f: typing ? 0 : (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0), s: typing ? 0 : (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0), jump: keys.has('Space'), crouch: keys.has('KeyC') || keys.has('ControlLeft'), walk: keys.has('ShiftLeft'), ads: mouseR };
     if (me.alive) {

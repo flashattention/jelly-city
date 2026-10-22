@@ -96,7 +96,7 @@ function renderTitleOpts() {
 const shell = new Shell({
   key: 'jellyrider', title: '🏁 젤리라이더', subtitle: '꿈나라 트랙을 곰돌이 카트로 질주! 드리프트로 니트로를 모아 역전해요', wsPath: '/rider-ws', max: 12,
   multiLabel: '👥 같이 달리기', roomIcon: '🏁', startLabel: '🏁 다 같이 출발!',
-  keysHelp: '↑ 가속 · ↓ 브레이크 · ← → 핸들 · Shift 드리프트(→ 니트로) · Ctrl/Space 니트로·아이템 · R 트랙으로 · M 소리',
+  keysHelp: '↑ 가속 · ↓ 브레이크 · ← → 핸들 · Shift 드리프트(→ 니트로) · Ctrl/Space 니트로·아이템 (↓+아이템: 물폭탄 뒤로 떨구기) · R 트랙으로 · M 소리',
   buttons: [
     { id: 'solo-btn', label: '🏁 혼자 달리기 <small>AI 5대와 경주</small>', onClick: () => startSolo(true) },
     { id: 'ta-btn', label: '⏱️ 타임어택 <small>혼자 기록 도전</small>', cls: 'ghost', onClick: () => startSolo(false) },
@@ -210,7 +210,7 @@ function useItem(k) {
   if (id === 'ghost') k.eff.ghost = 3.5;
   if (id === 'magnet') k.eff.magnet = 3;
   if (id === 'trap') { const x = k.pos.x - Math.sin(k.yaw) * 3.5, z = k.pos.z - Math.cos(k.yaw) * 3.5; game.items.addTrap(x, k.pos.y + 0.05, z, k.id); send({ k: 'trap', p: [x, k.pos.y + 0.05, z] }); }
-  if (id === 'bomb') { const off = T.offset(k.pos, k.idx); game.items.addBomb(k.idx, off, k.id); send({ k: 'bomb', p: [k.idx, off] }); }
+  if (id === 'bomb') { const back = !!k.useBack, off = T.offset(k.pos, k.idx); game.items.addBomb(k.idx, off, k.id, back); send({ k: 'bomb', p: [k.idx, off, back ? 1 : 0] }); } // ↓ 누르고 쓰면 뒤에 떨군다
   if (id === 'missile') {
     const R = ranked(), i = R.indexOf(k), tgt = R[i - 1];
     if (!tgt) { const off = T.offset(k.pos, k.idx); game.items.addBomb(k.idx, off, k.id); send({ k: 'bomb', p: [k.idx, off] }); return; } // 1등이면 앞으로 던진다
@@ -237,7 +237,7 @@ shell.on('item', (m) => {
   if (game.mode !== 'race' && game.mode !== 'count') return;
   const from = game.karts.find((k) => k.id === m.by); const p = (m.p || []).map(Number);
   if (m.k === 'trap') game.items.addTrap(p[0], p[1], p[2], m.by);
-  if (m.k === 'bomb') game.items.addBomb(p[0], p[1], m.by);
+  if (m.k === 'bomb') game.items.addBomb(p[0], p[1], m.by, !!p[2]);
   if (m.k === 'missile' && from) { const tgt = game.karts.find((k) => k.id === m.to); if (tgt) game.items.addMissile(from, tgt, m.by); sfx('missile'); }
   if (m.k === 'zap' && game.me && game.me.progress(game.track.M) > p[0] && !(game.team && m.team === game.me.team)) hit(game.me, 'zap');
 });
@@ -297,7 +297,7 @@ function race(dt) {
   const fx = (n, a) => { if (n === 'miniboost') { sfx('nitro'); return; } if (n === 'pad') { sfx('nitro'); return; } sfx(n, a); };
   const wasDone = me.done;
   me.update(dt, inp, T, fx, game.itemMode ? 'item' : 'speed');
-  if (inp.use && game.itemMode) useItem(me);
+  if (inp.use && game.itemMode) { me.useBack = !!inp.down; useItem(me); }
   if (!wasDone && me.done) onMeDone();
   // AI
   const pp = me.progress(T.M);

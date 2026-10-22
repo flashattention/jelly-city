@@ -154,12 +154,20 @@ export class Kart {
     if (Math.abs(off) > lim) {
       const n = track.Nrm[this.idx], push = (Math.abs(off) - lim) * Math.sign(off);
       this.pos.x -= n.x * push; this.pos.z -= n.z * push;
-      if (this.bumpT <= 0 && sp > 10) { fx?.('bump'); this.bumpT = 0.4; }
-      this.v *= sp > 10 ? 0.8 : 0.95; this.vl = 0;
-      // 벽을 따라 미끄러지게 진행 방향 쪽으로 살짝
+      // 벽으로 들이받는 정도(벽 쪽 속도)만큼만 느려진다 · 벽을 스치며 나란히 달리면 거의 안 느려진다
+      const wx = Math.sign(off) * n.x, wz = Math.sign(off) * n.z;
+      const into = Math.max(0, (sx * this.v + sz * this.vl) * wx + (sz * this.v - sx * this.vl) * wz) / Math.max(1, sp); // 0(스침) ~ 1(정면)
+      if (!this.onWall) { // 부딪힌 순간 한 번
+        if (sp > 10 && into > 0.25 && this.bumpT <= 0) { fx?.('bump'); this.bumpT = 0.4; }
+        this.v *= 1 - Math.min(0.6, into * 0.7);
+      }
+      this.v *= Math.exp(-dt * (0.15 + into * 1.5)); // 붙어서 긁는 동안은 아주 조금씩
+      if ((sz * wx - sx * wz) * this.vl > 0) this.vl = 0; // 벽 쪽으로 미끄러지던 힘만 없앤다
+      // 벽을 따라 미끄러지게 진행 방향 쪽으로
       let d = track.heading(this.idx) - this.yaw; d = Math.atan2(Math.sin(d), Math.cos(d));
-      if (Math.abs(d) < 1.2) this.yaw += d * Math.min(1, dt * 4);
-    }
+      if (Math.abs(d) < 1.2) this.yaw += d * Math.min(1, dt * 6);
+      this.onWall = true;
+    } else this.onWall = false;
     this.bumpT -= dt;
     // 높이: 앞뒤 점 사이로
     const p0 = track.P[this.idx], p1 = track.P[(this.idx + 1) % track.M];
@@ -200,7 +208,7 @@ export class Kart {
     const E = this.eff;
     const s = E.shrink > 0 ? 0.6 : 1; g.scale.setScalar(g.scale.x + (s - g.scale.x) * Math.min(1, dt * 6));
     this.shieldM.visible = E.shield > 0; if (E.shield > 0) this.shieldM.scale.setScalar(1 + Math.sin(t * 6) * 0.04);
-    g.visible = !(E.ghost > 0 && Math.sin(t * 30) < -0.3);
+    this.setGhost(E.ghost > 0);
     const boost = this.boostT > 0;
     for (const f of this.flames) { f.visible = boost; if (boost) { const k = 0.8 + Math.random() * 0.4; f.children[0].scale.set(0.22, (0.8 + this.boostP * 2.4) * k, 0.22); f.children[1].scale.set(0.1, (0.5 + this.boostP * 1.6) * k, 0.1); } }
     // 불꽃 가루: 드리프트(오래 할수록 파랑 → 노랑 → 보라) · 부스터
@@ -218,6 +226,21 @@ export class Kart {
       p.m.material.opacity = Math.max(0, p.life / p.max); p.m.visible = p.life > 0;
     }
     if (this.tag) this.tag.visible = g.visible;
+  }
+  // 유령: 깜빡이지 않고 반투명하게 (처음 쓸 때 이 카트만의 재질로 바꿔 둔다)
+  setGhost(on) {
+    const a = on ? 0.35 : 1;
+    if (this.ghostA === a) return;
+    this.ghostA = a;
+    if (!this.ghostMats) {
+      this.ghostMats = [];
+      this.root.traverse((o) => {
+        if (!o.isMesh || o === this.shieldM) return;
+        const one = (m) => { if (m.blending === THREE.AdditiveBlending) return m; const c = m.clone(); this.ghostMats.push({ m: c, op: c.opacity, tr: c.transparent, dw: c.depthWrite }); return c; };
+        o.material = Array.isArray(o.material) ? o.material.map(one) : one(o.material);
+      });
+    }
+    for (const e of this.ghostMats) { e.m.transparent = on || e.tr; e.m.opacity = e.op * a; e.m.depthWrite = on ? false : e.dw; e.m.needsUpdate = true; }
   }
   spark(lx, lz, color) {
     let p = this.sparks.find((q) => q.life <= 0);
