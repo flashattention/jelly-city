@@ -128,6 +128,7 @@ export class Shell {
     this.on('hello', (m) => {
       this.myId = m.id;
       if (this.net.pendingJoin) { this.send({ t: 'join', id: this.net.pendingJoin }); this.net.pendingJoin = null; return; }
+      if (this.net.pendingSend) { this.send(this.net.pendingSend); this.net.pendingSend = null; return; } // 연습전처럼 바로 시작하는 것
       this.renderRooms(m.rooms);
     });
     this.on('rooms', (m) => { if (!this.room) this.renderRooms(m.rooms); });
@@ -161,6 +162,8 @@ export class Shell {
     this.toast(`🎟️ ${code} 방에 들어가는 중…`, 1200);
     if (this.net.open) this.hello(); else this.connect();
   }
+  // 접속하자마자 보낼 것 (연습전 시작 등)
+  sendAfterHello(m) { this.multi = true; this.net.pendingSend = m; if (this.net.open) this.hello(); else this.connect(); }
   afterLeave() { if (this.logged()) { this.show('lobby'); this.send({ t: 'list' }); } else { this.multi = false; this.show('title'); } }
   backToRoom() { this.playing = false; this.show('room'); this.renderRoom(); }
   // ---------- 계정 · 캐릭터 ----------

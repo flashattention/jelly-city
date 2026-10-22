@@ -18,6 +18,7 @@ import { GOOGLE_CLIENT_ID, DEV_LOGIN, verifyGoogle, readJson } from './auth.js';
 import { DreamBoard, dreamApi } from './dream-runner/leaderboard.js';
 import { DreamRooms } from './dream-runner/rooms.js';
 import { RiderRooms } from './jelly-rider/rooms.js';
+import { AttackRooms } from './jelly-attack/rooms.js';
 import { Records } from './shared/records.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -41,6 +42,7 @@ const dreamRooms = new DreamRooms((sid) => world.userOf(sid)); // 드림 러너 
 // 젤리라이더: 방 · 트랙별 최고 기록 (짧을수록 좋다)
 const RIDER_TRACKS = ['candy', 'cloud', 'neon', 'lava', 'sakura', 'synth', 'snow', 'deep'];
 const riderRooms = new RiderRooms((sid) => world.userOf(sid));
+const attackRooms = new AttackRooms((sid) => world.userOf(sid)); // 젤리어택 방 (봇은 서버가 움직인다)
 const riderRecords = new Records(DATA_DIR, 'jelly-rider', {
   boards: RIDER_TRACKS, better: (a, b) => a.value < b.value, value: (b) => Math.round(Number(b.time) * 1000) / 1000,
   check: (b) => (Number.isFinite(Number(b.time)) && Number(b.time) >= 40 && Number(b.time) <= 3600 ? null : '기록이 이상해요'),
@@ -185,10 +187,12 @@ const dreamWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, pe
 dreamWss.on('connection', (ws) => dreamRooms.connect(ws));
 const riderWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
 riderWss.on('connection', (ws) => riderRooms.connect(ws));
+const attackWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
+attackWss.on('connection', (ws) => attackRooms.connect(ws));
 // 주소로 나눠 받는다: /ws = 젤리시티 · /dream-ws = 드림 러너
 server.on('upgrade', (req, socket, head) => {
   const p = new URL(req.url, 'http://x').pathname;
-  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/rider-ws' ? riderWss : null;
+  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/rider-ws' ? riderWss : p === '/attack-ws' ? attackWss : null;
   if (!target) { socket.destroy(); return; }
   target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
 });

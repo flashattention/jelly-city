@@ -1,0 +1,45 @@
+// 젤리어택 무기: 젤리시티 무기(위력 · 연사 · 사거리 · 반동 · 산탄 수)를 그대로 쓰고, 탄창 · 장전 · 퍼짐만 더한다
+//   서버도 이 파일로 피해를 계산한다
+import { ITEMS } from '../../jelly-city/js/items.js';
+
+// cls: 종류 (화면 총 모양 · 소리) · mag: 탄창 · reload: 장전(초) · spread: 기본 퍼짐(라디안) · move: 움직일 때 퍼짐
+const EXTRA = {
+  m4: { cls: 'rifle', mag: 30, reload: 2.1, spread: 0.012, move: 0.035 },
+  ak47: { cls: 'rifle', mag: 30, reload: 2.4, spread: 0.016, move: 0.04 },
+  rifle: { cls: 'rifle', mag: 30, reload: 2.2, spread: 0.014, move: 0.035 },
+  scar: { cls: 'rifle', mag: 20, reload: 2.5, spread: 0.012, move: 0.045 },
+  mp5: { cls: 'smg', mag: 30, reload: 1.8, spread: 0.02, move: 0.025 },
+  uzi: { cls: 'smg', mag: 32, reload: 1.6, spread: 0.03, move: 0.03 },
+  plasma_smg: { cls: 'smg', mag: 40, reload: 1.9, spread: 0.022, move: 0.026 },
+  sniper: { cls: 'sniper', mag: 5, reload: 3.0, spread: 0.002, move: 0.12, scope: true },
+  hunting_rifle: { cls: 'sniper', mag: 5, reload: 2.8, spread: 0.003, move: 0.1, scope: true },
+  barrett: { cls: 'sniper', mag: 5, reload: 3.6, spread: 0.002, move: 0.15, scope: true },
+  shotgun: { cls: 'shotgun', mag: 8, reload: 3.0, spread: 0.0, move: 0.02 },
+  double_barrel: { cls: 'shotgun', mag: 2, reload: 2.2, spread: 0.0, move: 0.02 },
+  m249: { cls: 'lmg', mag: 100, reload: 4.5, spread: 0.022, move: 0.06 },
+  pistol: { cls: 'pistol', mag: 12, reload: 1.4, spread: 0.012, move: 0.02 },
+  revolver: { cls: 'pistol', mag: 6, reload: 2.2, spread: 0.01, move: 0.025 },
+  deagle: { cls: 'pistol', mag: 7, reload: 1.9, spread: 0.014, move: 0.03 },
+  blaster: { cls: 'pistol', mag: 15, reload: 1.5, spread: 0.012, move: 0.02 },
+};
+export const PRIMARY = ['m4', 'ak47', 'rifle', 'scar', 'mp5', 'uzi', 'plasma_smg', 'sniper', 'hunting_rifle', 'barrett', 'shotgun', 'double_barrel', 'm249'];
+export const SECONDARY = ['pistol', 'revolver', 'deagle', 'blaster'];
+export const CLASS_NAME = { rifle: '돌격소총', smg: '기관단총', sniper: '저격총', shotgun: '산탄총', lmg: '기관총', pistol: '권총' };
+export const HEAD = 2.5;          // 머리 배율 (저격총은 3)
+export const KNIFE = { id: 'knife', name: '군용 나이프', emoji: '🔪', cls: 'knife', dmg: 55, back: 100, rate: 0.55, range: 2.4 };
+export const NADE = { id: 'nade', name: '젤리 수류탄', emoji: '💣', cls: 'nade', dmg: 110, r: 6.5, fuse: 2.2 };
+
+const cache = new Map();
+export function weapon(id) {
+  if (id === 'knife') return KNIFE;
+  if (id === 'nade') return NADE;
+  if (cache.has(id)) return cache.get(id);
+  const d = ITEMS[id], x = EXTRA[id];
+  if (!d || !x) return null;
+  const w = { id, name: d.name, emoji: d.emoji, dmg: d.dmg, rate: d.rate, range: d.range || 60, pellets: d.pellets || 1, pspread: d.spread || 0.1, recoil: d.recoil || [0.02, 0.01, 0.05], zoom: d.zoom || 1.5, auto: !!d.auto, held: d.held, tracer: d.tracer || '#fff3b0', ...x };
+  w.head = w.cls === 'sniper' ? 3 : HEAD;
+  cache.set(id, w);
+  return w;
+}
+// 거리에 따른 위력 (사거리를 넘으면 점점 약해진다)
+export const falloff = (w, dist) => (dist <= w.range ? 1 : Math.max(0.35, 1 - (dist - w.range) / w.range));
