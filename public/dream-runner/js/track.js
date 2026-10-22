@@ -157,7 +157,14 @@ export class Track {
     return o;
   }
   star(s, x, y) {
-    const m = new THREE.Mesh(starG(), STAR_M); m.scale.setScalar(0.42);
+    // 입체감: 빛을 받는 금색 + 진한 테두리 + 은은한 빛 + 발판 위 그림자
+    const m = new THREE.Group();
+    const body = new THREE.Mesh(starG(), STAR_M); body.scale.setScalar(0.42);
+    const rim = new THREE.Mesh(starG(), STAR_RIM); rim.scale.setScalar(0.42 * 1.16);
+    const halo = new THREE.Sprite(STAR_HALO); halo.scale.setScalar(1.5);
+    m.add(halo, rim, body);
+    const g = this.ground(s, x, y);
+    if (g && y - g.y < 3) { const sh = new THREE.Mesh(G_SHADOW, SHADOW_M); sh.rotation.x = -Math.PI / 2; sh.position.y = g.y + 0.04 - y; sh.scale.setScalar(0.42); m.add(sh); m.userData.shadow = sh; }
     m.position.set(x, y, this.z(s)); m.userData.s = s;
     this.root.add(m);
     this.stars.push({ s, x, y, mesh: m, got: false });
@@ -194,7 +201,7 @@ export class Track {
     this.boxes = this.boxes.filter((o) => { if (o.s < cut) { this.root.remove(o.mesh); return false; } return true; });
     this.traps = this.traps.filter((o) => { if (o.s < cut) { this.root.remove(o.mesh); return false; } return true; });
   }
-  drop(m) { this.root.remove(m); m.traverse?.((o) => { if (o.geometry && o.geometry !== G_BOX && o.geometry !== G_EDGE && o.geometry !== G_PUFF && o.geometry !== G_HANG && o.geometry !== G_SPIKE && o.geometry.type !== 'ExtrudeGeometry') o.geometry.dispose(); }); }
+  drop(m) { this.root.remove(m); m.traverse?.((o) => { if (o.geometry && !o.isSprite && o.geometry !== G_BOX && o.geometry !== G_EDGE && o.geometry !== G_PUFF && o.geometry !== G_HANG && o.geometry !== G_SPIKE && o.geometry !== G_SHADOW && o.geometry.type !== 'ExtrudeGeometry') o.geometry.dispose(); }); }
 
   // 꿈이 바뀌는 곳: 넓은 발판 + 빛나는 문
   newDream() {
@@ -382,6 +389,7 @@ export class Track {
       const k = Math.min(1, dt * 7);
       st.s -= ds * k; st.x -= dx * k; st.y -= dy * k;
       st.mesh.position.set(st.x, st.y, this.z(st.s));
+      if (st.mesh.userData.shadow) st.mesh.userData.shadow.visible = false; // 끌려오는 중엔 그림자 없이
     }
   }
   takeStars(s, x, y) {
@@ -400,7 +408,11 @@ const G_PUFF = new THREE.SphereGeometry(1, 10, 8);
 const G_HANG = new THREE.ConeGeometry(1, 1, 7).rotateX(Math.PI);
 const G_SPIKE = new THREE.ConeGeometry(1, 1, 6);
 const SPIKE_M = new THREE.MeshToonMaterial({ color: '#2b2b33' });
-const STAR_M = new THREE.MeshBasicMaterial({ color: '#ffd84d' });
+const STAR_M = new THREE.MeshToonMaterial({ color: '#ffd23f', emissive: '#7a5200' });
+const STAR_RIM = new THREE.MeshBasicMaterial({ color: '#a8560a', side: THREE.BackSide });
+const STAR_HALO = new THREE.SpriteMaterial({ map: (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,240,170,.9)'); g.addColorStop(1, 'rgba(255,220,120,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })(), transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending });
+const G_SHADOW = new THREE.CircleGeometry(1, 20);
+const SHADOW_M = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.28, depthWrite: false });
 const stripeCache = new Map();
 function stripeTex(c) {
   if (stripeCache.has(c)) return stripeCache.get(c);

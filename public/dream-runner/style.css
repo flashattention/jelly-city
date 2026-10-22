@@ -156,3 +156,25 @@ kbd.wide { min-width: 64px; }
 #effects { position: fixed; left: 16px; top: 112px; display: flex; flex-direction: column; gap: 4px; z-index: 3; pointer-events: none; font-family: 'Jua', sans-serif; font-size: 17px; text-shadow: 0 2px 6px rgba(0,0,0,.45); }
 #effects span { background: rgba(20,8,50,.45); padding: 3px 10px; border-radius: 999px; width: fit-content; }
 @media (pointer: coarse) { #itembar { bottom: 110px; } }
+
+/* 메인으로 */
+.card { position: relative; }
+.home-btn { position: absolute; left: 16px; top: 16px; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 20px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); }
+.home-btn:hover { background: rgba(255,255,255,.22); }
+a.btn { text-decoration: none; display: inline-block; }
+/* 팀전 */
+#room-team small { font-family: 'Gowun Dodum'; font-size: 11px; opacity: .8; }
+#members.teams, .teams { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+.team-col { border-radius: 18px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.team-col h4 { margin: 0 0 4px; font-family: 'Jua', sans-serif; font-size: 17px; }
+.team-col.red { background: rgba(255,90,122,.18); border: 2px solid rgba(255,90,122,.6); }
+.team-col.blue { background: rgba(76,195,255,.16); border: 2px solid rgba(76,195,255,.6); }
+#team-row { margin-top: 4px; }
+#teambar { position: fixed; top: 72px; left: 50%; transform: translateX(-50%); z-index: 3; pointer-events: none; display: flex; gap: 8px; align-items: center; font-family: 'Jua', sans-serif; text-shadow: 0 2px 6px rgba(0,0,0,.45); }
+#tb-time { font-size: 22px; padding: 4px 12px; border-radius: 999px; background: rgba(20,8,50,.55); }
+#tb-time.hurry { color: #ff8a80; }
+#teambar .tb { display: flex; gap: 6px; align-items: center; padding: 5px 12px; border-radius: 999px; font-size: 15px; }
+#teambar .tb.red { background: rgba(255,90,122,.55); }
+#teambar .tb.blue { background: rgba(76,195,255,.5); }
+#teambar .tb.lead { outline: 2px solid #ffd84d; }
+#ov-team { font-family: 'Jua', sans-serif; font-size: 20px; margin-top: 6px; }

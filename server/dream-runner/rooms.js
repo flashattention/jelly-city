@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 const MAX = 12;
 const SNAP_HZ = 15;
 const COUNTDOWN = 3500; // ms
+const TEAM_DUR = Number(process.env.DREAM_TEAM_SEC) || 180; // 팀전 제한 시간 (초, 시험할 땐 줄일 수 있다)
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 헷갈리는 0 O 1 I 는 뺐다
 const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n);
 
@@ -29,9 +30,9 @@ export class DreamRooms {
   }
   send(c, m) { if (c.ws.readyState === 1) c.ws.send(JSON.stringify(m)); }
   toRoom(room, m, except) { const s = JSON.stringify(m); for (const p of room.players) if (p !== except && p.ws.readyState === 1) p.ws.send(s); }
-  roomInfo(r) { return { id: r.id, name: r.name, n: r.players.length, max: MAX, state: r.state, host: r.host?.name || '', mode: r.mode }; }
+  roomInfo(r) { return { id: r.id, name: r.name, n: r.players.length, max: MAX, state: r.state, host: r.host?.name || '', mode: r.mode, team: !!r.team }; }
   list() { return [...this.rooms.values()].map((r) => this.roomInfo(r)); }
-  members(r) { return r.players.map((p) => ({ id: p.id, name: p.name, color: p.color, look: p.look, acc: p.acc, host: p === r.host, dead: p.dead, result: p.result })); }
+  members(r) { return r.players.map((p) => ({ id: p.id, name: p.name, color: p.color, look: p.look, acc: p.acc, host: p === r.host, dead: p.dead, result: p.result, team: p.team })); }
   roomUpdate(r) { this.toRoom(r, { t: 'room', room: this.roomInfo(r), you: null, members: this.members(r) }); }
 
   handle(c, m) {
@@ -51,7 +52,7 @@ export class DreamRooms {
       case 'create': {
         if (!c.who) return this.needLogin(c);
         this.leave(c);
-        const r = { id: this.newCode(), name: clean(m.name, 20) || `${c.name}의 꿈`, players: [], host: c, state: 'wait', seed: 0, startAt: 0, mode: m.mode === 'item' ? 'item' : 'speed' };
+        const r = { id: this.newCode(), name: clean(m.name, 20) || `${c.name}의 꿈`, players: [], host: c, state: 'wait', seed: 0, startAt: 0, mode: m.mode === 'item' ? 'item' : 'speed', team: false };
         this.rooms.set(r.id, r);
         return this.join(c, r);
       }
@@ -74,7 +75,9 @@ export class DreamRooms {
         if (!r || r.host !== c || r.state !== 'wait') return;
         r.state = 'run'; r.seed = crypto.randomInt(1, 2 ** 31 - 1); r.startAt = Date.now() + COUNTDOWN;
         for (const p of r.players) { p.dead = false; p.st = null; p.result = null; }
-        this.toRoom(r, { t: 'start', seed: r.seed, in: COUNTDOWN, members: this.members(r), mode: r.mode });
+        // 팀전: 한 팀이 비어 있으면 번갈아 나눈다
+        if (r.team && r.players.length > 1 && new Set(r.players.map((p) => p.team)).size < 2) r.players.forEach((p, i) => { p.team = i % 2 ? 'blue' : 'red'; });
+        this.toRoom(r, { t: 'start', seed: r.seed, in: COUNTDOWN, members: this.members(r), mode: r.mode, team: !!r.team, dur: TEAM_DUR });
         return this.broadcastList();
       }
       case 'st': {
@@ -95,6 +98,7 @@ export class DreamRooms {
         c.lastShove = now;
         const tgt = r.players.find((p) => p.id === +m.to);
         if (!tgt || tgt.dead || !c.st || !tgt.st) return;
+        if (r.team && tgt.team === c.team) return; // 팀전: 같은 팀은 못 밀친다
         if (Math.abs(tgt.st[0] - c.st[0]) > 3.5 || Math.abs(tgt.st[1] - c.st[1]) > 3.5) return; // 너무 멀면 무시
         const dir = Math.sign(+m.dir || 0) || 1;
         this.send(tgt, { t: 'shoved', by: c.id, dir });
@@ -103,7 +107,7 @@ export class DreamRooms {
       }
       case 'dead': {
         const r = c.room;
-        if (!r || r.state !== 'run' || c.dead) return;
+        if (!r || r.state !== 'run' || c.dead || r.team) return; // 팀전은 탈락 없이 부활
         c.dead = true;
         c.result = { dist: Math.max(0, Math.floor(+m.dist || 0)), stars: Math.max(0, Math.floor(+m.stars || 0)), why: clean(m.why, 30), at: Date.now() - r.startAt };
         this.toRoom(r, { t: 'dead', id: c.id, result: c.result });
@@ -118,6 +122,23 @@ export class DreamRooms {
         this.roomUpdate(r); this.broadcastList();
         return;
       }
+      case 'team': {
+        // 팀전 켜고 끄기 (방장, 기다리는 동안)
+        const r = c.room;
+        if (!r || r.host !== c || r.state !== 'wait') return;
+        r.team = !!m.on;
+        if (r.team) this.balance(r);
+        this.roomUpdate(r); this.broadcastList();
+        return;
+      }
+      case 'switch': {
+        // 내 팀 바꾸기
+        const r = c.room;
+        if (!r || !r.team || r.state !== 'wait') return;
+        c.team = c.team === 'red' ? 'blue' : 'red';
+        this.roomUpdate(r);
+        return;
+      }
       case 'item': {
         // 아이템전: 충격파 · 젤리 함정을 같은 방 사람들에게 (효과는 받는 쪽이 계산)
         const r = c.room;
@@ -127,11 +148,24 @@ export class DreamRooms {
         c.lastItem = now;
         const p = m.p.slice(0, 3).map(Number);
         if (!p.every(Number.isFinite)) return;
-        this.toRoom(r, { t: 'item', by: c.id, k: m.k, p }, c);
+        this.toRoom(r, { t: 'item', by: c.id, k: m.k, p, team: r.team ? c.team : null }, c);
         return;
       }
       case 'emote': { const r = c.room; if (r) this.toRoom(r, { t: 'emote', id: c.id, e: clean(m.e, 4) }, c); return; }
     }
+  }
+  // 팀: 사람이 적은 쪽으로
+  smaller(r, c) { const red = r.players.filter((p) => p !== c && p.team === 'red').length, blue = r.players.filter((p) => p !== c && p.team === 'blue').length; return red <= blue ? 'red' : 'blue'; }
+  balance(r) { for (const p of r.players) if (p.team !== 'red' && p.team !== 'blue') p.team = this.smaller(r, p); }
+  // 팀전 끝: 가장 멀리 간 팀원이 있는 팀이 이긴다
+  finishTeam(r) {
+    r.state = 'wait';
+    const best = { red: 0, blue: 0 }, who = { red: '', blue: '' };
+    for (const p of r.players) { const s = p.st?.[0] || 0; if (p.team && s > best[p.team]) { best[p.team] = s; who[p.team] = p.name; } }
+    const winner = Math.abs(best.red - best.blue) < 0.5 ? 'draw' : best.red > best.blue ? 'red' : 'blue';
+    const rank = r.players.map((p) => ({ id: p.id, name: p.name, color: p.color, team: p.team, dist: Math.floor(p.st?.[0] || 0), stars: 0 })).sort((a, b) => b.dist - a.dist).map((e, i) => ({ rank: i + 1, ...e }));
+    this.toRoom(r, { t: 'finish', rank, team: { winner, red: Math.floor(best.red), blue: Math.floor(best.blue), redBy: who.red, blueBy: who.blue } });
+    this.roomUpdate(r); this.broadcastList();
   }
   needLogin(c) { this.send(c, { t: 'error', code: 'needlogin', text: '방 만들기 · 빠른 참가는 로그인(체험판도 돼요)이 필요해요. 초대 코드로는 바로 들어갈 수 있어요' }); }
   newCode() { let k; do { k = Array.from({ length: 6 }, () => CODE_CHARS[crypto.randomInt(CODE_CHARS.length)]).join(''); } while (this.rooms.has(k)); return k; }
@@ -141,6 +175,7 @@ export class DreamRooms {
     if (r.players.length >= MAX) return this.send(c, { t: 'error', text: '방이 꽉 찼어요 (최대 12명)' });
     if (r.state === 'run') return this.send(c, { t: 'error', text: '이미 달리는 중인 방이에요. 끝나면 들어갈 수 있어요' });
     r.players.push(c); c.room = r; c.dead = false; c.st = null; c.result = null;
+    c.team = this.smaller(r, c);
     this.send(c, { t: 'joined', room: this.roomInfo(r), members: this.members(r) });
     this.roomUpdate(r);
     this.broadcastList();
@@ -173,6 +208,7 @@ export class DreamRooms {
   tick() {
     for (const r of this.rooms.values()) {
       if (r.state !== 'run') continue;
+      if (r.team && Date.now() > r.startAt + TEAM_DUR * 1000 + 800) { this.finishTeam(r); continue; }
       const p = [];
       for (const c of r.players) if (c.st) p.push(c.id, ...c.st, c.dead ? 1 : 0);
       if (p.length) this.toRoom(r, { t: 'snap', p });

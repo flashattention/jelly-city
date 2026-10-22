@@ -205,11 +205,14 @@ $('solo-btn').onclick = () => { unlock(); startSolo(); };
 $('multi-btn').onclick = () => { unlock(); openLobby(); };
 // ---------- 스피드전 · 아이템전 ----------
 const modeName = (m) => (m === 'item' ? '🎁 아이템전' : '⚡ 스피드전');
+const TEAMS = { red: { name: '🍓 딸기팀', color: '#ff5a7a' }, blue: { name: '🫧 소다팀', color: '#4cc3ff' } };
 function segSet(id, m) { for (const b of $(id).children) b.classList.toggle('on', b.dataset.m === m); }
 game.pickMode = store.get(MODE_KEY) === 'item' ? 'item' : 'speed';
 segSet('mode-pick', game.pickMode);
 for (const b of $('mode-pick').children) b.onclick = () => { game.pickMode = b.dataset.m; store.set(MODE_KEY, game.pickMode); segSet('mode-pick', game.pickMode); };
 for (const b of $('room-mode').children) b.onclick = () => net.send({ t: 'mode', mode: b.dataset.m });
+for (const b of $('room-team').children) b.onclick = () => net.send({ t: 'team', on: b.dataset.t === '1' });
+$('team-btn').onclick = () => net.send({ t: 'switch' });
 game.boardMode = 'speed';
 for (const b of $('board-mode').children) b.onclick = async () => { game.boardMode = b.dataset.m; segSet('board-mode', game.boardMode); renderBoard($('board-list'), await loadBoard(game.boardMode)); };
 $('board-btn').onclick = async () => { game.boardMode = game.pickMode; segSet('board-mode', game.boardMode); show('board'); renderBoard($('board-list'), await loadBoard(game.boardMode)); };
@@ -248,7 +251,7 @@ function newRun(seed, itemMode = false) {
   $('itembar').classList.toggle('hidden', !itemMode);
 }
 function startSolo() {
-  game.multi = false;
+  game.multi = false; game.team = false; $('teambar').classList.add('hidden');
   newRun((Math.random() * 2 ** 31) | 0, game.pickMode === 'item');
   countdown(3000);
 }
@@ -266,6 +269,7 @@ function countdown(ms) {
 }
 function goRun() { game.mode = 'run'; $('countdown').classList.add('hidden'); }
 function toTitle() {
+  game.team = false; $('teambar').classList.add('hidden');
   $('howto').classList.add('hidden'); $('itembar').classList.add('hidden');
   game.mode = 'title'; game.multi = false;
   for (const g of game.ghosts.values()) g.remove(); game.ghosts.clear();
@@ -304,6 +308,7 @@ async function showOver() {
   if (r?.anonPending) $('ov-best').textContent = '';
   if (r?.newBest) sfx('best');
   $('again-btn').textContent = game.multi ? '👥 방으로 돌아가기' : '🔁 다시 달리기';
+  $('ov-board-title').classList.remove('hidden'); $('ov-board').classList.remove('hidden');
   $('ov-board-title').textContent = `🏆 ${modeName(game.itemMode ? 'item' : 'speed')} 최고 기록`;
   renderBoard($('ov-board'), r?.top ? r : await loadBoard(game.itemMode ? 'item' : 'speed'), true);
 }
@@ -381,7 +386,7 @@ function renderRooms(list) {
   el.innerHTML = '';
   for (const r of list) {
     const d = document.createElement('div'); d.className = 'room';
-    d.innerHTML = `<span class="nm">${esc(r.name)}</span><span class="meta">${modeName(r.mode)} · 👑 ${esc(r.host)} · ${r.n}/${r.max}</span><span class="tag ${r.state === 'run' ? 'run' : ''}">${r.state === 'run' ? '달리는 중' : '기다리는 중'}</span>`;
+    d.innerHTML = `<span class="nm">${esc(r.name)}</span><span class="meta">${r.team ? '👥 팀전 · ' : ''}${modeName(r.mode)} · 👑 ${esc(r.host)} · ${r.n}/${r.max}</span><span class="tag ${r.state === 'run' ? 'run' : ''}">${r.state === 'run' ? '달리는 중' : '기다리는 중'}</span>`;
     const b = document.createElement('button'); b.className = 'btn'; b.textContent = '들어가기';
     b.disabled = r.state === 'run' || r.n >= r.max;
     b.onclick = () => net.send({ t: 'join', id: r.id });
@@ -395,8 +400,19 @@ function renderRoom(rank) {
   segSet('room-mode', r.mode || 'speed');
   const me = game.members.find((m) => m.id === game.myId);
   const host = !!me?.host;
+  for (const b of $('room-team').children) { b.classList.toggle('on', (b.dataset.t === '1') === !!r.team); b.disabled = !host; }
+  $('team-row').classList.toggle('hidden', !r.team);
   const el = $('members'); el.innerHTML = '';
-  for (let i = 0; i < 12; i++) {
+  el.className = r.team ? 'teams' : '';
+  if (r.team) {
+    // 팀전: 딸기팀 · 소다팀 두 줄
+    for (const k of ['red', 'blue']) {
+      const col = document.createElement('div'); col.className = `team-col ${k}`;
+      const list = game.members.filter((m) => m.team === k);
+      col.innerHTML = `<h4>${TEAMS[k].name} (${list.length})</h4>` + list.map((m) => `<div class="mem${m.id === game.myId ? ' me' : ''}"><span class="dot" style="background:${esc(m.color)}"></span>${m.host ? '👑 ' : ''}${esc(m.name)}</div>`).join('');
+      el.appendChild(col);
+    }
+  } else for (let i = 0; i < 12; i++) {
     const m = game.members[i];
     const d = document.createElement('div');
     d.className = 'mem' + (m ? (m.id === game.myId ? ' me' : '') : ' slot');
@@ -427,8 +443,12 @@ net.on('room', (m) => { game.room = m.room; game.members = m.members; if (game.m
 net.on('left', () => { const was = game.room; game.room = null; if (!game.multi || !was) return; afterLeave(); });
 net.on('start', (m) => {
   game.members = m.members;
+  game.team = !!m.team;
+  game.myTeam = m.members.find((x) => x.id === game.myId)?.team;
+  game.endAt = performance.now() + m.in + (m.dur || 180) * 1000; game.respawnT = 0;
   newRun(m.seed, m.mode === 'item');
-  for (const mem of m.members) if (mem.id !== game.myId) game.ghosts.set(mem.id, new Ghost(scene, mem));
+  for (const mem of m.members) if (mem.id !== game.myId) game.ghosts.set(mem.id, new Ghost(scene, game.team ? { ...mem, teamColor: TEAMS[mem.team]?.color } : mem));
+  $('teambar').classList.toggle('hidden', !game.team);
   game.alive = m.members.length;
   countdown(m.in);
 });
@@ -450,17 +470,38 @@ net.on('item', (m) => {
   if (!Array.isArray(m.p) || game.mode === 'title') return;
   const [s, x, y] = m.p.map(Number);
   const who = game.members.find((q) => q.id === m.by)?.name || '누군가';
-  if (m.k === 'trap') track.trap(s, x, y, false);
+  const friend = game.team && m.team === game.myTeam; // 팀전: 우리 팀 함정 · 충격파는 나한테 안 통한다
+  if (m.k === 'trap') track.trap(s, x, y, friend);
   if (m.k === 'wave') {
     sfx('wave');
-    if (game.mode === 'run' && runner.alive && Math.abs(s - runner.s) < 8 && Math.abs(x - runner.x) < 7) {
+    if (!friend && game.mode === 'run' && runner.alive && Math.abs(s - runner.s) < 8 && Math.abs(x - runner.x) < 7) {
       const r = runner.shoved(Math.sign(runner.x - x) || 1);
       toast(r === 'blocked' ? '🛡️ 충격파를 막았어요!' : `💥 ${who}의 충격파에 밀려났어요!`, 1200);
     }
   }
 });
 net.on('shovefx', (m) => { const g = game.ghosts.get(m.by); if (g) g.shoveT = 0.3; });
+function showTeamOver(m) {
+  game.mode = 'over';
+  for (const id of ['hud', 'touch', 'spectate', 'howto', 'itembar', 'teambar']) $(id).classList.add('hidden');
+  show('over');
+  const T = m.team, mine = game.myTeam;
+  $('ov-why').textContent = T.winner === 'draw' ? '🤝 비겼어요!' : `🏆 ${TEAMS[T.winner].name} 승리!`;
+  $('ov-score').textContent = T.winner === 'draw' ? '무승부' : T.winner === mine ? '이겼어요! 🎉' : '아쉽게 졌어요';
+  if (T.winner === mine) sfx('best');
+  $('ov-best').textContent = '';
+  $('ov-detail').innerHTML = `<div id="ov-team">${TEAMS.red.name} ${T.red.toLocaleString()}m${T.redBy ? ` <small>(${esc(T.redBy)})</small>` : ''} · ${TEAMS.blue.name} ${T.blue.toLocaleString()}m${T.blueBy ? ` <small>(${esc(T.blueBy)})</small>` : ''}</div>`;
+  $('ov-save').classList.add('hidden');
+  $('ov-room').classList.remove('hidden');
+  $('ov-room').innerHTML = '<h3>🏁 이번 판 순위</h3>' + m.rank.map((e) => `<div class="brow${e.id === game.myId ? ' me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="dot" style="background:${TEAMS[e.team]?.color || esc(e.color)}"></span>${esc(e.name)}</span><span class="sc">${e.dist.toLocaleString()}m</span></div>`).join('');
+  // 팀전은 시간 제한 경기라 개인 최고 기록 순위표에는 올리지 않는다
+  $('ov-board-title').classList.add('hidden'); $('ov-board').classList.add('hidden');
+  $('again-btn').textContent = '👥 방으로 돌아가기';
+  renderRoom(m.rank);
+}
 net.on('finish', (m) => {
+  if (m.team) { showTeamOver(m); return; }
+  $('ov-board-title').classList.remove('hidden'); $('ov-board').classList.remove('hidden');
   // 모두 탈락: 방 안 순위 + 전체 순위표
   game.lastRank = m.rank;
   const show2 = () => { showOver().then(() => { $('ov-room').classList.remove('hidden'); $('ov-room').innerHTML = '<h3>🏁 이번 판 순위</h3>' + m.rank.map((e) => `<div class="brow${e.id === game.myId ? ' me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.name)}</span><span class="sc">${e.dist.toLocaleString()}m<small>⭐${e.stars}</small></span></div>`).join(''); renderRoom(m.rank); }); };
@@ -485,7 +526,7 @@ function multiTick(dt) {
   game.sendT -= dt;
   if (game.sendT <= 0 && runner.alive && game.mode === 'run') {
     game.sendT = 1 / 15;
-    const f = (runner.slideT > 0 && runner.onGround ? 1 : 0) | (runner.onGround ? 0 : 2) | (runner.shoveT > 0 ? 4 : 0) | (runner.flipT > 0 ? 8 : 0) | (runner.boost > 0.5 ? 16 : 0) | (runner.eff.shield > 0 ? 32 : 0) | (runner.eff.ghost > 0 ? 64 : 0) | (runner.eff.cloud > 0 ? 128 : 0) | (runner.eff.magnet > 0 ? 256 : 0) | (runner.eff.rocket > 0 ? 512 : 0) | (runner.eff.slow > 0 ? 1024 : 0);
+    const f = (runner.slideT > 0 && runner.onGround ? 1 : 0) | (runner.onGround ? 0 : 2) | (runner.shoveT > 0 ? 4 : 0) | (runner.flipT > 0 ? 8 : 0) | (runner.boost > 0.5 ? 16 : 0) | (runner.eff.shield > 0 ? 32 : 0) | (runner.eff.ghost > 0 ? 64 : 0) | (runner.eff.cloud > 0 ? 128 : 0) | (runner.eff.magnet > 0 ? 256 : 0) | (runner.eff.rocket > 0 ? 512 : 0) | (runner.eff.slow > 0 ? 1024 : 0) | (runner.invul > 0 ? 2048 : 0);
     net.send({ t: 'st', p: [runner.s, runner.x, runner.y, f] });
   }
   for (const g of game.ghosts.values()) g.update(dt, track.origin);
@@ -500,7 +541,7 @@ function multiTick(dt) {
   if (input.shove && runner.shoveT <= 0) {
     let best = null, bd = 9;
     for (const g of game.ghosts.values()) {
-      if (!g.alive) continue;
+      if (!g.alive || (game.team && game.members.find((x) => x.id === g.id)?.team === game.myTeam)) continue; // 팀전: 같은 팀은 못 밀친다
       const ds = Math.abs(g.s - runner.s), dx = Math.abs(g.x - runner.x);
       if (ds < 2.6 && dx < 2.6 && Math.abs(g.y - runner.y) < 2 && ds + dx < bd) { bd = ds + dx; best = g; }
     }
@@ -543,7 +584,9 @@ function frame() {
       game.runT += dt;
       const why = runner.update(dt, input, track, onFx);
       if (input.item && runner.alive) useItem();
-      if (why) died(why);
+      if (why) { if (game.team) teamDown(why); else died(why); }
+      if (game.team && !runner.alive) { game.respawnT -= dt; if (game.respawnT <= 0) { runner.respawn(track); sfx('use_shield'); } }
+      if (game.team && performance.now() >= game.endAt) { game.mode = 'teamend'; toast('⏰ 시간 끝! 결과를 기다리는 중…', 4000); sfx('beep', true); }
     } else if (game.mode === 'dead') {
       runner.update(dt, input, track);
       game.deadT += dt;
@@ -565,6 +608,11 @@ function frame() {
   input.jump = input.slide = input.shove = input.item = false;
   env.update(dt, t, camera, runner.s, runner.x, runner.y);
   renderer.render(scene, camera);
+}
+function teamDown(why) {
+  sfx(why.includes('떨어') ? 'die' : 'bonk');
+  game.respawnT = 1.0;
+  toast(`💫 ${why} · 1초 뒤 그 자리에서 부활!`, 1200);
 }
 function maxGhostS() { let m = 0; for (const g of game.ghosts.values()) if (g.alive) m = Math.max(m, g.s); return m; }
 // 관전: 탈락한 뒤엔 가장 멀리 간 사람을 따라간다
@@ -633,7 +681,20 @@ function renderItems(reset, roll) {
   if (game.rolling) return;
   slots.forEach((el, i) => { el.textContent = runner.items[i] ? ITEMS[runner.items[i]].emoji : ''; el.classList.remove('spin'); });
 }
+function teamHud() {
+  if (!game.team) return;
+  const left = Math.max(0, (game.endAt - performance.now()) / 1000);
+  const tt = $('tb-time'); tt.textContent = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
+  tt.classList.toggle('hurry', left < 20);
+  const best = { red: 0, blue: 0 };
+  if (game.myTeam) best[game.myTeam] = Math.max(best[game.myTeam], runner.s);
+  for (const g of game.ghosts.values()) { const tm = game.members.find((x) => x.id === g.id)?.team; if (tm) best[tm] = Math.max(best[tm], g.s); }
+  $('tb-red').textContent = `${Math.floor(best.red).toLocaleString()}m`; $('tb-blue').textContent = `${Math.floor(best.blue).toLocaleString()}m`;
+  document.querySelector('#teambar .red').classList.toggle('lead', best.red > best.blue);
+  document.querySelector('#teambar .blue').classList.toggle('lead', best.blue > best.red);
+}
 function hud() {
+  teamHud();
   // 켜져 있는 아이템 효과와 남은 시간
   if (game.itemMode) {
     const on = Object.entries(runner.eff).filter(([k, v]) => v > 0 && ITEMS[k]).map(([k, v]) => `<span>${ITEMS[k].emoji} ${Math.ceil(v)}</span>`).join('') + (runner.eff.slow > 0 ? '<span>🍯 끈적</span>' : '');

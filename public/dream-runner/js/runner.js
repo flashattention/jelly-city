@@ -166,6 +166,8 @@ export class Runner {
   reset(s = 0, x = 0) {
     // 아이템: 들고 있는 것(최대 2개) · 켜져 있는 효과(남은 초)
     this.items = []; this.eff = { rocket: 0, shield: 0, cloud: 0, magnet: 0, ghost: 0, slow: 0 }; this.rocketK = 0; this.cloudY = 0; this.lastGroundY = 0;
+    // 팀전: 마지막으로 안전하게 밟은 곳 · 부활 뒤 멈춤 · 무적
+    this.safe = { s, x, y: 0 }; this.frozen = 0; this.invul = 0;
     Object.assign(this, { s, x, y: 0, boost: 0, vx: 0, vy: 0, knock: 0, onGround: true, jumps: 0, coyote: 0, jbuf: 0, slideT: 0, flipT: 0, shoveT: 0, alive: true, dead: null, stars: 0, plat: null, t: 0 });
     this.bear.inner.rotation.set(0, 0, 0); this.bear.root.scale.setScalar(1); this.bear.root.visible = true;
   }
@@ -176,6 +178,9 @@ export class Runner {
   update(dt, input, track, fx) {
     if (!this.alive) return this.updateDead(dt);
     this.t += dt;
+    this.invul = Math.max(0, this.invul - dt);
+    // 부활 직후: 그 자리에 멈춰서 깜빡이다가 다시 달린다
+    if (this.frozen > 0) { this.frozen -= dt; this.vy = 0; this.onGround = true; return; }
     const prevS = this.s, prevY = this.y;
     // 가속: 누르고 있으면 점점 빨라지고, 떼면 서서히 원래 속도로
     const wasB = this.boost;
@@ -211,6 +216,7 @@ export class Runner {
       this.y = g.y; this.vy = 0; this.onGround = true; this.jumps = 0;
       if (!was) { fx?.('land'); this.bear.jumpSquash = 1; }
       this.lastGroundY = g.y;
+      if (!g.mv && this.s > g.s0 + 0.5 && this.s < g.s1 - 0.5) this.safe = { s: this.s, x: Math.max(g.cx - g.w / 2 + 0.6, Math.min(g.cx + g.w / 2 - 0.6, this.x)), y: g.y };
       if (g.mv) this.x += g.dx; // 움직이는 발판에 실려 간다
     }
     // 구름발판: 떨어지지 않고 마지막 발판 높이에 떠 있는다
@@ -220,11 +226,11 @@ export class Runner {
     // 앞을 막는 발판 옆면: 조금 높으면 훌쩍 올라서고, 많이 높으면 쾅
     const w = track.wall(prevS, this.s, this.x, this.y);
     if (w) {
-      if (w.y - this.y < 1.3 || this.eff.ghost > 0 || this.eff.shield > 0) { /* 1.3m 아래 턱은 훌쩍 올라선다 (유령 · 방어막이면 어떤 턱이든) */ if (w.y - this.y >= 1.3 && this.eff.ghost <= 0) { this.eff.shield = 0; fx?.('shieldbreak'); } this.y = w.y; this.vy = Math.max(0, this.vy); this.onGround = true; this.jumps = 0; }
+      if (w.y - this.y < 1.3 || this.eff.ghost > 0 || this.eff.shield > 0 || this.invul > 0) { /* 1.3m 아래 턱은 훌쩍 올라선다 (유령 · 방어막이면 어떤 턱이든) */ if (w.y - this.y >= 1.3 && this.eff.ghost <= 0 && this.invul <= 0) { this.eff.shield = 0; fx?.('shieldbreak'); } this.y = w.y; this.vy = Math.max(0, this.vy); this.onGround = true; this.jumps = 0; }
       else return this.die('벽에 쾅! 부딪혔어요', track);
     }
     // 장애물
-    const o = this.eff.ghost > 0 ? null : track.hit(this.s, this.x, this.y, this.h);
+    const o = this.eff.ghost > 0 || this.invul > 0 ? null : track.hit(this.s, this.x, this.y, this.h);
     if (o && this.eff.shield > 0) { this.eff.shield = 0; track.breakOne(o); fx?.('shieldbreak'); }
     else if (o) return this.die(o.kind === 'spike' ? '가시를 밟았어요' : o.kind === 'bar' ? '가로대에 머리를 쿵!' : '장애물에 부딪혔어요', track);
     // 별사탕
@@ -233,7 +239,7 @@ export class Runner {
       const b = track.takeBox(this.s, this.x, this.y);
       if (b) { if (this.items.length < MAX_ITEMS) { const id = randomItem(this.multi); this.items.push(id); fx?.('item', id); } else fx?.('itemfull'); }
       const tr = track.hitTrap(this.s, this.x, this.y);
-      if (tr) { if (this.eff.shield > 0) { this.eff.shield = 0; fx?.('shieldbreak'); } else if (this.eff.ghost <= 0) { this.eff.slow = 1.6; this.knock += (Math.random() < 0.5 ? -1 : 1) * 7; fx?.('trapped'); } }
+      if (tr && this.invul <= 0) { if (this.eff.shield > 0) { this.eff.shield = 0; fx?.('shieldbreak'); } else if (this.eff.ghost <= 0) { this.eff.slow = 1.6; this.knock += (Math.random() < 0.5 ? -1 : 1) * 7; fx?.('trapped'); } }
       if (this.eff.magnet > 0) track.magnet(this.s, this.x, this.y, dt);
     }
     const n = track.takeStars(this.s, this.x, this.y);
@@ -254,8 +260,17 @@ export class Runner {
     fx?.('use', id);
     return id;
   }
-  shoved(dir) { if (this.eff.shield > 0) { this.eff.shield = 0; return 'blocked'; } if (this.eff.ghost > 0) return 'blocked'; this.knock = dir * 14; this.vy = Math.max(this.vy, 5.5); this.onGround = false; this.slideT = 0; }
+  shoved(dir) { if (this.invul > 0 || this.frozen > 0) return 'blocked'; if (this.eff.shield > 0) { this.eff.shield = 0; return 'blocked'; } if (this.eff.ghost > 0) return 'blocked'; this.knock = dir * 14; this.vy = Math.max(this.vy, 5.5); this.onGround = false; this.slideT = 0; }
   bump(dir) { this.knock += dir * 4.5; }
+  // 팀전 부활: 떨어졌으면 마지막으로 밟은 발판, 부딪혔으면 그 자리 발판 위에서
+  respawn(track) {
+    const D = this.dead;
+    let at = this.safe;
+    if (D && !D.fall) { const g = track.ground(this.s, this.x, this.y + 3); if (g) at = { s: this.s, x: Math.max(g.cx - g.w / 2 + 0.6, Math.min(g.cx + g.w / 2 - 0.6, this.x)), y: g.y }; }
+    Object.assign(this, { s: at.s, x: at.x, y: at.y, vx: 0, vy: 0, knock: 0, boost: 0, onGround: true, jumps: 0, slideT: 0, flipT: 0, alive: true, dead: null, frozen: 1.2, invul: 2.6 });
+    this.bear.inner.rotation.set(0, 0, 0);
+    if (this.bear.poseState) this.bear.poseState.rx = 0;
+  }
   die(why, track) {
     this.alive = false; this.dead = { why, t: 0, vy: Math.max(this.vy, 0), fall: why.includes('떨어') };
     if (!this.dead.fall) { this.dead.vy = 7; this.knock = 0; }
@@ -278,6 +293,8 @@ export class Runner {
     this.booster.update(dt, this.alive ? Math.max(this.boost, this.rocketK * 1.6) : 0, this.t);
     this.efx.update(dt, this.t, this.alive ? { shield: this.eff.shield > 0, ghost: this.eff.ghost > 0, cloud: this.eff.cloud > 0 && this.onGround && this.y <= this.cloudY + 0.01 && !this.plat, magnet: this.eff.magnet > 0, slow: this.eff.slow > 0 } : {});
     if (this.shoveT > 0) for (const a of b.arms.slice(0, 2)) a.rotation.x = -1.6;
+    // 부활해서 무적인 동안 깜빡깜빡
+    b.root.visible = this.invul > 0 ? Math.sin(this.t * 28) > -0.2 : true;
     if (!this.alive) { this.shadow.visible = false; return; }
     this.shadow.visible = true;
     const gy = this.plat ? this.plat.y : this.y - 0.5;
@@ -294,7 +311,7 @@ export class Ghost {
     scene.add(this.bear.root);
     this.booster = new Booster(scene); this.booster.attach(this.bear); this.bk = 0; this.t = 0;
     this.efx = new EffectFx(); this.efx.attach(this.bear);
-    this.tag = nameTag(m.name, m.color);
+    this.tag = nameTag(m.name, m.teamColor || m.color, m.teamColor);
     scene.add(this.tag);
     this.s = 0; this.x = 0; this.y = 0; this.f = 0; this.at = 0; this.ts = 0; this.tx = 0; this.ty = 0; this.alive = true; this.flipT = 0; this.shoveT = 0; this.pf = 0;
   }
@@ -325,19 +342,20 @@ export class Ghost {
     this.efx.update(dt, this.t, { shield: f & 32, ghost: f & 64, cloud: f & 128, magnet: f & 256, slow: f & 1024 });
     this.shoveT = Math.max(0, this.shoveT - dt);
     if (this.shoveT > 0) for (const a of b.arms.slice(0, 2)) a.rotation.x = -1.6;
-    b.root.visible = this.alive || this.y > -30;
+    b.root.visible = (this.alive || this.y > -30) && (!(this.f & 2048) || Math.sin(this.t * 28) > -0.2);
     this.tag.position.set(this.x, this.y + 2.5, origin - this.s);
     this.tag.visible = b.root.visible;
   }
   remove() { this.booster.dispose(); this.scene.remove(this.bear.root, this.tag); }
 }
 
-function nameTag(name, color) {
+function nameTag(name, color, team) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 64;
   const x = c.getContext('2d');
   x.font = 'bold 30px Jua, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
   const w = Math.min(250, x.measureText(name).width + 34);
   x.fillStyle = 'rgba(20,10,40,.6)'; x.beginPath(); x.roundRect(128 - w / 2, 8, w, 48, 24); x.fill();
+  if (team) { x.strokeStyle = team; x.lineWidth = 5; x.stroke(); } // 팀전: 팀 색 테두리
   x.fillStyle = color || '#ffffff'; x.beginPath(); x.arc(128 - w / 2 + 18, 32, 7, 0, 7); x.fill();
   x.fillStyle = '#ffffff'; x.fillText(name, 136, 33);
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthWrite: false, transparent: true }));

@@ -43,6 +43,7 @@
   <div id="speedlines"></div>
   <div id="itembar" class="hidden"><div class="slot" id="slot0"></div><div class="slot" id="slot1"></div><div class="key">Q</div></div>
   <div id="effects"></div>
+  <div id="teambar" class="hidden"><div id="tb-time">3:00</div><div class="tb red"><span>🍓 딸기팀</span><b id="tb-red">0m</b></div><div class="tb blue"><span>🫧 소다팀</span><b id="tb-blue">0m</b></div></div>
   <div id="howto">
     <div><kbd>←</kbd><kbd>→</kbd> <kbd>A</kbd><kbd>D</kbd> 좌우</div>
     <div><kbd class="wide">Space</kbd> 점프 · 두 번 = 2단 점프</div>
@@ -61,6 +62,7 @@
   <!-- 처음 화면 -->
   <div id="title" class="screen">
     <div class="card">
+      <a href="/" class="home-btn" title="메인으로">🏠</a>
       <div class="logo">🌙 드림 러너</div>
       <div class="sub">잠든 곰돌이가 꿈속을 끝없이 달려요 · 20초마다 바뀌는 100가지가 넘는 꿈</div>
       <div id="login-box" class="hidden">
@@ -83,7 +85,7 @@
         </div>
         <div class="row code-row"><input id="code-in" maxlength="6" placeholder="초대 코드 6자리" autocomplete="off" /><button id="code-btn" class="btn alt">🎟️ 코드로 참가</button></div>
       </div>
-      <div class="row2"><button id="board-btn" class="btn ghost">🏆 순위표</button><a href="/" class="link">← 게임 고르기</a></div>
+      <div class="row2"><button id="board-btn" class="btn ghost">🏆 순위표</button><a href="/" class="btn ghost">🏠 메인으로</a></div>
       <div class="keys">← → / A·D 좌우 · Space 점프 (두 번 = 2단 점프) · ↑ / W 꾹 = 가속 · ↓ / S 숙이기 · Q 아이템 (아이템전) · E 밀치기 (같이 달리기) · M 소리</div>
       <div id="err"></div>
     </div>
@@ -109,10 +111,12 @@
   <div id="room" class="screen hidden">
     <div class="card wide">
       <h2 id="room-title"></h2>
+      <div class="seg" id="room-team"><button data-t="0">🏃 개인전</button><button data-t="1">👥 팀전 <small>3분</small></button></div>
       <div class="seg" id="room-mode"><button data-m="speed">⚡ 스피드전</button><button data-m="item">🎁 아이템전</button></div>
       <div id="room-code"><span>초대 코드</span><b id="code-txt"></b><button id="copy-link" class="btn alt">🔗 링크 복사</button><button id="copy-code" class="btn ghost">코드 복사</button></div>
       <div class="note">링크를 보내거나 코드를 알려 주면 로그인 안 한 친구도 들어올 수 있어요</div>
       <div id="members"></div>
+      <div id="team-row" class="hidden"><button id="team-btn" class="btn ghost">🔁 팀 바꾸기</button><div class="note">3분 동안 달려서, 가장 멀리 간 팀원이 있는 팀이 이겨요 · 넘어지면 1초 뒤 그 자리에서 부활</div></div>
       <div id="room-rank" class="hidden"></div>
       <div id="room-hint" class="sub"></div>
       <div class="row2"><button id="start-btn" class="btn big hidden">🌙 다 같이 출발!</button><button id="leave-btn" class="btn ghost">방 나가기</button></div>
