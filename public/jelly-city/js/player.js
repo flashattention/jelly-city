@@ -361,6 +361,8 @@ export class Player {
       c.target.y + Math.sin(c.pitch) * dist,
       c.target.z + Math.cos(c.yaw) * cp * dist,
     );
+    // 땅 밑으로 파고들지 않게: 올려다보면 카메라가 땅 위를 미끄러지며 위를 본다
+    if (!this.inCar) want.y = Math.max(want.y, this.pos.y + 0.35);
     // 건물에 가리지 않도록
     if (world.cameraColliders) {
       const dir = want.clone().sub(c.target);

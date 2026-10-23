@@ -825,7 +825,8 @@ window.addEventListener('mousemove', (e) => {
   const c = game.player.cam;
   const sens = sensOf('city') / (game.zoomNow || 1); // 줌 중에는 감도를 낮춘다 · 마우스 감도 설정(1배 = 원래)
   c.yaw -= dx * 0.0028 * sens;
-  c.pitch = clamp(c.pitch + dy * 0.0022 * sens, game.player.fp || game.player.aim > 0.5 ? -1.3 : -0.35, 1.25);
+  // 젤리병단 장비: 하늘(건물 꼭대기 · 거대 젤리 뒷목)을 올려다보며 갈고리를 걸 수 있게 위로도 크게 (카메라는 땅에 닿으면 땅을 타고 미끄러진다)
+  c.pitch = clamp(c.pitch + dy * 0.0022 * sens, game.player.fp || game.player.aim > 0.5 || game.player.odmHeld ? -1.3 : -0.35, 1.25);
   game.mouseT = 1.5;
 });
 // 스코프 배율 (배그처럼 휠로 조절). 무기마다 고를 수 있는 배율과 처음 배율
