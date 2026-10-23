@@ -2,6 +2,8 @@
 //   혼자 달리기 · 같이 달리기(방, 최대 12명: 같은 길 · 같은 꿈 · 서로 밀치기) · 최고 기록 순위표
 import * as THREE from 'three';
 import { account, store } from '../../shared/js/account.js';
+import { localChars, LOCAL_MAX } from '../../shared/js/local-chars.js';
+import { Chat } from '../../shared/js/chat.js';
 import { Env } from './env.js';
 import { Track, speedAt, V0 } from './track.js';
 import { Runner, Ghost } from './runner.js';
@@ -123,9 +125,7 @@ function renderAccount() {
   const on = logged();
   $('login-box').classList.toggle('hidden', on);
   $('who-row').classList.toggle('hidden', !on);
-  $('chars-label').classList.toggle('hidden', !on);
-  $('multi-btn').classList.toggle('hidden', !on); // 방 만들기 · 빠른 참가는 로그인한 사람만 (비로그인은 초대 코드로)
-  $('play-btns').classList.toggle('one', !on);
+  $('chars-label').classList.remove('hidden'); $('multi-btn').classList.remove('hidden'); // 로그인 안 해도 캐릭터 · 같이 하기
   if (!on) {
     const s = game.status || {};
     if (s.googleClientId) account.googleButton($('g-btn'), s.googleClientId, () => renderAccount(), (e) => err(e.message)).catch(() => err('구글 로그인 버튼을 불러오지 못했어요'));
@@ -138,7 +138,7 @@ function renderAccount() {
   // 구글 계정은 실명 대신 닉네임: 처음이면 정하게 한다
   $('acct-nick').classList.toggle('hidden', !(on && account.user.needNick) && !game.editNick);
   $('acct-nick-hint').textContent = on && account.user.needNick ? '구글 이름 대신 쓸 닉네임을 정해 주세요 (모든 게임에서 써요)' : '새 닉네임';
-  const chars = on ? account.chars || [] : [];
+  const chars = on ? account.chars || [] : localChars(); // 로그인 안 했으면 이 기기에 만든 캐릭터
   let sel = store.get(CHAR_KEY) || store.get('jelly.char') || (chars[0]?.token ?? 'default'); // 메인 화면의 대표 캐릭터가 기본
   if (sel !== 'default' && !chars.some((c) => c.token === sel)) sel = chars[0]?.token ?? 'default';
   const box = $('chars'); box.innerHTML = '';
@@ -149,8 +149,9 @@ function renderAccount() {
     b.onclick = () => { store.set(CHAR_KEY, token); renderAccount(); };
     box.appendChild(b);
   };
-  if (on) { for (const c of chars) chip(c.token, c.name, c.profile?.color || '#8a5634'); chip('default', '🐻 기본 곰돌이', '#8a5634'); }
-  if (on && chars.length < 4) { const a = document.createElement('a'); a.className = 'chip'; a.href = '/?create=1&back=/dream-runner/'; a.textContent = '＋ 새 캐릭터'; a.style.textDecoration = 'none'; box.appendChild(a); }
+  for (const c of chars) chip(c.token, c.name, c.profile?.color || '#8a5634');
+  chip('default', '🐻 기본 곰돌이', '#8a5634');
+  if (chars.length < (on ? 4 : LOCAL_MAX)) { const a = document.createElement('a'); a.className = 'chip'; a.href = '/?create=1&back=/dream-runner/'; a.textContent = '＋ 새 캐릭터'; a.style.textDecoration = 'none'; box.appendChild(a); }
   const c = chars.find((x) => x.token === sel);
   $('nick-row').classList.toggle('hidden', !!c || on); // 로그인했으면 계정 닉네임을 쓴다
   if (!$('nick').value) {
@@ -362,14 +363,13 @@ const net = {
     this.ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/dream-ws`);
     this.ws.onopen = () => { this.open = true; hello(); };
     this.ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch { return; } this.handlers[m.t]?.(m); };
-    this.ws.onclose = () => { this.open = false; if (game.multi && game.mode !== 'title') { toast('🔧 서버 업데이트 중... 20초 안에 복구돼요. 잠시 뒤 다시 들어와 주세요', 5000); setTimeout(() => { if (game.multi) toTitle(); }, 800); } };
+    this.ws.onclose = () => { this.open = false; chat?.show(false); if (game.multi && game.mode !== 'title') { toast('🔧 서버 업데이트 중... 20초 안에 복구돼요. 잠시 뒤 다시 들어와 주세요', 5000); setTimeout(() => { if (game.multi) toTitle(); }, 800); } };
   },
   send(m) { if (this.ws?.readyState === 1) this.ws.send(JSON.stringify(m)); },
   on(t, f) { this.handlers[t] = f; },
 };
 function hello() { net.send({ t: 'hello', session: logged() ? account.session : null, name: game.profile.name, color: game.profile.color, look: game.profile.look, acc: game.profile.acc }); }
 function openLobby() {
-  if (!logged()) { err('방 만들기 · 빠른 참가는 로그인이 필요해요. 초대 코드로는 바로 참가할 수 있어요'); return; }
   game.multi = true; net.pendingJoin = null;
   show('lobby'); $('rooms').innerHTML = '<div class="empty">방 목록을 불러오는 중…</div>';
   if (net.open) hello(); else net.connect();
@@ -439,11 +439,14 @@ net.on('rooms', (m) => { if (!game.room) renderRooms(m.rooms); });
 net.on('error', (m) => {
   toast(m.text || '문제가 생겼어요', 2600);
   // 코드로 들어가다 실패했는데 방 밖이면: 로그인 안 했으면 처음 화면으로
-  if (!game.room && !logged() && game.mode !== 'run') { game.multi = false; show('title'); }
+  if (!game.room && game.mode !== 'run' && $('lobby').classList.contains('hidden')) { game.multi = false; show('title'); }
 });
-net.on('joined', (m) => { game.room = m.room; game.members = m.members; $('room-rank').classList.add('hidden'); show('room'); renderRoom(); });
-net.on('room', (m) => { game.room = m.room; game.members = m.members; if (game.mode !== 'run' && game.mode !== 'count' && game.mode !== 'dead') { if (!$('room').classList.contains('hidden') || !$('over').classList.contains('hidden')) renderRoom(); } });
-net.on('left', () => { const was = game.room; game.room = null; if (!game.multi || !was) return; afterLeave(); });
+// 방 채팅 (대기실부터 달리는 중까지 · 팀전이면 팀에게만도)
+const chat = new Chat({ send: (m) => net.send(m), myId: () => game.myId, teamMode: () => !!game.room?.team, myTeam: () => game.members?.find((x) => x.id === game.myId)?.team, teamColor: (t) => TEAMS[t]?.color });
+net.on('chat', (m) => chat.receive(m));
+net.on('joined', (m) => { chat.reset(m.chat || []); chat.show(true); game.room = m.room; game.members = m.members; $('room-rank').classList.add('hidden'); show('room'); renderRoom(); });
+net.on('room', (m) => { game.room = m.room; game.members = m.members; chat.renderScope(); if (game.mode !== 'run' && game.mode !== 'count' && game.mode !== 'dead') { if (!$('room').classList.contains('hidden') || !$('over').classList.contains('hidden')) renderRoom(); } });
+net.on('left', () => { chat.show(false); const was = game.room; game.room = null; if (!game.multi || !was) return; afterLeave(); });
 net.on('start', (m) => {
   game.members = m.members;
   game.team = !!m.team;
@@ -515,7 +518,7 @@ $('create-btn').onclick = () => net.send({ t: 'create', name: $('room-name').val
 $('lobby-back').onclick = () => { game.multi = false; show('title'); };
 $('leave-btn').onclick = () => { net.send({ t: 'leave' }); game.room = null; $('ov-room').classList.add('hidden'); afterLeave(); };
 // 방에서 나온 뒤: 로그인했으면 방 목록, 아니면 처음 화면
-function afterLeave() { if (logged()) { show('lobby'); net.send({ t: 'list' }); } else { game.multi = false; toTitle(); } }
+function afterLeave() { show('lobby'); net.send({ t: 'list' }); }
 $('start-btn').onclick = () => net.send({ t: 'start' });
 async function copy(text, label) {
   try { await navigator.clipboard.writeText(text); toast(`📋 ${label} 복사했어요`); }

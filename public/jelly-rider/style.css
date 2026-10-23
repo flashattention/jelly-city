@@ -57,3 +57,6 @@ kbd.wide { min-width: 40px; }
 #ov-team { font-family: 'Jua', sans-serif; font-size: 18px; margin-bottom: 8px; }
 #ov-best { font-family: 'Jua', sans-serif; color: var(--gold); min-height: 22px; margin-top: 8px; }
 #ov-save { margin-top: 12px; padding: 12px; border-radius: 18px; background: rgba(255,216,77,.12); }
+
+/* 채팅이 조작법 안내를 가리지 않게 */
+body #chat { bottom: 150px; }

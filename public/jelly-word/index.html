@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>젤리 끝말잇기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/css/shell.css" />
+  <link rel="stylesheet" href="../shared/css/party.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <div class="bubbles" aria-hidden="true"></div>
+  <div id="game" class="hidden">
+    <div id="top">
+      <div id="need-box"><div class="lbl">이어야 할 글자</div><div id="need">가</div><div id="need-alt"></div></div>
+      <div id="turn-info"></div>
+      <div id="timer" class="pbar"><i></i></div>
+    </div>
+    <div id="chain-wrap"><div id="chain"></div></div>
+    <div id="players"></div>
+    <form id="input-bar" autocomplete="off">
+      <input id="word-in" maxlength="12" placeholder="내 차례를 기다려요…" disabled autocomplete="off" autocorrect="off" spellcheck="false" />
+      <button id="word-btn" class="btn alt big" disabled>잇기!</button>
+      <div id="word-msg"></div>
+    </form>
+    <div class="hud-r"><button id="b-mute" title="소리">🔊</button><button id="b-quit" title="그만하기">✕</button></div>
+  </div>
+  <div id="count" class="overlay hidden"><div class="count-big" id="count-n">3</div></div>
+  <div id="over" class="screen hidden"><div class="card wide">
+    <h2 id="ov-title">🏆</h2>
+    <div id="ov-me" class="sub"></div>
+    <div id="ov-rank" class="res-list"></div>
+    <div id="ov-stat" class="note"></div>
+    <div class="row2"><button id="again-btn" class="btn big">🔁 한 판 더</button><button id="home-btn" class="btn ghost">처음으로</button></div>
+  </div></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

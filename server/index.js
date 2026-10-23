@@ -19,6 +19,12 @@ import { DreamBoard, dreamApi } from './dream-runner/leaderboard.js';
 import { DreamRooms } from './dream-runner/rooms.js';
 import { RiderRooms } from './jelly-rider/rooms.js';
 import { AttackRooms } from './jelly-attack/rooms.js';
+import { AppleRooms } from './jelly-apple/rooms.js';
+import { WordRooms } from './jelly-word/rooms.js';
+import { Dict } from './jelly-word/dict.js';
+import { DrawRooms } from './jelly-draw/rooms.js';
+import { normWord } from '../public/jelly-draw/js/prompts.js';
+import { complete } from './jelly-city/llm.js';
 import { Records } from './shared/records.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -43,6 +49,16 @@ const dreamRooms = new DreamRooms((sid) => world.userOf(sid)); // 드림 러너 
 const RIDER_TRACKS = ['candy', 'cloud', 'neon', 'lava', 'sakura', 'synth', 'snow', 'deep'];
 const riderRooms = new RiderRooms((sid) => world.userOf(sid));
 const attackRooms = new AttackRooms((sid) => world.userOf(sid)); // 젤리어택 방 (봇은 서버가 움직인다)
+// 젤리 사과게임: 방 · 시간별 최고 점수 (클수록 좋다)
+const appleRooms = new AppleRooms((sid) => world.userOf(sid));
+const appleRecords = new Records(DATA_DIR, 'jelly-apple', {
+  boards: ['t60', 't120', 't180'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.score)),
+  check: (b) => (Number.isInteger(Number(b.score)) && Number(b.score) >= 0 && Number(b.score) <= 170 ? null : '기록이 이상해요'),
+});
+const wordDict = new Dict(DATA_DIR); // 끝말잇기 사전 판정 (LLM 결과를 저장해 둔다)
+const wordRooms = new WordRooms((sid) => world.userOf(sid), wordDict);
+const drawRooms = new DrawRooms((sid) => world.userOf(sid)); // 젤리 그림릴레이 방
+const guessHits = new Map();
 const riderRecords = new Records(DATA_DIR, 'jelly-rider', {
   boards: RIDER_TRACKS, better: (a, b) => a.value < b.value, value: (b) => Math.round(Number(b.time) * 1000) / 1000,
   check: (b) => (Number.isFinite(Number(b.time)) && Number(b.time) >= 40 && Number(b.time) <= 3600 ? null : '기록이 이상해요'),
@@ -88,6 +104,26 @@ async function api(req, res, url) {
   // 드림 러너 (계정 · 로그인은 젤리시티와 같이 쓴다)
   if (url.pathname.startsWith('/api/dream/')) return dreamApi(req, res, url, world.userOf(sid), dreamBoard, json);
   if (url.pathname.startsWith('/api/rider/')) return riderRecords.api(req, res, url, world.userOf(sid), json, '/api/rider');
+  // 혼자 그려보기: AI 젤리봇이 그림을 보고 맞힌다 (그림은 저장하지 않는다)
+  if (url.pathname === '/api/draw/guess' && req.method === 'POST') {
+    if (!llmEnabled) return json(res, 503, { error: 'AI 젤리봇이 쉬는 중이에요' });
+    const ip = req.headers['fly-client-ip'] || req.socket.remoteAddress || '', now = Date.now();
+    const hits = (guessHits.get(ip) || []).filter((t) => now - t < 60000);
+    if (hits.length >= 12) return json(res, 429, { error: '잠시 후 다시 해 주세요' });
+    hits.push(now); guessHits.set(ip, hits);
+    const b = await readJson(req, 400 * 1024);
+    if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(String(b.img || '')) || String(b.img).length > 380 * 1024) return json(res, 400, { error: '그림이 이상해요' });
+    try {
+      const r = await complete([
+        { role: 'system', content: '너는 그림 맞히기 게임을 하는 귀여운 AI 젤리봇이다. 사람이 마우스로 대충 그린 그림을 보고 무엇을 그렸는지 한국어 명사로 맞힌다. 가장 그럴듯한 것부터 3개.' },
+        { role: 'user', content: [{ type: 'text', text: '이 그림은 무엇일까? 한국어 낱말 3개와, 그림을 보고 하는 짧고 다정한 한마디(20자 이내).' }, { type: 'image_url', image_url: { url: b.img, detail: 'low' } }] },
+      ], { schema: { type: 'object', properties: { guesses: { type: 'array', items: { type: 'string' } }, comment: { type: 'string' } }, required: ['guesses', 'comment'], additionalProperties: false }, temperature: 0.4, max_tokens: 120 });
+      const guesses = (r.guesses || []).map((x) => String(x).slice(0, 20)).slice(0, 3), ans = normWord(b.answer);
+      const hit = ans ? guesses.findIndex((x) => { const n = normWord(x); return n && (n === ans || n.includes(ans) || ans.includes(n)); }) : -1;
+      return json(res, 200, { guesses, comment: String(r.comment || '').slice(0, 40), hit });
+    } catch (e) { console.warn('그림 맞히기 실패', e.message); return json(res, 502, { error: 'AI 젤리봇이 그림을 못 봤어요' }); }
+  }
+  if (url.pathname.startsWith('/api/apple/')) return appleRecords.api(req, res, url, world.userOf(sid), json, '/api/apple');
   const who = world.userOf(sid);
   if (!who) return json(res, 401, { error: 'login' });
   if (url.pathname === '/api/me') return json(res, 200, { user: world.publicUser(who.user), chars: world.charList(who.sub), admin: isAdmin(who.user) });
@@ -189,10 +225,14 @@ const riderWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, pe
 riderWss.on('connection', (ws) => riderRooms.connect(ws));
 const attackWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
 attackWss.on('connection', (ws) => attackRooms.connect(ws));
+const partyWss = (rooms) => { const w = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false }); w.on('connection', (ws) => rooms.connect(ws)); return w; };
+const appleWss = partyWss(appleRooms), wordWss = partyWss(wordRooms);
+const drawWss = new WebSocketServer({ noServer: true, maxPayload: 160 * 1024, perMessageDeflate: { threshold: 2048 } }); // 그림은 커서 더 크게 · 압축
+drawWss.on('connection', (ws) => drawRooms.connect(ws));
 // 주소로 나눠 받는다: /ws = 젤리시티 · /dream-ws = 드림 러너
 server.on('upgrade', (req, socket, head) => {
   const p = new URL(req.url, 'http://x').pathname;
-  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/rider-ws' ? riderWss : p === '/attack-ws' ? attackWss : null;
+  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/rider-ws' ? riderWss : p === '/attack-ws' ? attackWss : p === '/apple-ws' ? appleWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : null;
   if (!target) { socket.destroy(); return; }
   target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
 });
@@ -247,7 +287,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
     stopping = true;
     world.broadcast({ t: 'sys', text: '🔧 서버가 업데이트돼요! 잠시 후 자동으로 다시 접속해요' });
     try { world.save(); console.log('💾 세계를 저장했어요'); } catch (e) { console.error('저장 실패', e); }
-    dreamBoard.save(); riderRecords.save();
+    dreamBoard.save(); riderRecords.save(); appleRecords.save(); wordDict.save();
     setTimeout(() => process.exit(0), 500);
   });
 }

@@ -62,3 +62,6 @@
 .bar i { display: block; height: 100%; background: linear-gradient(90deg, #7cd8ff, #ff8fc4); }
 #ov-title { font-family: 'Jua', sans-serif; font-size: 34px; }
 #ov-me { font-family: 'Jua', sans-serif; font-size: 20px; color: var(--gold); margin: 4px 0 10px; }
+
+/* 채팅이 체력 표시를 가리지 않게 */
+body #chat { bottom: 74px; }

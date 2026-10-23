@@ -1,0 +1,29 @@
+/* 파티 게임 공용: 몽글몽글한 젤리 배경 · 곰돌이 얼굴 · 게임 중 패널 */
+body { background: radial-gradient(ellipse at 20% 10%, #ff9ccf 0%, transparent 45%), radial-gradient(ellipse at 85% 20%, #9bd7ff 0%, transparent 45%), radial-gradient(ellipse at 50% 100%, #b79bff 0%, transparent 55%), #2a1b5e; }
+.bubbles { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+.bubbles i { position: absolute; bottom: -120px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.55), rgba(255,255,255,.08) 60%, transparent 70%); animation: rise linear infinite; }
+@keyframes rise { to { transform: translateY(-120vh) translateX(30px); } }
+.face { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden; flex: none; box-shadow: inset 0 -3px 0 rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.25); border: 2px solid rgba(255,255,255,.7); }
+.face img { width: 140%; height: 140%; object-fit: cover; object-position: 50% 18%; }
+#game { position: fixed; inset: 0; z-index: 5; display: flex; }
+.panel { background: rgba(24, 14, 52, .62); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,.16); border-radius: 22px; box-shadow: 0 14px 40px rgba(0,0,0,.3); }
+.hud-r { position: fixed; right: 14px; top: 14px; display: flex; gap: 8px; z-index: 30; }
+.hud-r button { width: 42px; height: 42px; border-radius: 50%; border: 1px solid rgba(255,255,255,.25); background: rgba(20,8,50,.55); color: #fff; font-size: 18px; }
+.ptitle { font-family: 'Jua', sans-serif; }
+.overlay { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.count-big { font-family: 'Jua', sans-serif; font-size: 140px; color: #fff; text-shadow: 0 0 40px rgba(255,143,196,.9), 0 8px 0 rgba(0,0,0,.25); animation: pulse .9s ease-out; }
+@keyframes pulse { from { transform: scale(1.6); opacity: 0; } 30% { opacity: 1; } to { transform: scale(1); } }
+.pbar { height: 14px; border-radius: 999px; background: rgba(255,255,255,.15); overflow: hidden; }
+.pbar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7cf0c8, #ffd84d, #ff8fc4); transition: width .25s linear; }
+.res-row { display: grid; grid-template-columns: 40px 44px 1fr auto; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 16px; background: rgba(255,255,255,.07); text-align: left; }
+.res-row.me { background: rgba(255,216,77,.2); outline: 1px solid #ffd84d; }
+.res-row .rk { font-family: 'Jua', sans-serif; font-size: 22px; text-align: center; }
+.res-row .nm { font-family: 'Jua', sans-serif; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.res-row .sc { font-family: 'Jua', sans-serif; font-size: 20px; }
+.res-row .sc small { font-family: 'Gowun Dodum'; font-size: 12px; opacity: .75; margin-left: 4px; }
+.res-list { display: flex; flex-direction: column; gap: 6px; margin: 14px 0; max-height: 50vh; overflow-y: auto; }
+.opt-row { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; color: var(--soft); }
+.opt-row b { font-family: 'Jua', sans-serif; color: #fff; min-width: 26px; display: inline-block; }
+.opt-row button.pm { width: 32px; height: 32px; border-radius: 50%; border: 0; background: rgba(255,255,255,.18); color: #fff; font-size: 18px; }
+#members .mem img { width: 26px; height: 26px; }
+@media (max-width: 720px) { .count-big { font-size: 100px; } }

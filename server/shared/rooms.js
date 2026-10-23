@@ -31,7 +31,7 @@ export class BaseRooms {
   list() { return [...this.rooms.values()].map((r) => this.roomInfo(r)); }
   members(r) { return r.players.map((p) => ({ id: p.id, name: p.name, color: p.color, look: p.look, acc: p.acc, host: p === r.host, team: p.team, bot: !!p.bot })); }
   roomUpdate(r) { this.toRoom(r, { t: 'room', room: this.roomInfo(r), members: this.members(r) }); }
-  broadcastList() { const s = JSON.stringify({ t: 'rooms', rooms: this.list() }); for (const c of this.clients) if (!c.room && c.who && c.ws.readyState === 1) c.ws.send(s); }
+  broadcastList() { const s = JSON.stringify({ t: 'rooms', rooms: this.list() }); for (const c of this.clients) if (!c.room && c.hi && c.ws.readyState === 1) c.ws.send(s); }
   needLogin(c) { this.send(c, { t: 'error', code: 'needlogin', text: '방 만들기 · 빠른 참가는 로그인(체험판도 돼요)이 필요해요. 초대 코드로는 바로 들어갈 수 있어요' }); }
   newCode() { let k; do { k = Array.from({ length: 6 }, () => CODE_CHARS[crypto.randomInt(CODE_CHARS.length)]).join(''); } while (this.rooms.has(k)); return k; }
   // 팀: 사람이 적은 쪽으로
@@ -47,11 +47,10 @@ export class BaseRooms {
         const lj = m.look && typeof m.look === 'object' ? JSON.stringify(m.look) : '';
         c.look = lj && lj.length < 600 ? JSON.parse(lj) : null;
         c.acc = Array.isArray(m.acc) ? m.acc.slice(0, 6).map((x) => String(x).slice(0, 40)) : [];
-        return this.send(c, { t: 'hello', id: c.id, rooms: c.who ? this.list() : [], anon: !c.who });
+        return this.send(c, { t: 'hello', id: c.id, rooms: this.list(), anon: !c.who });
       }
       case 'list': return this.send(c, { t: 'rooms', rooms: this.list() });
       case 'create': {
-        if (!c.who) return this.needLogin(c);
         this.leave(c);
         const r = { id: this.newCode(), name: clean(m.name, 20) || `${c.name}의 방`, players: [], host: c, state: 'wait', startAt: 0, opts: this.allow({ ...this.o.defaults }, m.opts || {}) };
         this.rooms.set(r.id, r);
@@ -64,12 +63,12 @@ export class BaseRooms {
         return this.join(c, r);
       }
       case 'quick': {
-        if (!c.who) return this.needLogin(c);
         const r = [...this.rooms.values()].filter((x) => x.state === 'wait' && x.players.length < this.o.max).sort((a, b) => b.players.length - a.players.length)[0];
         if (r) return this.join(c, r);
         return this.handle(c, { t: 'create', name: '', opts: m.opts });
       }
       case 'leave': return this.leave(c, true);
+      case 'chat': return this.chat(c, m);
       case 'opts': {
         // 방 설정 (방장, 기다리는 동안)
         const r = c.room;
@@ -108,6 +107,24 @@ export class BaseRooms {
         if (c.room) this.onMessage(c, m, c.room);
     }
   }
+  // ---------- 채팅: 대기실부터 게임 중까지 · 팀전이면 팀에게만도 ----------
+  teamChat(r) { return !!r.opts?.team; }
+  sysChat(r, s) { this.pushChat(r, { sys: true, s }); }
+  pushChat(r, m, onlyTeam) {
+    m.at = Date.now();
+    if (!onlyTeam) { (r.chat ||= []).push(m); if (r.chat.length > 40) r.chat.shift(); }
+    const msg = JSON.stringify({ t: 'chat', ...m });
+    for (const p of r.players) if (p.ws?.readyState === 1 && (!onlyTeam || p.team === onlyTeam)) p.ws.send(msg);
+  }
+  chat(c, m) {
+    const r = c.room; if (!r) return;
+    const s = clean(m.s, 120); if (!s) return;
+    const now = Date.now(); c.chatAt = (c.chatAt || []).filter((t) => now - t < 6000);
+    if (c.chatAt.length >= 5) return this.send(c, { t: 'chat', sys: true, s: '💬 너무 빨라요. 잠깐 쉬었다 말해요' });
+    c.chatAt.push(now);
+    const team = m.team && this.teamChat(r) && c.team ? c.team : null;
+    this.pushChat(r, { id: c.id, name: c.name, color: c.color, s, team }, team);
+  }
   join(c, r) {
     if (c.room === r) return;
     this.leave(c);
@@ -115,7 +132,8 @@ export class BaseRooms {
     if (r.state === 'run') return this.send(c, { t: 'error', text: '이미 시작한 방이에요. 끝나면 들어갈 수 있어요' });
     r.players.push(c); c.room = r; c.st = null; c.done = false; c.result = null;
     c.team = this.smaller(r, c);
-    this.send(c, { t: 'joined', room: this.roomInfo(r), members: this.members(r) });
+    this.send(c, { t: 'joined', room: this.roomInfo(r), members: this.members(r), chat: r.chat || [] });
+    this.sysChat(r, `👋 ${c.name} 님이 들어왔어요`);
     this.roomUpdate(r);
     this.broadcastList();
   }
@@ -128,6 +146,7 @@ export class BaseRooms {
     const humans = r.players.filter((p) => !p.bot);
     if (!humans.length) { this.rooms.delete(r.id); this.broadcastList(); return; }
     if (r.host === c || r.host?.bot) r.host = humans[0];
+    this.sysChat(r, `🚪 ${c.name} 님이 나갔어요`);
     if (r.state === 'run') { this.toRoom(r, { t: 'gone', id: c.id }); this.onLeave?.(r, c); }
     this.roomUpdate(r);
     this.broadcastList();

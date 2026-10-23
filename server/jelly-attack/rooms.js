@@ -13,6 +13,7 @@ const BOT_GUNS = ['m4', 'ak47', 'rifle', 'mp5', 'scar', 'shotgun', 'sniper', 'uz
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
 export class AttackRooms extends BaseRooms {
+  teamChat(r) { return r.opts.mode !== 'ffa'; } // 팀 데스매치면 팀 채팅
   constructor(userOf) {
     super(userOf, { max: 12, hz: 20, countdown: 3000, defaults: { map: 'depot', mode: 'tdm', bots: 4 } });
     this.navs = new Map();

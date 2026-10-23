@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>젤리 그림릴레이</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/css/shell.css" />
+  <link rel="stylesheet" href="../shared/css/party.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <div class="bubbles" aria-hidden="true"></div>
+  <div id="game" class="hidden">
+    <div id="head">
+      <div id="step"></div>
+      <div id="timer" class="pbar"><i></i></div>
+      <div id="ready"></div>
+    </div>
+    <!-- 제시어 고르기 -->
+    <div id="st-word" class="stage hidden">
+      <div class="big-q">📖 내 그림책의 첫 제시어를 골라요</div>
+      <div class="note">다음 사람이 이 낱말을 그림으로 그려요. 직접 써도 돼요!</div>
+      <div id="choices"></div>
+      <form class="answer" id="word-form"><input id="word-in" maxlength="20" placeholder="직접 쓰기 (예: 춤추는 곰돌이)" autocomplete="off" /><button class="btn alt">이걸로!</button></form>
+    </div>
+    <!-- 그리기 -->
+    <div id="st-draw" class="stage hidden">
+      <div class="big-q" id="draw-q"></div>
+      <div id="paper-wrap"><canvas id="paper"></canvas></div>
+      <div id="tools">
+        <div id="palette"></div>
+        <div id="sizes"></div>
+        <button id="t-erase" class="tool" title="지우개">🧽</button>
+        <button id="t-undo" class="tool" title="되돌리기 (Ctrl+Z)">↩️</button>
+        <button id="t-clear" class="tool" title="다 지우기">🗑️</button>
+        <button id="draw-done" class="btn alt">다 그렸어요 ✓</button>
+      </div>
+    </div>
+    <!-- 맞히기 -->
+    <div id="st-guess" class="stage hidden">
+      <div class="big-q">🤔 이 그림은 무엇일까요?</div>
+      <div id="guess-by" class="note"></div>
+      <div id="view-wrap"><canvas id="view"></canvas></div>
+      <form class="answer" id="guess-form"><input id="guess-in" maxlength="20" placeholder="정답을 써요" autocomplete="off" /><button class="btn alt">이거다!</button></form>
+    </div>
+    <!-- 기다리기 -->
+    <div id="st-wait" class="stage hidden">
+      <div class="big-q">🍬 다른 친구들을 기다려요…</div>
+      <div id="wait-faces"></div>
+    </div>
+    <!-- 함께 넘겨 보기 -->
+    <div id="st-reveal" class="stage hidden">
+      <div id="rv-title" class="big-q"></div>
+      <div id="rv-items"></div>
+      <div id="rv-ctl"><button id="rv-next" class="btn big alt">다음 ▶</button><div id="rv-wait" class="note">방장이 그림책을 넘겨요</div></div>
+    </div>
+    <!-- 혼자 그려보기 결과 -->
+    <div id="st-ai" class="stage hidden">
+      <div class="big-q" id="ai-q"></div>
+      <div id="ai-row"><canvas id="ai-view"></canvas><div id="ai-say" class="panel"></div></div>
+      <div class="row2"><button id="ai-again" class="btn big alt">🎨 다른 그림 그리기</button><button id="ai-home" class="btn ghost">처음으로</button></div>
+    </div>
+    <div class="hud-r"><button id="b-mute" title="소리">🔊</button><button id="b-quit" title="그만하기">✕</button></div>
+  </div>
+  <div id="count" class="overlay hidden"><div class="count-big" id="count-n">3</div></div>
+  <div id="over" class="screen hidden"><div class="card wide">
+    <h2>🎨 그림릴레이 끝!</h2>
+    <div id="ov-best"></div>
+    <div id="ov-perfect" class="sub"></div>
+    <div id="ov-rank" class="res-list"></div>
+    <div class="row2"><button id="again-btn" class="btn big">🔁 방으로 돌아가기</button><button id="home-btn" class="btn ghost">처음으로</button></div>
+  </div></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 // 메인 화면: 로그인 · 닉네임 · 내 캐릭터(만들기 · 꾸미기 · 삭제 · 대표 고르기) · 게임 고르기
 import { account, store } from '/shared/js/account.js';
 import { Creator, thumbOf, DEFAULT_CHAR_KEY } from '/shared/js/char-studio.js';
+import { localChars, addLocal, updateLocal, removeLocal, LOCAL_MAX } from '/shared/js/local-chars.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -31,7 +32,7 @@ async function boot() {
   await account.restore();
   if (!logged() && q.has('autostart') && status.devLogin) { try { await account.login({ dev: q.get('name') || '젤리' }); } catch (e) { err(e.message); } } // 점검용
   render();
-  if (q.has('create') && logged()) openStudio();
+  if (q.has('create')) openStudio(); // 로그인 안 해도 이 기기에 만든다
 }
 function render() {
   const on = logged();
@@ -63,28 +64,29 @@ $('nick-save').onclick = saveNick;
 $('nick-in').onkeydown = (e) => { if (e.key === 'Enter') saveNick(); };
 
 // ---------- 내 캐릭터 ----------
+// 로그인하면 계정 캐릭터, 아니면 이 기기에 저장한 캐릭터
+const myChars = () => (logged() ? account.chars || [] : localChars());
 function mainToken() {
-  const chars = account.chars || [];
+  const chars = myChars();
   const t = store.get(DEFAULT_CHAR_KEY);
   return chars.some((c) => c.token === t) ? t : chars[0]?.token || null;
 }
 function renderChars() {
   const el = $('char-list');
-  if (!logged()) { el.innerHTML = ''; $('chars-sub').textContent = '만든 캐릭터는 모든 게임에서 써요'; return; }
-  const chars = account.chars || [], main = mainToken();
-  $('chars-sub').textContent = `만든 캐릭터는 모든 게임에서 써요 · ⭐ 대표 캐릭터가 게임의 기본이에요 (${chars.length}/${MAX_CHARS})`;
+  const chars = myChars(), main = mainToken(), on = logged();
+  $('chars-sub').textContent = on ? `만든 캐릭터는 모든 게임에서 써요 · ⭐ 대표 캐릭터가 게임의 기본이에요 (${chars.length}/${MAX_CHARS})` : `로그인 없이도 만들 수 있어요 · 이 기기에만 저장돼요 (${chars.length}/${LOCAL_MAX}) · 젤리시티는 로그인(체험판)한 캐릭터로 해요`;
   el.innerHTML = chars.map((c) => `
     <div class="ch${c.token === main ? ' main' : ''}" data-tok="${c.token}">
-      ${c.token === main ? '<span class="badge">⭐ 대표</span>' : ''}
+      ${c.token === main ? '<span class="badge">⭐ 대표</span>' : ''}${c.local ? '<span class="badge local">📱 이 기기</span>' : ''}
       <img data-thumb="${c.token}" alt="">
       <div class="nm">${esc(c.name)}</div>
-      <div class="meta">${c.profile?.gender === '남' ? '♂' : '♀'} ${c.profile?.age}살 · ${esc(c.profile?.personality || '')}</div>
+      <div class="meta">${c.profile?.gender === '남' ? '♂' : '♀'} ${c.profile?.age || 25}살 · ${esc(c.profile?.personality || '')}</div>
       <div class="acts">
         ${c.token === main ? '' : `<button class="btn mini" data-main="${c.token}">⭐ 대표로</button>`}
         <button class="btn ghost mini" data-style="${c.token}">🎨 꾸미기</button>
         <button class="btn ghost mini" data-del="${c.token}" title="삭제">🗑️</button>
       </div>
-    </div>`).join('') + (chars.length < MAX_CHARS ? '<div class="ch new" id="new-char"><div class="plus">＋</div>새 캐릭터 만들기</div>' : '');
+    </div>`).join('') + (chars.length < (on ? MAX_CHARS : LOCAL_MAX) ? '<div class="ch new" id="new-char"><div class="plus">＋</div>새 캐릭터 만들기</div>' : '');
   if (!chars.length) el.insertAdjacentHTML('afterbegin', '<p class="empty">아직 캐릭터가 없어요. 나만의 곰돌이를 만들어 보세요! 🐻</p>');
   for (const c of chars) { const img = el.querySelector(`[data-thumb="${c.token}"]`); if (img) img.src = thumbOf(c); }
   el.querySelectorAll('[data-main]').forEach((b) => { b.onclick = () => { store.set(DEFAULT_CHAR_KEY, b.dataset.main); renderChars(); }; });
@@ -92,6 +94,7 @@ function renderChars() {
   el.querySelectorAll('[data-del]').forEach((b) => {
     b.onclick = async () => {
       const c = chars.find((x) => x.token === b.dataset.del);
+      if (c.local) { if (confirm(`"${c.name}" 캐릭터를 지울까요?`)) { removeLocal(c.token); renderChars(); } return; }
       const typed = prompt(`정말 "${c.name}" 캐릭터를 삭제할까요? 젤리시티의 돈·아이템·집도 모두 사라져요.\n삭제하려면 캐릭터 이름을 입력하세요.`);
       if (typed !== c.name) return;
       try { account.chars = (await account.api(`/api/chars/${c.token}`, { method: 'DELETE' })).chars; renderChars(); } catch (e) { err(e.message); }
@@ -119,7 +122,15 @@ $('create-ok').onclick = async () => {
   if (!editing && !pr.name) { $('studio-err').textContent = '이름을 지어 주세요!'; creator.tab = 'basic'; creator.renderTabs(); return; }
   $('create-ok').disabled = true;
   try {
-    if (editing) {
+    if (!logged()) {
+      // 로그인 안 함: 이 기기에 저장
+      if (editing) updateLocal(editing.token, { color: pr.color, look: pr.look });
+      else {
+        const c = addLocal(pr, creator.draft.starter);
+        if (!store.get(DEFAULT_CHAR_KEY) || localChars().length === 1 || back) store.set(DEFAULT_CHAR_KEY, c.token);
+        if (back) { location.href = back; return; }
+      }
+    } else if (editing) {
       account.chars = (await account.api(`/api/chars/${editing.token}/look`, { method: 'POST', body: { color: pr.color, look: pr.look } })).chars;
     } else {
       const r = await account.api('/api/chars', { method: 'POST', body: { profile: pr, starter: creator.draft.starter } });

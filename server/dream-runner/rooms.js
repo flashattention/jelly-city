@@ -2,6 +2,7 @@
 //   서버는 방 관리 · 시작 신호 · 서로의 위치 중계 · 밀치기 중계만 한다 (각자 자기 달리기는 자기 브라우저가 계산)
 //   방마다 6자리 초대 코드. 방 만들기 · 빠른 참가는 로그인(구글 · 체험판)한 사람만, 초대 코드(링크)로는 비로그인도 들어온다
 import crypto from 'node:crypto';
+import { BaseRooms } from '../shared/rooms.js';
 
 const MAX = 12;
 const SNAP_HZ = 15;
@@ -46,11 +47,10 @@ export class DreamRooms {
         const lj = m.look && typeof m.look === 'object' ? JSON.stringify(m.look) : '';
         c.look = lj && lj.length < 600 ? JSON.parse(lj) : null;
         c.acc = Array.isArray(m.acc) ? m.acc.slice(0, 6).map((x) => String(x).slice(0, 40)) : [];
-        return this.send(c, { t: 'hello', id: c.id, rooms: c.who ? this.list() : [], anon: !c.who });
+        return this.send(c, { t: 'hello', id: c.id, rooms: this.list(), anon: !c.who });
       }
       case 'list': return this.send(c, { t: 'rooms', rooms: this.list() });
       case 'create': {
-        if (!c.who) return this.needLogin(c);
         this.leave(c);
         const r = { id: this.newCode(), name: clean(m.name, 20) || `${c.name}의 꿈`, players: [], host: c, state: 'wait', seed: 0, startAt: 0, mode: m.mode === 'item' ? 'item' : 'speed', team: false };
         this.rooms.set(r.id, r);
@@ -63,13 +63,13 @@ export class DreamRooms {
         return this.join(c, r);
       }
       case 'quick': {
-        if (!c.who) return this.needLogin(c);
         // 기다리는 방 중 사람이 가장 많은 곳, 없으면 새 방
         const r = [...this.rooms.values()].filter((x) => x.state === 'wait' && x.players.length < MAX).sort((a, b) => b.players.length - a.players.length)[0];
         if (r) return this.join(c, r);
         return this.handle(c, { t: 'create', name: '' });
       }
       case 'leave': return this.leave(c, true);
+      case 'chat': return this.chat(c, m);
       case 'start': {
         const r = c.room;
         if (!r || r.host !== c || r.state !== 'wait') return;
@@ -176,7 +176,8 @@ export class DreamRooms {
     if (r.state === 'run') return this.send(c, { t: 'error', text: '이미 달리는 중인 방이에요. 끝나면 들어갈 수 있어요' });
     r.players.push(c); c.room = r; c.dead = false; c.st = null; c.result = null;
     c.team = this.smaller(r, c);
-    this.send(c, { t: 'joined', room: this.roomInfo(r), members: this.members(r) });
+    this.send(c, { t: 'joined', room: this.roomInfo(r), members: this.members(r), chat: r.chat || [] });
+    this.sysChat(r, `👋 ${c.name} 님이 들어왔어요`);
     this.roomUpdate(r);
     this.broadcastList();
   }
@@ -188,6 +189,7 @@ export class DreamRooms {
     if (tell) this.send(c, { t: 'left' }); // 혼자 있던 방이어도 꼭 알려 준다 (안 알려서 못 나가던 문제)
     if (!r.players.length) { this.rooms.delete(r.id); this.broadcastList(); return; }
     if (r.host === c) r.host = r.players[0];
+    this.sysChat(r, `🚪 ${c.name} 님이 나갔어요`);
     if (r.state === 'run') { this.toRoom(r, { t: 'dead', id: c.id, result: null, left: true }); if (r.players.every((p) => p.dead)) this.finish(r); }
     this.roomUpdate(r);
     this.broadcastList();
@@ -203,7 +205,7 @@ export class DreamRooms {
   // 로비에 있는 사람들(방 밖)에게 방 목록
   broadcastList() {
     const s = JSON.stringify({ t: 'rooms', rooms: this.list() });
-    for (const c of this.clients) if (!c.room && c.who && c.ws.readyState === 1) c.ws.send(s);
+    for (const c of this.clients) if (!c.room && c.hi && c.ws.readyState === 1) c.ws.send(s);
   }
   tick() {
     for (const r of this.rooms.values()) {
@@ -215,3 +217,7 @@ export class DreamRooms {
     }
   }
 }
+
+// 채팅은 다른 게임 방과 똑같이 (팀전이면 팀에게만도)
+for (const k of ['chat', 'pushChat', 'sysChat']) DreamRooms.prototype[k] = BaseRooms.prototype[k];
+DreamRooms.prototype.teamChat = (r) => !!r.team;

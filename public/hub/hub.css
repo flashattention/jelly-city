@@ -99,3 +99,18 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 #studio-err { color: #e53935; margin-right: auto; }
 .create-foot .btn.ghost { background: rgba(74,52,40,.08); color: #4a3428; border-color: rgba(74,52,40,.15); }
 @media (max-width: 680px) { .creator { grid-template-columns: 1fr; } #create-preview { height: 240px; } .creator-side { max-height: none; } }
+.ch .badge.local { left: auto; right: 10px; background: #7cf0c8; color: #0b4d3a; }
+/* 파티 게임 카드 */
+.apple .art { background: linear-gradient(180deg, #ffd6e8 0%, #fff1d6 60%, #ffe0f0 100%); }
+.apple .gums { position: absolute; left: 50%; top: 34%; transform: translate(-50%, -50%) rotate(-6deg); display: grid; grid-template-columns: repeat(4, 38px); gap: 6px; }
+.apple .gums i { width: 38px; height: 42px; border-radius: 45% 45% 40% 40%; display: flex; align-items: center; justify-content: center; font-family: 'Jua', sans-serif; font-style: normal; color: #fff; font-size: 18px; box-shadow: inset 0 -5px 8px rgba(0,0,0,.18), inset 4px 4px 6px rgba(255,255,255,.45); }
+.apple .frame { position: absolute; left: 30%; top: 14%; width: 92px; height: 50px; border: 3px dashed #3fe0a6; border-radius: 12px; background: rgba(63,224,166,.15); animation: wob 2.4s ease-in-out infinite; }
+.word .art { background: linear-gradient(180deg, #b388ff 0%, #ff8fc4 100%); }
+.word .caps { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); display: flex; gap: 8px; }
+.word .caps i { font-style: normal; font-family: 'Jua', sans-serif; font-size: 18px; color: #3a2350; padding: 8px 14px; border-radius: 999px; background: radial-gradient(circle at 30% 20%, #fff, #ffd1ea 60%); box-shadow: 0 6px 12px rgba(0,0,0,.2); white-space: nowrap; }
+.word .need { position: absolute; left: 50%; top: 42%; transform: translateX(-50%); width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Jua', sans-serif; font-size: 40px; color: #fff; background: radial-gradient(circle at 30% 25%, #fff, #ff8fc4 45%, #e2569b); box-shadow: 0 10px 20px rgba(0,0,0,.25); }
+.draw .art { background: linear-gradient(180deg, #8fd3ff 0%, #c9b8ff 100%); }
+.draw .paper { position: absolute; left: 50%; top: 32%; transform: translate(-50%, -50%) rotate(-4deg); width: 170px; height: 112px; background: #fffdf8; border-radius: 14px; box-shadow: 0 12px 26px rgba(0,0,0,.25); padding: 10px; }
+.draw .paper svg { width: 100%; height: 100%; }
+.draw .brush { position: absolute; left: 66%; top: 34%; font-size: 44px; animation: wob 2s ease-in-out infinite; }
+@keyframes wob { 50% { transform: translateY(-6px) rotate(4deg); } }

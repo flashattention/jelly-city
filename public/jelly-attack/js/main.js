@@ -117,6 +117,7 @@ const shell = new Shell({
   extraRow: [{ label: '🎒 무기 고르기', onClick: () => openLoadout() }],
   screens: ['over', 'loadout'],
   describe,
+  teamChat: (o) => o.mode !== 'ffa', // 팀 데스매치면 팀 채팅
   options: { room: (el, o, host) => optsUI(el, o, host, (n) => shell.send({ t: 'opts', opts: n })) },
   onProfile: (p) => { game.color = p.color; },
   onStart: (m) => start(m),

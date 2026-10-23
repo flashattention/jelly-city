@@ -2,6 +2,8 @@
 //   게임은 new Shell({...}) 로 화면을 만들고, 출발(start) · 위치(snap) 같은 메시지만 직접 처리한다
 import { account, store } from './account.js';
 import { DEFAULT_CHAR_KEY, charLook } from './char-studio.js';
+import { localChars, LOCAL_MAX } from './local-chars.js';
+import { Chat } from './chat.js';
 
 const $ = (id) => document.getElementById(id);
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -31,6 +33,13 @@ export class Shell {
     this.room = null; this.members = []; this.myId = 0; this.multi = false;
     this.net = { ws: null, open: false, handlers: {}, pendingJoin: null };
     this.mount();
+    // 방 채팅 (대기실부터 게임 중까지 · 팀전이면 팀에게만도)
+    this.chat = new Chat({
+      send: (m) => this.send(m), myId: () => this.myId,
+      teamMode: () => (o.teamChat ? o.teamChat(this.room?.opts || {}) : !!this.room?.opts?.team),
+      myTeam: () => this.members.find((m) => m.id === this.myId)?.team, teamColor: (t) => TEAMS[t]?.color,
+      onOpen: () => document.exitPointerLock?.(), onMessage: (m) => o.onChat?.(m),
+    });
     this.wire();
   }
   logged() { return !!account.session && !!account.user; }
@@ -49,7 +58,7 @@ export class Shell {
         <div id="g-btn"></div>
         <button id="guest-btn" class="btn ghost">🎮 체험판으로 시작 <small>구글 로그인 없이</small></button>
         <div id="dev-box" class="hidden"><input id="dev-name" placeholder="개발용 이름" /><button id="dev-btn" class="btn">입장</button></div>
-        <div class="note">로그인하면 내 캐릭터로 하고 방을 만들 수 있어요.<br />로그인 없이도 혼자 하기 · 초대 코드로 같이 하기가 돼요</div>
+        <div class="note">로그인하면 캐릭터 · 기록이 계정에 남아요.<br />로그인 없이도 캐릭터 꾸미기 · 방 만들기 · 같이 하기가 다 돼요</div>
       </div>
       <div id="who-row" class="who hidden"><span>안녕, <b id="me-name"></b></span><button id="nick-edit" class="mini" title="닉네임 바꾸기">✏️</button><button id="logout" class="mini">로그아웃</button></div>
       <div id="acct-nick" class="hidden"><div class="note" id="acct-nick-hint"></div><div class="row"><input id="acct-nick-in" maxlength="12" placeholder="닉네임 (2~12글자)" /><button id="acct-nick-save" class="btn alt">저장</button></div></div>
@@ -137,10 +146,11 @@ export class Shell {
       this.renderRooms(m.rooms);
     });
     this.on('rooms', (m) => { if (!this.room) this.renderRooms(m.rooms); });
-    this.on('error', (m) => { this.toast(m.text || '문제가 생겼어요', 2600); if (!this.room && !this.logged() && !this.playing) { this.multi = false; this.show('title'); } });
-    this.on('joined', (m) => { this.room = m.room; this.members = m.members; $('room-rank').classList.add('hidden'); this.show('room'); this.renderRoom(); });
-    this.on('room', (m) => { this.room = m.room; this.members = m.members; if (!this.playing && !$('room').classList.contains('hidden')) this.renderRoom(); });
-    this.on('left', () => { const was = this.room; this.room = null; if (!this.multi || !was) return; this.afterLeave(); });
+    this.on('error', (m) => { this.toast(m.text || '문제가 생겼어요', 2600); if (!this.room && !this.playing && $('lobby').classList.contains('hidden')) { this.multi = false; this.show('title'); } });
+    this.on('chat', (m) => this.chat.receive(m));
+    this.on('joined', (m) => { this.chat.reset(m.chat || []); this.chat.show(!m.practice); this.room = m.room; this.members = m.members; $('room-rank').classList.add('hidden'); this.show('room'); this.renderRoom(); });
+    this.on('room', (m) => { this.room = m.room; this.members = m.members; this.chat.renderScope(); if (!this.playing && !$('room').classList.contains('hidden')) this.renderRoom(); });
+    this.on('left', () => { this.chat.show(false); const was = this.room; this.room = null; if (!this.multi || !was) return; this.afterLeave(); });
     this.on('start', (m) => { this.members = m.members; this.playing = true; o.onStart?.(m, this); });
     this.on('finish', (m) => { this.playing = false; o.onFinish?.(m, this); });
   }
@@ -151,11 +161,10 @@ export class Shell {
     const ws = this.net.ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${this.o.wsPath}`);
     ws.onopen = () => { this.net.open = true; this.hello(); };
     ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch { return; } this.net.handlers[m.t]?.(m); };
-    ws.onclose = () => { this.net.open = false; if (this.multi) { this.toast('🔧 서버 업데이트 중... 20초 안에 복구돼요. 잠시 뒤 다시 들어와 주세요', 5000); this.o.onDisconnect?.(this); } };
+    ws.onclose = () => { this.net.open = false; this.chat.show(false); if (this.multi) { this.toast('🔧 서버 업데이트 중... 20초 안에 복구돼요. 잠시 뒤 다시 들어와 주세요', 5000); this.o.onDisconnect?.(this); } };
   }
   hello() { const p = this.profile; this.send({ t: 'hello', session: this.logged() ? account.session : null, name: p.name, color: p.color, look: p.look, acc: p.acc }); }
   openLobby() {
-    if (!this.logged()) { this.err('방 만들기 · 빠른 참가는 로그인이 필요해요. 초대 코드로는 바로 참가할 수 있어요'); return; }
     this.multi = true; this.net.pendingJoin = null;
     this.show('lobby'); $('rooms').innerHTML = '<div class="empty">방 목록을 불러오는 중…</div>';
     if (this.net.open) this.hello(); else this.connect();
@@ -169,7 +178,7 @@ export class Shell {
   }
   // 접속하자마자 보낼 것 (연습전 시작 등)
   sendAfterHello(m) { this.multi = true; this.net.pendingSend = m; if (this.net.open) this.hello(); else this.connect(); }
-  afterLeave() { if (this.logged()) { this.show('lobby'); this.send({ t: 'list' }); } else { this.multi = false; this.show('title'); } }
+  afterLeave() { this.show('lobby'); this.send({ t: 'list' }); }
   backToRoom() { this.playing = false; this.show('room'); this.renderRoom(); }
   // ---------- 계정 · 캐릭터 ----------
   async boot() {
@@ -190,8 +199,7 @@ export class Shell {
     const on = this.logged(), s = this.status || {};
     $('login-box').classList.toggle('hidden', on);
     $('who-row').classList.toggle('hidden', !on);
-    $('chars-label').classList.toggle('hidden', !on);
-    $('multi-btn').classList.toggle('hidden', !on);
+    $('chars-label').classList.remove('hidden'); $('multi-btn').classList.remove('hidden'); // 로그인 안 해도 캐릭터 · 같이 하기
     if (!on) {
       if (s.googleClientId) account.googleButton($('g-btn'), s.googleClientId, () => this.renderAccount(), (e) => this.err(e.message)).catch(() => this.err('구글 로그인 버튼을 불러오지 못했어요'));
       $('dev-box').classList.toggle('hidden', !s.devLogin);
@@ -200,7 +208,7 @@ export class Shell {
     } else $('me-name').textContent = account.user.name;
     $('acct-nick').classList.toggle('hidden', !(on && account.user.needNick) && !this.editNick);
     $('acct-nick-hint').textContent = on && account.user.needNick ? '구글 이름 대신 쓸 닉네임을 정해 주세요 (모든 게임에서 써요)' : '새 닉네임';
-    const chars = on ? account.chars || [] : [];
+    const chars = on ? account.chars || [] : localChars(); // 로그인 안 했으면 이 기기에 만든 캐릭터
     let sel = store.get(this.KEY.char) || store.get(DEFAULT_CHAR_KEY) || chars[0]?.token || 'default';
     if (sel !== 'default' && !chars.some((c) => c.token === sel)) sel = chars[0]?.token || 'default';
     this.sel = sel;
@@ -212,12 +220,10 @@ export class Shell {
       b.onclick = () => { store.set(this.KEY.char, token); this.renderAccount(); };
       box.appendChild(b);
     };
-    if (on) {
-      for (const c of chars) chip(c.token, c.name, c.profile?.color || '#8a5634');
-      chip('default', '🐻 기본 곰돌이', '#8a5634');
-      if (chars.length < 4) { const a = document.createElement('a'); a.className = 'chip'; a.href = `/?create=1&back=${location.pathname}`; a.textContent = '＋ 새 캐릭터'; box.appendChild(a); }
-    }
-    $('nick-row').classList.toggle('hidden', on);
+    for (const c of chars) chip(c.token, c.name, c.profile?.color || '#8a5634');
+    chip('default', '🐻 기본 곰돌이', '#8a5634');
+    if (chars.length < (on ? 4 : LOCAL_MAX)) { const a = document.createElement('a'); a.className = 'chip'; a.href = `/?create=1&back=${location.pathname}`; a.textContent = '＋ 새 캐릭터'; box.appendChild(a); }
+    $('nick-row').classList.toggle('hidden', on || sel !== 'default'); // 비로그인 + 기본 곰돌이일 때만 이름을 따로 정한다
     if (!$('nick').value) {
       let nick = store.get(this.KEY.nick);
       if (!nick) { nick = `곰돌이 ${1000 + Math.floor(Math.random() * 9000)}`; store.set(this.KEY.nick, nick); }
@@ -228,7 +234,7 @@ export class Shell {
   }
   updateProfile() {
     const on = this.logged();
-    const c = on ? (account.chars || []).find((x) => x.token === this.sel) : null;
+    const c = (on ? account.chars || [] : localChars()).find((x) => x.token === this.sel) || null;
     this.profile = c ? { ...charLook(c), name: c.name } : { name: (on && account.user.nick) || $('nick').value.trim() || '곰돌이', color: '#8a5634' };
     this.o.onProfile?.(this.profile, this);
   }

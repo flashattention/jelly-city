@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>젤리 사과게임</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/css/shell.css" />
+  <link rel="stylesheet" href="../shared/css/party.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <div class="bubbles" aria-hidden="true"></div>
+  <!-- 게임 중 -->
+  <div id="game" class="hidden">
+    <div id="side-l">
+      <div id="score-box" class="panel"><div class="lbl">점수</div><b id="score">0</b><div id="best" class="lbl"></div></div>
+      <div id="sum-box" class="panel"><div class="lbl">고른 합</div><b id="sum">0</b></div>
+      <button id="restart-btn" class="btn ghost hidden">🔄 다시</button>
+    </div>
+    <div id="board-wrap"><canvas id="board"></canvas><div id="timebar"><i></i></div></div>
+    <div id="side-r" class="panel hidden"><div class="ptitle">🍬 실시간 순위</div><div id="live"></div></div>
+    <div class="hud-r"><button id="b-mute" title="소리 (M)">🔊</button><button id="b-quit" title="그만하기">✕</button></div>
+  </div>
+  <div id="count" class="overlay hidden"><div class="count-big" id="count-n">3</div></div>
+  <!-- 결과 -->
+  <div id="over" class="screen hidden"><div class="card wide">
+    <h2 id="ov-title">⏰ 끝!</h2>
+    <div id="ov-me" class="sub"></div>
+    <div id="ov-save" class="hidden"><div class="note">로그인하지 않았어요. 순위표에 남길 닉네임을 정해 주세요</div><div class="row"><input id="ov-nick" maxlength="14" placeholder="닉네임" /><button id="ov-save-btn" class="btn alt">기록 남기기</button></div></div>
+    <div id="ov-rank" class="res-list"></div>
+    <div class="row2"><button id="again-btn" class="btn big">🔁 한 판 더</button><button id="home-btn" class="btn ghost">처음으로</button></div>
+  </div></div>
+  <!-- 순위표 -->
+  <div id="board-screen" class="screen hidden"><div class="card wide">
+    <h2>🏆 사과게임 순위표</h2>
+    <div class="seg" id="bd-seg"></div>
+    <div id="bd-list" class="board" style="margin-top:14px"></div>
+    <div class="row2"><button id="bd-back" class="btn ghost">← 돌아가기</button></div>
+  </div></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
