@@ -1,8 +1,11 @@
-// 젤리 사과게임: 숫자 곰젤리를 네모로 묶어 합이 10이 되면 팡! (혼자 · 봇과 대결 · 같이 최대 12명이 같은 판으로)
+// 젤리 사과게임: 숫자 곰젤리를 네모로 묶어 합이 10이 되면 팡! (혼자 · 봇과 대결 · 같이 최대 12명)
+//   같이 하기는 '각자 판' (같은 판을 따로따로 겨루기) 과 '한 판 같이' (판 하나를 다 같이 · 먼저 묶으면 임자 · 내 색으로 물든다)
 import { account, store } from '../../shared/js/account.js';
 import { Shell, esc } from '../../shared/js/shell.js';
 import { faceHtml, makeSound, confetti, rankIcon } from '../../shared/js/party.js';
 import { COLS, ROWS, TIMES, makeBoard, sumRect, tryMove } from './board.js';
+
+const MODES = [['race', '🍎 각자 판', '같은 판을 따로따로'], ['shared', '🍏 한 판 같이', '판 하나를 다 같이 · 먼저 묶으면 임자']];
 
 const $ = (id) => document.getElementById(id);
 const S = makeSound('jellyapple');
@@ -10,7 +13,8 @@ const PICK_KEY = 'jellyapple.pick', ANON_KEY = 'dreamrunner.anon';
 const pick0 = (() => { try { return JSON.parse(store.get(PICK_KEY) || '{}'); } catch { return {}; } })();
 const game = window.apple = {
   mode: 'title', kind: 'solo', board: null, score: 0, time: 120, startAt: 0, endAt: 0, players: new Map(), myId: 0,
-  pick: { time: TIMES.includes(pick0.time) ? pick0.time : 120, bots: pick0.bots ?? 2 },
+  pick: { time: TIMES.includes(pick0.time) ? pick0.time : 120, bots: pick0.bots ?? 2, mode: pick0.mode === 'shared' ? 'shared' : 'race' },
+  shared: false, own: null, drags: new Map(),
 };
 
 // 배경 거품
@@ -97,6 +101,16 @@ function draw(t) {
   for (const sp of fx.splats) { g.globalAlpha = Math.max(0, sp.life) * 0.32; g.fillStyle = sp.c; g.beginPath(); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, rr = sp.r * (0.75 + ((i * 37) % 10) / 25); g.lineTo(sp.x + Math.cos(a) * rr, sp.y + Math.sin(a) * rr); } g.closePath(); g.fill(); }
   g.globalAlpha = 1;
   const B = game.board;
+  // 한 판 같이: 내가 · 친구가 터뜨린 칸은 그 사람 색으로 물든다
+  if (game.shared && game.own) {
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+      const id = game.own[y * COLS + x]; if (!id) continue;
+      const p = game.players.get(id); if (!p) continue;
+      g.fillStyle = p.color || '#ccc'; g.globalAlpha = id === game.myId ? 0.42 : 0.28;
+      g.beginPath(); g.roundRect(cx(x) - cell * 0.47, cy(y) - cell * 0.47, cell * 0.94, cell * 0.94, cell * 0.24); g.fill();
+    }
+    g.globalAlpha = 1;
+  }
   if (B) {
     const s = sprites[0]?.width / dpr || cell;
     for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
@@ -108,6 +122,17 @@ function draw(t) {
       g.drawImage(sprites[v - 1], cx(x) - w / 2, cy(y) + s / 2 - h - (on ? 3 : 0), w, h); // 바닥에 붙어서 출렁
       if (on) g.restore();
     }
+  }
+  // 친구들이 지금 드래그하는 네모 (그 사람 색 · 이름표)
+  if (game.shared) for (const [id, d] of game.drags) {
+    const p = game.players.get(id); if (!p || !d.r || t - d.at > 1500) continue;
+    const [x0, y0, x1, y1] = d.r, X = cx(x0) - cell / 2, Y = cy(y0) - cell / 2, w = (x1 - x0 + 1) * cell, h = (y1 - y0 + 1) * cell;
+    g.strokeStyle = p.color || '#999'; g.lineWidth = 2.5; g.setLineDash([6, 5]); g.globalAlpha = 0.85;
+    g.beginPath(); g.roundRect(X, Y, w, h, 10); g.stroke(); g.setLineDash([]);
+    g.font = `${Math.max(11, cell * 0.36)}px Jua`; g.textAlign = 'left'; g.textBaseline = 'bottom';
+    const label = `${p.bot ? '🤖' : ''}${p.name}`, tw = g.measureText(label).width + 10;
+    g.fillStyle = p.color || '#999'; g.beginPath(); g.roundRect(X, Y - cell * 0.44, tw, cell * 0.42, 6); g.fill();
+    g.fillStyle = '#fff'; g.fillText(label, X + 5, Y - 2); g.globalAlpha = 1;
   }
   // 고르는 네모
   if (sel) {
@@ -153,10 +178,13 @@ function updateSel() {
   if (selSum !== prev) { S.sfx(selSum === 10 ? 'ten' : 'tick', Math.min(10, selSum)); }
 }
 cv.addEventListener('pointerdown', (e) => { if (!canPlay()) return; S.unlock(); cv.setPointerCapture(e.pointerId); const p = local(e); sel = { x0: p.x, y0: p.y, x1: p.x, y1: p.y }; updateSel(); });
-cv.addEventListener('pointermove', (e) => { if (!sel) return; const p = local(e); sel.x1 = p.x; sel.y1 = p.y; updateSel(); });
+let drSent = 0, drLast = '';
+function sendDrag(rc) { if (!game.shared) return; const k = rc ? rc.join() : ''; const now = performance.now(); if (k === drLast || (rc && now - drSent < 100)) return; drLast = k; drSent = now; shell.send({ t: 'dr', r: rc }); }
+cv.addEventListener('pointermove', (e) => { if (!sel) return; const p = local(e); sel.x1 = p.x; sel.y1 = p.y; updateSel(); sendDrag(selRc); });
 const release = () => {
   if (!sel) return;
-  const rc = selRc; sel = null; selRc = null;
+  const rc = selRc; sel = null; selRc = null; sendDrag(null);
+  if (rc && canPlay() && game.shared && sumRect(game.board, rc).s === 10) { shell.send({ t: 'mv', r: rc }); selSum = 0; return; } // 한 판 같이: 서버가 먼저 온 사람에게 준다 ('clr')
   if (rc && canPlay() && sumRect(game.board, rc).s === 10) {
     const cells = [];
     for (let y = rc[1]; y <= rc[3]; y++) for (let x = rc[0]; x <= rc[2]; x++) { const v = game.board[y * COLS + x]; if (v) cells.push([x, y, v]); }
@@ -203,6 +231,7 @@ function countdown(ms) {
 }
 function begin(kind, seed, time, ms) {
   game.kind = kind; game.mode = 'play'; game.time = time; game.score = 0; game.board = makeBoard(seed);
+  game.own = game.shared ? new Array(COLS * ROWS).fill(0) : null; game.drags.clear();
   game.startAt = performance.now() + ms; game.endAt = game.startAt + time * 1000;
   fx.flyers = []; fx.parts = []; fx.texts = []; fx.splats = []; sel = null; selRc = null; selSum = 0;
   shell.hideScreens(); $('game').classList.remove('hidden');
@@ -212,14 +241,16 @@ function begin(kind, seed, time, ms) {
   $('best').textContent = kind === 'solo' && game.bestOf?.[time] ? `내 최고 ${game.bestOf[time]}` : '';
   layout(); countdown(ms); S.sfx('start'); S.music('apple');
 }
-function startSolo() { S.unlock(); begin('solo', (Math.random() * 2 ** 31) | 0, game.pick.time, 3000); }
-function practice() { S.unlock(); shell.sendAfterHello({ t: 'practice', opts: { time: game.pick.time, bots: Math.max(1, game.pick.bots) } }); }
+function startSolo() { S.unlock(); game.shared = false; begin('solo', (Math.random() * 2 ** 31) | 0, game.pick.time, 3000); }
+function practice() { S.unlock(); shell.sendAfterHello({ t: 'practice', opts: { time: game.pick.time, bots: Math.max(1, game.pick.bots), mode: game.pick.mode } }); }
 function startMulti(m) {
   game.myId = shell.myId; game.players.clear();
   for (const mem of m.members) game.players.set(mem.id, { ...mem, score: 0 });
+  game.shared = m.opts?.mode === 'shared';
   begin('multi', m.seed, m.time || m.opts?.time || 120, m.in);
   game.endAt = performance.now() + (m.endAt ?? (m.in + game.time * 1000));
   renderLive();
+  if (game.shared) setTimeout(() => shell.toast('🍏 한 판 같이! 먼저 묶는 사람이 임자예요 · 내가 터뜨린 칸은 내 색으로 물들어요', 3200), m.in);
 }
 function timeUp() {
   game.mode = 'wait'; sel = null; S.stopMusic();
@@ -240,7 +271,7 @@ const shell = new Shell({
   buttons: [{ id: 'solo-btn', label: '🍎 혼자 하기 <small>최고 점수 도전</small>', onClick: () => startSolo() }, { id: 'bot-btn', label: '🤖 봇과 대결 <small>젤리봇과 같은 판</small>', cls: 'ghost', onClick: () => practice() }],
   extraRow: [{ label: '🏆 순위표', onClick: () => openBoard(game.pick.time) }],
   screens: ['over', 'board-screen'],
-  describe: (o = {}) => `⏱️ ${o.time || 120}초 · 🤖 봇 ${o.bots || 0}`,
+  describe: (o = {}) => `${o.mode === 'shared' ? '🍏 한 판 같이' : '🍎 각자 판'} · ⏱️ ${o.time || 120}초 · 🤖 봇 ${o.bots || 0}`,
   options: {
     room: (el, o, host) => optsUI(el, o, host, (n) => shell.send({ t: 'opts', opts: n }), true),
   },
@@ -249,14 +280,33 @@ const shell = new Shell({
   onAccount: () => loadBest(),
   onDisconnect: () => { if (game.mode !== 'title' && game.kind !== 'solo') { toTitle(); } },
 });
-shell.pickOpts = () => ({ time: game.pick.time, bots: game.pick.bots });
+shell.pickOpts = () => ({ time: game.pick.time, bots: game.pick.bots, mode: game.pick.mode });
 shell.on('sc', (m) => { const p = game.players.get(m.id); if (!p || m.id === game.myId) return; p.score = m.s; renderLive(m.id); });
-shell.on('bad', () => { /* 서버와 판이 어긋났을 때: 점수는 서버 기준 */ });
+shell.on('bad', (m) => {
+  // 한 판 같이: 친구가 먼저 가져갔다 → 서버 판으로 맞춘다
+  if (game.shared && Array.isArray(m.b) && m.b.length === COLS * ROWS) { game.board = m.b.slice(); if (Array.isArray(m.own)) game.own = m.own.slice(); S.sfx('bad'); shell.toast('😮 앗, 친구가 먼저 가져갔어요!', 900); }
+});
+shell.on('clr', (m) => {
+  if (!game.shared || !Array.isArray(m.r)) return;
+  const rc = m.r, cells = [];
+  for (let y = rc[1]; y <= rc[3]; y++) for (let x = rc[0]; x <= rc[2]; x++) { const i = y * COLS + x, v = game.board[i]; if (v) { cells.push([x, y, v]); game.own[i] = m.id; } }
+  game.board = game.board.slice(); for (const [x, y] of cells) game.board[y * COLS + x] = 0;
+  if (cells.length) popFx(rc, cells);
+  game.drags.delete(m.id);
+  const p = game.players.get(m.id); if (p) p.score = m.s;
+  if (m.id === game.myId) { game.score = m.s; S.sfx('pop', m.n); const el = $('score'); el.textContent = game.score; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+  else S.sfx('tick', 3);
+  if (selRc) updateSel();
+  renderLive(m.id);
+});
+shell.on('dr', (m) => { if (game.shared) game.drags.set(m.id, { r: m.r, at: performance.now() }); });
+shell.on('cleared', () => { if (game.mode === 'play') { game.mode = 'wait'; sel = null; S.stopMusic(); confetti(); shell.toast('🎉 판을 다 비웠어요! 결과를 모으는 중…', 1800); } });
 shell.on('gone', (m) => { game.players.delete(m.id); renderLive(); });
 function optsUI(el, o, editable, set, bots) {
-  el.innerHTML = `<div class="seg time-seg">${TIMES.map((t) => `<button data-t="${t}" class="${t === o.time ? 'on' : ''}" ${editable ? '' : 'disabled'}>⏱️ ${t === 60 ? '1분' : t === 120 ? '2분' : '3분'}</button>`).join('')}</div>
+  el.innerHTML = `<div class="seg mode-seg">${MODES.map(([k, l, d]) => `<button data-mode="${k}" class="${(o.mode || 'race') === k ? 'on' : ''}" ${editable ? '' : 'disabled'} title="${d}">${l}<small>${d}</small></button>`).join('')}</div><div class="seg time-seg">${TIMES.map((t) => `<button data-t="${t}" class="${t === o.time ? 'on' : ''}" ${editable ? '' : 'disabled'}>⏱️ ${t === 60 ? '1분' : t === 120 ? '2분' : '3분'}</button>`).join('')}</div>
     ${bots ? `<div class="opt-row">🤖 젤리봇 ${editable ? '<button class="pm" data-b="-1">−</button>' : ''}<b>${o.bots || 0}</b>${editable ? '<button class="pm" data-b="1">＋</button>' : ''}</div>` : ''}`;
   el.querySelectorAll('[data-t]').forEach((b) => { b.onclick = () => set({ time: +b.dataset.t }); });
+  el.querySelectorAll('[data-mode]').forEach((b) => { b.onclick = () => set({ mode: b.dataset.mode }); });
   el.querySelectorAll('[data-b]').forEach((b) => { b.onclick = () => set({ bots: Math.max(0, Math.min(5, (o.bots || 0) + +b.dataset.b)) }); });
 }
 function renderTitleOpts() { optsUI($('title-opts'), game.pick, true, (n) => { Object.assign(game.pick, n); store.set(PICK_KEY, JSON.stringify(game.pick)); renderTitleOpts(); }, true); }
@@ -266,7 +316,7 @@ function rowHtml(e, extra = '') { return `<div class="res-row${e.id === game.myI
 function results(m) {
   game.mode = 'over'; S.stopMusic(); $('game').classList.add('hidden');
   const mine = m.rank.find((e) => e.id === game.myId);
-  $('ov-title').textContent = m.rank[0] ? `🏆 ${m.rank[0].name} 우승!` : '끝!';
+  $('ov-title').textContent = m.rank[0] ? `${game.shared ? '🍏 땅따먹기 ' : ''}🏆 ${m.rank[0].name} 우승!` : '끝!';
   $('ov-me').textContent = mine ? `나는 ${mine.rank}등 · 곰젤리 ${mine.score}개` : '';
   $('ov-rank').innerHTML = m.rank.map((e) => rowHtml(e)).join('');
   $('ov-save').classList.add('hidden');

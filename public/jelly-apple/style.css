@@ -38,3 +38,7 @@
 
 /* 오른쪽 위 단추가 판을 가리지 않게 왼쪽 위로 */
 #game .hud-r { left: 14px; right: auto; }
+/* 같이 하기 방식: 각자 판 · 한 판 같이 */
+.seg.mode-seg { display: flex; width: fit-content; border-radius: 18px; }
+.seg.mode-seg button { border-radius: 14px; line-height: 1.15; }
+.seg.mode-seg button small { display: block; font-family: 'Gowun Dodum', sans-serif; font-size: 11px; opacity: .75; }
