@@ -84,9 +84,9 @@ export class Creator {
         <div class="opt-row"><div class="opt-label">성격 (젤리시티 이웃들과 대화할 때)</div><select id="c-pers">${PERSONALITIES.map((p) => `<option ${p.name === d.personality ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>`;
     } else if (this.tab === 'body') {
       html = `<div class="opt-row"><div class="opt-label">${Roach.style === 'roach' ? '피부색' : '젤리 색'}</div><div class="chips">${bodyColors().map((c) => `<span class="swatch ${d.color === c ? 'sel' : ''}" data-skin="${c}" style="background:${c}"></span>`).join('')}</div></div>`
-        + colors('belly', LOOK_COLORS.belly) + chips('wings', LOOK_PARTS.wings);
+        + colors('belly', LOOK_COLORS.belly) + chips('wings', LOOK_PARTS.wings) + chips('tail', LOOK_PARTS.tail);
     } else if (this.tab === 'face') {
-      html = chips('eyes', LOOK_PARTS.eyes) + colors('pupil', LOOK_COLORS.pupil) + chips('nose', LOOK_PARTS.nose) + chips('mouth', LOOK_PARTS.mouth) + colors('cheek', LOOK_COLORS.cheek);
+      html = chips('eyes', LOOK_PARTS.eyes) + colors('pupil', LOOK_COLORS.pupil) + (Roach.style === 'roach' ? '' : chips('ears', LOOK_PARTS.ears)) + chips('nose', LOOK_PARTS.nose) + chips('mouth', LOOK_PARTS.mouth) + colors('cheek', LOOK_COLORS.cheek);
     } else if (this.tab === 'antenna') {
       html = chips('antenna', LOOK_PARTS.antenna);
     } else {

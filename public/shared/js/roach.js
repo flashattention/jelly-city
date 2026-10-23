@@ -163,6 +163,7 @@ export class Roach {
     this.wings = [];
     this.wingStyle = look.wings | 0;
     this.buildWings(this.wingStyle, color, wingM);
+    this.buildTail(look.tail | 0, bodyM, color);
 
     // 팔 (4개)
     this.arms = [];
@@ -205,7 +206,7 @@ export class Roach {
     this.buildFace(look, color, darkM, white, black);
     if (gummy) {
       // 둥근 귀 + 주둥이 + 코, 더듬이는 숨긴다
-      for (const s of [-1, 1]) { mesh(rsph(), bodyM, this.head, s * 0.34, 0.34, -0.03, 0.17, 0.17, 0.11); mesh(rsph(), bellyM, this.head, s * 0.34, 0.33, 0.04, 0.09, 0.09, 0.05); }
+      this.buildEars(look.ears | 0, bodyM, bellyM);
       mesh(rsph(), bellyM, this.head, 0, -0.14, 0.38, 0.22, 0.16, 0.13);
       if (!(look.nose | 0)) mesh(rsph(), toon(shade(color, 0.45)), this.head, 0, -0.07, 0.5, 0.065, 0.048, 0.04); // 고른 코가 있으면 그 코를 주둥이에
       mesh(rsph(), jelly('#ffffff', 0.6), this.head, -0.2, 0.22, 0.36, 0.06, 0.1, 0.03);
@@ -270,6 +271,16 @@ export class Roach {
         const m = toon('#4a2c5e');
         const a = mesh(rsph(), m, w, s * 0.36, 0.18, -0.05, 0.48, 0.3, 0.03); a.rotation.z = s * -0.25;
         for (let i = 0; i < 3; i++) mesh(rsph(), toon('#3a2048'), w, s * (0.12 + i * 0.22), -0.08, -0.05, 0.1, 0.12, 0.035);
+      } else if (style === 8) { // 잠자리: 길쭉한 투명 날개 두 쌍
+        for (const [y, r] of [[0.12, -0.25], [-0.12, 0.25]]) { const a = mesh(rsph(), glassy('#e0f7fa', 0.5), w, s * 0.42, y, -0.04, 0.5, 0.11, 0.025); a.rotation.z = s * r; mesh(G.box(), toon('#80deea'), a, 0, 0, 0, 0.9, 0.08, 1.2); }
+      } else if (style === 9) { // 용: 뼈대 + 막 + 끝에 가시
+        const m = toon('#43a047');
+        const a = mesh(rsph(), toon('#81c784'), w, s * 0.38, 0.12, -0.05, 0.46, 0.34, 0.03); a.rotation.z = s * -0.3;
+        for (let i = 0; i < 3; i++) { const b = mesh(G.cyl(), m, w, s * (0.18 + i * 0.16), 0.32 - i * 0.18, -0.07, 0.02, 0.3, 0.02); b.rotation.z = s * (1.2 - i * 0.45); const sp = mesh(G.cone(), toon('#fff59d'), w, s * (0.3 + i * 0.22), 0.44 - i * 0.26, -0.07, 0.03, 0.08, 0.03); sp.rotation.z = s * -1; }
+      } else if (style === 10) { // 구름: 몽실몽실 흰 구름
+        for (let i = 0; i < 5; i++) mesh(G.sphereLow(), toon(i % 2 ? '#ffffff' : '#eef6ff'), w, s * (0.12 + (i % 3) * 0.16), 0.22 - Math.floor(i / 2) * 0.17, -0.06 - (i % 2) * 0.03, 0.17, 0.15, 0.1);
+      } else if (style === 11) { // 불꽃: 위로 넘실대는 불꽃 깃
+        ['#ff5722', '#ff9800', '#ffeb3b'].forEach((c, i) => { for (let k = 0; k < 3; k++) { const f = mesh(G.cone(), new THREE.MeshToonMaterial({ color: c, emissive: c, emissiveIntensity: 0.45, transparent: true, opacity: 0.9 }), w, s * (0.12 + k * 0.15), 0.08 + k * 0.08 - i * 0.04, -0.05 - i * 0.02, 0.09 - i * 0.02, 0.45 - k * 0.07 - i * 0.08, 0.05); f.rotation.z = s * (-0.5 - k * 0.25); } });
       } else if (style === 6) { // 무지개
         ['#ff8a80', '#ffd180', '#ffff8d', '#b9f6ca', '#80d8ff', '#b388ff'].forEach((c, i) => {
           mesh(rsph(), toon(c), w, s * 0.05, 0.05 - i * 0.04, -0.02 - i * 0.012, 0.32 - i * 0.035, 0.62 - i * 0.07, 0.06);
@@ -287,9 +298,34 @@ export class Roach {
     void gm;
   }
 
+  // 젤리 곰돌이 귀: 0 둥근, 1 토끼, 2 고양이, 3 꼬마, 4 늘어진 강아지, 5 하트, 6 왕 큰 귀, 7 유니콘 뿔
+  buildEars(style, bodyM, bellyM) {
+    const H = this.head;
+    for (const s of [-1, 1]) {
+      if (style === 1) { const e = mesh(rsph(), bodyM, H, s * 0.2, 0.62, -0.04, 0.1, 0.32, 0.08); e.rotation.z = s * -0.18; mesh(rsph(), bellyM, e, 0, 0, 0.5, 0.55, 0.8, 0.4); }
+      else if (style === 2) { const e = mesh(G.cone(), bodyM, H, s * 0.3, 0.46, -0.02, 0.15, 0.24, 0.1); e.rotation.z = s * -0.35; mesh(G.cone(), bellyM, e, 0, -0.05, 0.35, 0.6, 0.6, 0.4); }
+      else if (style === 4) { const e = mesh(rsph(), bodyM, H, s * 0.47, 0.02, -0.02, 0.11, 0.27, 0.09); e.rotation.z = s * 0.25; }
+      else if (style === 5) { const e = mesh(heartGeo(), bodyM, H, s * 0.33, 0.38, -0.02, 0.15, 0.15, 0.25); e.rotation.z = s * -0.3; }
+      else { const k = style === 3 ? 0.6 : style === 6 ? 1.45 : 1; mesh(rsph(), bodyM, H, s * 0.34 * (style === 6 ? 1.06 : 1), 0.34 + (k - 1) * 0.1, -0.03, 0.17 * k, 0.17 * k, 0.11); mesh(rsph(), bellyM, H, s * 0.34 * (style === 6 ? 1.06 : 1), 0.33 + (k - 1) * 0.1, 0.04, 0.09 * k, 0.09 * k, 0.05); }
+    }
+    if (style === 7) { const h = mesh(G.cone(), new THREE.MeshToonMaterial({ color: '#ffe082', emissive: '#ffd54f', emissiveIntensity: 0.25 }), H, 0, 0.6, 0.2, 0.07, 0.3, 0.07); h.rotation.x = 0.35; for (let i = 0; i < 3; i++) mesh(G.cyl(), toon('#ffb74d'), h, 0, -0.25 + i * 0.25, 0, 1.08 - i * 0.25, 0.06, 1.08 - i * 0.25); }
+  }
+  // 꼬리 (등 아래): 0 없음, 1 동글, 2 하트, 3 고양이, 4 여우, 5 번개, 6 악마, 7 별
+  buildTail(style, bodyM, color) {
+    if (!style) return;
+    const t = this.tail = new THREE.Group(); t.position.set(0, 0.72, -0.42); this.torso.add(t);
+    if (style === 1) mesh(rsph(), bodyM, t, 0, 0, -0.04, 0.13, 0.13, 0.13);
+    else if (style === 2) { const h = mesh(heartGeo(), toon('#ff6f91'), t, 0, 0.12, -0.12, 0.13, 0.13, 0.1); h.rotation.y = Math.PI; mesh(G.cyl(), bodyM, t, 0, 0.04, -0.06, 0.03, 0.14, 0.03).rotation.x = 0.6; }
+    else if (style === 3) { for (let i = 0; i < 7; i++) { const a = i / 6; mesh(G.sphereLow(), bodyM, t, Math.sin(a * 2.4) * 0.12, a * 0.62, -0.06 - Math.sin(a * Math.PI) * 0.2, 0.06, 0.06, 0.06); } }
+    else if (style === 4) { const f = mesh(rsph(), toon(shade(color, 1.05)), t, 0, 0.18, -0.24, 0.16, 0.32, 0.16); f.rotation.x = -0.7; mesh(rsph(), toon('#ffffff'), f, 0, 0.75, 0, 0.6, 0.35, 0.6); }
+    else if (style === 5) { const m = new THREE.MeshToonMaterial({ color: '#ffd54f', emissive: '#ffb300', emissiveIntensity: 0.3 }); [[0, 0.06, -0.1, 0.6], [0.06, 0.2, -0.16, -0.6], [0, 0.34, -0.22, 0.6]].forEach(([x, y, z, r]) => { const b = mesh(G.box(), m, t, x, y, z, 0.05, 0.17, 0.05); b.rotation.z = r; }); }
+    else if (style === 6) { const c = mesh(G.cyl(), toon('#c62828'), t, 0, 0.18, -0.16, 0.02, 0.36, 0.02); c.rotation.x = -0.8; mesh(G.cone(), toon('#e53935'), t, 0, 0.32, -0.32, 0.07, 0.12, 0.03).rotation.x = -0.8; }
+    else if (style === 7) { mesh(G.cyl(), bodyM, t, 0, 0.1, -0.1, 0.025, 0.24, 0.025).rotation.x = -0.6; const s = mesh(starGeo(), new THREE.MeshToonMaterial({ color: '#ffd54f', emissive: '#ffca28', emissiveIntensity: 0.35 }), t, 0, 0.24, -0.22, 0.11, 0.11, 0.08); s.rotation.y = Math.PI; }
+  }
+
   buildFace(look, color, darkM, white, black) {
     const H = this.head;
-    // 눈: 0 동글, 1 왕눈 반짝, 2 졸린 눈, 3 웃는 실눈, 4 별 눈, 5 고양이 눈, 6 속눈썹, 7 점 눈
+    // 눈: 0 동글, 1 왕눈 반짝, 2 졸린 눈, 3 웃는 실눈, 4 별 눈, 5 고양이 눈, 6 속눈썹, 7 점 눈, 8 하트, 9 반짝 소녀눈, 10 윙크, 11 빙글빙글, 12 네모 도트
     this.eyes = [];
     this.pupils = [];
     const es = look.eyes | 0;
@@ -298,27 +334,34 @@ export class Roach {
       const eye = new THREE.Group();
       eye.position.set(s * 0.19, 0.05, 0.38);
       H.add(eye);
-      if (es === 3) { // 웃는 실눈 ^^
+      if (es === 3 || (es === 10 && s === 1)) { // 웃는 실눈 ^^ (윙크는 오른쪽만)
         const arc = mesh(smileGeo(), black, eye, 0, -0.02, 0.1, 1.1, 1.1, 1);
         this.pupils.push(arc);
       } else if (es === 7) {
         const p = mesh(rsph(), pm, eye, 0, 0, 0.08, 0.06, 0.07, 0.04);
         this.pupils.push(p);
+      } else if (es === 12) { // 네모 도트 눈
+        const p = mesh(G.box(), pm, eye, 0, 0, 0.08, 0.1, 0.12, 0.04);
+        mesh(G.box(), white, p, -0.22, 0.25, 0.6, 0.3, 0.3, 0.3);
+        this.pupils.push(p);
       } else {
-        const big = es === 1 ? 1.22 : 1;
+        const big = es === 1 ? 1.22 : es === 9 ? 1.32 : 1;
         mesh(rsph(), es === 5 ? toon('#f0f4c3') : white, eye, 0, 0, 0.02, 0.15 * big, 0.18 * big, 0.1);
         let p;
         if (es === 4) { p = mesh(starGeo(), pm, eye, 0, -0.01, 0.11, 0.09, 0.09, 0.05); }
+        else if (es === 8) p = mesh(heartGeo(), toon(this.pupilColor === '#1d1410' ? '#ff4f81' : this.pupilColor), eye, 0, -0.01, 0.11, 0.1, 0.1, 0.05);
+        else if (es === 11) { p = new THREE.Group(); p.position.set(0, -0.01, 0.11); eye.add(p); mesh(ringGeo(), pm, p, 0, 0, 0, 1, 1.1, 1); mesh(ringGeo(), pm, p, 0, 0, 0.005, 0.55, 0.6, 1); mesh(G.sphereLow(), pm, p, 0, 0, 0.01, 0.02, 0.02, 0.01); }
         else if (es === 5) p = mesh(rsph(), pm, eye, 0, -0.01, 0.1, 0.035, 0.13, 0.05);
         else p = mesh(rsph(), pm, eye, 0, -0.01, 0.1, 0.09 * big, 0.11 * big, 0.05);
         this.pupils.push(p);
         mesh(G.sphereLow(), white, eye, s * -0.03, 0.04, 0.145, 0.03 * big, 0.03 * big, 0.02);
-        if (es === 1) mesh(G.sphereLow(), white, eye, s * 0.04, -0.05, 0.145, 0.018, 0.018, 0.015);
+        if (es === 1 || es === 9) mesh(G.sphereLow(), white, eye, s * 0.04, -0.05, 0.145, 0.018, 0.018, 0.015);
+        if (es === 9) mesh(starGeo(), white, eye, s * 0.05, 0.06, 0.15, 0.025, 0.025, 0.01);
         if (es === 2) { // 눈꺼풀
           const lid = mesh(G.hemi(), this.bodyM, eye, 0, 0.0, 0.03, 0.165, 0.2, 0.12);
           lid.rotation.x = -0.25;
         }
-        if (es === 6) for (let i = 0; i < 3; i++) {
+        if (es === 6 || es === 9) for (let i = 0; i < 3; i++) {
           const l = mesh(G.box(), black, eye, s * (0.06 + i * 0.05), 0.17 - i * 0.025, 0.08, 0.02, 0.08, 0.02);
           l.rotation.z = s * (-0.4 - i * 0.35);
         }
@@ -327,7 +370,7 @@ export class Roach {
     }
     // 볼터치
     if (look.cheek !== 'none') for (const s of [-1, 1]) mesh(G.sphereLow(), toon(look.cheek || '#ff9fb2'), H, s * 0.3, -0.11, 0.36, 0.09, 0.055, 0.04);
-    // 코: 0 없음, 1 콩알, 2 딸기, 3 돼지, 4 뾰족, 5 하트
+    // 코: 0 없음, 1 콩알, 2 딸기, 3 돼지, 4 뾰족, 5 하트, 6 별, 7 단추, 8 고양이
     const ns = look.nose | 0;
     let NH = H; if (this.gummy) { NH = new THREE.Group(); NH.position.set(0, -0.025, 0.06); H.add(NH); } // 젤리 곰돌이: 코는 주둥이 끝에
     if (ns === 1) mesh(G.sphereLow(), toon(shade(color, 0.6)), NH, 0, -0.05, 0.47, 0.045, 0.035, 0.03);
@@ -335,6 +378,9 @@ export class Roach {
     else if (ns === 3) { const n = mesh(G.cyl(), toon('#ffab91'), NH, 0, -0.05, 0.47, 0.08, 0.06, 0.06); n.rotation.x = Math.PI / 2; for (const s of [-1, 1]) mesh(G.sphereLow(), toon('#6d4c41'), NH, s * 0.025, -0.05, 0.505, 0.015, 0.022, 0.01); }
     else if (ns === 4) { const n = mesh(G.cone(), toon(shade(color, 0.8)), NH, 0, -0.04, 0.5, 0.05, 0.14, 0.05); n.rotation.x = Math.PI / 2; }
     else if (ns === 5) { const n = mesh(heartGeo(), toon('#ff6f91'), NH, 0, -0.05, 0.47, 0.05, 0.05, 0.06); void n; }
+    else if (ns === 6) mesh(starGeo(), toon('#ffd54f'), NH, 0, -0.05, 0.48, 0.06, 0.06, 0.06);
+    else if (ns === 7) { mesh(G.sphereLow(), toon(shade(color, 0.55)), NH, 0, -0.05, 0.47, 0.06, 0.05, 0.03); for (const s of [-1, 1]) mesh(G.sphereLow(), black, NH, s * 0.018, -0.05, 0.495, 0.01, 0.01, 0.006); }
+    else if (ns === 8) { const n = mesh(G.cone(), toon('#ff8fab'), NH, 0, -0.06, 0.48, 0.045, 0.05, 0.02); n.rotation.z = Math.PI; }
     // 입 (그룹: 감정에 따라 뒤집힌다. 로컬 y는 화면에서 반대)
     const ms = look.mouth | 0;
     this.mouthUpright = null;
@@ -363,8 +409,16 @@ export class Roach {
       half.position.set(0, 0, 0.005); M.add(half);
       mesh(G.sphereLow(), toon('#ff8a80'), M, 0, 0.06, 0.01, 0.045, 0.025, 0.01);
     } else if (ms === 7) mesh(rsph(), toon('#ffa726'), M, 0, 0.02, 0.03, 0.13, 0.05, 0.08);
+    else if (ms === 8) { const h = mesh(heartGeo(), toon('#ff4f81'), M, 0, 0.02, 0.01, 0.05, 0.05, 0.03); h.rotation.z = Math.PI; }
+    else if (ms === 9) { mesh(ringGeo(), black, M, 0, 0.02, 0.01, 0.38, 0.45, 1); mesh(G.sphereLow(), toon('#8e2b2b'), M, 0, 0.02, 0.005, 0.03, 0.038, 0.01); }
+    else if (ms === 10) {
+      const half = new THREE.Mesh(geo('halfdisc', () => new THREE.CircleGeometry(0.1, 16, 0, Math.PI)), toon('#8e2b2b'));
+      half.position.set(0, 0, 0.005); M.add(half);
+      mesh(G.box(), white, M, 0, 0.012, 0.012, 0.15, 0.03, 0.01);
+    }
     else mesh(smileGeo(), black, M, 0, 0, 0);
     if (ms === 3) mesh(G.sphereLow(), toon('#ff6f91'), M, 0.02, 0.1, 0.01, 0.04, 0.05, 0.02);
+    if (ms === 11) mesh(G.sphereLow(), toon('#81d4fa'), M, 0.07, 0.07, 0.01, 0.022, 0.035, 0.015); // 침 한 방울
     if (ms === 5) for (const s of [-1, 1]) { const f = mesh(G.cone(), white, M, s * 0.055, 0.03, 0.01, 0.018, 0.045, 0.018); f.rotation.z = Math.PI; }
     this.mouthO = mesh(G.sphereLow(), black, H, 0, -0.17, 0.45, 0.05, 0.06, 0.03);
     this.mouthO.visible = false;
