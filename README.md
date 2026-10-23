@@ -144,7 +144,7 @@ OPENAI_API_KEY=sk-... GAME_PASSWORD=비밀번호 npm start
 brew install flyctl && fly auth signup
 fly launch --copy-config --no-deploy
 fly volumes create roach_data --size 1 --region nrt
-fly secrets set GOOGLE_CLIENT_ID=....apps.googleusercontent.com OPENAI_API_KEY=sk-... GAME_PASSWORD=동료용비밀번호 ADMIN_EMAILS=나@gmail.com
+fly secrets set GOOGLE_CLIENT_ID=....apps.googleusercontent.com OPENAI_API_KEY=sk-... ADMIN_EMAILS=나@gmail.com
 fly deploy
 
 # 2) GitHub에 배포 권한 주기 (앱 이름이 바뀌면 토큰도 새로 만들어야 해요)
