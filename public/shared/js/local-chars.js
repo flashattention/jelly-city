@@ -16,5 +16,5 @@ export function addLocal(profile, starter = {}) {
   list.push(c); put(list);
   return c;
 }
-export function updateLocal(token, patch) { const list = localChars(); const c = list.find((x) => x.token === token); if (c) { c.profile = { ...c.profile, ...patch }; put(list); } return list; }
+export function updateLocal(token, patch) { const list = localChars(); const c = list.find((x) => x.token === token); if (c) { c.profile = { ...c.profile, ...patch }; if (patch.name) c.name = patch.name; put(list); } return list; }
 export function removeLocal(token) { const list = localChars().filter((x) => x.token !== token); put(list); return list; }

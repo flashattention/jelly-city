@@ -2,7 +2,7 @@
 //   게임은 new Shell({...}) 로 화면을 만들고, 출발(start) · 위치(snap) 같은 메시지만 직접 처리한다
 import { account, store } from './account.js';
 import { DEFAULT_CHAR_KEY, charLook } from './char-studio.js';
-import { localChars, LOCAL_MAX } from './local-chars.js';
+import { localChars, LOCAL_MAX, isLocal, updateLocal } from './local-chars.js';
 import { Chat } from './chat.js';
 
 const $ = (id) => document.getElementById(id);
@@ -218,6 +218,22 @@ export class Shell {
       b.className = 'chip' + (token === sel ? ' on' : '');
       b.innerHTML = `<span class="dot" style="background:${esc(color)}"></span>${esc(name)}`;
       b.onclick = () => { store.set(this.KEY.char, token); this.renderAccount(); };
+      // 고른 캐릭터는 ✏️ 로 이름을 바로 바꾼다 (돈 · 집 · 친구는 그대로)
+      if (token === sel && token !== 'default') {
+        const ed = document.createElement('span'); ed.className = 'chip-ed'; ed.textContent = '✏️'; ed.title = '이름 바꾸기';
+        ed.onclick = async (e) => {
+          e.stopPropagation();
+          const local = isLocal(token), max = local ? 12 : 8, v = prompt(`새 이름 (1~${max}글자)`, name);
+          const n = (v || '').trim().replace(/\s+/g, ' ').slice(0, max);
+          if (!n || n === name) return;
+          try {
+            if (local) updateLocal(token, { name: n });
+            else account.chars = (await account.api(`/api/chars/${token}/name`, { method: 'POST', body: { name: n } })).chars;
+            this.toast(`✏️ 이제 '${n}'(이)에요`); this.renderAccount();
+          } catch (er) { this.toast(er.message, 2200); }
+        };
+        b.appendChild(ed);
+      }
       box.appendChild(b);
     };
     for (const c of chars) chip(c.token, c.name, c.profile?.color || '#8a5634');

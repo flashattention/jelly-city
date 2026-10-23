@@ -86,6 +86,7 @@ function renderChars() {
       <div class="acts">
         ${c.token === main ? '' : `<button class="btn mini" data-main="${c.token}">⭐ 대표로</button>`}
         <button class="btn ghost mini" data-style="${c.token}">🎨 꾸미기</button>
+        <button class="btn ghost mini" data-name="${c.token}" title="이름 바꾸기">✏️</button>
         <button class="btn ghost mini" data-del="${c.token}" title="삭제">🗑️</button>
       </div>
     </div>`).join('') + (chars.length < (on ? MAX_CHARS : LOCAL_MAX) ? '<div class="ch new" id="new-char"><div class="plus">＋</div>새 캐릭터 만들기</div>' : '');
@@ -93,6 +94,19 @@ function renderChars() {
   for (const c of chars) { const img = el.querySelector(`[data-thumb="${c.token}"]`); if (img) img.src = thumbOf(c); }
   el.querySelectorAll('[data-main]').forEach((b) => { b.onclick = () => { store.set(DEFAULT_CHAR_KEY, b.dataset.main); renderChars(); }; });
   el.querySelectorAll('[data-style]').forEach((b) => { b.onclick = () => openStudio(chars.find((c) => c.token === b.dataset.style)); });
+  el.querySelectorAll('[data-name]').forEach((b) => {
+    b.onclick = async () => {
+      const c = chars.find((x) => x.token === b.dataset.name), max = c.local ? 12 : 8;
+      const v = prompt(`'${c.name}' 의 새 이름 (1~${max}글자) · 돈 · 집 · 친구는 그대로예요`, c.name);
+      const n = (v || '').trim().replace(/\s+/g, ' ').slice(0, max);
+      if (!n || n === c.name) return;
+      try {
+        if (c.local) updateLocal(c.token, { name: n });
+        else account.chars = (await account.api(`/api/chars/${c.token}/name`, { method: 'POST', body: { name: n } })).chars;
+        err(''); renderChars();
+      } catch (e) { err(e.message); }
+    };
+  });
   el.querySelectorAll('[data-del]').forEach((b) => {
     b.onclick = async () => {
       const c = chars.find((x) => x.token === b.dataset.del);

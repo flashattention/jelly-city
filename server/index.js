@@ -185,6 +185,10 @@ async function api(req, res, url) {
     const body = await readJson(req);
     try { world.restyleChar(who.sub, url.pathname.split('/')[3], body); return json(res, 200, { chars: world.charList(who.sub) }); } catch (e) { return json(res, 400, { error: e.message }); }
   }
+  if (/^\/api\/chars\/[0-9a-f]+\/name$/.test(url.pathname) && req.method === 'POST') {
+    const body = await readJson(req);
+    try { world.renameChar(who.sub, url.pathname.split('/')[3], body.name); return json(res, 200, { chars: world.charList(who.sub) }); } catch (e) { return json(res, 400, { error: e.message }); }
+  }
   if (url.pathname.startsWith('/api/chars/') && req.method === 'DELETE') {
     try { world.deleteChar(who.sub, url.pathname.slice('/api/chars/'.length)); return json(res, 200, { chars: world.charList(who.sub) }); } catch (e) { return json(res, 400, { error: e.message }); }
   }

@@ -206,6 +206,19 @@ export class World {
     this.dirty = true;
     return this.charSummary(token);
   }
+  // 캐릭터 이름 바꾸기 (언제나): 이름은 꾸밈일 뿐, 돈 · 집 · 팔로우 · DM 은 토큰으로 이어져 그대로
+  renameChar(sub, token, name) {
+    const u = this.users[sub];
+    if (!u || !u.chars.includes(token)) throw new Error('내 캐릭터가 아니에요');
+    const a = this.accounts[token];
+    if (!a) throw new Error('캐릭터가 없어요');
+    const n = typeof name === 'string' ? name.trim().replace(/\s+/g, ' ').slice(0, 8) : '';
+    if (!n) throw new Error('이름을 1~8글자로 지어 주세요');
+    a.name = n; a.profile = { ...a.profile, name: n };
+    for (const p of this.players.values()) if (p.token === token) { p.name = n; if (p.profile) p.profile.name = n; this.send(p, { t: 'sys', text: `✏️ 이제 '${n}'(이)에요 · 다른 사람에게는 다시 접속하면 새 이름으로 보여요` }); }
+    this.dirty = true;
+    return this.charSummary(token);
+  }
   deleteChar(sub, token) {
     const u = this.users[sub];
     if (!u || !u.chars.includes(token)) throw new Error('내 캐릭터가 아니에요');
