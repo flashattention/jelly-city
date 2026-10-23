@@ -35,6 +35,22 @@ export const ENEMIES = {
   lord: { name: '충치 대마왕', hp: 3600, spd: 1.9, dmg: 30, r: 2.9, xp: 0, boss: 2 },
 };
 export const E_KEYS = Object.keys(ENEMIES);
+// 스테이지: 갈수록 충치균이 세지고 · 많아지고 · 센 놈이 일찍 나온다 (들판 색도 바뀐다)
+export const STAGES = [
+  { name: '사탕 들판', emoji: '🍬', g: ['#ffe3f1', '#ffd3ea'], sky: '#ffd9ec' },
+  { name: '민트 초원', emoji: '🌿', g: ['#e3fff1', '#ccf5df'], sky: '#d9fff0' },
+  { name: '레몬 사막', emoji: '🍋', g: ['#fff8d6', '#ffefb0'], sky: '#fff3c4' },
+  { name: '블루베리 호수', emoji: '🫐', g: ['#e3ecff', '#cddcff'], sky: '#dbe6ff' },
+  { name: '초콜릿 숲', emoji: '🍫', g: ['#f0dccb', '#e2c6ad'], sky: '#efd8c4' },
+  { name: '포도 동굴', emoji: '🍇', g: ['#efe1ff', '#ddc6ff'], sky: '#e6d6ff' },
+  { name: '오렌지 화산', emoji: '🍊', g: ['#ffe6d1', '#ffd1ad'], sky: '#ffdcc2' },
+  { name: '솜사탕 구름', emoji: '☁️', g: ['#fbf4ff', '#efe3fb'], sky: '#f6eeff' },
+  { name: '콜라 늪', emoji: '🥤', g: ['#e6d7cf', '#d4beb2'], sky: '#dccbc2' },
+  { name: '얼음 사탕 빙하', emoji: '🧊', g: ['#e6fbff', '#c9f1ff'], sky: '#dff7ff' },
+  { name: '썩은 과자 성', emoji: '🏚️', g: ['#e4dde8', '#d0c6d6'], sky: '#d8d0de' },
+  { name: '충치 대마왕의 입속', emoji: '🦷', g: ['#ffd6d6', '#f5bcbc'], sky: '#f7c9c9' },
+];
+export const ENDLESS_STEP = 180; // 무한 모드: 3분마다 한 단계씩 어려워진다
 export const P_KINDS = ['candy', 'lolli', 'drill', 'bomb', 'spit'];
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -43,8 +59,10 @@ const clampA = (v) => Math.max(-ARENA, Math.min(ARENA, v));
 
 export class Sim {
   // players: [{ id, name, color }] · coop: 같이 하기면 쓰러져도 바로 끝나지 않는다
-  constructor(players, { coop = false, hard = false } = {}) {
+  // stage: 1~12 (스테이지 모드) · endless: 무한 모드 (단계가 시간에 따라 오른다)
+  constructor(players, { coop = false, hard = false, stage = 1, endless = false } = {}) {
     this.t = 0; this.coop = coop; this.hard = hard; this.nid = 1;
+    this.stage = Math.max(1, Math.min(STAGES.length, stage | 0)); this.endless = !!endless; this.lastLv = this.endless ? 1 : this.stage; this.nextBoss = RUN.boss1; this.bossN = 0;
     this.players = new Map(); this.enemies = []; this.projs = []; this.shots = []; this.gems = []; this.items = []; this.puddles = [];
     this.ev = []; this.spawnAcc = 0; this.nextElite = 60; this.rings = [100, 260, 360, 480]; this.boss1 = false; this.boss2 = false;
     this.over = false; this.win = false; this.endT = 0; this.gemAdd = []; this.gemRm = [];
@@ -139,18 +157,24 @@ export class Sim {
     }
   }
   // ---------- 충치균 나오기 ----------
-  scale(n) { return (1 + this.t / 95) * (1 + 0.45 * (n - 1)) * (this.hard ? 1.5 : 1); }
+  // 지금 단계: 스테이지 모드는 고른 스테이지 · 무한 모드는 3분마다 +1
+  lv() { return this.endless ? 1 + Math.floor(this.t / ENDLESS_STEP) : this.stage; }
+  scale(n) { const L = this.lv() - 1; return (1 + this.t / 95) * (1 + 0.45 * (n - 1)) * (this.hard ? 1.5 : 1) * (1 + 0.22 * L); }
   spawnOne(type, around, d0 = 15, d1 = 20, mult = 1) {
     const T = ENEMIES[type], a = Math.random() * Math.PI * 2, d = rnd(d0, d1);
     const n = this.players.size, hp = T.boss ? T.hp * (1 + 0.7 * (n - 1)) * (this.hard ? 1.4 : 1) : T.hp * this.scale(n) * mult;
-    const e = { id: this.nid++, type, x: clampA(around.x + Math.cos(a) * d), z: clampA(around.z + Math.sin(a) * d), hp, maxHp: hp, spd: T.spd * (mult > 1 ? 0.9 : 1) * rnd(0.92, 1.08), dmg: T.dmg * (mult > 1 ? 1.6 : 1) * (this.hard ? 1.3 : 1), r: T.r * (mult > 1 ? 1.55 : 1), elite: mult > 1, atkT: 0, slowT: 0, kx: 0, kz: 0, flash: 0, act: rnd(1, 3), dashT: 0, vx: 0, vz: 0 };
+    const L = this.lv() - 1, bossK = T.boss ? 1 + 0.35 * L : 1;
+    const e = { id: this.nid++, type, x: clampA(around.x + Math.cos(a) * d), z: clampA(around.z + Math.sin(a) * d), hp: hp * bossK, maxHp: hp * bossK, spd: T.spd * (mult > 1 ? 0.9 : 1) * rnd(0.92, 1.08) * (1 + 0.025 * L), dmg: T.dmg * (mult > 1 ? 1.6 : 1) * (this.hard ? 1.3 : 1) * (1 + 0.08 * L), r: T.r * (mult > 1 ? 1.55 : 1), elite: mult > 1, atkT: 0, slowT: 0, kx: 0, kz: 0, flash: 0, act: rnd(1, 3), dashT: 0, vx: 0, vz: 0 };
     this.enemies.push(e);
     return e;
   }
   spawn(dt, n) {
     const A = this.alive(); if (!A.length) return;
-    const t = this.t, cap = (210 + 45 * n) * (this.hard ? 1.2 : 1);
-    const rate = Math.min(16, (1.1 + t / 20) * (1 + 0.55 * (n - 1)) * (this.hard ? 1.35 : 1));
+    const L = this.lv() - 1;
+    // 단계가 오르면 알려 준다 (무한 모드)
+    if (this.lv() > this.lastLv) { this.lastLv = this.lv(); this.ev.push(['lvup', this.lastLv]); }
+    const t = this.t + L * 10, cap = (210 + 45 * n + 12 * L) * (this.hard ? 1.2 : 1); // 단계마다 센 놈이 10초씩 일찍
+    const rate = Math.min(16 + 1.5 * L, (1.1 + this.t / 20) * (1 + 0.55 * (n - 1)) * (this.hard ? 1.35 : 1) * (1 + 0.08 * L));
     this.spawnAcc += rate * dt;
     const pool = ['germ', 'germ', 'germ'];
     if (t > 30) pool.push('bat', 'bat');
@@ -164,11 +188,17 @@ export class Sim {
       this.spawnOne(pool[Math.floor(Math.random() * pool.length)], A[Math.floor(Math.random() * A.length)]);
     }
     // 엘리트 (크고 단단 · 보물 사탕 상자)
-    if (t >= this.nextElite) { this.nextElite += 55; const e = this.spawnOne(t > 200 ? 'choco' : 'germ', A[0], 14, 16, 5); this.ev.push(['elite', e.id]); }
+    if (this.t >= this.nextElite) { this.nextElite += Math.max(25, 55 - L * 3); const e = this.spawnOne(t > 200 ? 'choco' : 'germ', A[0], 14, 16, 5); this.ev.push(['elite', e.id]); }
     // 포위: 사방에서 둘러싼다
-    if (this.rings.length && t >= this.rings[0]) { this.rings.shift(); for (const P of A) for (let i = 0; i < 28; i++) { const e = this.spawnOne(t > 300 ? 'bat' : 'germ', P, 13, 13.5); const a = (i / 28) * Math.PI * 2; e.x = clampA(P.x + Math.cos(a) * 13); e.z = clampA(P.z + Math.sin(a) * 13); } this.ev.push(['warn', '사방에서 몰려와요!']); }
-    if (!this.boss1 && t >= RUN.boss1) { this.boss1 = true; this.spawnOne('king', A[0], 16, 17); this.ev.push(['boss', 1]); }
-    if (!this.boss2 && t >= RUN.boss2) { this.boss2 = true; this.spawnOne('lord', A[0], 17, 18); this.ev.push(['boss', 2]); }
+    if (this.endless && !this.rings.length) this.rings.push(this.t + 150); // 무한: 2분 반마다 포위
+    if (this.rings.length && this.t >= this.rings[0]) { this.rings.shift(); for (const P of A) for (let i = 0; i < 28; i++) { const e = this.spawnOne(t > 300 ? 'bat' : 'germ', P, 13, 13.5); const a = (i / 28) * Math.PI * 2; e.x = clampA(P.x + Math.cos(a) * 13); e.z = clampA(P.z + Math.sin(a) * 13); } this.ev.push(['warn', '사방에서 몰려와요!']); }
+    if (this.endless) {
+      // 무한: 3분마다 우두머리 (왕 충치균 · 대마왕이 번갈아, 점점 여러 마리)
+      if (this.t >= this.nextBoss) { this.nextBoss += ENDLESS_STEP; this.bossN++; const lord = this.bossN % 2 === 0, k = 1 + Math.floor((this.bossN - 1) / 3); for (let i = 0; i < k; i++) this.spawnOne(lord ? 'lord' : 'king', A[i % A.length], 16, 19); this.ev.push(['boss', lord ? 2 : 1, k]); }
+    } else {
+      if (!this.boss1 && this.t >= RUN.boss1) { this.boss1 = true; this.spawnOne('king', A[0], 16, 17); this.ev.push(['boss', 1]); }
+      if (!this.boss2 && this.t >= RUN.boss2) { this.boss2 = true; this.spawnOne('lord', A[0], 17, 18); this.ev.push(['boss', 2]); }
+    }
   }
   nearestPlayer(e) { let best = null, bd = Infinity; for (const P of this.players.values()) { if (P.st !== 0) continue; const d = dist2(e, P); if (d < bd) { bd = d; best = P; } } return best; }
   moveEnemies(dt) {
@@ -379,7 +409,8 @@ export class Sim {
     if (T.split) for (let i = 0; i < 2; i++) { const m = this.spawnOne('mini', e, 0.3, 0.8); m.hp = m.maxHp = 6 * this.scale(this.players.size); }
     if (e.elite || T.boss === 1) this.dropItem(e.x, e.z, 'chest');
     if (T.boss === 1) { for (let i = 0; i < 24; i++) this.dropGem(e.x + rnd(-3, 3), e.z + rnd(-3, 3), 5); this.ev.push(['bossdown', 1]); }
-    if (T.boss === 2) { this.win = true; this.ev.push(['bossdown', 2]); }
+    if (T.boss === 2 && !this.endless) { this.win = true; this.ev.push(['bossdown', 2]); }
+    else if (T.boss === 2) { this.dropItem(e.x, e.z, 'chest'); for (let i = 0; i < 30; i++) this.dropGem(e.x + rnd(-3, 3), e.z + rnd(-3, 3), 5); this.ev.push(['bossdown', 3]); }
     else if (Math.random() < 0.007) this.dropItem(e.x, e.z, 'cake');
     else if (Math.random() < 0.0025) this.dropItem(e.x, e.z, 'magnet');
     this.enemies = this.enemies.filter((o) => o !== e);
@@ -437,7 +468,7 @@ export class Sim {
     const p = []; for (const o of this.projs) p.push(o.id, P_KINDS.indexOf(o.k), q(o.x), q(o.z), Math.round((o.a || 0) * 100), q(o.r));
     for (const o of this.shots) p.push(o.id, 4, q(o.x), q(o.z), 0, q(o.r));
     const pl = [...this.players.values()].map((P) => [P.id, q(P.x), q(P.z), Math.round(P.face * 100), Math.ceil(P.hp), this.maxHp(P), P.lvl, P.xp, P.xpNext, P.st, Math.round(P.rev * 100), P.kills, P.hurtT > 0 ? 1 : 0, Object.entries(P.w).map(([k, l]) => k + l).join(','), Object.entries(P.p).map(([k, l]) => k + l).join(',')]);
-    const s = { tm: Math.round(this.t * 100), e, p, pl, ga: this.gemAdd.map((g) => [g.id, q(g.x), q(g.z), g.v]), gr: this.gemRm, gf: this.gems.filter((g) => g.fly).flatMap((g) => [g.id, q(g.x), q(g.z)]), it: this.items.map((i) => [i.id, q(i.x), q(i.z), i.k]), pu: this.puddles.map((u) => [u.id, q(u.x), q(u.z), q(u.r)]), ev: this.ev };
+    const s = { tm: Math.round(this.t * 100), lv: this.lv(), e, p, pl, ga: this.gemAdd.map((g) => [g.id, q(g.x), q(g.z), g.v]), gr: this.gemRm, gf: this.gems.filter((g) => g.fly).flatMap((g) => [g.id, q(g.x), q(g.z)]), it: this.items.map((i) => [i.id, q(i.x), q(i.z), i.k]), pu: this.puddles.map((u) => [u.id, q(u.x), q(u.z), q(u.r)]), ev: this.ev };
     this.gemAdd = []; this.gemRm = []; this.ev = [];
     return s;
   }

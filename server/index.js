@@ -62,7 +62,7 @@ const appleRecords = new Records(DATA_DIR, 'jelly-apple', {
 // 젤리 서바이버: 협동 방 · 혼자 하기 최고 점수 (보통 · 어려움)
 const survRooms = new SurvRooms((sid) => world.userOf(sid));
 const survRecords = new Records(DATA_DIR, 'jelly-survivor', {
-  boards: ['normal', 'hard'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.score)),
+  boards: ['normal', 'hard', 'endless'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.score)), // endless = 버틴 시간(초)
   check: (b) => (Number.isInteger(Number(b.score)) && Number(b.score) >= 0 && Number(b.score) <= 60000 ? null : '기록이 이상해요'),
 });
 const wordDict = new Dict(DATA_DIR); // 끝말잇기 사전 판정 (LLM 결과를 저장해 둔다)

@@ -6,7 +6,7 @@ import { account, store } from '../../shared/js/account.js';
 import { Shell, esc } from '../../shared/js/shell.js';
 import { Roach } from '../../shared/js/roach.js';
 import { faceHtml, makeSound, confetti, rankIcon } from '../../shared/js/party.js';
-import { Sim, WEAPONS, PASSIVES, ENEMIES, E_KEYS, P_KINDS, ARENA, RUN, MAX_LV } from './sim.js';
+import { Sim, WEAPONS, PASSIVES, ENEMIES, E_KEYS, P_KINDS, ARENA, RUN, MAX_LV, STAGES, ENDLESS_STEP } from './sim.js';
 
 const $ = (id) => document.getElementById(id);
 const S = makeSound('jellysurv');
@@ -14,7 +14,7 @@ const PICK_KEY = 'jellysurv.pick', ANON_KEY = 'dreamrunner.anon';
 const pick0 = (() => { try { return JSON.parse(store.get(PICK_KEY) || '{}'); } catch { return {}; } })();
 const game = window.surv = {
   mode: 'title', kind: 'solo', sim: null, myId: 1, watch: 0, paused: false, choices: null, pending: 0, t: 0,
-  pick: { diff: pick0.diff === 'hard' ? 'hard' : 'normal' }, members: [],
+  pick: { diff: pick0.diff === 'hard' ? 'hard' : 'normal', mode: pick0.mode === 'endless' ? 'endless' : 'stage', stage: Math.max(1, Math.min(STAGES.length, pick0.stage || 1)) }, members: [],
 };
 
 // ---------- 3D ----------
@@ -32,13 +32,22 @@ const sun = new THREE.DirectionalLight('#ffffff', 1.4); sun.position.set(10, 30,
 const toon = (c, o = {}) => new THREE.MeshToonMaterial({ color: c, ...o });
 
 // 젤리 들판: 파스텔 체크 + 스프링클 · 사탕 지팡이 울타리 · 젤리 구슬 · 막대사탕 장식
-{
+const groundMat = new THREE.MeshToonMaterial();
+// 스테이지마다 들판 색 · 하늘 색이 바뀐다
+function setStageLook(st) {
+  const S0 = STAGES[(st - 1) % STAGES.length];
   const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d');
-  x.fillStyle = '#ffe3f1'; x.fillRect(0, 0, 256, 256); x.fillStyle = '#ffd3ea'; x.fillRect(0, 0, 128, 128); x.fillRect(128, 128, 128, 128);
+  x.fillStyle = S0.g[0]; x.fillRect(0, 0, 256, 256); x.fillStyle = S0.g[1]; x.fillRect(0, 0, 128, 128); x.fillRect(128, 128, 128, 128);
   const cols = ['#ff8fc4', '#7cd8ff', '#ffd84d', '#9be7a7', '#c39bff'];
   for (let i = 0; i < 46; i++) { x.save(); x.translate(Math.random() * 256, Math.random() * 256); x.rotate(Math.random() * 3); x.fillStyle = cols[i % 5]; x.beginPath(); x.roundRect(-6, -2, 12, 4, 2); x.fill(); x.restore(); }
   const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set((ARENA * 2 + 60) / 8, (ARENA * 2 + 60) / 8); tex.colorSpace = THREE.SRGBColorSpace;
-  const g = new THREE.Mesh(new THREE.PlaneGeometry(ARENA * 2 + 60, ARENA * 2 + 60), new THREE.MeshToonMaterial({ map: tex }));
+  groundMat.map?.dispose(); groundMat.map = tex; groundMat.needsUpdate = true;
+  scene.background.set(S0.sky); scene.fog.color.set(S0.sky);
+}
+{
+  const cols = ['#ff8fc4', '#7cd8ff', '#ffd84d', '#9be7a7', '#c39bff'];
+  setStageLook(1);
+  const g = new THREE.Mesh(new THREE.PlaneGeometry(ARENA * 2 + 60, ARENA * 2 + 60), groundMat);
   g.rotation.x = -Math.PI / 2; scene.add(g);
   // 울타리: 사탕 지팡이
   const cane = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.25, 0.25, 2.4, 10), toon('#ff4f81'), 4 * 72);
@@ -154,7 +163,7 @@ class PlayerView {
 const parseLv = (s) => Object.fromEntries((s || '').split(',').filter(Boolean).map((x) => { const m = x.match(/^([a-z]+)(\d+)$/); return [m[1], +m[2]]; }));
 function apply(s, snap) {
   // 스냅샷 하나를 받아 화면 상태를 바꾼다 (snap=true 면 보간 없이 바로)
-  V.t = s.tm / 100;
+  V.t = s.tm / 100; V.lv = s.lv;
   for (const a of s.pl) {
     let P = V.pl.get(a[0]); if (!P) { const m = game.members.find((x) => x.id === a[0]) || { id: a[0], name: '?', color: '#8a5634' }; P = new PlayerView(m); V.pl.set(a[0], P); P.x = a[1] / 10; P.z = a[2] / 10; }
     P.tx = a[1] / 10; P.tz = a[2] / 10; P.tface = a[3] / 100; P.hp = a[4]; P.mh = a[5]; P.lvl = a[6]; P.xp = a[7]; P.xn = a[8];
@@ -214,8 +223,9 @@ function onEvent(ev) {
     case 'item': if (ev[1] === me) { S.sfx('ok'); shell.toast(ev[2] === 'cake' ? '🍰 케이크! 체력 회복' : ev[2] === 'magnet' ? '🧲 설탕 자석! 모두 끌어와요' : '🎁 보물 사탕 상자! 레벨업 한 번 더', 1400); } break;
     case 'elite': banner('⚠️ 엘리트 충치균!', '녹이면 🎁 보물 상자'); break;
     case 'warn': banner('🚨 포위!', ev[1]); S.sfx('boss'); break;
-    case 'boss': banner(ev[1] === 1 ? '👑 왕 충치균 등장!' : '😈 충치 대마왕 등장!', ev[1] === 1 ? '돌진 · 꼬마 충치균을 불러요' : '녹이면 이겨요!'); S.sfx('boss'); break;
-    case 'bossdown': banner(ev[1] === 1 ? '🎉 왕 충치균을 녹였어요!' : '🍬 이겼젤! 충치 대마왕 퇴치!', ev[1] === 1 ? '🎁 보물 상자 + 설탕 잔뜩' : ''); S.sfx('win'); confetti(); break;
+    case 'boss': banner(`${ev[1] === 1 ? '👑 왕 충치균' : '😈 충치 대마왕'}${ev[2] > 1 ? ` ×${ev[2]}` : ''} 등장!`, ev[1] === 1 ? '돌진 · 꼬마 충치균을 불러요' : game.endless ? '녹이면 보물 상자!' : '녹이면 이겨요!'); S.sfx('boss'); break;
+    case 'bossdown': banner(ev[1] === 1 ? '🎉 왕 충치균을 녹였어요!' : ev[1] === 3 ? '🎉 충치 대마왕을 녹였어요!' : '🍬 이겼젤! 충치 대마왕 퇴치!', ev[1] === 2 ? '' : '🎁 보물 상자 + 설탕 잔뜩'); S.sfx('win'); confetti(); break;
+    case 'lvup': banner(`🔥 단계 ${ev[1]}!`, '충치균이 더 세고 많아져요'); S.sfx('boss'); setStageLook(ev[1]); break;
     case 'down': { const P = V.pl.get(ev[1]); shell.toast(ev[1] === me ? '😵 쓰러졌어요! 친구가 옆에 서 있으면 일어나요 (25초)' : `🆘 ${P?.name || ''} 쓰러졌어요! 옆에 서서 살려 주세요`, 2600); break; }
     case 'revive': { const P = V.pl.get(ev[1]); shell.toast(`💖 ${P?.name || ''} 다시 일어났어요!`, 1600); S.sfx('ok'); break; }
     case 'dead': if (ev[1] === me && game.kind !== 'solo') { shell.toast('💀 탈락… 친구들을 응원해요 (Space: 관전 대상 바꾸기)', 2600); } break;
@@ -387,7 +397,7 @@ function hud(dt) {
   hudT -= dt; if (hudT > 0) return; hudT = 0.1;
   const P = V.pl.get(game.myId); if (!P) return;
   $('xpbar').firstElementChild.style.width = `${Math.min(100, (P.xp / Math.max(1, P.xn)) * 100)}%`; $('lv').textContent = `Lv ${P.lvl}`;
-  const t = Math.floor(V.t); $('timer').textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+  const t = Math.floor(V.t); $('timer').textContent = `${game.endless ? `♾️ ${V.lv || 1}단계 · ` : `${STAGES[(game.stage || 1) - 1].emoji} ${game.stage}단계 · `}${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
   $('kills').textContent = `🦷 ${P.kills}`;
   $('hp-n').textContent = Math.max(0, Math.ceil(P.hp)); $('hp-bar').firstElementChild.style.width = `${Math.max(0, (P.hp / P.mh) * 100)}%`;
   const sl = (D, l, cls) => `<div class="sl ${cls}${l >= MAX_LV ? ' max' : ''}" title="${esc(D.name)}">${D.emoji}<small>${l >= MAX_LV ? 'MAX' : l}</small></div>`;
@@ -415,21 +425,24 @@ function begin(kind, members, ms) {
   shell.hideScreens(); $('hud').classList.remove('hidden'); $('paused').classList.add('hidden'); $('b-pause').classList.toggle('hidden', kind !== 'solo');
   $('party').classList.toggle('hidden', kind === 'solo');
   game.startAt = performance.now() + ms; countdown(ms); S.music('surv');
-  banner('🦷 충치균 대습격!', `${Math.floor(RUN.boss1 / 60)}분 왕 충치균 · ${Math.floor(RUN.boss2 / 60)}분 충치 대마왕`);
+  setStageLook(game.endless ? 1 : game.stage);
+  if (game.endless) banner('♾️ 무한 모드!', `${ENDLESS_STEP / 60}분마다 단계가 올라 더 세져요 · 우두머리도 계속`);
+  else { const S0 = STAGES[game.stage - 1]; banner(`${S0.emoji} ${game.stage}단계 · ${S0.name}`, `${Math.floor(RUN.boss1 / 60)}분 왕 충치균 · ${Math.floor(RUN.boss2 / 60)}분 충치 대마왕`); }
 }
 function startSolo() {
   S.unlock();
   const p = shell.profile || { name: '곰돌이', color: '#8a5634' };
   game.myId = 1;
   const me = { id: 1, name: p.name, color: p.color, look: p.look, acc: p.acc };
-  game.sim = new Sim([me], { hard: game.pick.diff === 'hard' });
+  game.endless = game.pick.mode === 'endless'; game.stage = Math.min(game.pick.stage, unlocked());
+  game.sim = new Sim([me], { hard: game.pick.diff === 'hard', stage: game.stage, endless: game.endless });
   game.diff = game.pick.diff;
   begin('solo', [me], 2500);
   apply(game.sim.snapshot(), true);
 }
 function startMulti(m) {
   S.unlock();
-  game.sim = null; game.myId = shell.myId; game.diff = m.diff || 'normal';
+  game.sim = null; game.myId = shell.myId; game.diff = m.diff || 'normal'; game.endless = m.mode === 'endless'; game.stage = m.stage || 1;
   begin('multi', m.members, m.in);
 }
 function countdown(ms) {
@@ -453,8 +466,8 @@ function frame() {
         const s = game.sim.snapshot(); apply(s, true);
         const P = game.sim.players.get(game.myId);
         if (P.choices && !game.choices) showChoices(P.choices, P.pending);
-        if (game.sim.over) endSolo();
       } else acc = 0;
+      if (game.sim?.over) endSolo(); // 고르는 창이 떠 있어도 끝나면 끝
       render(dt, false);
     } else {
       sendT -= dt;
@@ -478,23 +491,31 @@ const shell = new Shell({
   multiLabel: '👥 같이 하기 (협동)', roomIcon: '🦷', startLabel: '🦷 다 같이 출동!',
   keysHelp: 'WASD · 방향키(폰은 화면을 끌어서) 이동 · 공격은 저절로 · 레벨업 1 2 3 · P 멈춤(혼자) · 같이 하기: 쓰러진 친구 옆에 서 있으면 살려요',
   buttons: [{ id: 'solo-btn', label: '🦷 혼자 하기 <small>7분 버티고 대마왕 녹이기</small>', onClick: () => startSolo() }],
-  extraRow: [{ label: '🏆 순위표', onClick: () => openBoard(game.pick.diff) }],
+  extraRow: [{ label: '🏆 순위표', onClick: () => openBoard(game.pick.mode === 'endless' ? 'endless' : game.pick.diff) }],
   screens: ['over', 'board-screen'],
-  describe: (o = {}) => (o.diff === 'hard' ? '🔥 어려움' : '🙂 보통') + ' · 최대 6명 협동',
+  describe: (o = {}) => `${o.mode === 'endless' ? '♾️ 무한' : `🗺️ ${o.stage || 1}단계`} · ${o.diff === 'hard' ? '🔥 어려움' : '🙂 보통'} · 최대 6명 협동`,
   options: { room: (el, o, host) => optsUI(el, o, host, (n) => shell.send({ t: 'opts', opts: n })) },
   onStart: (m) => startMulti(m),
   onFinish: (m) => results(m),
   onDisconnect: () => { if (game.mode !== 'title' && game.kind !== 'solo') toTitle(); },
 });
-shell.pickOpts = () => ({ diff: game.pick.diff });
+shell.pickOpts = () => ({ diff: game.pick.diff, mode: game.pick.mode, stage: game.pick.stage });
 shell.on('s', (m) => { if (game.mode === 'play' && game.kind !== 'solo') apply(m, false); });
 shell.on('ch', (m) => { if (game.mode === 'play') showChoices(m.c, m.pending); });
 shell.on('gone', (m) => { const P = V.pl.get(m.id); if (P) { P.remove(); V.pl.delete(m.id); } });
-function optsUI(el, o, editable, set) {
-  el.innerHTML = `<div class="seg diff-seg">${[['normal', '🙂 보통'], ['hard', '🔥 어려움']].map(([k, l]) => `<button data-d="${k}" class="${(o.diff || 'normal') === k ? 'on' : ''}" ${editable ? '' : 'disabled'}>${l}</button>`).join('')}</div>`;
+// 스테이지: 깬 다음 단계까지 열린다 (같이 하기는 모두 열림)
+const STAGE_KEY = 'jellysurv.cleared';
+const unlocked = () => Math.min(STAGES.length, (Number(store.get(STAGE_KEY)) || 0) + 1);
+function optsUI(el, o, editable, set, solo) {
+  const mode = o.mode || 'stage', open = solo ? unlocked() : STAGES.length;
+  el.innerHTML = `<div class="seg mode-seg">${[['stage', '🗺️ 스테이지'], ['endless', '♾️ 무한 모드']].map(([k, l]) => `<button data-m="${k}" class="${mode === k ? 'on' : ''}" ${editable ? '' : 'disabled'}>${l}</button>`).join('')}</div>
+    ${mode === 'stage' ? `<div class="stage-pick">${STAGES.map((S0, i) => { const n = i + 1, lock = n > open; return `<button data-s="${n}" class="${(o.stage || 1) === n ? 'on' : ''}${lock ? ' lock' : ''}" ${editable && !lock ? '' : 'disabled'} title="${esc(S0.name)}"><b>${lock ? '🔒' : S0.emoji}</b>${n}</button>`; }).join('')}</div><div class="stage-name">${STAGES[(o.stage || 1) - 1].emoji} ${o.stage || 1}단계 · ${esc(STAGES[(o.stage || 1) - 1].name)} <small>단계가 오를수록 충치균이 세고 많아요</small></div>` : '<div class="stage-name">♾️ 끝없이 버티기 · 3분마다 단계가 올라 더 세져요 <small>버틴 시간 순위표</small></div>'}
+    <div class="seg diff-seg">${[['normal', '🙂 보통'], ['hard', '🔥 어려움']].map(([k, l]) => `<button data-d="${k}" class="${(o.diff || 'normal') === k ? 'on' : ''}" ${editable ? '' : 'disabled'}>${l}</button>`).join('')}</div>`;
   el.querySelectorAll('[data-d]').forEach((b) => { b.onclick = () => set({ diff: b.dataset.d }); });
+  el.querySelectorAll('[data-m]').forEach((b) => { b.onclick = () => set({ mode: b.dataset.m }); });
+  el.querySelectorAll('[data-s]').forEach((b) => { b.onclick = () => set({ stage: +b.dataset.s }); });
 }
-function renderTitleOpts() { optsUI($('title-opts'), game.pick, true, (n) => { Object.assign(game.pick, n); store.set(PICK_KEY, JSON.stringify(game.pick)); renderTitleOpts(); }); }
+function renderTitleOpts() { game.pick.stage = Math.min(game.pick.stage, unlocked()); optsUI($('title-opts'), game.pick, true, (n) => { Object.assign(game.pick, n); store.set(PICK_KEY, JSON.stringify(game.pick)); renderTitleOpts(); }, true); }
 
 // ---------- 결과 ----------
 const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -515,13 +536,18 @@ async function endSolo() {
   if (game.mode !== 'play') return;
   finishView();
   const sim = game.sim, r = sim.result()[0];
-  const score = r.kills + r.time * 2 + (sim.win ? 2000 : 0);
-  $('ov-title').textContent = sim.win ? '🍬 이겼젤! 충치 대마왕 퇴치!' : `😵 ${fmt(r.time)} 버텼어요`;
-  $('ov-me').textContent = `🦷 ${r.kills}마리 · Lv${r.lvl} · 점수 ${score}`;
-  $('ov-rank').innerHTML = ''; $('again-btn').textContent = '🔁 한 판 더';
+  // 스테이지: 점수 = 처치 + 시간 + 승리 보너스(단계가 높을수록 큼) · 무한: 버틴 시간(초)
+  const score = game.endless ? r.time : r.kills + r.time * 2 + (sim.win ? 1500 + 500 * game.stage : 0) + (game.stage - 1) * 300;
+  if (sim.win && !game.endless && game.stage >= unlocked() - 0 && game.stage < STAGES.length + 1) store.set(STAGE_KEY, String(Math.max(Number(store.get(STAGE_KEY)) || 0, game.stage)));
+  const next = sim.win && !game.endless && game.stage < STAGES.length;
+  $('ov-title').textContent = game.endless ? `♾️ ${fmt(r.time)} 버텼어요 · ${sim.lv()}단계` : sim.win ? `🍬 이겼젤! ${game.stage}단계 클리어!` : `😵 ${game.stage}단계 · ${fmt(r.time)} 버텼어요`;
+  $('ov-me').textContent = `🦷 ${r.kills}마리 · Lv${r.lvl}${game.endless ? '' : ` · 점수 ${score}`}${next ? ` · 🔓 ${game.stage + 1}단계 열림!` : ''}`;
+  $('ov-rank').innerHTML = ''; $('again-btn').textContent = next ? `▶ ${game.stage + 1}단계로` : '🔁 한 판 더';
+  game.nextStage = next;
   if (sim.win) { confetti(); S.sfx('win'); } else S.sfx('lose');
   shell.show('over');
-  game.rec = { b: game.diff, score, color: shell.profile?.color };
+  game.rec = { b: game.endless ? 'endless' : game.diff, score, color: shell.profile?.color };
+  $('ov-rank').dataset.b = game.rec.b;
   if (shell.logged()) await saveRecord({ ...game.rec, name: shell.profile?.name });
   else { $('ov-save').classList.remove('hidden'); $('ov-nick').value = store.get('jellysurv.nick') || shell.profile?.name || ''; showTop(game.rec.b); }
 }
@@ -536,18 +562,18 @@ async function saveRecord(rec) {
 }
 $('ov-save-btn').onclick = async () => { const name = $('ov-nick').value.trim(); if (!name) return shell.toast('닉네임을 정해 주세요'); store.set('jellysurv.nick', name); $('ov-save').classList.add('hidden'); await saveRecord({ ...game.rec, name, anon: anonId() }); };
 function renderTop(top, me, el = $('ov-rank')) {
-  el.innerHTML = (top || []).slice(0, 10).map((e) => `<div class="brow${e.id === me?.id ? ' me' : ''}"><span class="rk">${rankIcon(e.rank)}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.name)}${e.guest ? ' <span class="guest">체험판</span>' : e.anon ? ' <span class="guest">비로그인</span>' : ''}</span><span class="sc">${e.value}<small>점</small></span></div>`).join('') || '<div class="empty">아직 기록이 없어요. 첫 기록의 주인공이 되어 보세요!</div>';
+  el.innerHTML = (top || []).slice(0, 10).map((e) => `<div class="brow${e.id === me?.id ? ' me' : ''}"><span class="rk">${rankIcon(e.rank)}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.name)}${e.guest ? ' <span class="guest">체험판</span>' : e.anon ? ' <span class="guest">비로그인</span>' : ''}</span><span class="sc">${el.dataset.b === 'endless' ? fmt(e.value) : `${e.value}<small>점</small>`}</span></div>`).join('') || '<div class="empty">아직 기록이 없어요. 첫 기록의 주인공이 되어 보세요!</div>';
   if (me && me.rank > 10) el.insertAdjacentHTML('beforeend', `<div class="brow gap">⋯</div><div class="brow me"><span class="rk">${me.rank}</span><span class="nm">${esc(me.name)}</span><span class="sc">${me.value}<small>점</small></span></div>`);
 }
-async function showTop(b, el) { try { const d = await account.api(`/api/surv/board?b=${b}` + (shell.logged() ? '' : `&anon=${anonId()}`)); renderTop(d.top, d.me, el); } catch { /* 무시 */ } }
+async function showTop(b, el = $('ov-rank')) { el.dataset.b = b; try { const d = await account.api(`/api/surv/board?b=${b}` + (shell.logged() ? '' : `&anon=${anonId()}`)); renderTop(d.top, d.me, el); } catch { /* 무시 */ } }
 function openBoard(b) {
-  $('bd-seg').innerHTML = [['normal', '🙂 보통'], ['hard', '🔥 어려움']].map(([k, l]) => `<button data-b="${k}" class="${k === b ? 'on' : ''}">${l}</button>`).join('');
+  $('bd-seg').innerHTML = [['normal', '🙂 스테이지 보통'], ['hard', '🔥 스테이지 어려움'], ['endless', '♾️ 무한 (버틴 시간)']].map(([k, l]) => `<button data-b="${k}" class="${k === b ? 'on' : ''}">${l}</button>`).join('');
   $('bd-seg').querySelectorAll('[data-b]').forEach((x) => { x.onclick = () => openBoard(x.dataset.b); });
   $('bd-list').innerHTML = '<div class="empty">불러오는 중…</div>';
   shell.show('board-screen'); showTop(b, $('bd-list'));
 }
 $('bd-back').onclick = () => shell.show('title');
-$('again-btn').onclick = () => { if (game.kind === 'solo') return startSolo(); game.mode = 'room'; shell.backToRoom(); };
+$('again-btn').onclick = () => { if (game.kind === 'solo') { if (game.nextStage) { game.pick.stage = game.stage + 1; store.set(PICK_KEY, JSON.stringify(game.pick)); } return startSolo(); } game.mode = 'room'; shell.backToRoom(); };
 $('home-btn').onclick = () => quit();
 function quit() { if (game.kind !== 'solo') { shell.send({ t: 'leave' }); shell.room = null; } toTitle(); }
 function toTitle() { game.mode = 'title'; game.sim = null; S.stopMusic(); shell.multi = false; shell.playing = false; hideChoices(); clearView(); for (const id of ['hud', 'count', 'paused']) $(id).classList.add('hidden'); shell.show('title'); renderTitleOpts(); }

@@ -5,12 +5,12 @@ import { Sim } from '../../public/jelly-survivor/js/sim.js';
 
 const HZ = 30, SEND = 2; // 1/30초마다 계산 · 두 번에 한 번 보내기 (15번/초)
 export class SurvRooms extends BaseRooms {
-  constructor(userOf) { super(userOf, { max: 6, hz: HZ, countdown: 3000, defaults: { diff: 'normal' } }); }
-  allow(cur, n) { return { diff: n.diff === 'hard' || n.diff === 'normal' ? n.diff : cur.diff }; }
+  constructor(userOf) { super(userOf, { max: 6, hz: HZ, countdown: 3000, defaults: { diff: 'normal', mode: 'stage', stage: 1 } }); }
+  allow(cur, n) { return { diff: n.diff === 'hard' || n.diff === 'normal' ? n.diff : cur.diff, mode: n.mode === 'endless' || n.mode === 'stage' ? n.mode : cur.mode || 'stage', stage: Number.isInteger(+n.stage) && +n.stage >= 1 && +n.stage <= 12 ? +n.stage : cur.stage || 1 }; }
   onStart(r) {
-    r.sim = new Sim(r.players.map((p) => ({ id: p.id, name: p.name, color: p.color })), { coop: true, hard: r.opts.diff === 'hard' });
+    r.sim = new Sim(r.players.map((p) => ({ id: p.id, name: p.name, color: p.color })), { coop: true, hard: r.opts.diff === 'hard', stage: r.opts.stage, endless: r.opts.mode === 'endless' });
     r.simAt = r.startAt; r.frame = 0; r.sentCh = new Map();
-    return { diff: r.opts.diff };
+    return { diff: r.opts.diff, mode: r.opts.mode, stage: r.opts.stage };
   }
   onMessage(c, m, r) {
     if (r.state !== 'run' || !r.sim) return;
