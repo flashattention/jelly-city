@@ -118,6 +118,7 @@ const shell = new Shell({
   screens: ['over', 'loadout'],
   describe,
   teamChat: (o) => o.mode !== 'ffa', // 팀 데스매치면 팀 채팅
+  onChatClose: () => { if (game.mode === 'play' && $('loadout').classList.contains('hidden')) lock(); }, // 채팅을 닫으면 바로 다시 조준
   options: { room: (el, o, host) => optsUI(el, o, host, (n) => shell.send({ t: 'opts', opts: n })) },
   onProfile: (p) => { game.color = p.color; },
   onStart: (m) => start(m),

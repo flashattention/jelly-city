@@ -38,7 +38,7 @@ export class Shell {
       send: (m) => this.send(m), myId: () => this.myId,
       teamMode: () => (o.teamChat ? o.teamChat(this.room?.opts || {}) : !!this.room?.opts?.team),
       myTeam: () => this.members.find((m) => m.id === this.myId)?.team, teamColor: (t) => TEAMS[t]?.color,
-      onOpen: () => document.exitPointerLock?.(), onMessage: (m) => o.onChat?.(m),
+      onOpen: () => document.exitPointerLock?.(), onClose: () => o.onChatClose?.(), onMessage: (m) => o.onChat?.(m),
     });
     this.wire();
   }
