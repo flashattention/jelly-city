@@ -184,3 +184,5 @@ a.btn { text-decoration: none; display: inline-block; }
 
 /* 채팅이 조작법 안내를 가리지 않게 */
 body #chat { bottom: 150px; }
+#spectate { cursor: pointer; }
+#spectate .key { font-size: 13px; padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,.2); margin-left: 6px; }

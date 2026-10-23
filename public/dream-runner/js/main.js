@@ -55,6 +55,7 @@ window.addEventListener('keydown', (e) => {
   unlock();
   if (e.repeat) { if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault(); return; }
   keys.add(e.code);
+  if (e.code === 'Space' && game.mode === 'dead' && game.multi && game.deadT > 1.4) { e.preventDefault(); cycleWatch(); return; } // 관전 대상 바꾸기
   if (e.code === 'Space') input.jump = true; // 점프는 Space (↑ · W 는 가속)
   if (['KeyS', 'ArrowDown'].includes(e.code)) input.slide = true;
   if (['KeyE', 'ShiftLeft', 'ShiftRight'].includes(e.code)) input.shove = true;
@@ -615,6 +616,7 @@ function frame() {
   env.update(dt, t, camera, runner.s, runner.x, runner.y);
   renderer.render(scene, camera);
 }
+$('spectate').onclick = () => cycleWatch();
 function teamDown(why) {
   sfx(why.includes('떨어') ? 'die' : 'bonk');
   game.respawnT = 1.0;
@@ -622,14 +624,17 @@ function teamDown(why) {
 }
 function maxGhostS() { let m = 0; for (const g of game.ghosts.values()) if (g.alive) m = Math.max(m, g.s); return m; }
 // 관전: 탈락한 뒤엔 가장 멀리 간 사람을 따라간다
+// Space: 다음 사람 (멀리 간 순서대로)
+const aliveGhosts = () => [...game.ghosts.values()].filter((g) => g.alive).sort((a, b) => b.s - a.s);
+function cycleWatch() { const L = aliveGhosts(); if (!L.length) return; game.watchPick = L[(L.indexOf(game.watch) + 1) % L.length]; sfx('item'); }
 function spectate() {
-  let best = null;
-  for (const g of game.ghosts.values()) if (g.alive && (!best || g.s > best.s)) best = g;
+  let best = game.watchPick?.alive ? game.watchPick : null;
+  if (!best) for (const g of game.ghosts.values()) if (g.alive && (!best || g.s > best.s)) best = g;
   const el = $('spectate');
   if (game.mode !== 'dead') { el.classList.add('hidden'); return; }
   el.classList.remove('hidden');
   const alive = [...game.ghosts.values()].filter((g) => g.alive).length;
-  el.textContent = best ? `👀 ${best.name} 관전 중 · 남은 곰돌이 ${alive}명` : '모두의 결과를 기다리는 중…';
+  el.innerHTML = best ? `👀 <b>${esc(best.name)}</b> 관전 중 · ${aliveGhosts().indexOf(best) + 1}/${alive}등 <span class="key">Space</span> 다른 사람` : '모두의 결과를 기다리는 중…';
   game.watch = best;
   if (best) {
     const d = track.dreamAt(best.s);

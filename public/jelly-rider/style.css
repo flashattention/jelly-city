@@ -60,3 +60,7 @@ kbd.wide { min-width: 40px; }
 
 /* 채팅이 조작법 안내를 가리지 않게 */
 body #chat { bottom: 150px; }
+
+/* 관전 (도착한 뒤) */
+#spectate { position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%); padding: 10px 18px; border-radius: 999px; background: rgba(20,8,50,.65); z-index: 6; font-family: 'Jua', sans-serif; font-size: 18px; cursor: pointer; white-space: nowrap; }
+#spectate .key { font-size: 13px; padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,.2); margin-left: 6px; }

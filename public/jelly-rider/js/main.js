@@ -55,6 +55,7 @@ window.addEventListener('keydown', (e) => {
   if (['ControlLeft', 'ControlRight', 'Space'].includes(e.code)) usePressed = true;
   if (e.code === 'KeyM') muteBtn();
   if (e.code === 'KeyR' && game.mode === 'race' && game.me && !game.me.done) resetToTrack(game.me);
+  if (e.code === 'Space' && game.mode === 'race' && game.multi && game.me?.done) cycleWatch(); // 도착한 뒤: 관전 대상 바꾸기
   if ((e.code === 'ArrowUp' || e.code === 'KeyW') && game.mode === 'count') game.startPress = game.countT;
 });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
@@ -148,7 +149,7 @@ function setupRace(trackId, itemMode, team) {
   game.items = new RiderItems(scene, game.track);
   game.itemMode = itemMode; game.team = team;
   if (itemMode) game.items.makeBoxes();
-  game.raceT = 0; game.results = null; game.finishShown = false; game.doneAt = 0; game.startPress = null;
+  game.raceT = 0; game.results = null; game.finishShown = false; game.doneAt = 0; game.startPress = null; game.watch = null;
   $('nitro').classList.toggle('hidden', itemMode); $('itembar').classList.toggle('hidden', !itemMode);
   renderItems();
 }
@@ -349,6 +350,21 @@ function race(dt) {
   // 소리
   engine(game.mode === 'race' ? Math.min(1, Math.abs(me.v) / MAX) : 0, me.boostT > 0 ? 1 : 0);
 }
+// 관전: 같이 달리기에서 먼저 들어오면 아직 달리는 사람을 따라간다 (Space 로 바꾸기)
+const watchList = () => ranked().filter((k) => k !== game.me && !k.done);
+function cycleWatch() {
+  const L = watchList(); if (!L.length) return;
+  game.watch = L[(L.indexOf(game.watch) + 1) % L.length]; game.watchPick = true; sfx('item');
+}
+function updateWatch() {
+  const el = $('spectate'), on = game.mode === 'race' && game.multi && game.me?.done && game.raceT - game.doneAt > 2.5;
+  if (!on) { el.classList.add('hidden'); game.watch = null; return; }
+  const L = watchList();
+  if (!L.includes(game.watch)) { game.watch = L[0] || null; game.watchPick = false; }
+  el.classList.remove('hidden');
+  el.innerHTML = game.watch ? `👀 <b>${esc(game.watch.name)}</b> 관전 중 · ${L.indexOf(game.watch) + 1}/${L.length} <span class="key">Space</span> 다른 사람` : '모두 들어오길 기다리는 중…';
+}
+$('spectate').onclick = () => cycleWatch();
 function onMeDone() {
   game.doneAt = game.raceT;
   banner('🏁 FINISH!');
@@ -356,7 +372,8 @@ function onMeDone() {
   if (game.multi) shell.send({ t: 'done', time: game.me.finishT });
 }
 function followCam(dt) {
-  const k = game.me; if (!k) return;
+  updateWatch();
+  const k = game.watch || game.me; if (!k) return;
   const sx = Math.sin(k.yaw), sz = Math.cos(k.yaw);
   const back = 7 + Math.min(2, Math.abs(k.v) / 20), up = 2.9;
   camPos.set(k.pos.x - sx * back, k.pos.y + up, k.pos.z - sz * back);
