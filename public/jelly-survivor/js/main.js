@@ -101,15 +101,24 @@ const PSH = {
   lolli: () => [part(CYL, '#ff8fc4', 0, 0, 0, 0.75, 0.16, 0.75), part(CYL, '#ffffff', 0, 0.01, 0, 0.5, 0.17, 0.5), part(CYL, '#7cd8ff', 0, 0.02, 0, 0.28, 0.18, 0.28), part(CYL, '#ffffff', 0, 0, 0.95, 0.06, 0.06, 0.8, Math.PI / 2)],
   drill: () => [part(SPH, '#ffc2e0', 0, 0, 0, 0.6, 0.5, 0.6), part(SPH, '#c8e6ff', 0.35, 0.15, 0, 0.45, 0.4, 0.45), part(SPH, '#ffe0f0', -0.3, 0.2, 0.2, 0.4, 0.35, 0.4), part(CONE, '#ffffff', 0, -0.55, 0, 0.3, 0.6, 0.3, Math.PI)],
   bomb: () => [part(SPH, '#ff4f6a', 0, 0, 0, 0.45, 0.45, 0.45), part(SPHL, '#ffffff', -0.15, 0.2, 0.2, 0.1, 0.08, 0.06), part(CYL, '#5c3519', 0, 0.5, 0, 0.05, 0.25, 0.05), part(SPHL, '#ffd84d', 0, 0.66, 0, 0.09, 0.09, 0.09)],
-  spit: () => [part(SPH, '#b04fff', 0, 0, 0, 0.42, 0.42, 0.42), part(SPHL, '#f0c8ff', -0.12, 0.15, 0.2, 0.12, 0.1, 0.08)],
+  spit: () => [part(SPH, '#b04fff', 0, 0, 0, 0.26, 0.26, 0.26), part(SPHL, '#f0c8ff', -0.08, 0.09, 0.12, 0.08, 0.07, 0.05)],
+  mine: () => [part(SPH, '#ff7aa8', 0, 0, 0, 0.42, 0.22, 0.42), part(SPHL, '#ffe0ec', 0, 0.12, 0, 0.26, 0.12, 0.26), part(SPHL, '#ff2a5a', 0, 0.22, 0, 0.08, 0.08, 0.08)],
+  star: () => [0, 1, 2, 3, 4].map((i) => part(BOX, '#ffd84d', Math.sin(i * 1.2566) * 0.24, 0, Math.cos(i * 1.2566) * 0.24, 0.14, 0.09, 0.36, 0, i * 1.2566, 0)).concat([part(SPHL, '#fff6b0', 0, 0, 0, 0.18, 0.12, 0.18)]),
+  meteor: () => [part(SPH, '#ff9f43', 0, 0, 0, 0.7, 0.7, 0.7), part(SPHL, '#ffe08a', -0.2, 0.25, 0.25, 0.25, 0.2, 0.2), part(CONE, '#ffd84d', 0, 1.0, 0, 0.5, 1.4, 0.5)],
 };
 const pMat = new THREE.MeshToonMaterial({ vertexColors: true, emissive: '#331133' }), pMesh = {};
 for (const k of P_KINDS) { const im = new THREE.InstancedMesh(mergeGeometries(PSH[k]()), pMat, 400); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.count = 0; im.frustumCulled = false; scene.add(im); pMesh[k] = im; }
-const gemMesh = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.28), new THREE.MeshToonMaterial({ color: '#ffffff', emissive: '#223355', transparent: true, opacity: 0.95 }), 800);
+const gemMesh = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.36), new THREE.MeshToonMaterial({ color: '#ffffff', emissive: '#4466aa', emissiveIntensity: 0.55 }), 800);
 gemMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); gemMesh.count = 0; gemMesh.frustumCulled = false; gemMesh.setColorAt(0, new THREE.Color()); scene.add(gemMesh);
 const bearMesh = new THREE.InstancedMesh(mergeGeometries([part(SPH, '#ffffff', 0, 0.35, 0, 0.32, 0.36, 0.3), part(SPH, '#ffffff', 0, 0.82, 0, 0.27, 0.25, 0.25), part(SPHL, '#ffffff', -0.18, 1.04, 0, 0.1, 0.1, 0.08), part(SPHL, '#ffffff', 0.18, 1.04, 0, 0.1, 0.1, 0.08), part(SPHL, '#2b1d2c', -0.09, 0.86, 0.22, 0.04, 0.05, 0.03), part(SPHL, '#2b1d2c', 0.09, 0.86, 0.22, 0.04, 0.05, 0.03)]), new THREE.MeshToonMaterial({ vertexColors: true, transparent: true, opacity: 0.88 }), 80);
 bearMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); bearMesh.count = 0; bearMesh.frustumCulled = false; bearMesh.setColorAt(0, new THREE.Color()); scene.add(bearMesh);
-const GEM_COL = (v) => (v >= 10 ? '#ffb02e' : v >= 5 ? '#ff5c9a' : v >= 3 ? '#5fe08a' : '#5ab8ff');
+const markMesh = new THREE.InstancedMesh(new THREE.RingGeometry(0.85, 1, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ff5a5a', transparent: true, opacity: 0.4, depthWrite: false }), 40);
+markMesh.count = 0; markMesh.frustumCulled = false; scene.add(markMesh);
+const marks = [];
+// 경험치 구슬 밑의 빛나는 고리 (잘 보이게)
+const gemGlow = new THREE.InstancedMesh(new THREE.CircleGeometry(0.42, 16).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.4, depthWrite: false, blending: THREE.AdditiveBlending }), 800);
+gemGlow.count = 0; gemGlow.frustumCulled = false; gemGlow.setColorAt(0, new THREE.Color()); scene.add(gemGlow);
+const GEM_COL = (v) => (v >= 10 ? '#ffc23c' : v >= 5 ? '#ff4f9a' : v >= 3 ? '#3fe87a' : '#3fb4ff');
 
 // ---------- 효과 ----------
 const fxList = [];
@@ -119,6 +128,17 @@ function zap(x, z) {
   const pts = []; let px = x, pz = z; for (let y = 14; y >= 0; y -= 2) { pts.push(new THREE.Vector3(px, y, pz)); px = x + (Math.random() - 0.5) * 0.9; pz = z + (Math.random() - 0.5) * 0.9; }
   const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: '#fff27a', transparent: true })); scene.add(l); fxList.push({ m: l, t: 0.22, life: 0.22, k: 'fade' });
   disc(x, z, 1.4, '#fff27a', 0.25);
+}
+// 무지개 레이저: 납작한 띠가 번쩍 사라진다
+function beam(x1, z1, x2, z2, w) {
+  const L = Math.hypot(x2 - x1, z2 - z1), m = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.9, L), new THREE.MeshBasicMaterial({ color: new THREE.Color().setHSL(Math.random(), 1, 0.55), transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide }));
+  m.rotation.x = -Math.PI / 2; m.rotation.z = -Math.atan2(x2 - x1, z2 - z1) + Math.PI; m.position.set((x1 + x2) / 2, 0.9, (z1 + z2) / 2); scene.add(m); fxList.push({ m, t: 0.18, life: 0.18, k: 'fade' });
+}
+// 아이스크림 냉기: 하늘색 부채꼴
+function fan(P, a, R) {
+  const m = new THREE.Mesh(new THREE.CircleGeometry(R, 24, -0.75, 1.5), new THREE.MeshBasicMaterial({ color: '#c8f0ff', transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2; m.rotation.z = a - Math.PI / 2; m.position.set(P.x, 0.3, P.z); scene.add(m); fxList.push({ m, t: 0.35, life: 0.35, k: 'fade' });
+  for (let i = 0; i < 6; i++) { const d = Math.random() * R, aa = a + (Math.random() - 0.5) * 1.4; burst(P.x + Math.sin(aa) * d, P.z + Math.cos(aa) * d, '#e8fbff', 2, 2); }
 }
 function sweep(P, a, R) {
   const m = new THREE.Mesh(new THREE.RingGeometry(R * 0.55, R, 24, 1, -1.1, 2.2), new THREE.MeshBasicMaterial({ color: '#bff3ff', transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }));
@@ -135,7 +155,7 @@ function burst(x, z, color, n = 8, sp = 5) {
   for (let i = 0; i < n; i++) { const j = pIdx = (pIdx + 1) % PN; pPos[j * 3] = x; pPos[j * 3 + 1] = 0.8; pPos[j * 3 + 2] = z; const a = Math.random() * 6.28, s = sp * (0.4 + Math.random()); pVel[j * 3] = Math.cos(a) * s; pVel[j * 3 + 1] = 3 + Math.random() * 4; pVel[j * 3 + 2] = Math.sin(a) * s; pLife[j] = 0.6 + Math.random() * 0.3; pCol[j * 3] = c.r; pCol[j * 3 + 1] = c.g; pCol[j * 3 + 2] = c.b; }
 }
 function stepFx(dt) {
-  for (const f of fxList) { f.t -= dt; const k = Math.max(0, f.t / f.life); if (f.k === 'ring' || f.k === 'disc') f.m.scale.setScalar(0.2 + (1 - k) * f.grow); f.m.material.opacity = (f.k === 'disc' ? 0.55 : 0.85) * k; }
+  for (const f of fxList) { f.t -= dt; const k = Math.max(0, f.t / f.life); if (f.k === 'ring' || f.k === 'disc') f.m.scale.setScalar(0.2 + (1 - k) * f.grow); f.m.material.opacity = (f.k === 'disc' ? 0.3 : 0.85) * k; /* 폭발 바닥 빛은 옅게 (화면을 덜 가리게) */ }
   for (let i = fxList.length - 1; i >= 0; i--) if (fxList[i].t <= 0) { scene.remove(fxList[i].m); fxList[i].m.geometry.dispose(); fxList.splice(i, 1); }
   for (let j = 0; j < PN; j++) { if (pLife[j] <= 0) { pPos[j * 3 + 1] = -50; continue; } pLife[j] -= dt; pVel[j * 3 + 1] -= 16 * dt; pPos[j * 3] += pVel[j * 3] * dt; pPos[j * 3 + 1] = Math.max(0.1, pPos[j * 3 + 1] + pVel[j * 3 + 1] * dt); pPos[j * 3 + 2] += pVel[j * 3 + 2] * dt; }
   pGeo.attributes.position.needsUpdate = true; pGeo.attributes.color.needsUpdate = true;
@@ -213,7 +233,9 @@ function onEvent(ev) {
   switch (ev[0]) {
     case 'hit': if (V.en.get(ev[5])) dmgNum(ev[1], ev[2], ev[3], ev[4] ? 'crit' : ''); break;
     case 'kill': { const t = E_KEYS[ev[3]]; burst(ev[1], ev[2], E_COL[t], ev[4] ? 24 : 7, ev[4] ? 8 : 5); if (now - lastKillSfx > 45) { lastKillSfx = now; S.sfx('kill'); } break; }
-    case 'boom': ring(ev[1], ev[2], ev[3], ev[4] ? '#bff3ff' : '#ff8fc4', 0.4); disc(ev[1], ev[2], ev[3], ev[4] ? '#bff3ff' : '#ffb3d9', 0.3); burst(ev[1], ev[2], '#ff8fc4', 10, 7); S.sfx('boom'); break;
+    case 'boom': { const c = ev[4] === 1 ? '#bff3ff' : ev[4] === 2 ? '#ffd84d' : '#ff8fc4'; ring(ev[1], ev[2], ev[3], c, 0.4); disc(ev[1], ev[2], ev[3] * 0.8, c, 0.22); burst(ev[1], ev[2], c, 10, 7); if (now - (game.boomSfx || 0) > 90) { game.boomSfx = now; S.sfx('boom'); } break; }
+    case 'beam': beam(ev[1], ev[2], ev[3], ev[4], ev[5]); if (now - (game.zapSfx || 0) > 120) { game.zapSfx = now; S.sfx('zap'); } break;
+    case 'frost': { const P = V.pl.get(ev[1]); if (P) fan(P, ev[2], ev[3]); break; }
     case 'zap': zap(ev[1], ev[2]); S.sfx('zap'); break;
     case 'sweep': { const P = V.pl.get(ev[1]); if (P) { sweep(P, ev[2], ev[3]); if (ev[1] === me) S.sfx('swish'); } break; }
     case 'shoot': if (ev[1] === me && now - lastShootSfx > 120) { lastShootSfx = now; S.sfx('shoot'); } break;
@@ -282,23 +304,32 @@ function render(dt, interp) {
   for (const p of V.pr.values()) {
     p.x += (p.tx - p.x) * k; p.z += (p.tz - p.z) * k;
     const im = pMesh[p.k]; if (pc[p.k] >= 400) continue;
-    let y = 0.9, rx = 0, ry = 0; const s = p.k === 'candy' ? (p.r / 0.3) * 1.5 : p.k === 'spit' ? p.r / 0.35 : p.r / 0.6;
+    let y = 0.9, rx = 0, ry = 0; const s = p.k === 'candy' ? (p.r / 0.3) * 1.5 : p.k === 'bomb' ? 1 : p.k === 'mine' ? 1 : p.k === 'meteor' ? 1.3 : p.k === 'star' ? p.r / 0.4 : p.k === 'spit' ? 1 : p.r / 0.6; // 폭탄은 작게 고정 (예전엔 폭발 반경만큼 커서 화면을 가렸다)
     if (p.k === 'candy') ry = p.a + Math.PI / 2;
     if (p.k === 'lolli') { ry = p.a; y = 0.8; }
     if (p.k === 'drill') { ry = V.t * 12; y = 1.0; }
-    if (p.k === 'bomb') { y = 1.4 + Math.sin(V.t * 10 + p.id) * 0.3; ry = V.t * 6; }
+    if (p.k === 'bomb') { y = 1.2 + Math.sin(V.t * 10 + p.id) * 0.25; ry = V.t * 6; }
+    if (p.k === 'mine') { y = 0.12; ry = V.t * 2; }
+    if (p.k === 'star') { ry = p.a; y = 0.8; }
+    if (p.k === 'meteor') { y = 0.4 + p.a * 16; marks.push(p); }
     Q.setFromEuler(new THREE.Euler(rx, ry, 0)); SC.setScalar(s); PO.set(p.x, y, p.z); M4.compose(PO, Q, SC); im.setMatrixAt(pc[p.k]++, M4);
   }
   for (const kk of P_KINDS) { pMesh[kk].count = pc[kk]; pMesh[kk].instanceMatrix.needsUpdate = true; }
+  // 별똥별 떨어질 자리 (빨간 원이 점점 진해진다)
+  let mi = 0; for (const p of marks) { if (mi >= 40) break; Q.identity(); SC.set(p.r, p.r, p.r); PO.set(p.x, 0.07, p.z); M4.compose(PO, Q, SC); markMesh.setMatrixAt(mi++, M4); }
+  markMesh.count = mi; markMesh.instanceMatrix.needsUpdate = true; markMesh.material.opacity = 0.35 + Math.sin(V.t * 12) * 0.15; marks.length = 0;
   // 설탕 결정
   let gi = 0;
   for (const g of V.gems.values()) {
     if (gi >= 800) break;
     if (g.tx != null) { g.x += (g.tx - g.x) * Math.min(1, dt * 20); g.z += (g.tz - g.z) * Math.min(1, dt * 20); }
     const s = g.v >= 10 ? 1.7 : g.v >= 5 ? 1.4 : g.v >= 3 ? 1.15 : 1;
-    Q.setFromAxisAngle(UP, V.t * 2 + g.ph); SC.setScalar(s); PO.set(g.x, 0.45 + Math.sin(V.t * 3 + g.ph) * 0.12, g.z); M4.compose(PO, Q, SC); gemMesh.setMatrixAt(gi, M4); gemMesh.setColorAt(gi, C1.set(GEM_COL(g.v))); gi++;
+    const tw = 1 + Math.max(0, Math.sin(V.t * 5 + g.ph * 3)) * 0.25; // 반짝
+    Q.setFromAxisAngle(UP, V.t * 2.5 + g.ph); SC.setScalar(s * tw); PO.set(g.x, 0.55 + Math.sin(V.t * 3 + g.ph) * 0.15, g.z); M4.compose(PO, Q, SC); gemMesh.setMatrixAt(gi, M4); gemMesh.setColorAt(gi, C1.set(GEM_COL(g.v)));
+    Q.identity(); SC.setScalar(s * (1.1 + Math.sin(V.t * 4 + g.ph) * 0.15)); PO.set(g.x, 0.06, g.z); M4.compose(PO, Q, SC); gemGlow.setMatrixAt(gi, M4); gemGlow.setColorAt(gi, C1); gi++;
   }
   gemMesh.count = gi; gemMesh.instanceMatrix.needsUpdate = true; if (gemMesh.instanceColor) gemMesh.instanceColor.needsUpdate = true;
+  gemGlow.count = gi; gemGlow.instanceMatrix.needsUpdate = true; if (gemGlow.instanceColor) gemGlow.instanceColor.needsUpdate = true;
   // 곰젤리 수호대 (규칙과 같은 식으로 자리를 계산)
   let bi = 0;
   for (const P of V.pl.values()) {

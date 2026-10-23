@@ -14,6 +14,11 @@ export const WEAPONS = {
   drill: { name: '솜사탕 회오리', emoji: '🌀', desc: ['화면 안을 튕겨 다니는 회오리', '더 오래', '회오리 +1', '더 세게', '회오리 +1 · 더 커져요'] },
   aura: { name: '치약 거품', emoji: '🫧', desc: ['곁에 오면 녹는 거품 (느려짐)', '더 넓게', '더 세게', '더 넓게', '거품 폭발 · 아주 넓게'] },
   lolli: { name: '롤리팝 부메랑', emoji: '🍭', desc: ['갔다가 돌아오는 롤리팝', '더 세게', '부메랑 +1', '더 멀리', '부메랑 +1 · 더 커져요'] },
+  laser: { name: '무지개 레이저', emoji: '🌈', desc: ['가까운 충치균 쪽으로 한 줄 관통 레이저', '더 길게', '레이저 +1', '더 자주', '레이저 +2 · 더 굵게'] },
+  mine: { name: '젤리 지뢰', emoji: '🍮', desc: ['걸어간 자리에 젤리 지뢰를 깔아요', '지뢰가 커져요', '더 자주', '더 세게', '연쇄 폭발 · 아주 크게'] },
+  frost: { name: '아이스크림 냉기', emoji: '🍦', desc: ['보는 쪽 부채꼴로 얼려요 (느려짐)', '더 넓게', '더 세게', '앞뒤로', '꽁꽁 얼리기 (멈춤)'] },
+  star: { name: '별사탕 수리검', emoji: '⭐', desc: ['네 방향으로 별사탕을 던져요', '더 세게', '여섯 방향', '꿰뚫어요', '여덟 방향 · 더 커져요'] },
+  meteor: { name: '별똥별 사탕', emoji: '☄️', desc: ['하늘에서 큰 사탕이 떨어져요', '더 커져요', '별똥별 +1', '더 세게', '별똥별 +2'] },
 };
 export const PASSIVES = {
   might: { name: '튼튼 이빨', emoji: '🦷', desc: '공격력 +12%' },
@@ -51,7 +56,7 @@ export const STAGES = [
   { name: '충치 대마왕의 입속', emoji: '🦷', g: ['#ffd6d6', '#f5bcbc'], sky: '#f7c9c9' },
 ];
 export const ENDLESS_STEP = 180; // 무한 모드: 3분마다 한 단계씩 어려워진다
-export const P_KINDS = ['candy', 'lolli', 'drill', 'bomb', 'spit'];
+export const P_KINDS = ['candy', 'lolli', 'drill', 'bomb', 'spit', 'mine', 'star', 'meteor']; // 뒤에만 덧붙인다 (스냅샷 번호)
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const dist2 = (a, b) => (a.x - b.x) ** 2 + (a.z - b.z) ** 2;
@@ -211,7 +216,8 @@ export class Sim {
       if (!P) continue;
       const T = ENEMIES[e.type];
       let dx = P.x - e.x, dz = P.z - e.z; const d = Math.hypot(dx, dz) || 1; dx /= d; dz /= d;
-      let sp = e.spd * (e.slowT > 0 ? 0.55 : 1);
+      e.frozen = Math.max(0, (e.frozen || 0) - dt);
+      let sp = e.spd * (e.slowT > 0 ? 0.55 : 1) * (e.frozen > 0 ? 0 : 1);
       // 원거리: 거리를 두고 솜사탕 침을 뱉는다
       if (T.ranged) { if (d < 7) sp *= -0.6; e.act -= dt; if (e.act <= 0 && d < 14) { e.act = rnd(2.4, 3.4); this.shoot(e, dx, dz, 7, e.dmg); } }
       if (T.boss) this.bossThink(e, P, dx, dz, d, dt);
@@ -249,7 +255,7 @@ export class Sim {
       else { for (let i = 0; i < 8; i++) this.spawnOne(Math.random() < 0.5 ? 'bat' : 'mini', e, 2, 4); e.act = 2.4; }
     }
   }
-  shoot(e, dx, dz, sp, dmg) { this.shots.push({ id: this.nid++, x: e.x, z: e.z, vx: dx * sp, vz: dz * sp, dmg, life: 6, r: 0.35 }); }
+  shoot(e, dx, dz, sp, dmg) { this.shots.push({ id: this.nid++, x: e.x, z: e.z, vx: dx * sp, vz: dz * sp, dmg, life: 6, r: 0.26 }); } // 작게 (너무 커서 피하기 어려웠다)
   moveShots(dt) {
     for (const s of this.shots) {
       s.x += s.vx * dt; s.z += s.vz * dt; s.life -= dt;
@@ -334,6 +340,39 @@ export class Sim {
       if (P.auraT <= 0) { P.auraT = 0.5; for (const e of this.enemies) { const rr = R + e.r; if ((e.x - P.x) ** 2 + (e.z - P.z) ** 2 < rr * rr) { this.damage(e, (5 + 3 * w.aura) * M, P, 0, 0, 0); e.slowT = 0.6; } } }
       if (w.aura >= 5 && ready('auraboom', 4)) { this.blast(P.x, P.z, R * 1.6, (30 + 8 * w.aura) * M, P, 8); this.ev.push(['boom', +P.x.toFixed(1), +P.z.toFixed(1), +(R * 1.6).toFixed(1), 1]); }
     }
+    if (w.laser && ready('laser', w.laser >= 4 ? 1.6 : 2.2)) {
+      // 한 줄로 쭉: 선 위의 충치균 모두
+      const n = 1 + (w.laser >= 3) + (w.laser >= 5) * 2, L = (11 + 2 * w.laser) * A, wide = (w.laser >= 5 ? 0.9 : 0.6) * A;
+      const e0 = this.nearest(P.x, P.z, L), a0 = e0 ? Math.atan2(e0.x - P.x, e0.z - P.z) : P.face;
+      for (let i = 0; i < n; i++) {
+        const a = a0 + (i ? (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 0.5 : 0), dx = Math.sin(a), dz = Math.cos(a);
+        for (const e of this.enemies) { const rx = e.x - P.x, rz = e.z - P.z, along = rx * dx + rz * dz; if (along < 0 || along > L) continue; if (Math.abs(rx * dz - rz * dx) < wide + e.r) this.damage(e, (16 + 7 * w.laser) * M, P, dx, dz, 2); }
+        this.ev.push(['beam', +P.x.toFixed(1), +P.z.toFixed(1), +(P.x + dx * L).toFixed(1), +(P.z + dz * L).toFixed(1), +wide.toFixed(2)]);
+      }
+    }
+    if (w.mine && ready('mine', w.mine >= 3 ? 1.1 : 1.6)) {
+      this.projs.push({ id: this.nid++, k: 'mine', o: P.id, x: P.x, z: P.z, vx: 0, vz: 0, r: 0.5, life: 12, arm: 0.4, br: (2.4 + 0.35 * w.mine + (w.mine >= 5) * 1.5) * A, dmg: (22 + 9 * w.mine) * M, chain: w.mine >= 5, hits: new Map(), pierce: 1, a: 0 });
+    }
+    if (w.frost && ready('frost', 1.8)) {
+      const R0 = (3.6 + 0.5 * w.frost) * A, dirs = w.frost >= 4 ? [0, Math.PI] : [0];
+      for (const off of dirs) {
+        const a0 = P.face + off;
+        for (const e of this.enemies) { const dx = e.x - P.x, dz = e.z - P.z, d = Math.hypot(dx, dz); if (d > R0 + e.r) continue; let da = Math.atan2(dx, dz) - a0; da = Math.atan2(Math.sin(da), Math.cos(da)); if (Math.abs(da) < 0.75 || d < 1) { this.damage(e, (9 + 5 * w.frost) * M, P, 0, 0, 0); e.slowT = w.frost >= 5 ? 1.6 : 1.1; if (w.frost >= 5 && !ENEMIES[e.type].boss) e.frozen = 0.8; } }
+        this.ev.push(['frost', P.id, +a0.toFixed(2), +R0.toFixed(1)]);
+      }
+    }
+    if (w.star && ready('star', 1.5)) {
+      const n = w.star >= 5 ? 8 : w.star >= 3 ? 6 : 4, o = this.t * 0.7;
+      for (let i = 0; i < n; i++) { const a = o + (i / n) * Math.PI * 2; this.projs.push({ id: this.nid++, k: 'star', o: P.id, x: P.x, z: P.z, vx: Math.sin(a) * 13, vz: Math.cos(a) * 13, r: (w.star >= 5 ? 0.55 : 0.4) * A, dmg: (10 + 4 * w.star) * M, life: 1.0, hits: new Map(), pierce: w.star >= 4 ? 3 : 1, a: 0 }); }
+    }
+    if (w.meteor && ready('meteor', 3)) {
+      const n = 1 + (w.meteor >= 3) + (w.meteor >= 5) * 2;
+      for (let i = 0; i < n; i++) {
+        const e = this.enemies.length ? this.enemies[Math.floor(Math.random() * this.enemies.length)] : null, near = e && (e.x - P.x) ** 2 + (e.z - P.z) ** 2 < 16 * 16;
+        const tx = near ? e.x : P.x + rnd(-8, 8), tz = near ? e.z : P.z + rnd(-8, 8);
+        this.projs.push({ id: this.nid++, k: 'meteor', o: P.id, x: tx, z: tz, vx: 0, vz: 0, r: (2.8 + 0.35 * w.meteor) * A, life: 1.1, dur: 1.1, dmg: (40 + 15 * w.meteor) * M, a: 1 });
+      }
+    }
     if (w.lolli && ready('lolli', 2)) {
       const n = 1 + (w.lolli >= 3) + (w.lolli >= 5);
       for (let i = 0; i < n; i++) {
@@ -352,6 +391,22 @@ export class Sim {
         if (p.life <= 0 && P) { this.blast(p.tx, p.tz, p.r, p.dmg, P, 5); this.ev.push(['boom', +p.tx.toFixed(1), +p.tz.toFixed(1), +p.r.toFixed(1), 0]); if (p.puddle) this.puddles.push({ id: this.nid++, x: p.tx, z: p.tz, r: p.r * 0.85, life: 3.5, o: p.o, dmg: p.dmg * 0.15, acc: 0 }); }
         continue;
       }
+      if (p.k === 'meteor') {
+        p.a = Math.max(0, p.life / p.dur); // 남은 높이 (화면: 하늘에서 떨어진다)
+        if (p.life <= 0 && P) { this.blast(p.x, p.z, p.r, p.dmg, P, 6); this.ev.push(['boom', +p.x.toFixed(1), +p.z.toFixed(1), +p.r.toFixed(1), 2]); }
+        continue;
+      }
+      if (p.k === 'mine') {
+        // 밟으면 펑 · Lv5 는 옆 지뢰도 따라 터진다
+        p.arm -= dt; p.a += dt;
+        const go = p.trig || (p.arm <= 0 && this.enemies.some((e) => (e.x - p.x) ** 2 + (e.z - p.z) ** 2 < (0.8 + e.r) ** 2));
+        if (go && P) {
+          p.life = 0; this.blast(p.x, p.z, p.br, p.dmg, P, 5); this.ev.push(['boom', +p.x.toFixed(1), +p.z.toFixed(1), +p.br.toFixed(1), 0]);
+          if (p.chain) for (const q of this.projs) if (q.k === 'mine' && q !== p && q.life > 0 && (q.x - p.x) ** 2 + (q.z - p.z) ** 2 < p.br * p.br) q.trig = true;
+        }
+        continue;
+      }
+      if (p.k === 'star') p.a += dt * 14;
       if (p.k === 'lolli' && P) {
         // 처음엔 나가다가 느려지고, 돌아올 때는 주인에게 끌려온다
         if (!p.back) { p.vx *= Math.exp(-dt * 1.6); p.vz *= Math.exp(-dt * 1.6); if (Math.hypot(p.vx, p.vz) < 2) p.back = true; }
