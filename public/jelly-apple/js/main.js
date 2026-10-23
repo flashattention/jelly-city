@@ -19,58 +19,56 @@ for (let i = 0; i < 14; i++) { const b = document.createElement('i'); const s = 
 // ---------- 곰젤리 그림 ----------
 const COLORS = ['#ff5c7a', '#ff9a3c', '#ffc23c', '#6fd36b', '#33c2b0', '#4aa3ff', '#8c7bff', '#d77bff', '#ff6fb5'];
 const shade = (hex, k) => { const n = parseInt(hex.slice(1), 16); const f = (v) => Math.max(0, Math.min(255, Math.round(v * k))); return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`; };
-function gummyPath(u) {
-  const p = new Path2D(), E = (x, y, rx, ry, rot = 0) => { p.moveTo(x + rx * Math.cos(rot), y + rx * Math.sin(rot)); p.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); };
-  E(-21 * u, -35 * u, 11 * u, 11 * u); E(21 * u, -35 * u, 11 * u, 11 * u); // 귀
-  E(0, -19 * u, 27 * u, 23 * u); // 머리
-  E(0, 17 * u, 30 * u, 29 * u); // 몸
-  E(-27 * u, 6 * u, 9 * u, 14 * u, 0.5); E(27 * u, 6 * u, 9 * u, 14 * u, -0.5); // 팔
-  E(-15 * u, 41 * u, 13 * u, 9 * u); E(15 * u, 41 * u, 13 * u, 9 * u); // 발
-  return p;
-}
+// 말랑한 젤리 사탕: 반투명 몸 · 위쪽 광택 · 아래 은은한 빛 · 설탕 반짝이 · 볼터치 · 가운데 숫자
 function drawGummy(g, s, col, n) {
-  const u = s / 104;
-  g.save(); g.translate(s / 2, s / 2 - 2 * u);
-  const p = gummyPath(u);
-  const gr = g.createRadialGradient(-12 * u, -16 * u, 4 * u, 0, 4 * u, 62 * u);
-  gr.addColorStop(0, shade(col, 1.35)); gr.addColorStop(0.55, col); gr.addColorStop(1, shade(col, 0.72));
-  g.shadowColor = 'rgba(60,20,80,.28)'; g.shadowBlur = 6 * u; g.shadowOffsetY = 3 * u;
-  g.fillStyle = gr; g.fill(p);
-  g.shadowColor = 'transparent';
-  g.lineWidth = 2.4 * u; g.strokeStyle = shade(col, 0.62); g.globalAlpha = 0.6; g.stroke(p); g.globalAlpha = 1;
-  // 반짝임
+  const r = s * 0.43;
+  g.save(); g.translate(s / 2, s / 2);
+  // 바닥 그림자
+  g.fillStyle = 'rgba(80,40,110,.16)'; g.beginPath(); g.ellipse(0, r * 0.98, r * 0.9, r * 0.2, 0, 0, Math.PI * 2); g.fill();
+  // 몸: 위가 둥근 젤리 틀 모양
+  const body = new Path2D(); body.roundRect(-r, -r * 0.9, r * 2, r * 1.88, [r * 0.78, r * 0.78, r * 0.5, r * 0.5]);
+  const gr = g.createLinearGradient(0, -r, 0, r);
+  gr.addColorStop(0, shade(col, 1.32)); gr.addColorStop(0.55, col); gr.addColorStop(1, shade(col, 0.78));
+  g.globalAlpha = 0.93; g.fillStyle = gr; g.fill(body); g.globalAlpha = 1;
+  // 속에서 비치는 빛 (반투명 젤리 느낌)
+  const glow = g.createRadialGradient(0, r * 0.45, r * 0.1, 0, r * 0.35, r * 1.1);
+  glow.addColorStop(0, 'rgba(255,255,255,.42)'); glow.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = glow; g.fill(body);
+  // 테두리
+  g.lineWidth = Math.max(1, r * 0.07); g.strokeStyle = shade(col, 0.62); g.globalAlpha = 0.55; g.stroke(body); g.globalAlpha = 1;
+  // 광택
+  g.fillStyle = 'rgba(255,255,255,.78)'; g.beginPath(); g.ellipse(-r * 0.42, -r * 0.5, r * 0.28, r * 0.14, -0.5, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.9)'; g.beginPath(); g.arc(-r * 0.12, -r * 0.66, r * 0.07, 0, Math.PI * 2); g.fill();
+  // 설탕 반짝이 (숫자마다 같은 자리)
   g.fillStyle = 'rgba(255,255,255,.55)';
-  g.beginPath(); g.ellipse(-11 * u, -29 * u, 8 * u, 4.5 * u, -0.5, 0, Math.PI * 2); g.fill();
-  g.fillStyle = 'rgba(255,255,255,.28)';
-  g.beginPath(); g.ellipse(-15 * u, 6 * u, 5 * u, 11 * u, 0.3, 0, Math.PI * 2); g.fill();
-  // 얼굴
-  g.fillStyle = shade(col, 0.45);
-  g.beginPath(); g.arc(-9 * u, -21 * u, 2.6 * u, 0, Math.PI * 2); g.arc(9 * u, -21 * u, 2.6 * u, 0, Math.PI * 2); g.fill();
-  g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(0, -11 * u, 7 * u, 5 * u, 0, 0, Math.PI * 2); g.fill();
-  // 배의 숫자
-  g.font = `${36 * u}px Jua, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.lineWidth = 6 * u; g.strokeStyle = shade(col, 0.55); g.strokeText(String(n), 0, 20 * u);
-  g.fillStyle = '#fff'; g.fillText(String(n), 0, 20 * u);
+  for (let i = 0; i < 6; i++) { const a = (n * 1.7 + i * 2.4) % (Math.PI * 2), d = r * (0.45 + ((i * 37 + n * 11) % 40) / 100); g.beginPath(); g.arc(Math.cos(a) * d * 0.9, Math.sin(a) * d * 0.8 + r * 0.05, r * 0.035, 0, Math.PI * 2); g.fill(); }
+  // 볼터치
+  g.fillStyle = 'rgba(255,120,160,.33)';
+  for (const sx of [-1, 1]) { g.beginPath(); g.ellipse(sx * r * 0.62, r * 0.42, r * 0.17, r * 0.1, 0, 0, Math.PI * 2); g.fill(); }
+  // 숫자
+  g.font = `${Math.round(r * 1.12)}px Jua, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineJoin = 'round'; g.lineWidth = r * 0.2; g.strokeStyle = shade(col, 0.5); g.strokeText(String(n), 0, r * 0.1);
+  g.fillStyle = '#fff'; g.fillText(String(n), 0, r * 0.1);
   g.restore();
 }
 
 // ---------- 판 그리기 ----------
 const cv = $('board'), g = cv.getContext('2d');
 let cell = 40, pad = 14, dpr = 1, sprites = [];
-const fx = { flyers: [], parts: [], texts: [] };
+const fx = { flyers: [], parts: [], texts: [], splats: [] };
 let sel = null, selRc = null, selSum = 0;
 function layout() {
   dpr = Math.min(2, devicePixelRatio || 1);
   const small = innerWidth <= 900;
   const availW = innerWidth - (small ? 16 : 150 + (game.kind === 'solo' ? 0 : 220) + 48 + 28 + 16 * 2);
   const availH = innerHeight - (small ? 60 + 70 + (game.kind === 'solo' ? 0 : 110) : 40);
-  cell = Math.max(18, Math.floor(Math.min((availW - 28) / COLS, (availH - 28) / ROWS)));
+  cell = Math.max(18, Math.min(42, Math.floor(Math.min((availW - 28) / COLS, (availH - 28) / ROWS)))); // 젤리는 작고 촘촘하게
   pad = Math.round(cell * 0.35);
   const w = cell * COLS + pad * 2, h = cell * ROWS + pad * 2;
   cv.width = w * dpr; cv.height = h * dpr; cv.style.width = `${w}px`; cv.style.height = `${h}px`;
   $('timebar').style.height = `${h}px`;
   game.geom = { cell, pad }; // 점검용
-  sprites = COLORS.map((c, i) => { const s = Math.ceil(cell * 1.04), k = document.createElement('canvas'); k.width = k.height = Math.ceil(s * dpr); const kg = k.getContext('2d'); kg.scale(dpr, dpr); drawGummy(kg, s, c, i + 1); return k; });
+  sprites = COLORS.map((c, i) => { const s = Math.ceil(cell * 1.0), k = document.createElement('canvas'); k.width = k.height = Math.ceil(s * dpr); const kg = k.getContext('2d'); kg.scale(dpr, dpr); drawGummy(kg, s, c, i + 1); return k; });
 }
 window.addEventListener('resize', () => { if (game.mode !== 'title') layout(); });
 const cx = (x) => pad + (x + 0.5) * cell, cy = (y) => pad + (y + 0.5) * cell;
@@ -88,18 +86,26 @@ function draw(t) {
   // 판 바탕: 연한 크림 젤리
   const bg = g.createLinearGradient(0, 0, W, H); bg.addColorStop(0, '#fff6fb'); bg.addColorStop(1, '#f1ebff');
   g.fillStyle = bg; g.fillRect(0, 0, W, H);
-  g.fillStyle = 'rgba(180,140,220,.13)';
-  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) { g.beginPath(); g.arc(cx(x), cy(y), cell * 0.32, 0, Math.PI * 2); g.fill(); }
+  g.fillStyle = 'rgba(180,140,220,.12)';
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) { g.beginPath(); g.roundRect(cx(x) - cell * 0.3, cy(y) - cell * 0.3, cell * 0.6, cell * 0.6, cell * 0.22); g.fill(); }
+  // 위에서 흘러내리는 딸기 젤리 띠
+  const drip = g.createLinearGradient(0, 0, 0, pad * 1.6); drip.addColorStop(0, 'rgba(255,120,180,.85)'); drip.addColorStop(1, 'rgba(255,160,205,.6)');
+  g.fillStyle = drip; g.beginPath(); g.moveTo(0, 0); g.lineTo(W, 0);
+  for (let x = W; x >= 0; x -= cell * 0.5) { const d = pad * (0.35 + 0.35 * Math.abs(Math.sin(x * 0.07))) + Math.sin(t / 800 + x * 0.05) * 2; g.lineTo(x, d); }
+  g.closePath(); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.55)'; g.beginPath(); g.ellipse(W * 0.12, pad * 0.18, W * 0.06, pad * 0.08, 0, 0, Math.PI * 2); g.fill();
+  for (const sp of fx.splats) { g.globalAlpha = Math.max(0, sp.life) * 0.32; g.fillStyle = sp.c; g.beginPath(); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, rr = sp.r * (0.75 + ((i * 37) % 10) / 25); g.lineTo(sp.x + Math.cos(a) * rr, sp.y + Math.sin(a) * rr); } g.closePath(); g.fill(); }
+  g.globalAlpha = 1;
   const B = game.board;
   if (B) {
     const s = sprites[0]?.width / dpr || cell;
     for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
       const v = B[y * COLS + x]; if (!v) continue;
       const on = inRc(selRc, x, y);
-      const k = on ? 1.1 + Math.sin(t / 90 + x + y) * 0.03 : 1 + Math.sin(t / 700 + x * 0.7 + y * 1.3) * 0.015;
-      const w = s * k;
+      const ph = on ? Math.sin(t / 70 + x + y) * 0.06 : Math.sin(t / 520 + x * 0.7 + y * 1.3) * 0.025;
+      const kx = (on ? 1.1 : 1) * (1 + ph), ky = (on ? 1.1 : 1) * (1 - ph), w = s * kx, h = s * ky;
       if (on) { g.save(); g.shadowColor = selSum === 10 ? 'rgba(80,230,170,.95)' : 'rgba(255,255,255,.9)'; g.shadowBlur = 14; }
-      g.drawImage(sprites[v - 1], cx(x) - w / 2, cy(y) - w / 2 - (on ? 3 : 0), w, w);
+      g.drawImage(sprites[v - 1], cx(x) - w / 2, cy(y) + s / 2 - h - (on ? 3 : 0), w, h); // 바닥에 붙어서 출렁
       if (on) g.restore();
     }
   }
@@ -109,11 +115,6 @@ function draw(t) {
     const col = selSum === 10 ? '80,220,160' : selSum > 10 ? '255,110,120' : '120,150,255';
     g.fillStyle = `rgba(${col},.16)`; g.strokeStyle = `rgba(${col},.95)`; g.lineWidth = 3; g.setLineDash([10, 6]); g.lineDashOffset = -t / 30;
     g.beginPath(); g.roundRect(x, y, w, h, 12); g.fill(); g.stroke(); g.setLineDash([]);
-    if (selSum) {
-      g.font = `${Math.round(cell * 0.6)}px Jua`; g.textAlign = 'left'; g.textBaseline = 'bottom';
-      const tx = Math.min(W - cell * 1.2, sel.x1 + 10), ty = Math.max(cell * 0.7, sel.y1 - 6);
-      g.lineWidth = 5; g.strokeStyle = 'rgba(40,20,70,.6)'; g.strokeText(String(selSum), tx, ty); g.fillStyle = selSum === 10 ? '#3fe0a6' : selSum > 10 ? '#ff6b7a' : '#fff'; g.fillText(String(selSum), tx, ty);
-    }
   }
   // 터진 곰젤리 · 알갱이 · 점수 글자
   const s = sprites[0]?.width / dpr || cell;
@@ -130,11 +131,14 @@ function stepFx(dt) {
   for (const f of fx.flyers) { f.vy += 1500 * dt; f.x += f.vx * dt; f.y += f.vy * dt; f.r += f.vr * dt; f.life -= dt * 1.1; f.k = Math.min(1.3, f.k + dt * 0.8); }
   for (const p of fx.parts) { p.vy += 900 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * 1.6; }
   for (const t of fx.texts) { t.y -= 60 * dt; t.life -= dt * 1.1; }
+  for (const sp of fx.splats) sp.life -= dt * 0.6;
+  fx.splats = fx.splats.filter((sp) => sp.life > 0);
   fx.flyers = fx.flyers.filter((f) => f.life > 0); fx.parts = fx.parts.filter((p) => p.life > 0); fx.texts = fx.texts.filter((t) => t.life > 0);
 }
 function popFx(rc, cells) {
   for (const [x, y, v] of cells) {
     fx.flyers.push({ x: cx(x), y: cy(y), vx: (Math.random() - 0.5) * 360, vy: -380 - Math.random() * 320, r: 0, vr: (Math.random() - 0.5) * 10, v, life: 1, k: 1 });
+    fx.splats.push({ x: cx(x), y: cy(y), r: cell * 0.42, c: COLORS[v - 1], life: 1 });
     for (let i = 0; i < 7; i++) fx.parts.push({ x: cx(x), y: cy(y), vx: (Math.random() - 0.5) * 520, vy: -Math.random() * 520, r: 2 + Math.random() * 4, c: COLORS[v - 1], life: 0.8 + Math.random() * 0.4 });
   }
   fx.texts.push({ x: (cx(rc[0]) + cx(rc[2])) / 2, y: (cy(rc[1]) + cy(rc[3])) / 2, n: cells.length, life: 1 });
@@ -147,7 +151,6 @@ function updateSel() {
   const prev = selSum;
   selRc = rcOf(sel); selSum = selRc ? sumRect(game.board, selRc).s : 0;
   if (selSum !== prev) { S.sfx(selSum === 10 ? 'ten' : 'tick', Math.min(10, selSum)); }
-  const el = $('sum'); el.textContent = selSum; el.className = selSum === 10 ? 'ten' : selSum > 10 ? 'over' : '';
 }
 cv.addEventListener('pointerdown', (e) => { if (!canPlay()) return; S.unlock(); cv.setPointerCapture(e.pointerId); const p = local(e); sel = { x0: p.x, y0: p.y, x1: p.x, y1: p.y }; updateSel(); });
 cv.addEventListener('pointermove', (e) => { if (!sel) return; const p = local(e); sel.x1 = p.x; sel.y1 = p.y; updateSel(); });
@@ -164,7 +167,7 @@ const release = () => {
       if (game.kind !== 'solo') { shell.send({ t: 'mv', r: rc }); const me = game.players.get(game.myId); if (me) { me.score = game.score; renderLive(game.myId); } }
     }
   } else if (selSum > 0) S.sfx('bad');
-  selSum = 0; $('sum').textContent = 0; $('sum').className = '';
+  selSum = 0;
 };
 cv.addEventListener('pointerup', release); cv.addEventListener('pointercancel', release);
 
@@ -201,11 +204,11 @@ function countdown(ms) {
 function begin(kind, seed, time, ms) {
   game.kind = kind; game.mode = 'play'; game.time = time; game.score = 0; game.board = makeBoard(seed);
   game.startAt = performance.now() + ms; game.endAt = game.startAt + time * 1000;
-  fx.flyers = []; fx.parts = []; fx.texts = []; sel = null; selRc = null; selSum = 0;
+  fx.flyers = []; fx.parts = []; fx.texts = []; fx.splats = []; sel = null; selRc = null; selSum = 0;
   shell.hideScreens(); $('game').classList.remove('hidden');
   $('side-r').classList.toggle('hidden', kind === 'solo');
   $('restart-btn').classList.toggle('hidden', kind !== 'solo');
-  $('score').textContent = 0; $('sum').textContent = 0;
+  $('score').textContent = 0;
   $('best').textContent = kind === 'solo' && game.bestOf?.[time] ? `내 최고 ${game.bestOf[time]}` : '';
   layout(); countdown(ms); S.sfx('start'); S.music('apple');
 }

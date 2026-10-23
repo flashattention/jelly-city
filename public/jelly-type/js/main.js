@@ -107,11 +107,12 @@ function rainStep(dt) {
   const W = innerWidth, H = innerHeight, ground = H - 110;
   R.spawnT -= dt;
   if (R.spawnT <= 0) {
-    R.spawnT = Math.max(0.7, 2.4 - R.level * 0.17);
+    R.spawnT = Math.max(0.55, 1.7 - R.level * 0.12);
     const used = new Set(R.drops.map((d) => d.w));
     const pool = RAIN_WORDS.filter((w) => !used.has(w) && (R.level > 3 || w.length <= 3));
     const w = pool[Math.floor(Math.random() * pool.length)];
-    R.drops.push({ w, x: 80 + Math.random() * (W - 160), y: -30, v: 26 + R.level * 7 + Math.random() * 10, c: DROP_COLS[Math.floor(Math.random() * DROP_COLS.length)], wob: Math.random() * 6 });
+    const left = W > 700 ? 190 : 70; // 왼쪽 점수판 · 오른쪽 위 단추를 피해서
+    R.drops.push({ w, x: left + Math.random() * Math.max(40, W - left - 110), y: -30, v: 52 + R.level * 11 + Math.random() * 16, c: DROP_COLS[Math.floor(Math.random() * DROP_COLS.length)], wob: Math.random() * 6 });
   }
   for (const d of R.drops) d.y += d.v * dt;
   const fell = R.drops.filter((d) => d.y > ground);
