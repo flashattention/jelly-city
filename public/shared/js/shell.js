@@ -98,6 +98,13 @@ export class Shell {
   // 소리 단추 (o.sound = { muted(), toggle() }): 처음 화면 · 방 · 게임 화면 단추 모두 같은 모양으로
   syncSound() { if (!this.o.sound) return; const m = this.o.sound.muted(); document.querySelectorAll('[data-snd]').forEach((b) => { b.textContent = m ? '🔇' : '🔊'; }); }
   wire() {
+    // ESC: 열린 선택창 · 순위표 · 방 목록을 닫는다 (게임마다 o.onEscape 로 자기 창을 먼저 닫을 수 있다)
+    addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) || document.getElementById('sens-dlg')) return;
+      if (this.o.onEscape?.()) { e.preventDefault(); return; }
+      const open = ['board-screen', 'board', 'lobby'].find((id) => $(id) && !$(id).classList.contains('hidden'));
+      if (open) { e.preventDefault(); this.show('title'); }
+    });
     const o = this.o;
     document.querySelectorAll('[data-snd]').forEach((b) => { b.onclick = () => { o.sound.toggle(); this.syncSound(); }; });
     this.syncSound();
@@ -163,7 +170,7 @@ export class Shell {
     ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch { return; } this.net.handlers[m.t]?.(m); };
     ws.onclose = () => { this.net.open = false; this.chat.show(false); if (this.multi) { this.toast('🔧 서버 업데이트 중... 20초 안에 복구돼요. 잠시 뒤 다시 들어와 주세요', 5000); this.o.onDisconnect?.(this); } };
   }
-  hello() { const p = this.profile; this.send({ t: 'hello', session: this.logged() ? account.session : null, name: p.name, color: p.color, look: p.look, acc: p.acc }); }
+  hello() { if (!this.profile) this.updateProfile(); const p = this.profile || { name: '곰돌이', color: '#8a5634' }; this.send({ t: 'hello', session: this.logged() ? account.session : null, name: p.name, color: p.color, look: p.look, acc: p.acc }); }
   openLobby() {
     this.multi = true; this.net.pendingJoin = null;
     this.show('lobby'); $('rooms').innerHTML = '<div class="empty">방 목록을 불러오는 중…</div>';

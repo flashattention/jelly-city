@@ -62,7 +62,13 @@ function reload() {
 // ---------- 입력 ----------
 const keys = new Set(); let mouseL = false, mouseR = false;
 const locked = () => !!game.testLock || document.pointerLockElement === $('c'); // testLock: 점검용 (마우스 잠금 없이)
-function lock() { unlock(); $('c').requestPointerLock?.(); }
+// 키보드 잠금: 전체화면이면 Ctrl+W(앉아서 앞으로) 같은 브라우저 단축키도 게임이 받는다
+const GAME_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyC', 'KeyR', 'KeyQ', 'KeyE', 'KeyG', 'KeyF', 'Space', 'Tab', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight'];
+$('fs-btn').onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch { /* 무시 */ } lock(); };
+function lock() { unlock(); $('c').requestPointerLock?.(); navigator.keyboard?.lock?.(GAME_KEYS).catch?.(() => {}); }
+// 게임 중 Ctrl(앉기) + 글자: 북마크(Ctrl+D) · 저장(Ctrl+S) 같은 브라우저 단축키가 끼어들지 않게
+window.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && !(MODE_OFF()) && /^(Key|Digit|Space)/.test(e.code) && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) e.preventDefault(); }, true);
+const MODE_OFF = () => game.mode !== 'play';
 document.addEventListener('pointerlockchange', () => { if (game.mode === 'play') $('lockmsg').classList.toggle('hidden', locked() || !$('loadout').classList.contains('hidden')); });
 $('c').addEventListener('click', () => { if (game.mode === 'play' && !locked()) lock(); });
 $('lock-btn').onclick = lock;
@@ -125,6 +131,7 @@ const shell = new Shell({
   onProfile: (p) => { game.color = p.color; },
   onStart: (m) => start(m),
   onFinish: (m) => results(m),
+  onEscape: () => { if (!$('loadout').classList.contains('hidden')) { $('lo-ok').onclick(); return true; } if (!$('scoreboard').classList.contains('hidden')) { $('scoreboard').classList.add('hidden'); return true; } return false; },
   onDisconnect: () => { if (game.mode === 'play') { shell.toast('🔧 서버 업데이트 중... 20초 안에 복구돼요. 잠시 뒤 다시 들어와 주세요', 5000); toTitle(); } },
 });
 shell.pickOpts = () => ({ map: game.pick.map, mode: game.pick.mode, bots: game.pick.bots });

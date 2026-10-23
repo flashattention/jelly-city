@@ -92,6 +92,8 @@ $('c').addEventListener('pointerup', (e) => {
 
 // ---------- 화면 ----------
 const screens = ['title', 'lobby', 'room', 'over', 'board'];
+// ESC: 순위표 · 방 목록을 닫는다
+addEventListener('keydown', (e) => { if (e.key !== 'Escape' || ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return; if (['board', 'lobby'].some((id) => !document.getElementById(id).classList.contains('hidden'))) show('title'); });
 function show(id) { for (const s of screens) $(s).classList.toggle('hidden', s !== id); }
 function hideScreens() { for (const s of screens) $(s).classList.add('hidden'); }
 function toast(text, ms = 1600) { const t = $('toast'); t.textContent = text; t.classList.remove('hidden'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.add('hidden'), ms); }

@@ -53,7 +53,13 @@ function reload() { const w = curW(), a = ammo[w.id]; if (!a || reloadEnd || a.m
 // ---------- 입력 ----------
 const keys = new Set(); let mouseL = false, mouseR = false, bigMap = false;
 const locked = () => !!game.testLock || document.pointerLockElement === $('c');
-function lock() { unlock(); $('c').requestPointerLock?.(); }
+// 키보드 잠금: 전체화면이면 Ctrl+W(앉아서 앞으로) 같은 브라우저 단축키도 게임이 받는다
+const GAME_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyC', 'KeyR', 'KeyQ', 'KeyE', 'KeyG', 'KeyF', 'Space', 'Tab', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight'];
+$('fs-btn').onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch { /* 무시 */ } lock(); };
+function lock() { unlock(); $('c').requestPointerLock?.(); navigator.keyboard?.lock?.(GAME_KEYS).catch?.(() => {}); }
+// 게임 중 Ctrl(앉기) + 글자: 북마크(Ctrl+D) · 저장(Ctrl+S) 같은 브라우저 단축키가 끼어들지 않게
+window.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && !(MODE_OFF()) && /^(Key|Digit|Space)/.test(e.code) && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) e.preventDefault(); }, true);
+const MODE_OFF = () => game.mode === 'title' || game.mode === 'over';
 document.addEventListener('pointerlockchange', () => { if (game.mode !== 'title' && game.mode !== 'over') $('lockmsg').classList.toggle('hidden', locked() || game.mode === 'dead'); });
 $('c').addEventListener('click', () => { if (game.mode === 'dead') return cycleWatch(); if (game.mode !== 'title' && game.mode !== 'over' && !locked()) lock(); });
 $('lock-btn').onclick = lock; $('sens-btn').onclick = () => openSens('bg'); $('quit-btn').onclick = () => quit();
@@ -459,7 +465,7 @@ function frame() {
       if (me.pos.y <= fl + 0.05) { me.pos.y = fl; land(); }
     } else if (game.mode === 'ground') {
       if (reloadEnd && now >= reloadEnd) { const w = curW(), a = ammo[w.id]; if (a) a.mag = w.mag; reloadEnd = 0; }
-      const inp = { f: kf('KeyW') - kf('KeyS'), s: kf('KeyD') - kf('KeyA'), jump: keys.has('Space') && !typing, crouch: !typing && (keys.has('KeyC') || keys.has('ControlLeft')), sprint: !typing && keys.has('ShiftLeft') && !mouseL && !healing, ads: mouseR };
+      const inp = { f: kf('KeyW') - kf('KeyS'), s: kf('KeyD') - kf('KeyA'), jump: keys.has('Space') && !typing, crouch: !typing && (keys.has('KeyC') || keys.has('ControlLeft') || keys.has('ControlRight')), sprint: !typing && (keys.has('ShiftLeft') || keys.has('ShiftRight')) && !mouseL && !healing, ads: mouseR };
       if (healing) { inp.f *= 0.4; inp.s *= 0.4; }
       for (const e of me.update(dt, inp, MAP)) sfx(e, null, e === 'step' ? 0.6 : 1);
       if (mouseL && locked()) shoot(now);
@@ -516,6 +522,7 @@ const shell = new Shell({
   onStart: (m) => start(m),
   onFinish: (m) => results(m),
   onChatClose: () => { if (game.mode !== 'title' && game.mode !== 'over' && game.mode !== 'dead') lock(); },
+  onEscape: () => { if (bigMap) { bigMap = false; $('bigmap').classList.add('hidden'); return true; } return false; },
   onDisconnect: () => { if (game.mode !== 'title') toTitle(); },
 });
 shell.pickOpts = () => ({ fill: game.pick.fill });

@@ -21,6 +21,7 @@ import { RiderRooms } from './jelly-rider/rooms.js';
 import { AttackRooms } from './jelly-attack/rooms.js';
 import { BgRooms } from './jelly-attack/bg.js';
 import { AppleRooms } from './jelly-apple/rooms.js';
+import { SurvRooms } from './jelly-survivor/rooms.js';
 import { WordRooms } from './jelly-word/rooms.js';
 import { Dict } from './jelly-word/dict.js';
 import { DrawRooms } from './jelly-draw/rooms.js';
@@ -57,6 +58,12 @@ const appleRooms = new AppleRooms((sid) => world.userOf(sid));
 const appleRecords = new Records(DATA_DIR, 'jelly-apple', {
   boards: ['t60', 't120', 't180'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.score)),
   check: (b) => (Number.isInteger(Number(b.score)) && Number(b.score) >= 0 && Number(b.score) <= 170 ? null : '기록이 이상해요'),
+});
+// 젤리 서바이버: 협동 방 · 혼자 하기 최고 점수 (보통 · 어려움)
+const survRooms = new SurvRooms((sid) => world.userOf(sid));
+const survRecords = new Records(DATA_DIR, 'jelly-survivor', {
+  boards: ['normal', 'hard'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.score)),
+  check: (b) => (Number.isInteger(Number(b.score)) && Number(b.score) >= 0 && Number(b.score) <= 60000 ? null : '기록이 이상해요'),
 });
 const wordDict = new Dict(DATA_DIR); // 끝말잇기 사전 판정 (LLM 결과를 저장해 둔다)
 const wordRooms = new WordRooms((sid) => world.userOf(sid), wordDict);
@@ -134,6 +141,7 @@ async function api(req, res, url) {
   }
   if (url.pathname.startsWith('/api/type/')) return typeRecords.api(req, res, url, world.userOf(sid), json, '/api/type');
   if (url.pathname.startsWith('/api/apple/')) return appleRecords.api(req, res, url, world.userOf(sid), json, '/api/apple');
+  if (url.pathname.startsWith('/api/surv/')) return survRecords.api(req, res, url, world.userOf(sid), json, '/api/surv');
   const who = world.userOf(sid);
   if (!who) return json(res, 401, { error: 'login' });
   if (url.pathname === '/api/me') return json(res, 200, { user: world.publicUser(who.user), chars: world.charList(who.sub), admin: isAdmin(who.user) });
@@ -245,10 +253,12 @@ const partyWss = (rooms) => { const w = new WebSocketServer({ noServer: true, ma
 const appleWss = partyWss(appleRooms), wordWss = partyWss(wordRooms), typeWss = partyWss(typeRooms);
 const drawWss = new WebSocketServer({ noServer: true, maxPayload: 160 * 1024, perMessageDeflate: { threshold: 2048 } }); // 그림은 커서 더 크게 · 압축
 drawWss.on('connection', (ws) => drawRooms.connect(ws));
+const survWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: { threshold: 512 } }); // 충치균이 많아서 압축
+survWss.on('connection', (ws) => survRooms.connect(ws));
 // 주소로 나눠 받는다: /ws = 젤리시티 · /dream-ws = 드림 러너
 server.on('upgrade', (req, socket, head) => {
   const p = new URL(req.url, 'http://x').pathname;
-  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/rider-ws' ? riderWss : p === '/attack-ws' ? attackWss : p === '/bg-ws' ? bgWss : p === '/apple-ws' ? appleWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : p === '/type-ws' ? typeWss : null;
+  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/rider-ws' ? riderWss : p === '/attack-ws' ? attackWss : p === '/bg-ws' ? bgWss : p === '/apple-ws' ? appleWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : p === '/type-ws' ? typeWss : p === '/surv-ws' ? survWss : null;
   if (!target) { socket.destroy(); return; }
   target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
 });
@@ -303,7 +313,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
     stopping = true;
     world.broadcast({ t: 'sys', text: '🔧 서버가 업데이트돼요! 잠시 후 자동으로 다시 접속해요' });
     try { world.save(); console.log('💾 세계를 저장했어요'); } catch (e) { console.error('저장 실패', e); }
-    dreamBoard.save(); riderRecords.save(); appleRecords.save(); wordDict.save(); typeRecords.save();
+    dreamBoard.save(); riderRecords.save(); appleRecords.save(); survRecords.save(); wordDict.save(); typeRecords.save();
     setTimeout(() => process.exit(0), 500);
   });
 }

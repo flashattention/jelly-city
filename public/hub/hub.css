@@ -120,3 +120,11 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .type .keys { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%) perspective(300px) rotateX(25deg); display: grid; grid-template-columns: repeat(5, 40px); gap: 6px; }
 .type .keys i { height: 40px; border-radius: 10px; background: #fff; color: #3a2350; font-style: normal; font-family: 'Jua', sans-serif; font-size: 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 0 #c9b8ff; }
 .type .drop { position: absolute; left: 62%; top: 6%; padding: 6px 14px; border-radius: 999px; background: radial-gradient(circle at 30% 30%, #fff, #ff8fc4 60%); font-family: 'Jua', sans-serif; color: #3a2350; animation: wob 2.4s ease-in-out infinite; }
+
+/* 젤리 서바이버 카드 */
+.card.surv .art { background: radial-gradient(circle at 50% 55%, #ffd9ec, #ff9fc8 70%, #c06aa6); }
+.card.surv .horde { position: absolute; inset: 0; }
+.card.surv .horde i { position: absolute; font-style: normal; font-size: 26px; animation: horde 2.4s ease-in-out infinite alternate; }
+.card.surv .horde i.me { left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 40px; animation: none; filter: drop-shadow(0 0 10px #fff); }
+.card.surv .horde i:nth-child(odd) { animation-delay: -1.2s; }
+@keyframes horde { to { transform: translate(8px, 6px) scale(1.1); } }

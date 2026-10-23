@@ -59,11 +59,22 @@ export function makeSound(key) {
     page: (t) => { tone(t, 0.12, 300, { type: 'triangle', vol: 0.08, f2: 600 }); },
     heart: (t) => { tone(t, 0.1, 880, { vol: 0.15 }); tone(t + 0.07, 0.16, 1175, { vol: 0.15 }); },
     type: (t) => tone(t, 0.03, 1200 + Math.random() * 300, { type: 'square', vol: 0.025 }),
+    // 젤리 서바이버
+    xp: (t, k = 0) => tone(t, 0.06, 1200 + Math.min(12, k) * 60, { type: 'sine', vol: 0.05 }),
+    kill: (t) => tone(t, 0.09, 420 + Math.random() * 200, { type: 'triangle', vol: 0.07, f2: 900 }),
+    shoot: (t) => tone(t, 0.05, 1400, { type: 'triangle', vol: 0.025, f2: 900 }),
+    zap: (t) => { tone(t, 0.12, 2400, { type: 'sawtooth', vol: 0.05, f2: 300 }); tone(t + 0.03, 0.1, 1800, { type: 'square', vol: 0.03, f2: 200 }); },
+    boom: (t) => { tone(t, 0.35, 160, { type: 'sine', vol: 0.3, f2: 40 }); tone(t, 0.2, 90, { type: 'sawtooth', vol: 0.06, f2: 50 }); },
+    hurt: (t) => tone(t, 0.18, 260, { type: 'sawtooth', vol: 0.1, f2: 120 }),
+    lvl: (t) => [659, 784, 988, 1319].forEach((f, i) => tone(t + i * 0.06, 0.2, f, { type: 'triangle', vol: 0.16 })),
+    boss: (t) => { [196, 185, 175, 165].forEach((f, i) => tone(t + i * 0.22, 0.4, f, { type: 'sawtooth', vol: 0.12 })); },
+    swish: (t) => tone(t, 0.12, 600, { type: 'triangle', vol: 0.05, f2: 1800 }),
   };
   // 배경음악: 통통 튀는 짧은 반복 (게임마다 음 다르게)
   const MUSIC = {
     apple: { bpm: 132, notes: [72, 76, 79, 76, 74, 77, 81, 77, 72, 76, 79, 84, 79, 76, 74, 71], bass: [48, 48, 53, 53, 48, 48, 55, 55] },
     word: { bpm: 104, notes: [69, 72, 76, 72, 71, 74, 77, 74, 69, 72, 76, 81, 79, 76, 74, 72], bass: [45, 45, 50, 50, 45, 45, 52, 52] },
+    surv: { bpm: 150, notes: [64, 67, 71, 67, 64, 69, 72, 69, 62, 66, 69, 74, 72, 71, 69, 67], bass: [40, 40, 45, 45, 38, 38, 43, 43] },
     draw: { bpm: 96, notes: [67, 71, 74, 71, 72, 76, 79, 76, 67, 71, 74, 79, 77, 74, 72, 71], bass: [43, 43, 48, 48, 43, 43, 50, 50] },
   };
   const midi = (n) => 440 * 2 ** ((n - 69) / 12);

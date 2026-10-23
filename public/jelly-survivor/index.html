@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>젤리 서바이버</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/css/shell.css" />
+  <link rel="stylesheet" href="../shared/css/party.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <!-- 게임 중 -->
+  <div id="hud" class="hidden">
+    <div id="hurt"></div>
+    <div id="labels"></div>
+    <div id="nums"></div>
+    <div id="xpbar"><i></i><b id="lv">Lv 1</b></div>
+    <div id="top"><span id="timer">0:00</span><span id="kills">🦷 0</span></div>
+    <div id="boss" class="hidden"><div class="nm"></div><div class="bar"><i></i></div></div>
+    <div id="slots"></div>
+    <div id="party"></div>
+    <div id="hpbox"><b id="hp-n">100</b><div id="hp-bar"><i></i></div></div>
+    <div id="banner" class="hidden"></div>
+    <div id="spec" class="hidden"></div>
+    <div id="joy" class="hidden"><i></i></div>
+    <div id="help">WASD · 방향키 이동 · 공격은 저절로 · 레벨업은 1 2 3 · P 멈춤(혼자)</div>
+    <div class="hud-r"><button id="b-mute" title="소리">🔊</button><button id="b-pause" title="멈춤 (P)">⏸️</button><button id="b-quit" title="그만하기">✕</button></div>
+  </div>
+  <!-- 레벨업 -->
+  <div id="lvup" class="hidden"><div class="lv-in">
+    <h2>⬆️ 레벨 업! <small id="lv-left"></small></h2>
+    <div id="cards"></div>
+    <div class="note" id="lv-note">1 · 2 · 3 또는 눌러서 고르기</div>
+  </div></div>
+  <div id="paused" class="overlay hidden"><div class="card"><h2>⏸️ 잠깐 멈춤</h2><div id="build"></div><div class="row2"><button id="resume-btn" class="btn big">▶ 계속하기</button><button id="giveup-btn" class="btn ghost">그만하기</button></div></div></div>
+  <div id="count" class="overlay hidden"><div class="count-big" id="count-n">3</div></div>
+  <!-- 결과 -->
+  <div id="over" class="screen hidden"><div class="card wide">
+    <h2 id="ov-title">끝!</h2>
+    <div id="ov-me" class="sub"></div>
+    <div id="ov-save" class="hidden"><div class="note">로그인하지 않았어요. 순위표에 남길 닉네임을 정해 주세요</div><div class="row"><input id="ov-nick" maxlength="14" placeholder="닉네임" /><button id="ov-save-btn" class="btn alt">기록 남기기</button></div></div>
+    <div id="ov-rank" class="res-list"></div>
+    <div class="row2"><button id="again-btn" class="btn big">🔁 한 판 더</button><button id="home-btn" class="btn ghost">처음으로</button></div>
+  </div></div>
+  <!-- 순위표 -->
+  <div id="board-screen" class="screen hidden"><div class="card wide">
+    <h2>🏆 젤리 서바이버 순위표</h2>
+    <div class="seg" id="bd-seg"></div>
+    <div id="bd-list" class="board" style="margin-top:14px"></div>
+    <div class="row2"><button id="bd-back" class="btn ghost">← 돌아가기</button></div>
+  </div></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

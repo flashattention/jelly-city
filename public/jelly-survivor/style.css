@@ -1,0 +1,78 @@
+/* 젤리 서바이버 */
+body { background: #2b1d5c; overflow: hidden; }
+#c { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; }
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; font-family: 'Jua', sans-serif; color: #fff; }
+#hud .hud-r { pointer-events: auto; }
+#hurt { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .25s; background: radial-gradient(ellipse at center, rgba(255,40,80,0) 45%, rgba(255,40,80,.5) 100%); }
+#xpbar { position: absolute; left: 0; right: 0; top: 0; height: 18px; background: rgba(20,8,50,.6); border-bottom: 2px solid rgba(255,255,255,.18); }
+#xpbar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #7cd8ff, #b388ff, #ff8fc4); box-shadow: 0 0 12px rgba(180,140,255,.8); transition: width .15s; }
+#xpbar b { position: absolute; left: 50%; top: 0; transform: translateX(-50%); font-weight: normal; font-size: 14px; line-height: 18px; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+#top { position: absolute; left: 50%; top: 26px; transform: translateX(-50%); display: flex; gap: 10px; }
+#top span { padding: 4px 16px; border-radius: 999px; background: rgba(20,8,50,.55); font-size: 22px; }
+#timer { min-width: 70px; text-align: center; }
+#boss { position: absolute; left: 50%; top: 70px; transform: translateX(-50%); width: min(520px, 80vw); text-align: center; }
+#boss .nm { font-size: 18px; text-shadow: 0 2px 4px rgba(0,0,0,.6); }
+#boss .bar { height: 14px; border-radius: 999px; background: rgba(20,8,50,.7); overflow: hidden; border: 2px solid rgba(255,255,255,.4); }
+#boss .bar i { display: block; height: 100%; background: linear-gradient(90deg, #ff4f81, #ffb36b); transition: width .2s; }
+#slots { position: absolute; left: 14px; top: 28px; display: flex; flex-direction: column; gap: 6px; }
+#slots .row { display: flex; gap: 5px; }
+#slots .sl { position: relative; width: 40px; height: 40px; border-radius: 12px; background: rgba(20,8,50,.6); border: 2px solid rgba(255,255,255,.2); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+#slots .sl.p { width: 32px; height: 32px; font-size: 17px; border-radius: 10px; }
+#slots .sl small { position: absolute; right: -3px; bottom: -4px; font-size: 11px; background: #ff8fc4; border-radius: 6px; padding: 0 4px; line-height: 15px; }
+#slots .sl.max small { background: #ffd84d; color: #3a2350; }
+#party { position: absolute; left: 14px; top: 132px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+#party .pm { display: flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 10px; background: rgba(20,8,50,.5); min-width: 170px; }
+#party .pm.me { outline: 2px solid var(--gold); }
+#party .pm.down { background: rgba(255,80,110,.45); }
+#party .pm.dead { opacity: .45; }
+#party .pm .dot { width: 9px; height: 9px; border-radius: 50%; }
+#party .pm .nm { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#party .pm .hb { width: 50px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.2); overflow: hidden; }
+#party .pm .hb i { display: block; height: 100%; background: #7be04a; }
+#hpbox { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; }
+#hp-n { font-weight: normal; font-size: 30px; min-width: 52px; text-align: right; text-shadow: 0 2px 4px rgba(0,0,0,.5); }
+#hp-bar { width: min(320px, 50vw); height: 16px; border-radius: 999px; background: rgba(20,8,50,.6); overflow: hidden; border: 2px solid rgba(255,255,255,.3); }
+#hp-bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff5a7a, #ff8fc4); transition: width .15s; }
+#labels .lb { position: absolute; transform: translate(-50%, -100%); text-align: center; font-size: 13px; white-space: nowrap; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+#labels .lb .hb { width: 44px; height: 5px; margin: 2px auto 0; border-radius: 3px; background: rgba(0,0,0,.4); overflow: hidden; }
+#labels .lb .hb i { display: block; height: 100%; background: #7be04a; }
+#labels .lb .sos { display: inline-block; margin-top: 2px; padding: 1px 8px; border-radius: 999px; background: #ff4f81; font-size: 13px; animation: sos .6s ease-in-out infinite alternate; }
+@keyframes sos { to { transform: scale(1.12); } }
+#nums .dn { position: absolute; transform: translate(-50%, -50%); font-size: 16px; color: #fff; text-shadow: 0 0 3px #3a2350, 0 2px 0 #3a2350; pointer-events: none; }
+#nums .dn.crit { color: #ffd84d; font-size: 22px; }
+#nums .dn.hurt { color: #ff5a7a; font-size: 20px; }
+#banner { position: absolute; left: 50%; top: 32%; transform: translateX(-50%); font-size: 40px; text-align: center; text-shadow: 0 4px 0 rgba(0,0,0,.35), 0 0 30px rgba(255,143,196,.8); animation: bannerin 2.2s ease-out forwards; white-space: nowrap; }
+#banner small { display: block; font-size: 18px; opacity: .9; }
+@keyframes bannerin { 0% { transform: translateX(-50%) scale(.4); opacity: 0; } 12% { transform: translateX(-50%) scale(1.1); opacity: 1; } 20% { transform: translateX(-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
+#spec { position: absolute; left: 50%; bottom: 70px; transform: translateX(-50%); padding: 8px 18px; border-radius: 999px; background: rgba(20,8,50,.65); font-size: 18px; }
+#help { position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%); font-family: 'Gowun Dodum', sans-serif; font-size: 12px; opacity: .55; white-space: nowrap; }
+#joy { position: absolute; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 3px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08); }
+#joy i { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; background: rgba(255,143,196,.75); }
+/* 레벨업 카드 */
+#lvup { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: rgba(20,8,50,.45); pointer-events: none; }
+#lvup .lv-in { pointer-events: auto; text-align: center; animation: pop .3s cubic-bezier(.2, 1.6, .4, 1); }
+#lvup h2 { font-family: 'Jua', sans-serif; font-size: 40px; margin: 0 0 14px; color: #ffd84d; text-shadow: 0 4px 0 rgba(0,0,0,.3), 0 0 24px rgba(255,216,77,.6); }
+#lvup h2 small { font-size: 18px; color: #fff; }
+#cards { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+.ucard { width: 210px; padding: 16px 14px; border-radius: 22px; border: 3px solid rgba(255,255,255,.3); background: linear-gradient(160deg, rgba(60,36,120,.95), rgba(36,20,80,.95)); color: #fff; cursor: pointer; text-align: center; font-family: 'Gowun Dodum', sans-serif; transition: transform .15s, border-color .15s; box-shadow: 0 14px 30px rgba(0,0,0,.35); }
+.ucard:hover { transform: translateY(-6px) scale(1.03); border-color: #ffd84d; }
+.ucard .em { font-size: 52px; line-height: 1.1; }
+.ucard .nm { font-family: 'Jua', sans-serif; font-size: 21px; margin: 6px 0 2px; }
+.ucard .tag { display: inline-block; font-family: 'Jua', sans-serif; font-size: 13px; padding: 2px 10px; border-radius: 999px; background: #ff8fc4; margin-bottom: 8px; }
+.ucard .tag.new { background: #7be04a; color: #1d3a10; }
+.ucard .tag.max { background: #ffd84d; color: #3a2350; }
+.ucard .ds { font-size: 14px; opacity: .92; min-height: 38px; }
+.ucard .key { margin-top: 8px; font-family: 'Jua', sans-serif; font-size: 13px; opacity: .6; }
+@keyframes pop { from { transform: scale(.6); opacity: 0; } }
+#lv-note { margin-top: 12px; color: #fff; }
+#paused .card { pointer-events: auto; }
+#build { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 10px 0; font-size: 15px; }
+#build span { padding: 4px 10px; border-radius: 10px; background: rgba(255,255,255,.1); }
+.diff-seg { margin-top: 6px; }
+@media (max-width: 720px) {
+  #help { display: none; }
+  .ucard { width: 150px; padding: 10px; }
+  .ucard .em { font-size: 38px; }
+  #party { top: 120px; }
+  #slots .sl { width: 32px; height: 32px; font-size: 17px; }
+}

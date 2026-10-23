@@ -95,6 +95,7 @@ function renderTitleOpts() {
   modeSeg(el, game.pick, true, (o) => { Object.assign(game.pick, o); store.set(MODE_KEY, game.pick.mode); renderTitleOpts(); }, false);
 }
 const shell = new Shell({
+  onEscape: () => { if (!$('howto').classList.contains('hidden')) { $('howto').classList.add('hidden'); return true; } return false; },
   sound: { muted: () => sound.muted, toggle: () => { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; if (sound.muted) engine(0); } },
   key: 'jellyrider', title: '🏁 젤리라이더', subtitle: '꿈나라 트랙을 곰돌이 카트로 질주!<br>드리프트로 니트로를 모아 역전해요', wsPath: '/rider-ws', max: 12,
   multiLabel: '👥 같이 달리기', roomIcon: '🏁', startLabel: '🏁 다 같이 출발!',
