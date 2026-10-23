@@ -14,7 +14,7 @@ import { weapon, KNIFE, NADE, SMOKE } from './weapons.js';
 import { buildMap } from './world.js';
 import { Player, ViewModel, gunModel } from './fps.js';
 import { sfx, unlock, toggleMute, sound } from './sound.js';
-import { explosion, smoke, updateFx as updateBig } from './fx.js';
+import { explosion, smoke, updateFx as updateBig, stepNade, NadeArc } from './fx.js';
 
 const $ = (id) => document.getElementById(id);
 const PICK_KEY = 'jellybg.pick';
@@ -314,24 +314,19 @@ function knife() {
   puff(best.pos.clone().setY(best.pos.y + 1.1), best.color, 8, 0.25, 3);
   shell.send({ t: 'hit', to: best.id, w: 'knife', part: 'body', back });
 }
-const nades = [];
+const nades = [], arc = new NadeArc(scene);
 function throwNade(kind = throwId()) {
   if (!kind || game.inv[kind] <= 0) return;
   vm.swing(); sfx('throw');
   const m = new THREE.Mesh(kind === 'smoke' ? new THREE.CylinderGeometry(0.1, 0.1, 0.3, 10) : new THREE.SphereGeometry(0.13, 12, 8), new THREE.MeshToonMaterial({ color: kind === 'smoke' ? '#7a9a6a' : game.color }));
   const p = me.eye().addScaledVector(me.forward(), 0.5); m.position.copy(p); scene.add(m);
-  nades.push({ m, kind, v: me.forward().multiplyScalar(17).add(new THREE.Vector3(0, 4, 0)), t: kind === 'smoke' ? SMOKE.fuse : NADE.fuse });
+  nades.push({ m, kind, v: me.forward().multiplyScalar(NADE.speed).add(new THREE.Vector3(0, NADE.up, 0)), t: kind === 'smoke' ? SMOKE.fuse : NADE.fuse });
   game.inv[kind]--; renderSlots(); if (!slotIds()[cur]) switchTo(3);
 }
 function updateNades(dt) {
   for (let i = nades.length - 1; i >= 0; i--) {
     const n = nades[i], p = n.m.position;
-    n.v.y -= 18 * dt;
-    const step = n.v.clone().multiplyScalar(dt), L = step.length();
-    if (L > 0) { const d = step.clone().divideScalar(L), wt = rayBoxes(MAP, p, d, L + 0.15); if (wt < L + 0.15) { n.v.x *= -0.4; n.v.z *= -0.4; step.set(0, step.y, 0); } }
-    p.add(step);
-    const fl = floorAt(MAP, p.x, p.z, p.y, 0.1) + 0.13;
-    if (p.y < fl) { p.y = fl; n.v.y = Math.abs(n.v.y) * 0.35; n.v.x *= 0.7; n.v.z *= 0.7; }
+    stepNade(p, n.v, dt, MAP);
     n.t -= dt;
     if (n.t <= 0) { shell.send({ t: n.kind === 'smoke' ? 'smoke' : 'nade', p: [p.x, p.y, p.z] }); scene.remove(n.m); nades.splice(i, 1); }
   }
@@ -500,6 +495,7 @@ function cycleWatch() {
   game.watch = L[(L.indexOf(game.watch) + 1) % L.length]; sfx('switch');
 }
 function die(byName) {
+  arc.show(false);
   if (game.drv) { game.drv = null; myBear.setSeated(false); myBear.root.visible = false; }
   $('inv').classList.add('hidden');
   game.mode = 'dead'; me.alive = false; cancelHeal(); document.exitPointerLock?.();
@@ -649,6 +645,7 @@ function frame() {
       for (const e of me.update(dt, inp, MAP)) sfx(e, null, e === 'step' ? 0.6 : 1);
       pushFromVehicles();
       if (mouseL && locked()) shoot(now);
+      { const tw = curW(), on = tw?.cls === 'nade'; arc.show(on); if (on) { const k = tw.id === 'smoke'; arc.update(me.eye().addScaledVector(me.forward(), 0.5), me.forward().multiplyScalar(NADE.speed).add(new THREE.Vector3(0, NADE.up, 0)), MAP, k ? SMOKE.fuse : NADE.fuse, k ? SMOKE.r : NADE.r); } }
       if (kickBack > 0) { const r = Math.min(kickBack, dt * 1.2); me.pitch -= r; kickBack -= r; }
       if (healing && now >= healing.end) { shell.send({ t: 'heal', k: healing.k }); cancelHeal(); }
       camera.position.copy(me.viewEye()); camera.rotation.set(me.pitch, me.yaw, 0);
@@ -658,6 +655,7 @@ function frame() {
       if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 14); camera.updateProjectionMatrix(); }
       vm.update(dt, camera.aspect, Math.hypot(me.vel.x, me.vel.z) > 1.5 && me.onGround, mouseR, t);
     } else if (game.mode === 'drive') {
+      arc.show(false);
       driveStep(dt, kf, typing);
       if (healing && now >= healing.end) { shell.send({ t: 'heal', k: healing.k }); cancelHeal(); }
       if (camera.fov !== 72) { camera.fov = 72; camera.updateProjectionMatrix(); }

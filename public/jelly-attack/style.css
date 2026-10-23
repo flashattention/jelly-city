@@ -77,3 +77,6 @@ body #chat { bottom: 74px; }
 #plist .hpb i { display: block; height: 100%; transition: width .2s; }
 #plist b { width: 26px; text-align: right; font-weight: normal; }
 @media (max-width: 760px) { #plist { display: none; } }
+
+/* 부활 무적 */
+#prot { position: fixed; left: 50%; top: 58%; transform: translateX(-50%); z-index: 4; padding: 6px 16px; border-radius: 999px; background: rgba(60,160,220,.6); color: #fff; font-family: 'Jua', sans-serif; font-size: 18px; pointer-events: none; box-shadow: 0 0 20px rgba(159,232,255,.7); }

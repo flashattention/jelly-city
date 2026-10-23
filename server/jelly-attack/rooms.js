@@ -4,9 +4,9 @@ import { BaseRooms, clean } from '../shared/rooms.js';
 import { mapById, clearLine, rayBoxes } from '../../public/jelly-attack/js/maps.js';
 import { weapon, PRIMARY, SECONDARY, KNIFE, NADE, nadeDmg, falloff } from '../../public/jelly-attack/js/weapons.js';
 
-const MAP_IDS = ['depot', 'desert', 'factory', 'harbor'];
+const MAP_IDS = ['depot', 'desert', 'factory', 'harbor', 'school', 'snow', 'subway'];
 const TIME = Number(process.env.ATTACK_SEC) || 6 * 60; // 한 판 시간 (초)
-const RESPAWN = 3000, PROTECT = 2000, EYE = 1.55;
+const RESPAWN = 3000, PROTECT = 3000, EYE = 1.55, NADES = 3; // 부활 뒤 3초 무적 · 수류탄 3개
 const BOT_NAMES = ['젤리봇 딸기', '젤리봇 소다', '젤리봇 푸딩', '젤리봇 망고', '젤리봇 민트', '젤리봇 라임', '젤리봇 자두', '젤리봇 복숭아', '젤리봇 포도', '젤리봇 레몬', '젤리봇 체리', '젤리봇 키위'];
 const BOT_COLORS = ['#ff8fb1', '#7cd8ff', '#ffd27a', '#ffb36b', '#9be7a7', '#c39bff', '#ff7a7a', '#ffc2d1', '#b39ddb', '#fff176', '#ef5350', '#aed581'];
 const BOT_GUNS = ['m4', 'ak47', 'rifle', 'mp5', 'scar', 'shotgun', 'sniper', 'uzi'];
@@ -55,7 +55,7 @@ export class AttackRooms extends BaseRooms {
     }
     if (r.opts.mode !== 'tdm') for (const p of r.players) p.team = null;
     const spawns = {};
-    for (const p of r.players) { p.k = 0; p.d = 0; p.hp = 100; p.alive = false; p.lastFire = {}; p.nades = 1; this.spawn(r, p, r.startAt, true); spawns[p.id] = [p.pos.x, 0, p.pos.z, p.yaw]; }
+    for (const p of r.players) { p.k = 0; p.d = 0; p.hp = 100; p.alive = false; p.lastFire = {}; p.nades = NADES; this.spawn(r, p, r.startAt, true); spawns[p.id] = [p.pos.x, 0, p.pos.z, p.yaw]; }
     // 처음 자리는 출발 메시지에 같이 (따로 보내면 출발보다 먼저 도착한다)
     return { map: r.map.id, mode: r.opts.mode, dur: TIME, limit: r.limit, spawns, guns: Object.fromEntries(r.players.filter((p) => p.bot).map((p) => [p.id, p.gun])) };
   }
@@ -67,7 +67,7 @@ export class AttackRooms extends BaseRooms {
     for (const s of pts) { const d = enemies.length ? Math.min(...enemies.map((q) => dist({ x: s[0], z: s[1] }, q.pos))) : Math.random() * 10; if (d > bd) { bd = d; best = s; } }
     const yaw = best[0] < 0 ? -Math.PI / 2 : Math.PI / 2; // 맵 가운데를 본다 (앞 = -sin, -cos)
     p.pos = { x: best[0] + (Math.random() - 0.5) * 2, y: 0, z: best[1] + (Math.random() - 0.5) * 2 };
-    p.yaw = yaw; p.hp = 100; p.alive = true; p.prot = at + PROTECT; p.nades = 1; p.respawnAt = 0;
+    p.yaw = yaw; p.hp = 100; p.alive = true; p.prot = at + PROTECT; p.nades = NADES; p.respawnAt = 0;
     p.st = [p.pos.x, 0, p.pos.z, yaw, 0, 0];
     if (p.bot) { p.path = null; p.target = null; p.react = 0; p.fireT = 0; p.mag = weapon(p.gun).mag; p.reloadT = 0; }
     if (!silent) this.toRoom(r, { t: 'spawn', id: p.id, p: [p.pos.x, 0, p.pos.z, yaw], gun: p.bot ? p.gun : undefined });

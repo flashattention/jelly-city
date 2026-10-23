@@ -1,6 +1,7 @@
 // 큰 효과 (젤리어택 · 젤리배그 같이): 수류탄 폭발 · 연막
 //   폭발 = 하얀 섬광 + 불덩이 + 땅을 쓸고 가는 충격파 + 파편 + 오래 남는 검은 연기 + 순간 조명
 import * as THREE from 'three';
+import { rayBoxes, floorAt } from './maps.js';
 
 let _soft = null;
 function softTex() {
@@ -85,4 +86,39 @@ export function updateFx(dt, camera) {
   }
   for (let i = list.length - 1; i >= 0; i--) if (list[i].t <= 0) { const o = list[i].o; o.parent?.remove(o); o.geometry?.dispose?.(); o.material?.dispose?.(); list.splice(i, 1); }
   void camera;
+}
+
+// ---------- 수류탄 날아가기 (실제 비행 · 미리보기가 같은 식) ----------
+export function stepNade(p, v, dt, map) {
+  v.y -= 18 * dt;
+  const step = v.clone().multiplyScalar(dt), L = step.length();
+  if (L > 0) { const d = step.clone().divideScalar(L), wt = rayBoxes(map, p, d, L + 0.15); if (wt < L + 0.15) { v.x *= -0.4; v.z *= -0.4; step.set(0, step.y, 0); } }
+  p.add(step);
+  const fl = floorAt(map, p.x, p.z, p.y, 0.1) + 0.13;
+  if (p.y < fl) { p.y = fl; v.y = Math.abs(v.y) * 0.35; v.x *= 0.7; v.z *= 0.7; }
+}
+// 던지기 전에 보이는 포물선 + 터질 자리 · 폭발 범위
+export class NadeArc {
+  constructor(scene) {
+    this.N = 140;
+    this.geo = new THREE.BufferGeometry(); this.geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.N * 3), 3));
+    this.line = new THREE.Line(this.geo, new THREE.LineDashedMaterial({ color: '#ffe27a', dashSize: 0.35, gapSize: 0.22, transparent: true, opacity: 0.95, depthTest: false }));
+    this.line.renderOrder = 20; this.line.frustumCulled = false;
+    this.ring = new THREE.Mesh(new THREE.RingGeometry(0.93, 1, 56), new THREE.MeshBasicMaterial({ color: '#ff5a5a', transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false }));
+    this.ring.rotation.x = -Math.PI / 2;
+    this.fill = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshBasicMaterial({ color: '#ff5a5a', transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide }));
+    this.fill.rotation.x = -Math.PI / 2;
+    this.dot = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 8), new THREE.MeshBasicMaterial({ color: '#ffe27a' }));
+    this.group = new THREE.Group(); this.group.add(this.line, this.ring, this.fill, this.dot); this.group.visible = false; scene.add(this.group);
+  }
+  show(on) { this.group.visible = on; }
+  update(p0, v0, map, fuse, r) {
+    const p = p0.clone(), v = v0.clone(), arr = this.geo.attributes.position.array, dt = fuse / (this.N - 1);
+    for (let i = 0; i < this.N; i++) { arr[i * 3] = p.x; arr[i * 3 + 1] = p.y; arr[i * 3 + 2] = p.z; for (let k = 0; k < 2; k++) stepNade(p, v, dt / 2, map); }
+    this.geo.attributes.position.needsUpdate = true; this.line.computeLineDistances(); this.geo.computeBoundingSphere();
+    const end = new THREE.Vector3(arr[(this.N - 1) * 3], arr[(this.N - 1) * 3 + 1], arr[(this.N - 1) * 3 + 2]);
+    this.ring.position.set(end.x, end.y - 0.1, end.z); this.ring.scale.setScalar(r);
+    this.fill.position.set(end.x, end.y - 0.11, end.z); this.fill.scale.setScalar(r);
+    this.dot.position.copy(end);
+  }
 }

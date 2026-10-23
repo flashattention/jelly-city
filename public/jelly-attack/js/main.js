@@ -4,12 +4,12 @@ import { openSens, sensOf } from '../../shared/js/sens.js';
 import { store } from '../../shared/js/account.js';
 import { Shell, esc, TEAMS } from '../../shared/js/shell.js';
 import { Roach } from '../../shared/js/roach.js';
-import { MAPS, mapById, rayBoxes } from './maps.js';
+import { MAPS, mapById, rayBoxes, floorAt } from './maps.js';
 import { weapon, PRIMARY, SECONDARY, CLASS_NAME, KNIFE, NADE } from './weapons.js';
 import { buildMap } from './world.js';
 import { Player, ViewModel } from './fps.js';
 import { sfx, unlock, toggleMute, sound } from './sound.js';
-import { explosion, smoke, updateFx as updateBig } from './fx.js';
+import { explosion, smoke, updateFx as updateBig, stepNade, NadeArc } from './fx.js';
 
 const $ = (id) => document.getElementById(id);
 const LOAD_KEY = 'jellyattack.loadout', PICK_KEY = 'jellyattack.pick';
@@ -39,7 +39,8 @@ const game = window.attack = { me, ray: rayBoxes, // 점검용
 const slots = () => [game.load.p, game.load.s, 'knife', 'nade'];
 let cur = 0, ammo = {}, nextFire = 0, reloadEnd = 0, fireLatch = false, nadeCount = 1, kickBack = 0;
 // 예비 탄은 무한: 장전만 하면 계속 쏠 수 있다
-function refill() { ammo = {}; for (const id of slots()) { const w = weapon(id); if (w?.mag) ammo[id] = { mag: w.mag }; } nadeCount = 1; }
+const NADES = 3, PROTECT = 3; // 부활마다 수류탄 3개 · 3초 무적
+function refill() { ammo = {}; for (const id of slots()) { const w = weapon(id); if (w?.mag) ammo[id] = { mag: w.mag }; } nadeCount = NADES; }
 function curW() { return weapon(slots()[cur]); }
 // 게임 중 무기를 바꾸면: 새 무기 탄을 채우고 바로 손에 든다 (탄이 없어 쏠 때마다 멈추던 문제)
 //   이미 쓰던 무기는 남은 탄 그대로 (바꿨다 돌아와서 탄을 다시 채우지 못하게)
@@ -50,7 +51,7 @@ function armNew() {
 }
 function switchTo(i) {
   if (i === cur && vm.gun) return;
-  if (i === 3 && nadeCount <= 0) { shell.toast('💣 수류탄이 없어요 (부활하면 다시 1개)', 900); return; }
+  if (i === 3 && nadeCount <= 0) { shell.toast(`💣 수류탄이 없어요 (부활하면 다시 ${NADES}개)`, 900); return; }
   cur = i; reloadEnd = 0; vm.setWeapon(curW(), game.color); sfx('switch');
   shell.send({ t: 'wpn', w: slots()[cur] }); renderSlots();
 }
@@ -95,11 +96,11 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyR') reload();
   if (/^Digit[1-4]$/.test(e.code) && me.alive) switchTo(+e.code.slice(5) - 1);
   if (e.code === 'KeyQ' && me.alive) switchTo(cur === 0 ? 1 : 0);
-  if (e.code === 'KeyG' && me.alive && nadeCount > 0) { const was = cur; switchTo(3); throwNade(); setTimeout(() => switchTo(was === 3 ? 0 : was), 400); }
+  if (e.code === 'KeyG' && me.alive && nadeCount > 0 && !game.gAim) { game.gAim = { was: cur }; switchTo(3); } // 누르고 있으면 날아갈 길이 보이고, 떼면 던진다
   if (e.code === 'KeyB') openLoadout();
   if (e.code === 'KeyM') muteBtn();
 });
-window.addEventListener('keyup', (e) => { keys.delete(e.code); if (e.code === 'Tab') $('scoreboard').classList.add('hidden'); });
+window.addEventListener('keyup', (e) => { keys.delete(e.code); if (e.code === 'Tab') $('scoreboard').classList.add('hidden'); if (e.code === 'KeyG' && game.gAim) { const was = game.gAim.was; game.gAim = null; if (game.mode === 'play' && me.alive) { throwNade(); setTimeout(() => switchTo(was === 3 ? 0 : was), 350); } } });
 window.addEventListener('blur', () => { keys.clear(); mouseL = mouseR = false; });
 function muteBtn() { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; shell.syncSound(); }
 $('b-mute').onclick = muteBtn;
@@ -194,8 +195,13 @@ class Other {
     const crouch = this.flags & 1; b.root.scale.y = 0.85 * (crouch ? 0.75 : 1);
     this.tag.position.set(this.pos.x, this.pos.y + (crouch ? 1.75 : 2.2), this.pos.z); this.tag.visible = this.alive;
     this.firedT -= dt;
+    // 부활 무적: 젤리 보호막이 깜빡이며 감싼다
+    const prot = (this.protUntil || 0) - performance.now();
+    if (!this.shield) { this.shield = new THREE.Mesh(new THREE.SphereGeometry(1.15, 20, 14), new THREE.MeshBasicMaterial({ color: '#9fe8ff', transparent: true, opacity: 0.25, depthWrite: false })); scene.add(this.shield); }
+    this.shield.visible = this.alive && prot > 0;
+    if (this.shield.visible) { this.shield.position.set(this.pos.x, this.pos.y + 0.95, this.pos.z); this.shield.material.opacity = 0.18 + 0.12 * Math.sin(performance.now() / 90); }
   }
-  remove() { scene.remove(this.bear.root, this.tag); }
+  remove() { scene.remove(this.bear.root, this.tag); if (this.shield) scene.remove(this.shield); }
   // 맞았나: 머리(공) · 몸(원기둥). 돌려주는 값 { t, part } 또는 null
   hit(o, d) {
     const crouch = this.flags & 1, p = this.pos;
@@ -303,17 +309,21 @@ function throwNade() {
   if (nadeCount <= 0 || !me.alive) return;
   nadeCount--; renderSlots(); vm.swing(); sfx('throw');
   const m = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), new THREE.MeshToonMaterial({ color: game.color || '#ff8fc4' }));
-  const p = me.eye().addScaledVector(me.forward(), 0.5); m.position.copy(p); scene.add(m);
-  nades.push({ m, v: me.forward().multiplyScalar(17).add(new THREE.Vector3(0, 4, 0)), t: NADE.fuse });
+  const { p, v } = nadeLaunch(); m.position.copy(p); scene.add(m);
+  nades.push({ m, v, t: NADE.fuse });
+}
+// 던지는 자리 · 빠르기 (궤적 미리보기와 같은 값)
+function nadeLaunch() { const right = new THREE.Vector3(Math.cos(me.yaw), 0, -Math.sin(me.yaw)); return { p: me.eye().addScaledVector(me.forward(), 0.5).addScaledVector(right, 0.45).add(new THREE.Vector3(0, -0.25, 0)), v: me.forward().multiplyScalar(NADE.speed).add(new THREE.Vector3(0, NADE.up, 0)) }; } // 오른손에서
+const arc = new NadeArc(scene);
+function updateArc() {
+  const on = game.mode === 'play' && me.alive && curW()?.cls === 'nade' && nadeCount > 0;
+  arc.show(on);
+  if (on) { const { p, v } = nadeLaunch(); arc.update(p, v, game.map, NADE.fuse, NADE.r); }
 }
 function updateNades(dt) {
   for (let i = nades.length - 1; i >= 0; i--) {
     const n = nades[i], p = n.m.position;
-    n.v.y -= 18 * dt;
-    const step = n.v.clone().multiplyScalar(dt), L = step.length();
-    if (L > 0) { const d = step.clone().divideScalar(L), wt = rayBoxes(game.map, p, d, L + 0.15); if (wt < L + 0.15) { n.v.x *= -0.4; n.v.z *= -0.4; step.set(0, step.y, 0); } }
-    p.add(step);
-    if (p.y < 0.13) { p.y = 0.13; n.v.y = Math.abs(n.v.y) * 0.35; n.v.x *= 0.7; n.v.z *= 0.7; }
+    stepNade(p, n.v, dt, game.map);
     n.t -= dt;
     if (n.t <= 0) { shell.send({ t: 'nade', p: [p.x, p.y, p.z] }); scene.remove(n.m); nades.splice(i, 1); }
   }
@@ -342,9 +352,11 @@ function start(m) {
   renderSlots(); renderPlist();
 }
 function spawnMe(p) {
-  me.pos.set(p[0], p[1], p[2]); me.yaw = p[3]; me.pitch = 0; me.vel.set(0, 0, 0); me.alive = true; me.hp = 100;
+  // 계단 · 승강장 위에서 태어나면 그 높이에
+  me.pos.set(p[0], floorAt(game.map, p[0], p[2], 2), p[2]); me.yaw = p[3]; me.pitch = 0; me.vel.set(0, 0, 0); me.alive = true; me.hp = 100;
   refill(); cur = 0; reloadEnd = 0; if (vm) vm.setWeapon(curW(), game.color);
   $('death').classList.add('hidden'); sfx('spawn'); renderSlots();
+  game.protUntil = performance.now() + PROTECT * 1000;
   shell.send({ t: 'wpn', w: slots()[0] });
 }
 shell.on('snap', (m) => { for (const [id, ...st] of m.p) { if (id === game.myId) continue; const o = game.others.get(id); if (o) o.set(st); } });
@@ -352,7 +364,7 @@ shell.on('spawn', (m) => {
   const st = game.stats.get(m.id); if (st) { st.hp = 100; st.alive = true; renderPlist(); }
   if (m.id === game.myId) return spawnMe(m.p);
   const o = game.others.get(m.id); if (!o) return;
-  o.alive = true; o.set(m.p, true); if (m.gun) o.setGun(m.gun);
+  o.alive = true; o.set(m.p, true); if (m.gun) o.setGun(m.gun); o.protUntil = performance.now() + PROTECT * 1000;
 });
 shell.on('wpn', (m) => { game.others.get(m.id)?.setGun(m.w); });
 shell.on('fire', (m) => {
@@ -454,6 +466,7 @@ function renderSlots() {
   $('slots').innerHTML = s.join('');
 }
 function hud(now) {
+  const pr = (game.protUntil || 0) - now; $('prot').classList.toggle('hidden', !(pr > 0 && me.alive && game.mode === 'play')); if (pr > 0) $('prot').textContent = `🛡️ 부활 무적 ${(pr / 1000).toFixed(1)}초`;
   const w = curW(), a = ammo[w?.id];
   $('hp-n').textContent = Math.max(0, Math.round(me.hp)); $('hp-bar').firstElementChild.style.width = `${Math.max(0, me.hp)}%`;
   $('w-name').textContent = `${w?.emoji || ''} ${w?.name || ''}${reloadEnd ? ' · 장전 중…' : ''}`;
@@ -512,6 +525,7 @@ function frame() {
     if (me.alive) {
       for (const e of me.update(dt, inp, game.map)) sfx(e, null, e === 'step' ? 0.6 : 1);
       if (mouseL && locked()) shoot(now);
+      updateArc();
       // 반동 회복
       if (kickBack > 0) { const r = Math.min(kickBack, dt * 1.2); me.pitch -= r; kickBack -= r; }
     }
