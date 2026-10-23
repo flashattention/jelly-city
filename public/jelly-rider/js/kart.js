@@ -4,8 +4,8 @@ import { Roach } from '../../shared/js/roach.js';
 import { toon } from '../../shared/js/utils.js';
 import { HW, LAPS } from './tracks.js';
 
-export const MAX = 33;            // 최고 속도 m/s (약 120km/h)
-const ACC = 16, BRAKE = 32, REV = 8, TURN = 2.1;
+export const MAX = 49;            // 최고 속도 m/s (약 175km/h, 예전 33 의 1.5배)
+const ACC = 24, BRAKE = 46, REV = 10, TURN = 2.45; // 빨라진 만큼 가속 · 핸들도
 
 let _glow = null;
 function glowTex() {
@@ -150,7 +150,7 @@ export class Kart {
     // 트랙 · 벽
     this.prevIdx = this.idx;
     this.idx = track.nearest(this.pos, this.idx);
-    const off = track.offset(this.pos, this.idx), lim = HW - 1.1;
+    const off = track.offset(this.pos, this.idx), lim = (track.hw || HW) - 1.1;
     if (Math.abs(off) > lim) {
       const n = track.Nrm[this.idx], push = (Math.abs(off) - lim) * Math.sign(off);
       this.pos.x -= n.x * push; this.pos.z -= n.z * push;

@@ -21,7 +21,7 @@ export class Bot {
     const bend = Math.abs(track.curve(k.idx, 18));
     const inp = { up: true, down: false, dir: Math.max(-1, Math.min(1, d * 2.4)), drift: false, use: false };
     // 굽은 길 앞에선 속도를 줄인다
-    const safe = 33 * (1 - Math.min(0.55, bend * 0.9));
+    const safe = 49 * (1 - Math.min(0.55, bend * 0.9));
     if (Math.abs(k.v) > safe + 4) { inp.up = false; if (Math.abs(k.v) > safe + 9) inp.down = true; }
     // 큰 굽이: 드리프트
     if (this.driftHold > 0) { this.driftHold -= dt; inp.drift = true; }

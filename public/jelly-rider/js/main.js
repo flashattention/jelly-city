@@ -4,7 +4,7 @@ import { account, store } from '../../shared/js/account.js';
 import { Shell, esc, TEAMS } from '../../shared/js/shell.js';
 import { Env } from '../../dream-runner/js/env.js';
 import { sfx, setMusic, unlock, toggleMute, sound, engine } from '../../dream-runner/js/music.js';
-import { TRACKS, Track, LAPS } from './tracks.js';
+import { TRACKS, RANDOMS, isRandom, pickTrack, stars, Track, LAPS } from './tracks.js';
 import { Kart, MAX } from './kart.js';
 import { Bot } from './ai.js';
 import { ITEMS, RiderItems, randomItem } from './items.js';
@@ -32,6 +32,7 @@ const game = window.rider = { Bot,
 
 // ---------- 트랙 ----------
 function loadTrack(id) {
+  if (isRandom(id)) { if (game.def) return; id = pickTrack(id); } // 랜덤을 고르면 미리보기는 지금 트랙 그대로
   const def = TRACKS.find((t) => t.id === id) || TRACKS[0];
   if (game.def === def) return;
   if (game.track) game.track.dispose();
@@ -79,7 +80,8 @@ function resetToTrack(k) { const t = game.track; t.at(k.idx, 0, k.pos); k.yaw = 
 
 // ---------- 처음 화면 · 방 (공용 틀) ----------
 function trackPicker(el, cur, editable, onPick) {
-  el.innerHTML = `<div class="track-pick">${TRACKS.map((t) => `<button data-t="${t.id}" class="${t.id === cur ? 'on' : ''}" ${editable ? '' : 'disabled'}><b>${t.emoji}</b>${esc(t.name)}</button>`).join('')}</div>`;
+  const btn = (t) => `<button data-t="${t.id}" class="${t.id === cur ? 'on' : ''}${isRandom(t.id) ? ' rnd' : ''}" ${editable ? '' : 'disabled'}><b>${t.emoji}</b>${esc(t.name)}${t.lv ? `<i class="lv lv${t.lv}">${stars(t.lv)}</i>` : ''}</button>`;
+  el.innerHTML = `<div class="track-rand">${RANDOMS.map(btn).join('')}</div><div class="track-pick">${TRACKS.map(btn).join('')}</div>`;
   el.querySelectorAll('[data-t]').forEach((b) => { b.onclick = () => onPick(b.dataset.t); });
 }
 function modeSeg(el, opts, editable, onPick, withTeam) {
@@ -88,7 +90,7 @@ function modeSeg(el, opts, editable, onPick, withTeam) {
   el.querySelectorAll('[data-mode]').forEach((b) => { b.onclick = () => onPick({ mode: b.dataset.mode }); });
   el.querySelectorAll('[data-team]').forEach((b) => { b.onclick = () => onPick({ team: b.dataset.team === 'true' }); });
 }
-const describe = (o = {}) => { const t = TRACKS.find((x) => x.id === o.track); return `${t ? t.emoji + ' ' + t.name : ''} · ${o.mode === 'item' ? '아이템전' : '스피드전'}${o.team ? ' · 팀전' : ''}`; };
+const describe = (o = {}) => { const t = TRACKS.find((x) => x.id === o.track) || RANDOMS.find((x) => x.id === o.track); return `${t ? t.emoji + ' ' + t.name : ''} · ${o.mode === 'item' ? '아이템전' : '스피드전'}${o.team ? ' · 팀전' : ''}`; };
 function renderTitleOpts() {
   const el = $('title-opts'); el.innerHTML = '';
   trackPicker(el, game.pick.track, true, (id) => { game.pick.track = id; store.set(TRACK_KEY, id); loadTrack(id); renderTitleOpts(); placePreview(); });
@@ -104,7 +106,7 @@ const shell = new Shell({
     { id: 'solo-btn', label: '🏁 혼자 달리기 <small>AI 5대와 경주</small>', onClick: () => startSolo(true) },
     { id: 'ta-btn', label: '⏱️ 타임어택 <small>혼자 기록 도전</small>', cls: 'ghost', onClick: () => startSolo(false) },
   ],
-  extraRow: [{ label: '🏆 기록판', onClick: () => openBoard(game.pick.track) }],
+  extraRow: [{ label: '🏆 기록판', onClick: () => openBoard(isRandom(game.pick.track) ? game.def?.id || 'candy' : game.pick.track) }],
   screens: ['over', 'board'],
   describe,
   options: {
@@ -156,7 +158,9 @@ function setupRace(trackId, itemMode, team) {
 }
 function startSolo(withBots) {
   game.multi = false; shell.multi = false;
-  setupRace(game.pick.track, withBots && game.pick.mode === 'item', false);
+  const tid = pickTrack(game.pick.track);
+  if (isRandom(game.pick.track)) { const t = TRACKS.find((x) => x.id === tid); shell.toast(`🎲 ${t.emoji} ${t.name} (${stars(t.lv)})`, 2600); }
+  setupRace(tid, withBots && game.pick.mode === 'item', false);
   const me = game.me = new Kart({ scene, profile: shell.profile, id: 'me' });
   game.karts.push(me);
   if (withBots) {
@@ -176,7 +180,8 @@ function startSolo(withBots) {
 function startMulti(m) {
   game.multi = true;
   const o = m.opts || {};
-  setupRace(o.track, o.mode === 'item', !!o.team);
+  setupRace(m.track || pickTrack(o.track), o.mode === 'item', !!o.team);
+  if (isRandom(o.track) && m.track) { const t = TRACKS.find((x) => x.id === m.track); shell.toast(`🎲 ${t.emoji} ${t.name} (${stars(t.lv)})`, 2600); }
   m.members.forEach((mem, i) => {
     const mine = mem.id === shell.myId;
     const k = new Kart({ scene, profile: mine ? shell.profile : { name: mem.name, color: mem.color, look: mem.look, acc: mem.acc }, id: mem.id, remote: !mine });
@@ -469,7 +474,7 @@ $('home-btn').onclick = () => { if (game.multi) { shell.send({ t: 'leave' }); sh
 async function openBoard(id) {
   shell.show('board');
   const el = $('board-tracks');
-  el.innerHTML = TRACKS.map((t) => `<button data-t="${t.id}" class="${t.id === id ? 'on' : ''}"><b>${t.emoji}</b>${esc(t.name)}</button>`).join('');
+  el.innerHTML = TRACKS.map((t) => `<button data-t="${t.id}" class="${t.id === id ? 'on' : ''}"><b>${t.emoji}</b>${esc(t.name)}<i class="lv lv${t.lv}">${stars(t.lv)}</i></button>`).join('');
   el.querySelectorAll('[data-t]').forEach((b) => { b.onclick = () => openBoard(b.dataset.t); });
   $('board-list').innerHTML = '<div class="empty">불러오는 중…</div>';
   let d = { top: [] };

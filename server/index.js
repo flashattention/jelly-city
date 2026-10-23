@@ -49,7 +49,7 @@ const world = new World({ dataDir: DATA_DIR });
 const dreamBoard = new DreamBoard(DATA_DIR); // 드림 러너 리더보드
 const dreamRooms = new DreamRooms((sid) => world.userOf(sid)); // 드림 러너 같이 달리기 방
 // 젤리라이더: 방 · 트랙별 최고 기록 (짧을수록 좋다)
-const RIDER_TRACKS = ['candy', 'cloud', 'neon', 'lava', 'sakura', 'synth', 'snow', 'deep'];
+const RIDER_TRACKS = ['candy', 'cloud', 'neon', 'lava', 'sakura', 'synth', 'snow', 'deep', 'hairpin', 'choco', 'crystal', 'steam', 'park', 'rainbow', 'moon', 'chess'];
 const riderRooms = new RiderRooms((sid) => world.userOf(sid));
 const attackRooms = new AttackRooms((sid) => world.userOf(sid)); // 젤리어택 방 (봇은 서버가 움직인다)
 const bgRooms = new BgRooms((sid) => world.userOf(sid)); // 젤리배그 (최대 30명)
@@ -77,7 +77,7 @@ const typeRecords = new Records(DATA_DIR, 'jelly-type', {
 });
 const riderRecords = new Records(DATA_DIR, 'jelly-rider', {
   boards: RIDER_TRACKS, better: (a, b) => a.value < b.value, value: (b) => Math.round(Number(b.time) * 1000) / 1000,
-  check: (b) => (Number.isFinite(Number(b.time)) && Number(b.time) >= 40 && Number(b.time) <= 3600 ? null : '기록이 이상해요'),
+  check: (b) => (Number.isFinite(Number(b.time)) && Number(b.time) >= 25 && Number(b.time) <= 3600 ? null : '기록이 이상해요'),
 });
 // 옛 주소: REDIRECT_TO 가 있으면 모든 요청을 새 주소로 보낸다
 const REDIRECT_TO = (process.env.REDIRECT_TO || '').replace(/\/$/, '');

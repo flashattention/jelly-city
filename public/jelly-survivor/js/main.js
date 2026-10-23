@@ -233,7 +233,8 @@ function render(dt, interp) {
   for (const P of V.pl.values()) {
     P.x += (P.tx - P.x) * k; P.z += (P.tz - P.z) * k;
     let d = (P.tface ?? 0) - P.face; d = Math.atan2(Math.sin(d), Math.cos(d)); P.face += d * Math.min(1, dt * 12);
-    const sp = Math.hypot(P.x - P.last.x, P.z - P.last.z) / Math.max(dt, 1e-3); P.last.set(P.x, 0, P.z);
+    const sp0 = Math.hypot(P.x - P.last.x, P.z - P.last.z) / Math.max(dt, 1e-3); P.last.set(P.x, 0, P.z);
+    P.spd = (P.spd || 0) + (sp0 - (P.spd || 0)) * Math.min(1, dt * 10); const sp = P.spd; // 걷기 빠르기도 부드럽게 (같이 하기 보간에서도 깜빡이지 않게)
     P.r.root.position.set(P.x, 0, P.z); P.r.root.rotation.y = P.face; P.r.root.visible = P.st !== 2;
     P.r.update(dt, P.st === 0 ? Math.min(6, sp) : 0, { noCrawl: true });
     // 맞는 순간 깜빡
@@ -448,7 +449,7 @@ function frame() {
     if (game.kind === 'solo' && game.sim) {
       game.sim.input(game.myId, dx, dz);
       if (started && !game.paused && !game.choices) {
-        acc += dt; while (acc >= 1 / 60) { acc -= 1 / 60; game.sim.step(1 / 60); }
+        game.sim.step(Math.min(dt, 1 / 30)); // 매 프레임 실제 시간만큼 (고정 칸으로 돌리면 어떤 프레임은 안 움직여서 깜빡 · 버벅인다)
         const s = game.sim.snapshot(); apply(s, true);
         const P = game.sim.players.get(game.myId);
         if (P.choices && !game.choices) showChoices(P.choices, P.pending);
