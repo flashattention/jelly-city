@@ -35,6 +35,7 @@ jobs:
           curl -sf localhost:8123/jelly-apple/ > /dev/null
           curl -sf localhost:8123/jelly-word/ > /dev/null
           curl -sf localhost:8123/jelly-draw/ > /dev/null
+          curl -sf localhost:8123/jelly-type/ > /dev/null
           curl -sf 'localhost:8123/api/apple/board?b=t120' > /dev/null
           curl -sf localhost:8123/api/dream/board
 

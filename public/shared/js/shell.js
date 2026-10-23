@@ -148,7 +148,7 @@ export class Shell {
     this.on('rooms', (m) => { if (!this.room) this.renderRooms(m.rooms); });
     this.on('error', (m) => { this.toast(m.text || '문제가 생겼어요', 2600); if (!this.room && !this.playing && $('lobby').classList.contains('hidden')) { this.multi = false; this.show('title'); } });
     this.on('chat', (m) => this.chat.receive(m));
-    this.on('joined', (m) => { this.chat.reset(m.chat || []); this.chat.show(!m.practice); this.room = m.room; this.members = m.members; $('room-rank').classList.add('hidden'); this.show('room'); this.renderRoom(); });
+    this.on('joined', (m) => { this.chat.reset(m.chat || []); this.chat.show(true); this.room = m.room; this.members = m.members; $('room-rank').classList.add('hidden'); this.show('room'); this.renderRoom(); });
     this.on('room', (m) => { this.room = m.room; this.members = m.members; this.chat.renderScope(); if (!this.playing && !$('room').classList.contains('hidden')) this.renderRoom(); });
     this.on('left', () => { this.chat.show(false); const was = this.room; this.room = null; if (!this.multi || !was) return; this.afterLeave(); });
     this.on('start', (m) => { this.members = m.members; this.playing = true; o.onStart?.(m, this); });

@@ -66,6 +66,13 @@ $('input-bar').addEventListener('submit', (e) => {
 });
 function bad(msg) { const inp = $('word-in'); inp.classList.remove('bad'); void inp.offsetWidth; inp.classList.add('bad'); $('word-msg').textContent = `❌ ${msg}`; $('word-msg').className = ''; S.sfx('bad'); inp.select(); }
 
+// Enter: 내 차례면 입력 칸을 직접 누르지 않아도 바로 단어를 쓴다 (채팅보다 먼저)
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || e.isComposing || game.mode !== 'play' || game.turn !== game.myId) return;
+  const a = document.activeElement, inp = $('word-in');
+  if (a === inp || (a && ['INPUT', 'TEXTAREA'].includes(a.tagName))) return; // 채팅 칸에 쓰는 중이면 그대로
+  e.preventDefault(); e.stopImmediatePropagation(); inp.focus();
+}, true);
 // ---------- 흐름 ----------
 let lastSec = -1;
 function frame(now) {
@@ -108,13 +115,14 @@ const shell = new Shell({
   sound: { muted: () => S.sound.muted, toggle: () => { S.toggleMute(); $('b-mute').textContent = S.sound.muted ? '🔇' : '🔊'; } },
   key: 'jellyword', title: '🔤 젤리 끝말잇기', subtitle: '끝 글자로 시작하는 낱말을 차례대로 이어요!<br>시간 안에 못 이으면 젤리 하트가 하나씩 녹아요', wsPath: '/word-ws', max: 8,
   multiLabel: '👥 같이 하기', roomIcon: '🔤', startLabel: '🔤 끝말잇기 시작!',
-  keysHelp: '내 차례에 단어를 치고 Enter · 두 글자 이상 명사 · 한 번 나온 단어는 다시 못 써요 · 두음법칙 인정 (력 → 역)',
+  keysHelp: '내 차례엔 Enter 만 눌러도 바로 단어 칸 · 두 글자 이상 낱말 (외래어 · 사람 이름 · 캐릭터 이름도 OK) · 한 번 나온 단어는 다시 못 써요 · 두음법칙 인정 (력 → 역)',
   buttons: [{ id: 'bot-btn', label: '🤖 젤리봇과 하기 <small>바로 연습</small>', onClick: () => practice() }],
   describe: (o = {}) => `${o.speed === 'fast' ? '⚡ 빠르게' : '🐢 보통'} · 🍬 ${o.lives || 3} · 🤖 ${o.bots || 0}`,
   options: { room: (el, o, host) => optsUI(el, o, host, (n) => shell.send({ t: 'opts', opts: n })) },
   onStart: (m) => start(m),
   onFinish: (m) => results(m),
   onDisconnect: () => { if (game.mode === 'play') toTitle(); },
+  onChatClose: () => { if (game.mode === 'play' && game.turn === game.myId) $('word-in').focus(); }, // 채팅을 닫으면 다시 단어 칸으로
 });
 shell.pickOpts = () => ({ ...game.pick });
 shell.on('ty', (m) => { if (m.id !== game.turn) return; say(m.id, m.s || '…'); if (m.id !== game.myId) S.sfx('type'); });

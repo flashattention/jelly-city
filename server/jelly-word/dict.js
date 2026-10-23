@@ -27,7 +27,7 @@ export const isWordShape = (w) => /^[가-힣]{2,12}$/.test(w);
 // ---------- 사전 확인 ----------
 export class Dict {
   constructor(dataDir) {
-    this.file = path.join(dataDir, 'word-cache.json');
+    this.file = path.join(dataDir, 'word-cache3.json'); // 3: 인명 · 캐릭터 · 고유명사 · 외래어도 인정하는 기준 (예전 판정은 버린다)
     this.cache = {};
     try { this.cache = JSON.parse(fs.readFileSync(this.file, 'utf8')); } catch { /* 처음 */ }
     this.dirty = false; this.pending = new Map();
@@ -42,18 +42,18 @@ export class Dict {
   // { ok, why } — 단어장에 있으면 바로, 아니면 저장된 판정, 그래도 없으면 LLM 에게 묻는다
   async check(w) {
     if (BASE.has(w)) return { ok: true };
-    if (w in this.cache) return this.cache[w] ? { ok: true } : { ok: false, why: '사전에 없는 단어예요' };
+    if (w in this.cache) return this.cache[w] ? { ok: true } : { ok: false, why: '쓸 수 없는 말이에요 (활용형 · 지어낸 말 · 비속어)' };
     if (!llmEnabled) return { ok: true, loose: true }; // 사전 확인을 못 하면 너그럽게
     if (this.pending.has(w)) return this.pending.get(w);
     const job = (async () => {
       try {
         const r = await complete([
-          { role: 'system', content: '너는 한국어 끝말잇기 심판이다. 주어진 단어가 국립국어원 표준국어대사전(또는 우리말샘)에 표제어로 실린 일반 명사인지 판정한다. 사람 이름 · 지명 · 상표 같은 고유명사, 사전에 없는 합성어 · 신조어 · 줄임말, 동사 · 형용사 활용형, 비속어는 인정하지 않는다. 띄어쓰기 없이 한 단어로 사전에 실려 있어야 한다.' },
+          { role: 'system', content: '너는 너그러운 한국어 끝말잇기 심판이다. 주어진 낱말이 한국어에서 실제로 쓰이는 명사이면 인정한다. 표준국어대사전 · 우리말샘의 일반 명사, 외래어 · 전문 용어(예: 사이코패스, 알고리즘), 고유명사(사람 이름 · 연예인 · 운동선수 · 역사 인물, 나라 · 도시 · 지명, 영화 · 책 · 노래 등 작품, 상표 · 회사, 게임 · 만화 · 애니 캐릭터, 리그 오브 레전드 챔피언 같은 게임 캐릭터 이름, 예: 음바페, 이순신, 서울, 피카츄, 르블랑, 아리)를 모두 인정한다. 인정하지 않는 것: 실제로 없는 지어낸 말, 오타, 동사 · 형용사 활용형(먹었다, 예쁜), 조사가 붙은 말, 욕설 · 비속어. 애매하면 인정한다.' },
           { role: 'user', content: `단어: ${w}` },
         ], { schema: { type: 'object', properties: { valid: { type: 'boolean' } }, required: ['valid'], additionalProperties: false }, temperature: 0, max_tokens: 20 });
         const ok = !!r.valid;
         this.cache[w] = ok; this.dirty = true;
-        return ok ? { ok: true } : { ok: false, why: '사전에 없는 단어예요' };
+        return ok ? { ok: true } : { ok: false, why: '쓸 수 없는 말이에요 (활용형 · 지어낸 말 · 비속어)' };
       } catch (e) {
         console.warn('단어 확인 실패', e.message);
         return { ok: true, loose: true };

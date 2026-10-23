@@ -23,6 +23,7 @@ import { AppleRooms } from './jelly-apple/rooms.js';
 import { WordRooms } from './jelly-word/rooms.js';
 import { Dict } from './jelly-word/dict.js';
 import { DrawRooms } from './jelly-draw/rooms.js';
+import { TypeRooms } from './jelly-type/rooms.js';
 import { normWord } from '../public/jelly-draw/js/prompts.js';
 import { complete } from './jelly-city/llm.js';
 import { Records } from './shared/records.js';
@@ -59,6 +60,12 @@ const wordDict = new Dict(DATA_DIR); // 끝말잇기 사전 판정 (LLM 결과�
 const wordRooms = new WordRooms((sid) => world.userOf(sid), wordDict);
 const drawRooms = new DrawRooms((sid) => world.userOf(sid)); // 젤리 그림릴레이 방
 const guessHits = new Map();
+// 젤리 타자연습: 경주 방 · 짧은 글 최고 타수(정확도 90% 이상) · 젤리비 최고 점수
+const typeRooms = new TypeRooms((sid) => world.userOf(sid));
+const typeRecords = new Records(DATA_DIR, 'jelly-type', {
+  boards: ['kpm', 'rain'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.value)),
+  check: (b) => { const v = Number(b.value); return Number.isFinite(v) && v >= 0 && v <= (b.b === 'kpm' ? 1600 : 5000000) ? null : '기록이 이상해요'; },
+});
 const riderRecords = new Records(DATA_DIR, 'jelly-rider', {
   boards: RIDER_TRACKS, better: (a, b) => a.value < b.value, value: (b) => Math.round(Number(b.time) * 1000) / 1000,
   check: (b) => (Number.isFinite(Number(b.time)) && Number(b.time) >= 40 && Number(b.time) <= 3600 ? null : '기록이 이상해요'),
@@ -123,6 +130,7 @@ async function api(req, res, url) {
       return json(res, 200, { guesses, comment: String(r.comment || '').slice(0, 40), hit });
     } catch (e) { console.warn('그림 맞히기 실패', e.message); return json(res, 502, { error: 'AI 젤리봇이 그림을 못 봤어요' }); }
   }
+  if (url.pathname.startsWith('/api/type/')) return typeRecords.api(req, res, url, world.userOf(sid), json, '/api/type');
   if (url.pathname.startsWith('/api/apple/')) return appleRecords.api(req, res, url, world.userOf(sid), json, '/api/apple');
   const who = world.userOf(sid);
   if (!who) return json(res, 401, { error: 'login' });
@@ -226,13 +234,13 @@ riderWss.on('connection', (ws) => riderRooms.connect(ws));
 const attackWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
 attackWss.on('connection', (ws) => attackRooms.connect(ws));
 const partyWss = (rooms) => { const w = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false }); w.on('connection', (ws) => rooms.connect(ws)); return w; };
-const appleWss = partyWss(appleRooms), wordWss = partyWss(wordRooms);
+const appleWss = partyWss(appleRooms), wordWss = partyWss(wordRooms), typeWss = partyWss(typeRooms);
 const drawWss = new WebSocketServer({ noServer: true, maxPayload: 160 * 1024, perMessageDeflate: { threshold: 2048 } }); // 그림은 커서 더 크게 · 압축
 drawWss.on('connection', (ws) => drawRooms.connect(ws));
 // 주소로 나눠 받는다: /ws = 젤리시티 · /dream-ws = 드림 러너
 server.on('upgrade', (req, socket, head) => {
   const p = new URL(req.url, 'http://x').pathname;
-  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/rider-ws' ? riderWss : p === '/attack-ws' ? attackWss : p === '/apple-ws' ? appleWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : null;
+  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/rider-ws' ? riderWss : p === '/attack-ws' ? attackWss : p === '/apple-ws' ? appleWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : p === '/type-ws' ? typeWss : null;
   if (!target) { socket.destroy(); return; }
   target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
 });
@@ -287,7 +295,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
     stopping = true;
     world.broadcast({ t: 'sys', text: '🔧 서버가 업데이트돼요! 잠시 후 자동으로 다시 접속해요' });
     try { world.save(); console.log('💾 세계를 저장했어요'); } catch (e) { console.error('저장 실패', e); }
-    dreamBoard.save(); riderRecords.save(); appleRecords.save(); wordDict.save();
+    dreamBoard.save(); riderRecords.save(); appleRecords.save(); wordDict.save(); typeRecords.save();
     setTimeout(() => process.exit(0), 500);
   });
 }

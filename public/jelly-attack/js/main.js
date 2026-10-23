@@ -98,11 +98,11 @@ $('b-mute').textContent = sound.muted ? '🔇' : '🔊';
 $('b-quit').onclick = () => quit();
 
 // ---------- 처음 화면 · 방 ----------
-const describe = (o = {}) => { const m = mapById(o.map); return `${m.emoji} ${m.name} · ${o.mode === 'ffa' ? '개인전' : '팀 데스매치'} · 봇 ${o.bots ?? 0}`; };
-function optsUI(el, o, editable, set) {
+const describe = (o = {}) => { const m = mapById(o.map); return `${m.emoji} ${m.name} · ${o.mode === 'ffa' ? `개인전 · 봇 ${o.bots ?? 0}` : '팀 데스매치'}`; };
+function optsUI(el, o, editable, set, room = false) {
   el.innerHTML = `<div class="map-pick">${MAPS.map((m) => `<button data-m="${m.id}" class="${m.id === o.map ? 'on' : ''}" ${editable ? '' : 'disabled'}><b>${m.emoji}</b>${esc(m.name)}</button>`).join('')}</div>
     <div class="seg"><button data-mode="tdm" class="${o.mode !== 'ffa' ? 'on' : ''}" ${editable ? '' : 'disabled'}>👥 팀 데스매치</button><button data-mode="ffa" class="${o.mode === 'ffa' ? 'on' : ''}" ${editable ? '' : 'disabled'}>🎯 개인전</button></div>
-    <div class="bots-row">🤖 봇 ${editable ? '<button data-b="-1">−</button>' : ''}<b>${o.bots ?? 0}</b>${editable ? '<button data-b="1">＋</button>' : ''}</div>`;
+    ${room && o.mode !== 'ffa' ? '<div class="bots-row">👥 팀전은 사람끼리 (봇 없음)</div>' : `<div class="bots-row">🤖 봇 ${editable ? '<button data-b="-1">−</button>' : ''}<b>${o.bots ?? 0}</b>${editable ? '<button data-b="1">＋</button>' : ''}</div>`}`;
   el.querySelectorAll('[data-m]').forEach((b) => { b.onclick = () => set({ map: b.dataset.m }); });
   el.querySelectorAll('[data-mode]').forEach((b) => { b.onclick = () => set({ mode: b.dataset.mode }); });
   el.querySelectorAll('[data-b]').forEach((b) => { b.onclick = () => set({ bots: Math.max(0, Math.min(10, (o.bots ?? 0) + +b.dataset.b)) }); });
@@ -119,7 +119,7 @@ const shell = new Shell({
   describe,
   teamChat: (o) => o.mode !== 'ffa', // 팀 데스매치면 팀 채팅
   onChatClose: () => { if (game.mode === 'play' && $('loadout').classList.contains('hidden')) lock(); }, // 채팅을 닫으면 바로 다시 조준
-  options: { room: (el, o, host) => optsUI(el, o, host, (n) => shell.send({ t: 'opts', opts: n })) },
+  options: { room: (el, o, host) => optsUI(el, o, host, (n) => shell.send({ t: 'opts', opts: n }), true) },
   onProfile: (p) => { game.color = p.color; },
   onStart: (m) => start(m),
   onFinish: (m) => results(m),

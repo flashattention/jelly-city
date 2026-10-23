@@ -92,6 +92,7 @@ export class BaseRooms {
         if (r.opts.team && r.players.length > 1 && new Set(r.players.map((p) => p.team)).size < 2) r.players.forEach((p, i) => { p.team = i % 2 ? 'blue' : 'red'; });
         const extra = this.onStart(r) || {};
         this.toRoom(r, { t: 'start', seed: r.seed, in: this.o.countdown, members: this.members(r), opts: r.opts, ...extra });
+        this.botsGreet(r);
         return this.broadcastList();
       }
       case 'st': {
@@ -106,6 +107,11 @@ export class BaseRooms {
       default:
         if (c.room) this.onMessage(c, m, c.room);
     }
+  }
+  // 젤리봇도 채팅으로 한마디 (시작할 때)
+  botsGreet(r) {
+    const LINES = ['잘 부탁해요! 🍬', '이번엔 안 질 거예요 😤', '다들 화이팅! ✨', '젤리봇 등장! 🤖', '살살 해 주세요 🥺', '오늘 컨디션 최고예요 💪', '즐겁게 해요~ 🎉'];
+    r.players.filter((p) => p.bot).forEach((b, i) => setTimeout(() => { if (r.players.includes(b)) this.pushChat(r, { id: b.id, name: `🤖 ${b.name}`, color: b.color, s: LINES[Math.floor(Math.random() * LINES.length)], team: null }); }, 600 + i * 900 + Math.random() * 500));
   }
   // ---------- 채팅: 대기실부터 게임 중까지 · 팀전이면 팀에게만도 ----------
   teamChat(r) { return !!r.opts?.team; }

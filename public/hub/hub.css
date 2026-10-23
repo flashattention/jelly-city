@@ -114,3 +114,8 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .draw .paper svg { width: 100%; height: 100%; }
 .draw .brush { position: absolute; left: 66%; top: 34%; font-size: 44px; animation: wob 2s ease-in-out infinite; }
 @keyframes wob { 50% { transform: translateY(-6px) rotate(4deg); } }
+/* 타자연습 카드 */
+.type .art { background: linear-gradient(180deg, #7cf0c8 0%, #8fd3ff 100%); }
+.type .keys { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%) perspective(300px) rotateX(25deg); display: grid; grid-template-columns: repeat(5, 40px); gap: 6px; }
+.type .keys i { height: 40px; border-radius: 10px; background: #fff; color: #3a2350; font-style: normal; font-family: 'Jua', sans-serif; font-size: 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 0 #c9b8ff; }
+.type .drop { position: absolute; left: 62%; top: 6%; padding: 6px 14px; border-radius: 999px; background: radial-gradient(circle at 30% 30%, #fff, #ff8fc4 60%); font-family: 'Jua', sans-serif; color: #3a2350; animation: wob 2.4s ease-in-out infinite; }

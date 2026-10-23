@@ -47,7 +47,7 @@ export class AttackRooms extends BaseRooms {
     r.endAt = Date.now() + this.o.countdown + TIME * 1000;
     r.limit = r.opts.mode === 'tdm' ? 40 : 20;
     // 봇 채우기 (팀전이면 사람이 적은 팀부터)
-    const n = r.opts.bots;
+    const n = !r.private && r.opts.mode === 'tdm' ? 0 : r.opts.bots; // 팀전(같이 하기)에는 봇 없이 사람끼리
     for (let i = 0; i < n && r.players.length < this.o.max; i++) {
       const b = { bot: true, id: this.nextPid++, name: BOT_NAMES[i % BOT_NAMES.length], color: BOT_COLORS[i % BOT_COLORS.length], room: r, st: null, team: null, skill: 0.55 + Math.random() * 0.35, gun: BOT_GUNS[Math.floor(Math.random() * BOT_GUNS.length)] };
       b.team = this.smaller(r, b);

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>젤리 타자연습</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/css/shell.css" />
+  <link rel="stylesheet" href="../shared/css/party.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <div class="bubbles" aria-hidden="true"></div>
+  <!-- 문장 치기 (연습 · 경주) -->
+  <div id="game" class="hidden">
+    <div id="lanes" class="hidden"></div>
+    <div id="stats">
+      <div class="st panel"><span>타수</span><b id="s-kpm">0</b></div>
+      <div class="st panel"><span>정확도</span><b id="s-acc">100%</b></div>
+      <div class="st panel"><span>진행</span><b id="s-prog">1/5</b></div>
+      <div class="st panel"><span>시간</span><b id="s-time">0.0</b></div>
+    </div>
+    <div id="type-box" class="panel">
+      <div id="target"></div>
+      <input id="typed" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="여기에 그대로 따라 쳐요 · 다 치면 Enter" />
+      <div id="next"></div>
+    </div>
+    <div class="hud-r"><button id="b-mute" title="소리">🔊</button><button id="b-quit" title="그만하기">✕</button></div>
+  </div>
+  <!-- 젤리비 -->
+  <div id="rain" class="hidden">
+    <canvas id="rain-cv"></canvas>
+    <div id="rain-hud"><div class="panel"><span>점수</span><b id="r-score">0</b></div><div class="panel"><span>단계</span><b id="r-level">1</b></div><div class="panel"><span>젤리 둑</span><b id="r-lives"></b></div></div>
+    <form id="rain-form" autocomplete="off"><input id="rain-in" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="떨어지는 낱말을 치고 Enter!" /></form>
+    <div class="hud-r"><button id="b-mute2" title="소리">🔊</button><button id="b-quit2" title="그만하기">✕</button></div>
+  </div>
+  <div id="count" class="overlay hidden"><div class="count-big" id="count-n">3</div></div>
+  <div id="over" class="screen hidden"><div class="card wide">
+    <h2 id="ov-title"></h2>
+    <div id="ov-me" class="sub"></div>
+    <div id="ov-save" class="hidden"><div class="note">로그인하지 않았어요. 순위표에 남길 닉네임을 정해 주세요</div><div class="row"><input id="ov-nick" maxlength="14" placeholder="닉네임" /><button id="ov-save-btn" class="btn alt">기록 남기기</button></div></div>
+    <div id="ov-rank" class="res-list"></div>
+    <div class="row2"><button id="again-btn" class="btn big">🔁 한 번 더</button><button id="home-btn" class="btn ghost">처음으로</button></div>
+  </div></div>
+  <div id="board-screen" class="screen hidden"><div class="card wide">
+    <h2>🏆 타자연습 순위표</h2>
+    <div class="seg" id="bd-seg"><button data-b="kpm" class="on">⌨️ 짧은 글 타수</button><button data-b="rain">🍬 젤리비 점수</button></div>
+    <div id="bd-list" class="board" style="margin-top:14px"></div>
+    <div class="row2"><button id="bd-back" class="btn ghost">← 돌아가기</button></div>
+  </div></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

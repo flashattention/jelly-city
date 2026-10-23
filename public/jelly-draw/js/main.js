@@ -144,6 +144,13 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
+// Enter: 제시어 · 맞히기 칸을 직접 누르지 않아도 바로 쓴다 (채팅보다 먼저)
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || e.isComposing || game.mode !== 'play' || game.submitted || !['word', 'guess'].includes(game.kind)) return;
+  const a = document.activeElement, inp = $(game.kind === 'word' ? 'word-in' : 'guess-in');
+  if (a === inp || (a && ['INPUT', 'TEXTAREA'].includes(a.tagName))) return;
+  e.preventDefault(); e.stopImmediatePropagation(); inp.focus();
+}, true);
 // ---------- 함께 넘겨 보기 ----------
 function onReveal(m) {
   game.kind = 'reveal'; game.books = m.books; game.steps = m.steps; game.host = m.host; game.likes = {}; game.myLikes = new Set();
@@ -234,6 +241,7 @@ const shell = new Shell({
   onStart: (m) => start(m),
   onFinish: (m) => results(m),
   onDisconnect: () => { if (game.mode === 'play' && !game.solo) toTitle(); },
+  onChatClose: () => { if (game.mode === 'play' && !game.submitted && ['word', 'guess'].includes(game.kind)) $(game.kind === 'word' ? 'word-in' : 'guess-in').focus(); },
 });
 shell.pickOpts = () => ({ ...game.pick });
 shell.on('phase', (m) => onPhase(m));
