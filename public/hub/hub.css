@@ -128,3 +128,9 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .card.surv .horde i.me { left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 40px; animation: none; filter: drop-shadow(0 0 10px #fff); }
 .card.surv .horde i:nth-child(odd) { animation-delay: -1.2s; }
 @keyframes horde { to { transform: translate(8px, 6px) scale(1.1); } }
+
+/* 스케치퀴즈 카드 */
+.card.sketch .art { background: linear-gradient(160deg, #ffe08a, #ffb3c7); }
+.sketch .paper { position: absolute; left: 50%; top: 32%; transform: translate(-50%, -50%) rotate(3deg); width: 170px; height: 112px; background: #fffdf8; border-radius: 14px; box-shadow: 0 12px 26px rgba(0,0,0,.25); padding: 10px; }
+.sketch .paper svg { width: 100%; height: 100%; }
+.sketch .brush { position: absolute; right: 18%; top: 14%; font-size: 40px; }

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>젤리 스케치퀴즈</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/css/shell.css" />
+  <link rel="stylesheet" href="../shared/css/party.css" />
+  <link rel="stylesheet" href="../jelly-draw/style.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <div class="bubbles" aria-hidden="true"></div>
+  <div id="game" class="hidden">
+    <div id="sk-head">
+      <div id="sk-round"></div>
+      <div id="sk-hint"></div>
+      <div id="timer" class="pbar"><i></i></div>
+    </div>
+    <div id="sk-main">
+      <div id="sk-players" class="panel"></div>
+      <div id="sk-center">
+        <div id="paper-wrap"><canvas id="paper"></canvas><div id="sk-cover" class="hidden"></div></div>
+        <div id="tools" class="hidden">
+          <div id="palette"></div>
+          <div id="sizes"></div>
+          <button id="t-erase" class="tool" title="지우개">🧽</button>
+          <button id="t-undo" class="tool" title="되돌리기 (Ctrl+Z)">↩️</button>
+          <button id="t-clear" class="tool" title="다 지우기">🗑️</button>
+        </div>
+      </div>
+      <div id="sk-side" class="panel">
+        <div class="ptitle">💬 맞히기</div>
+        <div id="sk-feed"></div>
+        <form id="sk-form" autocomplete="off"><input id="sk-in" maxlength="30" placeholder="정답을 써요 (Enter)" autocomplete="off" /><button class="btn alt">보내기</button></form>
+      </div>
+    </div>
+    <!-- 주제 정하기 (그리는 사람만) -->
+    <div id="sk-pick" class="hidden"><div class="card">
+      <div class="big-q">✏️ 내가 그릴 주제를 정해요</div>
+      <div class="note">아무거나 직접 써도 돼요! 친구들이 맞히게 그려 봐요 · 정답은 나만 봐요</div>
+      <form class="answer" id="pick-form"><input id="pick-in" maxlength="20" placeholder="예: 춤추는 곰돌이" autocomplete="off" /><button class="btn alt">이걸로!</button></form>
+      <div class="note">또는 추천에서 고르기</div>
+      <div id="choices"></div>
+    </div></div>
+    <div id="sk-banner" class="hidden"></div>
+    <div class="hud-r"><button id="b-mute" title="소리">🔊</button><button id="b-quit" title="그만하기">✕</button></div>
+  </div>
+  <div id="count" class="overlay hidden"><div class="count-big" id="count-n">3</div></div>
+  <div id="over" class="screen hidden"><div class="card wide">
+    <h2 id="ov-title">🖍️ 스케치퀴즈 끝!</h2>
+    <div id="ov-me" class="sub"></div>
+    <div id="ov-rank" class="res-list"></div>
+    <div class="row2"><button id="again-btn" class="btn big">🔁 방으로 돌아가기</button><button id="home-btn" class="btn ghost">처음으로</button></div>
+  </div></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

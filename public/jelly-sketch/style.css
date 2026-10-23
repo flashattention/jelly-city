@@ -1,0 +1,42 @@
+/* 젤리 스케치퀴즈 (그리기 도구 · 종이 모양은 그림릴레이 style.css 를 같이 쓴다) */
+#game { flex-direction: column; align-items: center; padding: 12px 14px; gap: 8px; overflow-y: auto; }
+#sk-head { width: min(1280px, 100%); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+#sk-round { font-family: 'Jua', sans-serif; font-size: 18px; opacity: .9; }
+#sk-hint { font-family: 'Jua', sans-serif; font-size: 34px; letter-spacing: 6px; min-height: 44px; text-shadow: 0 3px 0 rgba(0,0,0,.25); }
+#sk-hint.mine { color: #ffd84d; letter-spacing: 2px; }
+#sk-main { width: min(1280px, 100%); display: grid; grid-template-columns: 200px 1fr 290px; gap: 12px; align-items: start; }
+#sk-players { padding: 10px; display: flex; flex-direction: column; gap: 6px; max-height: 76vh; overflow-y: auto; }
+.skp { display: grid; grid-template-columns: 34px 1fr auto; gap: 6px; align-items: center; padding: 5px 8px; border-radius: 14px; background: rgba(255,255,255,.07); border: 2px solid transparent; transition: background .3s; }
+.skp .nm { font-family: 'Jua', sans-serif; font-size: 14px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.skp .sc { font-family: 'Jua', sans-serif; font-size: 15px; color: #ffd84d; }
+.skp.me { border-color: rgba(255,216,77,.6); }
+.skp.drawer { background: rgba(255,143,196,.28); }
+.skp.got { background: rgba(124,240,200,.25); }
+.skp .tag { font-size: 12px; }
+#sk-center { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
+#paper-wrap { position: relative; }
+#sk-cover { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; border-radius: 22px; background: rgba(40,20,70,.55); font-family: 'Jua', sans-serif; font-size: 26px; padding: 20px; }
+#sk-side { padding: 10px; display: flex; flex-direction: column; gap: 6px; height: 76vh; }
+#sk-side .ptitle { font-family: 'Jua', sans-serif; font-size: 16px; }
+#sk-feed { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+#sk-feed .ln { padding: 4px 8px; border-radius: 10px; background: rgba(255,255,255,.06); word-break: break-all; }
+#sk-feed .ln b { font-family: 'Jua', sans-serif; font-weight: normal; margin-right: 6px; }
+#sk-feed .ln.ok { background: rgba(124,240,200,.3); font-family: 'Jua', sans-serif; }
+#sk-feed .ln.close { background: rgba(255,216,77,.3); }
+#sk-feed .ln.sys { background: none; opacity: .75; text-align: center; font-size: 13px; }
+#sk-feed .ln.side { opacity: .6; }
+#sk-form { display: flex; gap: 6px; }
+#sk-form input { flex: 1; min-width: 0; font-family: 'Jua', sans-serif; font-size: 17px; padding: 10px 12px; }
+#sk-form button { padding: 8px 12px; }
+#sk-pick { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: rgba(20,8,50,.55); }
+#sk-pick .card { max-width: 640px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+#sk-banner { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 15; padding: 18px 32px; border-radius: 26px; background: rgba(28,14,60,.92); font-family: 'Jua', sans-serif; font-size: 30px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,.4); animation: skin .35s cubic-bezier(.2, 1.6, .4, 1); }
+#sk-banner small { display: block; font-family: 'Gowun Dodum'; font-size: 15px; opacity: .85; margin-top: 6px; }
+#sk-banner b { color: #ffd84d; }
+@keyframes skin { from { transform: translate(-50%, -50%) scale(.5); opacity: 0; } }
+@media (max-width: 980px) {
+  #sk-main { grid-template-columns: 1fr; }
+  #sk-players { flex-direction: row; flex-wrap: wrap; max-height: none; }
+  .skp { grid-template-columns: 28px auto auto; }
+  #sk-side { height: 34vh; }
+}

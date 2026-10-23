@@ -22,6 +22,7 @@ import { AttackRooms } from './jelly-attack/rooms.js';
 import { BgRooms } from './jelly-attack/bg.js';
 import { AppleRooms } from './jelly-apple/rooms.js';
 import { SurvRooms } from './jelly-survivor/rooms.js';
+import { SketchRooms } from './jelly-sketch/rooms.js';
 import { WordRooms } from './jelly-word/rooms.js';
 import { Dict } from './jelly-word/dict.js';
 import { DrawRooms } from './jelly-draw/rooms.js';
@@ -68,6 +69,7 @@ const survRecords = new Records(DATA_DIR, 'jelly-survivor', {
 const wordDict = new Dict(DATA_DIR); // 끝말잇기 사전 판정 (LLM 결과를 저장해 둔다)
 const wordRooms = new WordRooms((sid) => world.userOf(sid), wordDict);
 const drawRooms = new DrawRooms((sid) => world.userOf(sid)); // 젤리 그림릴레이 방
+const sketchRooms = new SketchRooms((sid) => world.userOf(sid)); // 젤리 스케치퀴즈 방 (최대 12명)
 const guessHits = new Map();
 // 젤리 타자연습: 경주 방 · 짧은 글 최고 타수(정확도 90% 이상) · 젤리비 최고 점수
 const typeRooms = new TypeRooms((sid) => world.userOf(sid));
@@ -255,10 +257,12 @@ const drawWss = new WebSocketServer({ noServer: true, maxPayload: 160 * 1024, pe
 drawWss.on('connection', (ws) => drawRooms.connect(ws));
 const survWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: { threshold: 512 } }); // 충치균이 많아서 압축
 survWss.on('connection', (ws) => survRooms.connect(ws));
+const sketchWss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024, perMessageDeflate: { threshold: 1024 } }); // 그리는 획을 실시간으로
+sketchWss.on('connection', (ws) => sketchRooms.connect(ws));
 // 주소로 나눠 받는다: /ws = 젤리시티 · /dream-ws = 드림 러너
 server.on('upgrade', (req, socket, head) => {
   const p = new URL(req.url, 'http://x').pathname;
-  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/rider-ws' ? riderWss : p === '/attack-ws' ? attackWss : p === '/bg-ws' ? bgWss : p === '/apple-ws' ? appleWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : p === '/type-ws' ? typeWss : p === '/surv-ws' ? survWss : null;
+  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/rider-ws' ? riderWss : p === '/attack-ws' ? attackWss : p === '/bg-ws' ? bgWss : p === '/apple-ws' ? appleWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : p === '/type-ws' ? typeWss : p === '/surv-ws' ? survWss : p === '/sketch-ws' ? sketchWss : null;
   if (!target) { socket.destroy(); return; }
   target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
 });
