@@ -2,16 +2,58 @@
 //   상자 = { x, z: 가운데, w(x 폭), d(z 폭), y: 바닥 높이, h: 높이, k: 종류(색) }
 const B = (x, z, w, d, h, k = 'wall', y = 0) => ({ x, z, w, d, h, k, y });
 function walls(W, D, h = 6) { return [B(0, -D / 2 - 0.5, W + 2, 1, h, 'outer'), B(0, D / 2 + 0.5, W + 2, 1, h, 'outer'), B(-W / 2 - 0.5, 0, 1, D, h, 'outer'), B(W / 2 + 0.5, 0, 1, D, h, 'outer')]; }
+// ---------- 들어갈 수 있는 건물 ----------
+//   벽(두께 0.4) 에 문(폭 1.6) · 창문(1.0~2.2 높이 구멍) · 층마다 바닥 + 안쪽 계단 · 지붕
+//   doors: 1층 문이 있는 쪽 'N' 'S' 'E' 'W' 여러 개 · roof: 'pitch' 세모 지붕 / 'flat' 평평(올라설 수 있다)
+const T = 0.4;
+function wallRun(out, axis, c, fixed, len, h, y, k, gap, door) {
+  const box = (a, l, hh, yy) => out.push(axis === 'x' ? B(a, fixed, l, T, hh, k, yy) : B(fixed, a, T, l, hh, k, yy));
+  if (!gap) return box(c, len, h, y);
+  const side = (len - gap) / 2, off = (gap + side) / 2;
+  box(c - off, side, h, y); box(c + off, side, h, y);
+  if (door) box(c, gap, h - 2.3, y + 2.3); else { box(c, gap, 1.0, y); box(c, gap, h - 2.2, y + 2.2); }
+}
+function building(x, z, w, d, k, { floors = 1, doors = 'S', h = 3.2, roof = 'flat', inside = [] } = {}) {
+  const out = [];
+  for (let f = 0; f < floors; f++) {
+    const y = f * h, dr = (sd) => f === 0 && doors.includes(sd);
+    wallRun(out, 'x', x, z - d / 2, w, h, y, k, dr('N') ? 1.6 : w > 4 ? 1.4 : 0, dr('N'));
+    wallRun(out, 'x', x, z + d / 2, w, h, y, k, dr('S') ? 1.6 : w > 4 ? 1.4 : 0, dr('S'));
+    wallRun(out, 'z', z, x - w / 2, d, h, y, k, dr('W') ? 1.6 : d > 4 ? 1.4 : 0, dr('W'));
+    wallRun(out, 'z', z, x + w / 2, d, h, y, k, dr('E') ? 1.6 : 0, dr('E')); // 동쪽 벽 안쪽엔 계단이 붙는다
+    if (f > 0) {
+      // 위층 바닥 (계단 자리는 비운다) + 동쪽 벽을 따라 오르는 계단
+      const sw = 1.3, sx = x + w / 2 - T / 2 - sw / 2, run = Math.min(d - 1.2, 6 * 0.55);
+      out.push(B(x - sw / 2 - T / 4, z, w - sw - T / 2, d - T, 0.25, 'floor', y - 0.25));
+      out.push(B(sx, z - d / 2 + T / 2 + (d - T - run - 0.4) / 2, sw, d - T - run - 0.4, 0.25, 'floor', y - 0.25));
+      const n = 6, rise = h / n, step = run / n;
+      for (let i = 0; i < n; i++) out.push(B(sx, z + d / 2 - T / 2 - 0.2 - step * (i + 0.5), sw, step, rise * (i + 1), 'step', y - h));
+    }
+  }
+  const top = floors * h;
+  out.push({ ...B(x, z, w + 0.2, d + 0.2, 0.3, 'roofslab', top), roof: roof === 'pitch' ? 'pitch' : 'none' });
+  if (roof === 'flat') for (const [px, pz, pw, pd] of [[x, z - d / 2, w, T], [x, z + d / 2, w, T], [x - w / 2, z, T, d], [x + w / 2, z, T, d]]) out.push(B(px, pz, pw, pd, 0.5, k, top + 0.3)); // 옥상 낮은 난간 (앉으면 숨고 · 걸어서 넘는다)
+  for (const [ix, iz, n = 1] of inside) for (let i = 0; i < n; i++) out.push(B(x + ix, z + iz, 1.1, 1.1, 1.1, 'crate', i * 1.1));
+  return out;
+}
+// 바깥 계단: (x, z) 에서 (dx, dz) 쪽으로 올라가 높이 top 에 닿는다 (옥상 · 컨테이너 위로)
+function stairs(x, z, dx, dz, top, wide = 1.4, k = 'step') {
+  const n = Math.ceil(top / 0.5), rise = top / n, out = [];
+  for (let i = 0; i < n; i++) { const cx = x + dx * (i + 0.5) * 0.6, cz = z + dz * (i + 0.5) * 0.6; out.push(B(cx, cz, dx ? 0.6 : wide, dx ? wide : 0.6, rise * (i + 1), k)); }
+  return out;
+}
 function crates(list) { return list.flatMap(([x, z, n = 1]) => Array.from({ length: n }, (_, i) => B(x, z, 1.3, 1.3, 1.3, 'crate', i * 1.3))); }
 
 export const MAPS = [
   {
     id: 'depot', name: '제3보급창고', emoji: '📦', W: 84, D: 64,
     sky: ['#7fa7d6', '#e8d9b8', '#c9b48a'], fog: [40, 160], floor: '#b8a582', floor2: '#a89470',
-    colors: { outer: '#8d8a80', wall: '#c9b99a', ware: '#a0846a', roof: '#6d5a48', cont1: '#c0504d', cont2: '#3f7cb5', cont3: '#5f8f4e', crate: '#b8864b', low: '#9e9686', step: '#8d8a80' },
+    colors: { floor: '#b59b7a', roofslab: '#6d5a48', outer: '#8d8a80', wall: '#c9b99a', ware: '#a0846a', roof: '#6d5a48', cont1: '#c0504d', cont2: '#3f7cb5', cont3: '#5f8f4e', crate: '#b8864b', low: '#9e9686', step: '#8d8a80' },
     boxes: [
       ...walls(84, 64),
-      B(0, -6, 12, 8, 5.5, 'ware'), B(0, 8, 12, 8, 5.5, 'ware'),
+      ...building(0, -6, 12, 8, 'ware', { doors: 'EW', h: 4, inside: [[-3, -2, 2], [3, 2], [-3, 2]] }), ...building(0, 8, 12, 8, 'ware', { doors: 'EW', h: 4, inside: [[3, 2, 2], [-3, -2], [3, -2]] }),
+      ...stairs(-4, -11.2, 1, 0, 4.3, 1.2), ...stairs(4, 13.2, -1, 0, 4.3, 1.2),
+      B(-14, -17.8, 1.3, 1.3, 1.3, 'crate'), B(-15.3, -17.8, 1.3, 1.3, 1.3, 'crate'), B(-15.3, -17.8, 1.3, 1.3, 1.3, 'crate', 1.3), B(14, 17.8, 1.3, 1.3, 1.3, 'crate'), B(15.3, 17.8, 1.3, 1.3, 1.3, 'crate'), B(15.3, 17.8, 1.3, 1.3, 1.3, 'crate', 1.3),
       B(-14, -20, 12, 3, 3, 'cont1'), B(14, 20, 12, 3, 3, 'cont2'), B(-18, 16, 3, 10, 3, 'cont3'), B(18, -16, 3, 10, 3, 'cont1'),
       B(-14, -20, 12, 3, 3, 'cont2', 3), B(14, 20, 12, 3, 3, 'cont3', 3),
       B(-30, -8, 1, 8, 1.2, 'low'), B(-30, 10, 1, 8, 1.2, 'low'), B(30, 8, 1, 8, 1.2, 'low'), B(30, -10, 1, 8, 1.2, 'low'),
@@ -23,12 +65,13 @@ export const MAPS = [
   {
     id: 'desert', name: '사막 마을', emoji: '🏜️', W: 96, D: 72,
     sky: ['#ff9e57', '#ffe2b0', '#e8c07d'], fog: [45, 170], floor: '#e2c48a', floor2: '#d4b273',
-    colors: { outer: '#c9a06a', house: '#e8d4a8', house2: '#d9b98a', roof: '#b07d4b', wall: '#d2b07a', low: '#c79c63', crate: '#a8743f', stall: '#e57373', step: '#c9a06a' },
+    colors: { floor: '#c9a678', roofslab: '#b07d4b', outer: '#c9a06a', house: '#e8d4a8', house2: '#d9b98a', roof: '#b07d4b', wall: '#d2b07a', low: '#c79c63', crate: '#a8743f', stall: '#e57373', step: '#c9a06a' },
     boxes: [
       ...walls(96, 72, 7),
-      B(-22, -22, 10, 10, 6, 'house'), B(-22, 0, 10, 8, 5, 'house2'), B(-22, 22, 10, 10, 6, 'house'),
-      B(22, -22, 10, 10, 6, 'house2'), B(22, 0, 10, 8, 5, 'house'), B(22, 22, 10, 10, 6, 'house2'),
-      B(0, -14, 8, 8, 7, 'house'), B(0, 14, 8, 8, 7, 'house2'),
+      ...building(-22, -22, 10, 10, 'house', { floors: 2, doors: 'SE', roof: 'pitch', inside: [[-3, -3]] }), B(-22, 0, 10, 8, 5, 'house2'), B(-22, 22, 10, 10, 6, 'house'),
+      B(22, -22, 10, 10, 6, 'house2'), B(22, 0, 10, 8, 5, 'house'), ...building(22, 22, 10, 10, 'house2', { floors: 2, doors: 'NW', roof: 'pitch', inside: [[3, 3]] }),
+      ...building(0, -14, 8, 8, 'house', { floors: 2, doors: 'NS' }), ...building(0, 14, 8, 8, 'house2', { floors: 2, doors: 'NS' }),
+      ...stairs(-3.2, -1.4, 0, -1, 6.7, 1.2), ...stairs(3.2, 1.4, 0, 1, 6.7, 1.2),
       B(-6, 0, 1, 6, 2, 'low'), B(6, 0, 1, 6, 2, 'low'),
       B(-36, -14, 6, 1, 2.4, 'wall'), B(-36, 14, 6, 1, 2.4, 'wall'), B(36, -14, 6, 1, 2.4, 'wall'), B(36, 14, 6, 1, 2.4, 'wall'),
       B(-10, -30, 1.2, 1.2, 1, 'stall'), B(10, 30, 1.2, 1.2, 1, 'stall'), B(-12, 30, 3, 1.5, 1, 'stall'), B(12, -30, 3, 1.5, 1, 'stall'),
@@ -39,13 +82,15 @@ export const MAPS = [
   {
     id: 'factory', name: '젤리 공장', emoji: '🏭', W: 90, D: 60,
     sky: ['#3a2f5c', '#d97fb3', '#5c4a7a'], fog: [30, 140], floor: '#7c7a8c', floor2: '#6c6a7c',
-    colors: { outer: '#5c5a6c', tank: '#ff8fb8', tank2: '#7cd8ff', pipe: '#b0b6c3', belt: '#3c3a4c', wall: '#8a8798', plat: '#9a8fb3', crate: '#c48a5a', low: '#6c6a7c', step: '#9a8fb3' },
+    colors: { floor: '#8a87a0', roofslab: '#5c5a6c', outer: '#5c5a6c', tank: '#ff8fb8', tank2: '#7cd8ff', pipe: '#b0b6c3', belt: '#3c3a4c', wall: '#8a8798', plat: '#9a8fb3', crate: '#c48a5a', low: '#6c6a7c', step: '#9a8fb3' },
     boxes: [
       ...walls(90, 60, 8),
       B(-16, -14, 6, 6, 8, 'tank'), B(-16, 14, 6, 6, 8, 'tank2'), B(16, -14, 6, 6, 8, 'tank2'), B(16, 14, 6, 6, 8, 'tank'),
       B(0, 0, 14, 6, 2.5, 'plat'), // 가운데 높은 단 (양쪽 계단으로 오른다)
       B(-28, -20, 14, 1.2, 1, 'belt'), B(28, 20, 14, 1.2, 1, 'belt'), B(-28, 20, 14, 1.2, 1, 'belt'), B(28, -20, 14, 1.2, 1, 'belt'),
-      B(0, -22, 1, 10, 3, 'wall'), B(0, 22, 1, 10, 3, 'wall'),
+      ...building(0, -22, 6, 8, 'wall', { doors: 'NSW', h: 3.4, inside: [[-1.5, -2.5]] }), ...building(0, 22, 6, 8, 'wall', { doors: 'NSE', h: 3.4, inside: [[1.5, 2.5]] }),
+      ...stairs(3.8, -26.4, 0, 1, 3.7, 1.0), ...stairs(-3.8, 26.4, 0, -1, 3.7, 1.0), // 파이프(높이 2.6) 반대쪽
+      B(-12.4, -14, 1.3, 1.3, 1.3, 'crate'), B(12.4, 14, 1.3, 1.3, 1.3, 'crate'),
       B(-32, 0, 1, 10, 1.4, 'low'), B(32, 0, 1, 10, 1.4, 'low'),
       B(-8, -24, 10, 0.8, 0.8, 'pipe', 2.6), B(8, 24, 10, 0.8, 0.8, 'pipe', 2.6),
       ...crates([[-8, -10, 2], [8, 10, 2], [-24, 8], [24, -8], [-36, -12, 2], [36, 12, 2], [-6, 14], [6, -14], [-24, -26], [24, 26]]),
@@ -72,7 +117,7 @@ dress(MAPS[0], [
 ]);
 MAPS[0].roads = [{ x: 0, z: 0, w: 70, d: 6, c: '#8d8478', line: true }, { x: 0, z: 0, w: 6, d: 50, c: '#8d8478' }];
 // 사막 마을: 세모 지붕 · 야자수 · 시장 파라솔 · 깃발 줄 · 바위
-for (const b of MAPS[1].boxes) if (b.k.startsWith('house') && b.h <= 6) b.roof = 'pitch';
+for (const b of MAPS[1].boxes) if (b.k.startsWith('house') && b.h >= 4 && b.h <= 6 && b.w > 3 && b.d > 3) b.roof = 'pitch'; // 통짜 집만 (들어가는 집의 벽 조각은 빼고)
 dress(MAPS[1], [
   barrel(-16, -8, '#a8743f'), barrel(16, 8, '#a8743f'), car(-30, -6, 1, '#ffb36b'), car(30, 6, 1, '#9be7c4'),
   B(-14, -30, 4, 1.2, 1.1, 'stall'), B(14, 30, 4, 1.2, 1.1, 'stall'),
@@ -96,11 +141,13 @@ MAPS[2].roads = [{ x: 0, z: 0, w: 80, d: 4, c: '#5d5b6c', line: true }];
 MAPS.push({
   id: 'harbor', name: '젤리 항구', emoji: '⚓', W: 100, D: 70,
   sky: ['#6fb7ff', '#d9f0ff', '#9cc3d6'], fog: [45, 180], floor: '#a9a39a', floor2: '#99928a', sea: '#3fa0d8',
-  colors: { outer: '#7d7f88', ware: '#d7c3a5', roof: '#6d6a78', cont1: '#e8574f', cont2: '#3f7cb5', cont3: '#5fae6e', cont4: '#ffb02e', crate: '#b8864b', low: '#8d8a80', wall: '#c4b9a8', dock: '#8a6a4a', step: '#8d8a80' },
+  colors: { floor: '#b8a68a', roofslab: '#6d6a78', outer: '#7d7f88', ware: '#d7c3a5', roof: '#6d6a78', cont1: '#e8574f', cont2: '#3f7cb5', cont3: '#5fae6e', cont4: '#ffb02e', crate: '#b8864b', low: '#8d8a80', wall: '#c4b9a8', dock: '#8a6a4a', step: '#8d8a80' },
   boxes: [
     ...walls(100, 70, 4),
     // 창고 두 채 (가운데 통로)
-    B(-30, -20, 18, 12, 6.5, 'ware'), B(30, 20, 18, 12, 6.5, 'ware'),
+    ...building(-30, -20, 18, 12, 'ware', { floors: 2, doors: 'NES', inside: [[-5, -3, 2], [-5, 2], [2, 3]] }), ...building(30, 20, 18, 12, 'ware', { floors: 2, doors: 'SWN', inside: [[5, 3, 2], [5, -2], [-2, -3]] }),
+    B(-12, -3.4, 1.3, 1.3, 1.3, 'crate'), B(-13.3, -3.4, 1.3, 1.3, 1.3, 'crate'), B(-13.3, -3.4, 1.3, 1.3, 1.3, 'crate', 1.3), B(12, 3.4, 1.3, 1.3, 1.3, 'crate'), B(13.3, 3.4, 1.3, 1.3, 1.3, 'crate'), B(13.3, 3.4, 1.3, 1.3, 1.3, 'crate', 1.3),
+    B(-22, 12.6, 1.3, 1.3, 1.3, 'crate'), B(22, -12.6, 1.3, 1.3, 1.3, 'crate'), B(-4, 7.4, 1.3, 1.3, 1.3, 'crate'), B(4, -7.4, 1.3, 1.3, 1.3, 'crate'),
     // 컨테이너 미로 (2단도)
     B(-12, -6, 12, 2.6, 2.8, 'cont1'), B(-12, -6, 12, 2.6, 2.8, 'cont2', 2.8), B(12, 6, 12, 2.6, 2.8, 'cont3'), B(12, 6, 12, 2.6, 2.8, 'cont4', 2.8),
     B(-4, 14, 2.6, 12, 2.8, 'cont4'), B(4, -14, 2.6, 12, 2.8, 'cont1'), B(-22, 10, 12, 2.6, 2.8, 'cont3'), B(22, -10, 12, 2.6, 2.8, 'cont2'),

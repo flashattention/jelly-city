@@ -465,7 +465,7 @@ function frame() {
       if (mouseL && locked()) shoot(now);
       if (kickBack > 0) { const r = Math.min(kickBack, dt * 1.2); me.pitch -= r; kickBack -= r; }
       if (healing && now >= healing.end) { shell.send({ t: 'heal', k: healing.k }); cancelHeal(); }
-      camera.position.copy(me.eye()); camera.rotation.set(me.pitch, me.yaw, 0);
+      camera.position.copy(me.viewEye()); camera.rotation.set(me.pitch, me.yaw, 0);
       const w = curW(), zoom = mouseR && w?.cls !== 'knife' && w?.cls !== 'nade' ? (w.scope ? w.zoom : Math.min(1.6, w.zoom)) : 1;
       const fov = (me.sprinting ? 80 : 72) / zoom;
       if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 14); camera.updateProjectionMatrix(); }

@@ -4,14 +4,17 @@ import { floorAt, boxesIn } from './maps.js';
 
 const R = 0.35, H_STAND = 1.72, H_CROUCH = 1.18, EYE_STAND = 1.55, EYE_CROUCH = 1.05;
 export class Player {
-  constructor() { this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3(); this.yaw = 0; this.pitch = 0; this.onGround = true; this.crouch = 0; this.alive = false; this.hp = 100; this.stepT = 0; }
+  constructor() { this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3(); this.yaw = 0; this.pitch = 0; this.onGround = true; this.crouch = 0; this.alive = false; this.hp = 100; this.stepT = 0; this.snapDY = 0; }
   get eyeH() { return EYE_STAND + (EYE_CROUCH - EYE_STAND) * this.crouch; }
   get height() { return H_STAND + (H_CROUCH - H_STAND) * this.crouch; }
   eye(out = new THREE.Vector3()) { return out.set(this.pos.x, this.pos.y + this.eyeH, this.pos.z); }
+  // 카메라 눈: 턱 · 상자 · 차 위로 올라설 때 몸은 바로 올라가도 시점은 부드럽게 따라간다 (뚝 끊기지 않게)
+  viewEye(out = new THREE.Vector3()) { return out.set(this.pos.x, this.pos.y + this.eyeH - this.snapDY, this.pos.z); }
   forward(out = new THREE.Vector3()) { const cp = Math.cos(this.pitch); return out.set(-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp); }
   // inp = { f, s (앞뒤 · 좌우 -1~1), jump, crouch, sprint, ads }  돌려주는 값: 소리 낼 일
   update(dt, inp, map) {
     const ev = [];
+    this.snapDY *= Math.exp(-dt * 13); if (Math.abs(this.snapDY) < 0.002) this.snapDY = 0;
     this.crouch += ((inp.crouch ? 1 : 0) - this.crouch) * Math.min(1, dt * 12);
     // 달리기: Shift + 앞으로 (앉거나 조준하는 중엔 안 된다)
     this.sprinting = !!inp.sprint && inp.f > 0 && !inp.crouch && !inp.ads && this.crouch < 0.5;
@@ -29,9 +32,10 @@ export class Player {
     // 위아래
     const wasGround = this.onGround;
     this.pos.y += this.vel.y * dt;
+    this.snapDY = Math.min(this.snapDY, 0.6);
     if (this.vel.y > 0) for (const b of boxesIn(map, this.pos.x - 1, this.pos.z - 1, this.pos.x + 1, this.pos.z + 1)) if (this.inXZ(b) && b.y > this.pos.y && b.y < this.pos.y + this.height) { this.pos.y = b.y - this.height; this.vel.y = 0; }
     const fl = floorAt(map, this.pos.x, this.pos.z, Math.max(this.pos.y, this.pos.y - this.vel.y * dt), R);
-    if (this.pos.y <= fl) { if (!wasGround && this.vel.y < -6) ev.push('land'); this.pos.y = fl; this.vel.y = 0; this.onGround = true; }
+    if (this.pos.y <= fl) { if (!wasGround && this.vel.y < -6) ev.push('land'); if (fl - this.pos.y > 0.03) this.snapDY += fl - this.pos.y; this.pos.y = fl; this.vel.y = 0; this.onGround = true; }
     else if (this.pos.y > fl + 0.05) this.onGround = false;
     // 발소리
     const sp = Math.hypot(this.vel.x, this.vel.z);
@@ -48,7 +52,7 @@ export class Player {
     }
     // 낮은 턱은 올라선다
     const fl = floorAt(map, this.pos.x, this.pos.z, this.pos.y, R);
-    if (fl > this.pos.y && fl - this.pos.y <= 0.55 && this.onGround) this.pos.y = fl;
+    if (fl > this.pos.y && fl - this.pos.y <= 0.55 && this.onGround) { this.snapDY += fl - this.pos.y; this.pos.y = fl; }
   }
 }
 

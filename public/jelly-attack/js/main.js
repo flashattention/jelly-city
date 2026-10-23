@@ -491,7 +491,7 @@ function frame() {
     updateNades(dt);
     for (const o of game.others.values()) o.update(dt);
     // 카메라: 살아 있으면 눈, 죽으면 그 자리에서 천천히 내려다본다
-    const eye = me.eye();
+    const eye = me.viewEye();
     camera.position.copy(eye); camera.rotation.set(me.alive ? me.pitch : -0.5, me.yaw, 0);
     const w = curW(), zoom = mouseR && me.alive && w?.cls !== 'knife' && w?.cls !== 'nade' ? (w.scope ? w.zoom : Math.min(1.6, w.zoom)) : 1;
     const fov = (me.sprinting && me.alive ? 80 : 72) / zoom; // 달릴 때 시야가 살짝 넓어진다
