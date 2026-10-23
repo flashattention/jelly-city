@@ -19,6 +19,7 @@ import { DreamBoard, dreamApi } from './dream-runner/leaderboard.js';
 import { DreamRooms } from './dream-runner/rooms.js';
 import { RiderRooms } from './jelly-rider/rooms.js';
 import { AttackRooms } from './jelly-attack/rooms.js';
+import { BgRooms } from './jelly-attack/bg.js';
 import { AppleRooms } from './jelly-apple/rooms.js';
 import { WordRooms } from './jelly-word/rooms.js';
 import { Dict } from './jelly-word/dict.js';
@@ -50,6 +51,7 @@ const dreamRooms = new DreamRooms((sid) => world.userOf(sid)); // 드림 러너 
 const RIDER_TRACKS = ['candy', 'cloud', 'neon', 'lava', 'sakura', 'synth', 'snow', 'deep'];
 const riderRooms = new RiderRooms((sid) => world.userOf(sid));
 const attackRooms = new AttackRooms((sid) => world.userOf(sid)); // 젤리어택 방 (봇은 서버가 움직인다)
+const bgRooms = new BgRooms((sid) => world.userOf(sid)); // 젤리배그 (최대 30명)
 // 젤리 사과게임: 방 · 시간별 최고 점수 (클수록 좋다)
 const appleRooms = new AppleRooms((sid) => world.userOf(sid));
 const appleRecords = new Records(DATA_DIR, 'jelly-apple', {
@@ -233,6 +235,8 @@ const riderWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, pe
 riderWss.on('connection', (ws) => riderRooms.connect(ws));
 const attackWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
 attackWss.on('connection', (ws) => attackRooms.connect(ws));
+const bgWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
+bgWss.on('connection', (ws) => bgRooms.connect(ws));
 const partyWss = (rooms) => { const w = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false }); w.on('connection', (ws) => rooms.connect(ws)); return w; };
 const appleWss = partyWss(appleRooms), wordWss = partyWss(wordRooms), typeWss = partyWss(typeRooms);
 const drawWss = new WebSocketServer({ noServer: true, maxPayload: 160 * 1024, perMessageDeflate: { threshold: 2048 } }); // 그림은 커서 더 크게 · 압축
@@ -240,7 +244,7 @@ drawWss.on('connection', (ws) => drawRooms.connect(ws));
 // 주소로 나눠 받는다: /ws = 젤리시티 · /dream-ws = 드림 러너
 server.on('upgrade', (req, socket, head) => {
   const p = new URL(req.url, 'http://x').pathname;
-  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/rider-ws' ? riderWss : p === '/attack-ws' ? attackWss : p === '/apple-ws' ? appleWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : p === '/type-ws' ? typeWss : null;
+  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/rider-ws' ? riderWss : p === '/attack-ws' ? attackWss : p === '/bg-ws' ? bgWss : p === '/apple-ws' ? appleWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : p === '/type-ws' ? typeWss : null;
   if (!target) { socket.destroy(); return; }
   target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
 });

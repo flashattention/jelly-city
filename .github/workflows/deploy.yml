@@ -32,6 +32,7 @@ jobs:
           curl -sf localhost:8123/dream-runner/ > /dev/null
           curl -sf localhost:8123/jelly-rider/ > /dev/null
           curl -sf localhost:8123/jelly-attack/ > /dev/null
+          curl -sf localhost:8123/jelly-attack/bg/ > /dev/null
           curl -sf localhost:8123/jelly-apple/ > /dev/null
           curl -sf localhost:8123/jelly-word/ > /dev/null
           curl -sf localhost:8123/jelly-draw/ > /dev/null

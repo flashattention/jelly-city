@@ -1,0 +1,32 @@
+/* 젤리배그: 젤리어택 화면(../style.css) 위에 더하는 것 */
+#bg-top { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; font-size: 19px; }
+#bg-top span { padding: 4px 14px; border-radius: 999px; background: rgba(20,8,50,.6); white-space: nowrap; }
+#zone-txt.warn { background: rgba(70,140,255,.75) !important; }
+#mini { position: absolute; right: 14px; top: 62px; width: 200px; height: 200px; border-radius: 16px; background: rgba(20,8,50,.4); border: 2px solid rgba(255,255,255,.25); }
+#feed { top: 270px !important; }
+#hp { flex-wrap: wrap; max-width: 330px; }
+#gear { width: 100%; display: flex; gap: 6px; font-size: 15px; }
+#gear span { padding: 2px 10px; border-radius: 999px; background: rgba(20,8,50,.6); border: 1px solid rgba(255,255,255,.25); }
+#gear span.l1 { border-color: #9be7a7; } #gear span.l2 { border-color: #7cd8ff; } #gear span.l3 { border-color: #c39bff; box-shadow: 0 0 10px rgba(195,155,255,.6); }
+#heals { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 8px; font-size: 15px; }
+#heals span { padding: 5px 12px; border-radius: 12px; background: rgba(20,8,50,.6); border: 1px solid rgba(255,255,255,.25); }
+#heals span.none { opacity: .4; }
+#bg-slots { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; margin-top: 6px; font-size: 14px; }
+#bg-slots span { padding: 3px 10px; border-radius: 8px; background: rgba(20,8,50,.55); border: 1px solid rgba(255,255,255,.2); min-width: 150px; text-align: right; }
+#bg-slots span.on { border-color: var(--gold); color: var(--gold); }
+#bg-slots span.empty { opacity: .35; }
+#prompt { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); padding: 8px 16px; border-radius: 14px; background: rgba(20,8,50,.72); font-size: 19px; white-space: nowrap; }
+#prompt kbd { font-family: 'Jua'; padding: 1px 8px; border-radius: 6px; background: #fff; color: #2b1d5c; margin-right: 6px; }
+#heal-bar { position: absolute; left: 50%; top: 56%; transform: translateX(-50%); text-align: center; font-size: 18px; }
+.pbar2 { width: 220px; height: 10px; border-radius: 999px; background: rgba(255,255,255,.2); overflow: hidden; margin-top: 4px; }
+.pbar2 i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #7cf0c8, #ffd84d); }
+#phase-tip { position: absolute; left: 50%; bottom: 22%; transform: translateX(-50%); padding: 10px 20px; border-radius: 16px; background: rgba(20,8,50,.7); font-size: 22px; text-align: center; }
+#phase-tip small { display: block; font-family: 'Gowun Dodum'; font-size: 13px; opacity: .8; margin-top: 2px; }
+#zone-tint { position: fixed; inset: 0; pointer-events: none; z-index: 2; opacity: 0; transition: opacity .4s; background: radial-gradient(ellipse at center, rgba(60,120,255,.08) 40%, rgba(60,120,255,.45) 100%); }
+#bigmap { position: fixed; inset: 0; z-index: 7; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(10,4,30,.55); pointer-events: none; }
+#bigmap canvas { width: min(80vmin, 720px); height: min(80vmin, 720px); border-radius: 22px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+#spec { position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%); z-index: 6; text-align: center; font-family: 'Jua', sans-serif; text-shadow: 0 2px 8px rgba(0,0,0,.7); }
+#spec-place { font-size: 42px; color: var(--gold); }
+#spec-who { font-size: 22px; padding: 6px 16px; border-radius: 999px; background: rgba(20,8,50,.6); display: inline-block; margin-top: 6px; }
+#ov-rank .brow .sc small { margin-left: 4px; }
+body #chat { bottom: 120px; }
