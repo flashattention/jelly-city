@@ -26,6 +26,8 @@ export class Records {
   mine(b, sub) { if (!sub || !this.data[b]?.[sub]) return null; const i = this.sorted(b).findIndex(([s]) => s === sub); return this.row(sub, this.data[b][sub], i); }
   async api(req, res, url, who, json, prefix) {
     const b = url.searchParams.get('b');
+    // 판마다 1등만 한꺼번에 (트랙 고르는 화면에 최고 기록 표시)
+    if (url.pathname === `${prefix}/tops`) return json(res, 200, { tops: Object.fromEntries(this.boards.map((x) => [x, this.top(x, 1)[0] || null])) });
     if (url.pathname === `${prefix}/board`) {
       if (!this.boards.includes(b)) return json(res, 400, { error: '판이 없어요' });
       const anon = url.searchParams.get('anon');

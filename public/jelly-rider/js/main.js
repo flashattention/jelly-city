@@ -80,7 +80,8 @@ function resetToTrack(k) { const t = game.track; t.at(k.idx, 0, k.pos); k.yaw = 
 
 // ---------- 처음 화면 · 방 (공용 틀) ----------
 function trackPicker(el, cur, editable, onPick) {
-  const btn = (t) => `<button data-t="${t.id}" class="${t.id === cur ? 'on' : ''}${isRandom(t.id) ? ' rnd' : ''}" ${editable ? '' : 'disabled'}><b>${t.emoji}</b>${esc(t.name)}${t.lv ? `<i class="lv lv${t.lv}">${stars(t.lv)}</i>` : ''}</button>`;
+  const top = (id) => { const e = game.tops?.[id]; return e ? `<i class="best">🏆 ${fmt(e.value)}</i>` : ''; };
+  const btn = (t) => `<button data-t="${t.id}" class="${t.id === cur ? 'on' : ''}${isRandom(t.id) ? ' rnd' : ''}" ${editable ? '' : 'disabled'}><b>${t.emoji}</b>${esc(t.name)}${t.lv ? `<i class="lv lv${t.lv}">${stars(t.lv)}</i>` : ''}${isRandom(t.id) ? '' : top(t.id)}</button>`;
   el.innerHTML = `<div class="track-rand">${RANDOMS.map(btn).join('')}</div><div class="track-pick">${TRACKS.map(btn).join('')}</div>`;
   el.querySelectorAll('[data-t]').forEach((b) => { b.onclick = () => onPick(b.dataset.t); });
 }
@@ -94,6 +95,9 @@ const describe = (o = {}) => { const t = TRACKS.find((x) => x.id === o.track) ||
 function renderTitleOpts() {
   const el = $('title-opts'); el.innerHTML = '';
   trackPicker(el, game.pick.track, true, (id) => { game.pick.track = id; store.set(TRACK_KEY, id); loadTrack(id); renderTitleOpts(); placePreview(); });
+  // 고른 트랙의 기록 TOP 5 (랜덤이면 숨김)
+  el.insertAdjacentHTML('beforeend', '<div id="mini-board" class="mini-board"></div>');
+  miniBoard(game.pick.track);
   modeSeg(el, game.pick, true, (o) => { Object.assign(game.pick, o); store.set(MODE_KEY, game.pick.mode); renderTitleOpts(); }, false);
 }
 const shell = new Shell({
@@ -462,6 +466,7 @@ function anonId() { let a = store.get(ANON_KEY); if (!/^[a-f0-9]{24}$/.test(a ||
 async function saveRecord(rec) {
   try {
     const r = await account.api('/api/rider/record', { method: 'POST', body: rec });
+    game.boards = {}; loadTops(); // 새 기록이 처음 화면에 바로 보이게
     $('ov-best').textContent = r.best ? `🎉 이 트랙 내 최고 기록! 전체 ${r.me.rank}위` : `내 최고 ${fmt(r.me.value)} · 전체 ${r.me.rank}위`;
     if (r.best) sfx('best');
   } catch (e) { $('ov-best').textContent = `기록을 남기지 못했어요 (${e.message})`; }
@@ -471,6 +476,18 @@ $('again-btn').onclick = () => { if (game.multi) { game.mode = 'title-room'; she
 $('home-btn').onclick = () => { if (game.multi) { shell.send({ t: 'leave' }); shell.room = null; } toTitle(); };
 
 // ---------- 기록판 ----------
+// 트랙마다 1등 기록 (처음 화면 버튼) · 고른 트랙 TOP 5
+async function loadTops() { try { game.tops = (await account.api('/api/rider/tops')).tops; if (game.mode === 'title' || !game.mode) renderTitleOpts(); } catch { /* 무시 */ } }
+async function miniBoard(id) {
+  const el = $('mini-board'); if (!el) return;
+  if (isRandom(id)) { el.innerHTML = ''; return; }
+  const t = TRACKS.find((x) => x.id === id);
+  let d = game.boards?.[id];
+  if (!d) { try { d = await account.api(`/api/rider/board?b=${id}` + (shell.logged() ? '' : `&anon=${anonId()}`)); (game.boards ||= {})[id] = d; } catch { d = { top: [] }; } }
+  if (!$('mini-board')) return;
+  const rows = (d.top || []).slice(0, 5).map((e) => `<div class="mb-row${e.id === d.me?.id ? ' me' : ''}"><span>${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm">${esc(e.name)}</span><b>${fmt(e.value)}</b></div>`).join('');
+  $('mini-board').innerHTML = `<div class="mb-title">🏆 ${t.emoji} ${esc(t.name)} 최고 기록</div>${rows || '<div class="mb-empty">아직 기록이 없어요 · 타임어택으로 첫 기록을!</div>'}${d.me && d.me.rank > 5 ? `<div class="mb-row me"><span>${d.me.rank}</span><span class="nm">나</span><b>${fmt(d.me.value)}</b></div>` : ''}`;
+}
 async function openBoard(id) {
   shell.show('board');
   const el = $('board-tracks');
@@ -487,6 +504,7 @@ $('board-close').onclick = () => shell.show('title');
 
 // ---------- 시작 ----------
 loadTrack(game.pick.track);
+loadTops();
 renderTitleOpts();
 shell.boot().then(() => { placePreview(); });
 placePreview();
