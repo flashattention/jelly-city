@@ -14,7 +14,7 @@ const CSS = `
 #chat .msg .tm { font-size: 11px; padding: 1px 6px; border-radius: 999px; margin-right: 4px; color: #fff; }
 #chat .msg.sys { color: #c9c1ff; font-size: 13px; font-style: italic; }
 #chat .msg.me b::after { content: ' (나)'; font-size: 11px; opacity: .7; }
-#chat .bar { display: flex; gap: 6px; margin-top: 6px; pointer-events: auto; align-items: center; }
+#chat .bar { display: flex; gap: 6px; margin-top: 6px; pointer-events: auto; align-items: center; height: auto; overflow: visible; background: none; border-radius: 0; } /* 게임마다 있는 .bar 스타일에 안 휩쓸리게 */
 #chat .toggle { width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(255,255,255,.3); background: rgba(20,10,46,.45); opacity: .7; color: #fff; font-size: 20px; position: relative; flex: none; cursor: pointer; }
 #chat .toggle i { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; border-radius: 9px; background: #ff5c8a; color: #fff; font-size: 11px; font-style: normal; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
 #chat .toggle i:empty { display: none; }

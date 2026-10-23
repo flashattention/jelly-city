@@ -58,8 +58,8 @@
 .wgrid button { border: 2px solid transparent; border-radius: 14px; padding: 8px 10px; background: rgba(255,255,255,.08); color: var(--ink); font-size: 13px; }
 .wgrid button b { font-family: 'Jua', sans-serif; font-size: 15px; display: block; }
 .wgrid button.on { border-color: var(--gold); background: rgba(255,216,77,.15); }
-.bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,.12); margin-top: 3px; overflow: hidden; }
-.bar i { display: block; height: 100%; background: linear-gradient(90deg, #7cd8ff, #ff8fc4); }
+#loadout .bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,.12); margin-top: 3px; overflow: hidden; }
+#loadout .bar i { display: block; height: 100%; background: linear-gradient(90deg, #7cd8ff, #ff8fc4); }
 #ov-title { font-family: 'Jua', sans-serif; font-size: 34px; }
 #ov-me { font-family: 'Jua', sans-serif; font-size: 20px; color: var(--gold); margin: 4px 0 10px; }
 
