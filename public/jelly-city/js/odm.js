@@ -12,6 +12,7 @@ function napeTex() {
   if (_napeTex) return _napeTex;
   const c = document.createElement('canvas'); c.width = c.height = 128;
   const x = c.getContext('2d');
+  x.fillStyle = 'rgba(255,23,68,.28)'; x.beginPath(); x.arc(64, 64, 46, 0, Math.PI * 2); x.fill(); // 젤리 몸에 붙은 빨간 얼룩
   x.strokeStyle = '#ff1744'; x.lineWidth = 10; x.shadowColor = '#ff1744'; x.shadowBlur = 16;
   x.beginPath(); x.arc(64, 64, 44, 0, Math.PI * 2); x.stroke();
   x.lineWidth = 6; x.beginPath(); x.arc(64, 64, 20, 0, Math.PI * 2); x.stroke();
@@ -51,7 +52,7 @@ export class TitansView {
       t.state = st;
       this.setHp(t, arr[i + 7], arr[i + 8]);
     }
-    for (const [id, t] of this.list) if (!seen.has(id)) { this.scene.remove(t.r.root, t.mark, t.bar); t.bar.material.map?.dispose(); this.list.delete(id); }
+    for (const [id, t] of this.list) if (!seen.has(id)) { this.scene.remove(t.r.root, t.bar); t.bar.material.map?.dispose(); this.list.delete(id); }
   }
   make(id, s, c, x, z, h) {
     // 히죽 웃는 거대 곰돌이 젤리
@@ -61,9 +62,9 @@ export class TitansView {
     r.root.scale.setScalar(s);
     r.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     this.scene.add(r.root);
-    const mark = new THREE.Sprite(new THREE.SpriteMaterial({ map: napeTex(), transparent: true, depthWrite: false, depthTest: false }));
-    mark.scale.setScalar(1.6 + s * 0.12); mark.renderOrder = 60;
-    this.scene.add(mark);
+    // 뒷목 과녁: 공중에 뜬 표시가 아니라 젤리 몸 표면(뒷목)에 딱 붙인다 → 첫 update 에서 붙일 자리를 찾는다
+    const mark = new THREE.Mesh(new THREE.CircleGeometry(0.5, 32), new THREE.MeshBasicMaterial({ map: napeTex(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }));
+    mark.renderOrder = 5; mark.visible = false;
     const bar = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false, depthTest: false }));
     const bw = 10 + s * 1.0; bar.scale.set(bw, bw / 4, 1); bar.renderOrder = 61; // 멀리서도 읽히게
     this.scene.add(bar);
@@ -87,13 +88,29 @@ export class TitansView {
       t.r.root.position.set(t.x, t.y, t.z); t.r.root.rotation.y = t.h;
       t.r.update(dt, t.state === 2 ? 0 : Math.min(1.2, mv * 0.35), {});
       t.base.set(t.x, t.y, t.z);
-      const n = napePos(t);
-      t.mark.position.set(n.x, n.y, n.z);
-      t.mark.visible = showMarks && t.state !== 2;
-      t.mark.material.opacity = 0.6 + Math.sin(now / 180) * 0.35;
+      if (!t.marked) this.stick(t);
+      t.mark.visible = t.marked && showMarks && t.state !== 2;
+      t.mark.material.opacity = 0.75 + Math.sin(now / 180) * 0.25;
+      if (t.marked) t.mark.scale.setScalar(t.markS * (1 + Math.sin(now / 180) * 0.06));
       t.bar.position.set(t.x, t.y + TITAN.top * t.s + 1.5 + t.s * 0.1, t.z);
       t.bar.visible = t.state !== 2 && t.max > 0;
     }
+  }
+  // 뒷목 과녁을 몸에 붙인다: 뒤에서 뒷목 쪽으로 광선을 쏴서 처음 닿는 젤리 표면에, 그 면을 바라보게
+  stick(t) {
+    t.r.root.updateMatrixWorld(true);
+    const n = napePos(t), back = new THREE.Vector3(-Math.sin(t.h), 0, -Math.cos(t.h));
+    const from = new THREE.Vector3(n.x, n.y, n.z).addScaledVector(back, t.s * 2);
+    const meshes = []; t.r.root.traverse((o) => { if (o.isMesh && o.visible) meshes.push(o); });
+    const hit = new THREE.Raycaster(from, back.clone().negate(), 0, t.s * 4).intersectObjects(meshes, false)[0];
+    if (!hit) return;
+    const parent = hit.object.parent, ws = new THREE.Vector3(); parent.getWorldScale(ws);
+    const nrm = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : back;
+    parent.add(t.mark);
+    t.mark.position.copy(parent.worldToLocal(hit.point.clone().addScaledVector(nrm, 0.02 * t.s)));
+    t.mark.lookAt(hit.point.clone().addScaledVector(nrm, t.s));
+    t.markS = (0.42 * t.s) / ws.x; // 뒷목 판정 거리와 비슷한 크기
+    t.marked = true;
   }
   // 총알·갈고리가 맞는 몸통 (원기둥)
   shapes() { return [...this.list.values()].filter((t) => t.state !== 2).map((t) => ({ id: t.id, base: t.base, r: TITAN.body * t.s, h: TITAN.top * t.s, t })); }

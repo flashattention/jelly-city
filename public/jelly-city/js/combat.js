@@ -334,6 +334,22 @@ export class FX {
     }
   }
 
+  // 젤리병단 쌍검: 끝은 가늘고 가운데는 두꺼운 초승달 빛 두 줄기가 X자로 교차 (곰돌이를 따라다녀서 날면서 베도 보인다)
+  twinSlash(pos, heading) {
+    const fwd = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
+    const one = (roll, dir, delay) => {
+      for (const [geo, color, op] of [[crescentGeo(2.2, 0.6, undefined, undefined, true), '#7fe3ff', 0.95], [crescentGeo(2.15, 0.18, undefined, undefined, true), '#ffffff', 1]]) {
+        const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, vertexColors: true, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+        m.visible = false; m.renderOrder = 50; this.scene.add(m);
+        this.items.push({ m, t: 0.3 + delay, life: 0.3 + delay, delay, kind: 'twin', pos, heading, roll, dir, op, ownGeo: true });
+      }
+    };
+    one(Math.PI * 0.75 + Math.PI / 2, 1, 0); one(Math.PI * 0.25 + Math.PI / 2 + Math.PI, -1, 0.06); // ↘ 와 ↙ 로 교차
+    const at = pos.clone().addScaledVector(fwd, 1.2); at.y += 1.2;
+    this.sparkle(at, '#bfefff', 14, 1.4);
+    this.flash.position.copy(at); this.flashT = 0.08;
+  }
+
   // 1인칭 휘두르기: 눈앞에서 화면을 가로질러 베는 궤적 (카메라에 붙어 다녀서 빨리 날아도 보인다)
   //   젤리병단 장비(쌍검)는 두 칼이 X자로 교차한다
   fpSlash(cam, wid = 'fist') {
@@ -350,7 +366,14 @@ export class FX {
       blade(roll, dir, delay, '#ffffff', 0.022, 0.95, false);       // 칼날
       blade(roll, dir, delay, col, 0.075, 0.55, true);              // 빛 번짐
     };
-    if (twin) { one(2.2, 1, 0); one(0.9, -1, 0.07); }               // 오른쪽 위 → 왼쪽 아래, 왼쪽 위 → 오른쪽 아래
+    const cres = (roll, dir, delay) => {
+      for (const [geo, color, op] of [[crescentGeo(0.7, 0.2), '#7fe3ff', 0.95], [crescentGeo(0.69, 0.06), '#ffffff', 1]]) {
+        const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, vertexColors: true, transparent: true, opacity: op, depthWrite: false, depthTest: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+        m.renderOrder = 999; m.visible = false; this.scene.add(m);
+        this.items.push({ m, t: 0.3 + delay, life: 0.3 + delay, delay, kind: 'fpsweep', cam, roll, dir, op, ownGeo: true, spin: 1.1 });
+      }
+    };
+    if (twin) { cres(2.2, 1, 0); cres(0.9, -1, 0.06); }               // 오른쪽 위 → 왼쪽 아래, 왼쪽 위 → 오른쪽 아래
     else { this.fpFlip = !this.fpFlip; if (this.fpFlip) one(2.2, 1, 0); else one(0.9, -1, 0); } // 한 손 무기: 번갈아 반대로
   }
 
@@ -373,7 +396,17 @@ export class FX {
         it.m.visible = true;
         it.m.position.set(0, -0.08, -1.05).applyQuaternion(c.quaternion).add(c.position);
         it.m.quaternion.copy(c.quaternion);
-        it.m.rotateZ(it.roll - it.dir * u * 1.7); // 휙 가로지른다
+        it.m.rotateZ(it.roll - it.dir * u * (it.spin || 1.7)); // 휙 가로지른다
+      } else if (it.kind === 'twin') {
+        const el = it.life - it.t;
+        if (el < it.delay) continue;
+        const u = (el - it.delay) / (it.life - it.delay);
+        it.m.visible = true;
+        // 곰돌이 앞 · 가슴 높이에서 바라보는 쪽을 향해 X 로 벤다
+        it.m.position.set(it.pos.x + Math.sin(it.heading) * 0.9, it.pos.y + 1.2, it.pos.z + Math.cos(it.heading) * 0.9);
+        it.m.rotation.set(0, it.heading, 0); it.m.rotateZ(it.roll - it.dir * (u - 0.5) * 0.5);
+        it.m.scale.setScalar(0.85 + u * 0.35);
+        it.m.material.opacity = it.op * (u < 0.12 ? u / 0.12 : 1 - (u - 0.12) / 0.88);
         it.m.material.opacity = it.op * (u < 0.15 ? u / 0.15 : 1 - (u - 0.15) / 0.85);
       } else if (it.kind === 'boom') { it.m.scale.setScalar(0.3 + (1 - k) * it.r); it.m.material.opacity = k; }
       else if (it.kind === 'fly') {
@@ -910,7 +943,7 @@ export class Combat {
   melee(w, s) {
     const g = this.g, p = g.player;
     p.roach.attack('melee');
-    this.fx.slash(p.pos, p.heading, w.id);
+    if (itemDef(w.id)?.odm) { if (!p.fp || p.inCar) this.fx.twinSlash(p.pos, p.heading); } else this.fx.slash(p.pos, p.heading, w.id);
     if (p.fp && !p.inCar) this.fx.fpSlash(g.camera, w.id); // 1인칭이면 눈앞에도
     g.net.send({ t: 'fx', k: 'swing', w: w.id });
     const fwd = new THREE.Vector3(Math.sin(p.heading), 0, Math.cos(p.heading));
@@ -1292,7 +1325,7 @@ export class Combat {
     else if (m.k === 'holyfx' && Array.isArray(m.p)) { this.fx.holyFx(v3(m.p)); this.remoteCast(m.pid, '#fff59d'); }
     else if (m.k === 'hearts') { const a = v3(m.a), b = m.b ? v3(m.b) : null; this.fx.hearts(a, b, m.e || '💗'); const p = g.players.list.get(m.pid); p?.roach.flirt(); }
     else if (m.k === 'eat') { const p = g.players.list.get(m.pid); if (p) p.roach.eat(m.m, m.prop, Math.min(6, +m.d || 3), typeof m.e === 'string' ? m.e.slice(0, 4) : null, !!m.tb); }
-    else if (m.k === 'swing') { const p = g.players.list.get(m.pid); if (p && p.visible) { p.roach.attack('melee'); this.fx.slash(p.pos, p.heading, typeof m.w === 'string' && itemDef(m.w) ? m.w : 'fist'); } }
+    else if (m.k === 'swing') { const p = g.players.list.get(m.pid); if (p && p.visible) { p.roach.attack('melee'); const wid = typeof m.w === 'string' && itemDef(m.w) ? m.w : 'fist'; if (itemDef(wid)?.odm) this.fx.twinSlash(p.pos, p.heading); else this.fx.slash(p.pos, p.heading, wid); } }
     else if (m.k === 'odm') g.odm?.remote(m);
     else if (m.k === 'noeffect' && Array.isArray(m.p)) g.ui.floatText(v3(m.p), `🛡️ ${m.text || '효과 없음'}`, '#ffab40');
     else if (m.k === 'napehit' && Array.isArray(m.p)) {
@@ -1319,4 +1352,20 @@ export class Combat {
       if (m.pid !== undefined) { const p = g.players.list.get(m.pid); p?.roach.hurt(); }
     }
   }
+}
+
+// 초승달 빛 궤적: 0 → span 으로 갈수록 두꺼워지다가 끝에서 가늘어진다 · 안쪽은 밝고 바깥은 투명 (더하기 섞기라 검정 = 안 보임)
+function crescentGeo(R, w, span = Math.PI * 0.8, seg = 36, mid = false) {
+  const pos = [], col = [], idx = [];
+  for (let i = 0; i <= seg; i++) {
+    const u = i / seg, a = u * span, th = w * Math.pow(Math.sin(Math.PI * Math.min(1, u * 1.15)), 0.7) * (0.35 + 0.65 * u);
+    const tail = 0.15 + 0.85 * u; // 지나간 쪽은 흐리게
+    pos.push(Math.cos(a) * R, Math.sin(a) * R, 0, Math.cos(a) * (R - th), Math.sin(a) * (R - th), 0);
+    col.push(tail, tail, tail, tail * 0.05, tail * 0.05, tail * 0.05);
+    if (i < seg) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx);
+  if (mid) g.translate(-Math.cos(span / 2) * R, -Math.sin(span / 2) * R, 0); // 호 가운데가 중심에 오게 → 두 줄기가 가운데서 X 로 만난다
+  return g;
 }

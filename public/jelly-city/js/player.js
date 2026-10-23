@@ -331,6 +331,8 @@ export class Player {
     const c = this.cam;
     const seatH = this.mount ? this.mount.ride.seat * this.mount.scale : 0; // 탈것에 타면 시점도 높아진다
     const tgt = this.inCar ? this.inCar.pos.clone().setY((this.inCar.pos.y || 0) + 1.8) : this.pos.clone().setY(this.pos.y + 1.5 + seatH * 0.8);
+    // 젤리병단 장비: 카메라가 곰돌이 머리보다 위를 보게 해서 곰돌이가 조준점(화면 가운데) 아래에 보인다
+    if (!this.inCar && !this.mount) tgt.y += 1.15 * (this.odmK || 0);
     if (this.inCar) {
       // 차 뒤로 자연스럽게 따라감
       const behind = this.inCar.heading + Math.PI;
