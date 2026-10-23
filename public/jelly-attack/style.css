@@ -65,3 +65,15 @@
 
 /* 채팅이 체력 표시를 가리지 않게 */
 body #chat { bottom: 74px; }
+
+/* 같이 하는 사람들 · 체력 (레이더 아래) */
+#plist { position: absolute; left: 14px; top: 176px; width: 210px; display: flex; flex-direction: column; gap: 3px; font-size: 13px; pointer-events: none; }
+#plist .pl { display: flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 9px; background: rgba(20,8,50,.5); }
+#plist .pl.me { outline: 2px solid var(--gold); }
+#plist .pl.dead { opacity: .45; }
+#plist .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+#plist .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#plist .hpb { width: 54px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.18); overflow: hidden; flex: none; }
+#plist .hpb i { display: block; height: 100%; transition: width .2s; }
+#plist b { width: 26px; text-align: right; font-weight: normal; }
+@media (max-width: 760px) { #plist { display: none; } }

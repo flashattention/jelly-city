@@ -72,9 +72,18 @@ function layout() {
   cv.width = w * dpr; cv.height = h * dpr; cv.style.width = `${w}px`; cv.style.height = `${h}px`;
   $('timebar').style.height = `${h}px`;
   game.geom = { cell, pad }; // 점검용
-  sprites = COLORS.map((c, i) => { const s = Math.ceil(cell * 1.0), k = document.createElement('canvas'); k.width = k.height = Math.ceil(s * dpr); const kg = k.getContext('2d'); kg.scale(dpr, dpr); drawGummy(kg, s, c, i + 1); return k; });
+  sprites = new Map(); // 색 × 숫자 젤리 그림 (쓸 때 만든다)
 }
 window.addEventListener('resize', () => { if (game.mode !== 'title') layout(); });
+// 젤리 색은 숫자와 상관없이 칸마다 랜덤 (판을 새로 깔 때 정한다)
+const sprSize = () => Math.ceil(cell * 1.0);
+function spr(c, n) {
+  const key = c * 10 + n;
+  let k = sprites.get(key);
+  if (!k) { const s = sprSize(); k = document.createElement('canvas'); k.width = k.height = Math.ceil(s * dpr); const kg = k.getContext('2d'); kg.scale(dpr, dpr); drawGummy(kg, s, COLORS[c], n); sprites.set(key, k); }
+  return k;
+}
+const tintAt = (x, y) => game.tint?.[y * COLS + x] ?? 0;
 const cx = (x) => pad + (x + 0.5) * cell, cy = (y) => pad + (y + 0.5) * cell;
 function rcOf(s) {
   if (!s) return null;
@@ -112,14 +121,14 @@ function draw(t) {
     g.globalAlpha = 1;
   }
   if (B) {
-    const s = sprites[0]?.width / dpr || cell;
+    const s = sprSize();
     for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
       const v = B[y * COLS + x]; if (!v) continue;
       const on = inRc(selRc, x, y);
       const ph = on ? Math.sin(t / 70 + x + y) * 0.06 : Math.sin(t / 520 + x * 0.7 + y * 1.3) * 0.025;
       const kx = (on ? 1.1 : 1) * (1 + ph), ky = (on ? 1.1 : 1) * (1 - ph), w = s * kx, h = s * ky;
       if (on) { g.save(); g.shadowColor = selSum === 10 ? 'rgba(80,230,170,.95)' : 'rgba(255,255,255,.9)'; g.shadowBlur = 14; }
-      g.drawImage(sprites[v - 1], cx(x) - w / 2, cy(y) + s / 2 - h - (on ? 3 : 0), w, h); // 바닥에 붙어서 출렁
+      g.drawImage(spr(tintAt(x, y), v), cx(x) - w / 2, cy(y) + s / 2 - h - (on ? 3 : 0), w, h); // 바닥에 붙어서 출렁
       if (on) g.restore();
     }
   }
@@ -142,8 +151,8 @@ function draw(t) {
     g.beginPath(); g.roundRect(x, y, w, h, 12); g.fill(); g.stroke(); g.setLineDash([]);
   }
   // 터진 곰젤리 · 알갱이 · 점수 글자
-  const s = sprites[0]?.width / dpr || cell;
-  for (const f of fx.flyers) { g.save(); g.globalAlpha = Math.max(0, f.life); g.translate(f.x, f.y); g.rotate(f.r); g.drawImage(sprites[f.v - 1], -s / 2 * f.k, -s / 2 * f.k, s * f.k, s * f.k); g.restore(); }
+  const s = sprSize();
+  for (const f of fx.flyers) { g.save(); g.globalAlpha = Math.max(0, f.life); g.translate(f.x, f.y); g.rotate(f.r); g.drawImage(spr(f.c, f.v), -s / 2 * f.k, -s / 2 * f.k, s * f.k, s * f.k); g.restore(); }
   for (const p of fx.parts) { g.globalAlpha = Math.max(0, p.life); g.fillStyle = p.c; g.beginPath(); g.arc(p.x, p.y, p.r, 0, Math.PI * 2); g.fill(); }
   g.globalAlpha = 1;
   for (const tx of fx.texts) {
@@ -162,9 +171,10 @@ function stepFx(dt) {
 }
 function popFx(rc, cells) {
   for (const [x, y, v] of cells) {
-    fx.flyers.push({ x: cx(x), y: cy(y), vx: (Math.random() - 0.5) * 360, vy: -380 - Math.random() * 320, r: 0, vr: (Math.random() - 0.5) * 10, v, life: 1, k: 1 });
-    fx.splats.push({ x: cx(x), y: cy(y), r: cell * 0.42, c: COLORS[v - 1], life: 1 });
-    for (let i = 0; i < 7; i++) fx.parts.push({ x: cx(x), y: cy(y), vx: (Math.random() - 0.5) * 520, vy: -Math.random() * 520, r: 2 + Math.random() * 4, c: COLORS[v - 1], life: 0.8 + Math.random() * 0.4 });
+    const ci = tintAt(x, y);
+    fx.flyers.push({ x: cx(x), y: cy(y), vx: (Math.random() - 0.5) * 360, vy: -380 - Math.random() * 320, r: 0, vr: (Math.random() - 0.5) * 10, v, c: ci, life: 1, k: 1 });
+    fx.splats.push({ x: cx(x), y: cy(y), r: cell * 0.42, c: COLORS[ci], life: 1 });
+    for (let i = 0; i < 7; i++) fx.parts.push({ x: cx(x), y: cy(y), vx: (Math.random() - 0.5) * 520, vy: -Math.random() * 520, r: 2 + Math.random() * 4, c: COLORS[ci], life: 0.8 + Math.random() * 0.4 });
   }
   fx.texts.push({ x: (cx(rc[0]) + cx(rc[2])) / 2, y: (cy(rc[1]) + cy(rc[3])) / 2, n: cells.length, life: 1 });
 }
@@ -231,6 +241,7 @@ function countdown(ms) {
 }
 function begin(kind, seed, time, ms) {
   game.kind = kind; game.mode = 'play'; game.time = time; game.score = 0; game.board = makeBoard(seed);
+  game.tint = Uint8Array.from({ length: COLS * ROWS }, () => Math.floor(Math.random() * COLORS.length));
   game.own = game.shared ? new Array(COLS * ROWS).fill(0) : null; game.drags.clear();
   game.startAt = performance.now() + ms; game.endAt = game.startAt + time * 1000;
   fx.flyers = []; fx.parts = []; fx.texts = []; fx.splats = []; sel = null; selRc = null; selSum = 0;

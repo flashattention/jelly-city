@@ -319,7 +319,7 @@ function start(m) {
   game.myId = shell.myId; loadMap(m.map);
   game.endAt = performance.now() + m.in + m.dur * 1000; game.limit = m.limit;
   for (const mem of m.members) {
-    game.stats.set(mem.id, { name: mem.name, team: mem.team, color: mem.color, k: 0, d: 0, bot: mem.bot });
+    game.stats.set(mem.id, { name: mem.name, team: mem.team, color: mem.color, k: 0, d: 0, bot: mem.bot, hp: 100, alive: true });
     if (mem.id === game.myId) { game.team = mem.team; continue; }
     const o = new Other({ ...mem, gun: m.guns?.[mem.id] }); game.others.set(mem.id, o);
     if (m.spawns?.[mem.id]) o.set(m.spawns[mem.id], true);
@@ -331,7 +331,7 @@ function start(m) {
   $('top').classList.toggle('ffa', m.opts.mode !== 'tdm');
   banner(`${game.map.emoji} ${game.map.name} · ${m.opts.mode === 'tdm' ? `${TEAMS[game.team]?.name || ''}` : '개인전'}`);
   if (!locked()) $('lockmsg').classList.remove('hidden');
-  renderSlots();
+  renderSlots(); renderPlist();
 }
 function spawnMe(p) {
   me.pos.set(p[0], p[1], p[2]); me.yaw = p[3]; me.pitch = 0; me.vel.set(0, 0, 0); me.alive = true; me.hp = 100;
@@ -341,6 +341,7 @@ function spawnMe(p) {
 }
 shell.on('snap', (m) => { for (const [id, ...st] of m.p) { if (id === game.myId) continue; const o = game.others.get(id); if (o) o.set(st); } });
 shell.on('spawn', (m) => {
+  const st = game.stats.get(m.id); if (st) { st.hp = 100; st.alive = true; renderPlist(); }
   if (m.id === game.myId) return spawnMe(m.p);
   const o = game.others.get(m.id); if (!o) return;
   o.alive = true; o.set(m.p, true); if (m.gun) o.setGun(m.gun);
@@ -359,6 +360,7 @@ shell.on('fire', (m) => {
   if (along > 0 && along < t && toMe.addScaledVector(d, -along).length() < 1.5 && m.by !== game.myId) sfx('whizz');
 });
 shell.on('dmg', (m) => {
+  const st = game.stats.get(m.to); if (st) { st.hp = m.hp; renderPlist(); }
   if (m.to === game.myId) {
     me.hp = m.hp; sfx('hurt');
     $('hurt').style.opacity = '1'; clearTimeout(game.hurtT); game.hurtT = setTimeout(() => { $('hurt').style.opacity = '0'; }, 250);
@@ -368,7 +370,8 @@ shell.on('dmg', (m) => {
 });
 shell.on('kill', (m) => {
   const K = game.stats.get(m.by), V = game.stats.get(m.to);
-  if (K && m.by !== m.to) K.k++; if (V) V.d++;
+  if (K && m.by !== m.to) K.k++; if (V) { V.d++; V.hp = 0; V.alive = false; }
+  renderPlist();
   if (m.score) game.score = m.score;
   const w = weapon(m.w);
   const row = document.createElement('div');
@@ -386,7 +389,19 @@ shell.on('boom', (m) => {
   puff(p, '#ffb36b', 24, 0.9, 9); puff(p, '#ffffff', 10, 1.4, 4);
   sfx('boom', null, Math.max(0.1, 1 - p.distanceTo(me.eye()) / 80));
 });
-shell.on('gone', (m) => { game.others.get(m.id)?.remove(); game.others.delete(m.id); });
+shell.on('gone', (m) => { game.others.get(m.id)?.remove(); game.others.delete(m.id); game.stats.delete(m.id); renderPlist(); });
+// 지금 같이 하는 사람들 · 체력 (왼쪽, 레이더 아래). 팀전이면 우리 팀이 위
+function renderPlist() {
+  const el = $('plist'); if (!el) return;
+  const tdm = game.opts?.mode === 'tdm';
+  const rows = [...game.stats.entries()].map(([id, s]) => ({ id, ...s }))
+    .sort((a, b) => (tdm ? (a.team === game.team ? 0 : 1) - (b.team === game.team ? 0 : 1) || (a.team > b.team ? 1 : a.team < b.team ? -1 : 0) : 0) || b.alive - a.alive || b.hp - a.hp);
+  el.innerHTML = rows.map((r) => {
+    const col = tdm ? TEAMS[r.team]?.color || '#fff' : r.color || '#fff', hp = Math.max(0, Math.round(r.hp ?? 100));
+    const bar = hp > 60 ? '#7be04a' : hp > 30 ? '#ffd23b' : '#ff5a5a';
+    return `<div class="pl${r.id === game.myId ? ' me' : ''}${r.alive === false ? ' dead' : ''}"><span class="dot" style="background:${esc(col)}"></span><span class="nm">${r.bot ? '🤖' : ''}${esc(r.name)}</span><span class="hpb"><i style="width:${hp}%;background:${bar}"></i></span><b>${r.alive === false ? '💀' : hp}</b></div>`;
+  }).join('');
+}
 function showDeath(K) {
   $('death').classList.remove('hidden');
   $('death-by').textContent = K ? `💥 ${K.name}에게 당했어요` : '💥 쓰러졌어요';
