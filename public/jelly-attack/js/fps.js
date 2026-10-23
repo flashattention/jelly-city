@@ -1,6 +1,6 @@
 // 1인칭: 내 몸(움직임 · 벽 · 계단 · 점프 · 앉기) + 화면 앞 총(곰돌이 손 · 반동 · 장전 · 총구 불꽃)
 import * as THREE from 'three';
-import { floorAt } from './maps.js';
+import { floorAt, boxesIn } from './maps.js';
 
 const R = 0.35, H_STAND = 1.72, H_CROUCH = 1.18, EYE_STAND = 1.55, EYE_CROUCH = 1.05;
 export class Player {
@@ -29,7 +29,7 @@ export class Player {
     // 위아래
     const wasGround = this.onGround;
     this.pos.y += this.vel.y * dt;
-    if (this.vel.y > 0) for (const b of map.boxes) if (this.inXZ(b) && b.y > this.pos.y && b.y < this.pos.y + this.height) { this.pos.y = b.y - this.height; this.vel.y = 0; }
+    if (this.vel.y > 0) for (const b of boxesIn(map, this.pos.x - 1, this.pos.z - 1, this.pos.x + 1, this.pos.z + 1)) if (this.inXZ(b) && b.y > this.pos.y && b.y < this.pos.y + this.height) { this.pos.y = b.y - this.height; this.vel.y = 0; }
     const fl = floorAt(map, this.pos.x, this.pos.z, Math.max(this.pos.y, this.pos.y - this.vel.y * dt), R);
     if (this.pos.y <= fl) { if (!wasGround && this.vel.y < -6) ev.push('land'); this.pos.y = fl; this.vel.y = 0; this.onGround = true; }
     else if (this.pos.y > fl + 0.05) this.onGround = false;
@@ -40,7 +40,7 @@ export class Player {
   }
   inXZ(b, r = R) { return this.pos.x > b.x - b.w / 2 - r && this.pos.x < b.x + b.w / 2 + r && this.pos.z > b.z - b.d / 2 - r && this.pos.z < b.z + b.d / 2 + r; }
   push(map, axis) {
-    for (const b of map.boxes) {
+    for (const b of boxesIn(map, this.pos.x - 1, this.pos.z - 1, this.pos.x + 1, this.pos.z + 1)) {
       const top = b.y + b.h;
       if (top <= this.pos.y + 0.55 || b.y >= this.pos.y + this.height || !this.inXZ(b)) continue; // 계단처럼 낮은 건 올라선다
       if (axis === 'x') { const l = b.x - b.w / 2 - R, r = b.x + b.w / 2 + R; this.pos.x = this.pos.x - l < r - this.pos.x ? l : r; this.vel.x = 0; }

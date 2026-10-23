@@ -4,7 +4,7 @@ import { BaseRooms, clean } from '../shared/rooms.js';
 import { mapById, clearLine, rayBoxes } from '../../public/jelly-attack/js/maps.js';
 import { weapon, PRIMARY, SECONDARY, KNIFE, NADE, falloff } from '../../public/jelly-attack/js/weapons.js';
 
-const MAP_IDS = ['depot', 'desert', 'factory'];
+const MAP_IDS = ['depot', 'desert', 'factory', 'harbor'];
 const TIME = Number(process.env.ATTACK_SEC) || 6 * 60; // 한 판 시간 (초)
 const RESPAWN = 3000, PROTECT = 2000, EYE = 1.55;
 const BOT_NAMES = ['젤리봇 딸기', '젤리봇 소다', '젤리봇 푸딩', '젤리봇 망고', '젤리봇 민트', '젤리봇 라임', '젤리봇 자두', '젤리봇 복숭아', '젤리봇 포도', '젤리봇 레몬', '젤리봇 체리', '젤리봇 키위'];

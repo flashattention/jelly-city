@@ -47,7 +47,7 @@
 #banner { position: fixed; left: 50%; top: 26%; transform: translate(-50%, -50%); z-index: 6; font-family: 'Jua', sans-serif; font-size: clamp(36px, 7vw, 70px); text-shadow: 0 0 26px rgba(255,170,230,.9), 0 5px 0 rgba(0,0,0,.3); pointer-events: none; white-space: nowrap; animation: pop 1.6s ease forwards; }
 @keyframes pop { 0% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; } 15% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
 /* 맵 · 무기 고르기 */
-.map-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 12px 0 4px; }
+.map-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 0 4px; }
 .map-pick button { border: 2px solid transparent; border-radius: 14px; padding: 8px 4px; background: rgba(255,255,255,.1); color: var(--ink); font-family: 'Jua', sans-serif; font-size: 14px; }
 .map-pick button b { display: block; font-size: 26px; }
 .map-pick button.on { border-color: var(--gold); background: rgba(255,216,77,.16); }
