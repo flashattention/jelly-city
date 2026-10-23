@@ -1,5 +1,6 @@
 // 젤리어택: 곰돌이 젤리들의 팀 슈팅 (연습전: 봇과 · 같이: 최대 12명, 팀 데스매치 / 개인전)
 import * as THREE from 'three';
+import { openSens, sensOf } from '../../shared/js/sens.js';
 import { store } from '../../shared/js/account.js';
 import { Shell, esc, TEAMS } from '../../shared/js/shell.js';
 import { Roach } from '../../shared/js/roach.js';
@@ -10,7 +11,7 @@ import { Player, ViewModel } from './fps.js';
 import { sfx, unlock, toggleMute, sound } from './sound.js';
 
 const $ = (id) => document.getElementById(id);
-const LOAD_KEY = 'jellyattack.loadout', PICK_KEY = 'jellyattack.pick', SENS_KEY = 'jellyattack.sens';
+const LOAD_KEY = 'jellyattack.loadout', PICK_KEY = 'jellyattack.pick';
 const coarse = matchMedia('(pointer: coarse)').matches;
 
 // ---------- 3D ----------
@@ -30,7 +31,7 @@ const game = window.attack = { me, ray: rayBoxes, // 점검용
   mode: 'title', map: null, world: null, others: new Map(), myId: 0, team: null, opts: null,
   pick: { map: pick0.map || 'depot', mode: pick0.mode || 'tdm', bots: pick0.bots ?? 6 },
   load: (() => { try { return { p: 'm4', s: 'pistol', ...JSON.parse(store.get(LOAD_KEY) || '{}') }; } catch { return { p: 'm4', s: 'pistol' }; } })(),
-  stats: new Map(), score: { red: 0, blue: 0 }, endAt: 0, sens: Number(store.get(SENS_KEY)) || 1,
+  stats: new Map(), score: { red: 0, blue: 0 }, endAt: 0, 
 };
 
 // ---------- 무기 · 탄 ----------
@@ -65,11 +66,12 @@ function lock() { unlock(); $('c').requestPointerLock?.(); }
 document.addEventListener('pointerlockchange', () => { if (game.mode === 'play') $('lockmsg').classList.toggle('hidden', locked() || !$('loadout').classList.contains('hidden')); });
 $('c').addEventListener('click', () => { if (game.mode === 'play' && !locked()) lock(); });
 $('lock-btn').onclick = lock;
+$('sens-btn').onclick = () => openSens('attack');
 $('loadout-btn').onclick = () => openLoadout();
 $('quit-btn').onclick = () => quit();
 document.addEventListener('mousemove', (e) => {
   if (!locked() || game.mode !== 'play') return;
-  const s = 0.0022 * game.sens * (mouseR ? 0.55 * (curW()?.scope ? 0.35 : 1) : 1);
+  const s = 0.0022 * sensOf('attack') * (mouseR ? 0.55 * (curW()?.scope ? 0.35 : 1) : 1);
   me.yaw -= e.movementX * s; me.pitch = Math.max(-1.45, Math.min(1.45, me.pitch - e.movementY * s));
 });
 document.addEventListener('mousedown', (e) => { if (!locked()) return; if (e.button === 0) mouseL = true; if (e.button === 2) mouseR = true; });
@@ -114,7 +116,7 @@ const shell = new Shell({
   multiLabel: '👥 같이 하기', roomIcon: '🔫', startLabel: '🔫 작전 시작!',
   keysHelp: 'WASD 이동 · 마우스 조준 · 클릭 사격 · 우클릭 조준경 · R 장전 · 1~4 무기 · G 수류탄 · Space 점프 · Shift 달리기 · C/Ctrl 앉기 · Tab 점수 · B 무기 고르기',
   buttons: [{ id: 'practice-btn', label: '🎯 연습전 <small>봇과 바로 대결</small>', onClick: () => practice() }],
-  extraRow: [{ label: '🎒 무기 고르기', onClick: () => openLoadout() }, { label: '🪂 젤리배그 (배틀로얄)', onClick: () => { location.href = '/jelly-attack/bg/'; } }],
+  extraRow: [{ label: '🎒 무기 고르기', onClick: () => openLoadout() }, { label: '🖱️ 마우스 감도', onClick: () => openSens('attack') }, { label: '🪂 젤리배그 (배틀로얄)', onClick: () => { location.href = '/jelly-attack/bg/'; } }],
   screens: ['over', 'loadout'],
   describe,
   teamChat: (o) => o.mode !== 'ffa', // 팀 데스매치면 팀 채팅

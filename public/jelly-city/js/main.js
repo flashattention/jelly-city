@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { sensOf } from '../../shared/js/sens.js';
 import { SEED, HALF } from './config.js';
 import { buildCity, renderMapImage } from './city.js';
 import { setupWorld, housePrice, homeLabel, freeUnits } from './world-setup.js';
@@ -822,7 +823,7 @@ window.addEventListener('mousemove', (e) => {
   else if (dragging) { dx = e.clientX - lastMX; dy = e.clientY - lastMY; lastMX = e.clientX; lastMY = e.clientY; }
   else return;
   const c = game.player.cam;
-  const sens = 1 / (game.zoomNow || 1); // 줌 중에는 감도를 낮춘다
+  const sens = sensOf('city') / (game.zoomNow || 1); // 줌 중에는 감도를 낮춘다 · 마우스 감도 설정(1배 = 원래)
   c.yaw -= dx * 0.0028 * sens;
   c.pitch = clamp(c.pitch + dy * 0.0022 * sens, game.player.fp || game.player.aim > 0.5 ? -1.3 : -0.35, 1.25);
   game.mouseT = 1.5;

@@ -2,6 +2,7 @@
 //   젤리 비행선 → 뛰어내리기(F) → 낙하산 → 착지 → 줍기(E) → 싸우기 → 줄어드는 젤리 자기장 → 마지막 한 명 '이겼젤!'
 import * as THREE from 'three';
 import { store } from '../../shared/js/account.js';
+import { openSens, sensOf } from '../../shared/js/sens.js';
 import { Shell, esc } from '../../shared/js/shell.js';
 import { Roach } from '../../shared/js/roach.js';
 import { confetti } from '../../shared/js/party.js';
@@ -55,10 +56,10 @@ const locked = () => !!game.testLock || document.pointerLockElement === $('c');
 function lock() { unlock(); $('c').requestPointerLock?.(); }
 document.addEventListener('pointerlockchange', () => { if (game.mode !== 'title' && game.mode !== 'over') $('lockmsg').classList.toggle('hidden', locked() || game.mode === 'dead'); });
 $('c').addEventListener('click', () => { if (game.mode === 'dead') return cycleWatch(); if (game.mode !== 'title' && game.mode !== 'over' && !locked()) lock(); });
-$('lock-btn').onclick = lock; $('quit-btn').onclick = () => quit();
+$('lock-btn').onclick = lock; $('sens-btn').onclick = () => openSens('bg'); $('quit-btn').onclick = () => quit();
 document.addEventListener('mousemove', (e) => {
   if (!locked() || game.mode === 'title' || game.mode === 'over') return;
-  const s = 0.0022 * (mouseR ? 0.55 * (curW()?.scope ? 0.35 : 1) : 1);
+  const s = 0.0022 * sensOf('bg') * (mouseR ? 0.55 * (curW()?.scope ? 0.35 : 1) : 1);
   me.yaw -= e.movementX * s; me.pitch = Math.max(-1.45, Math.min(1.45, me.pitch - e.movementY * s));
 });
 document.addEventListener('mousedown', (e) => { if (!locked()) return; if (e.button === 0) mouseL = true; if (e.button === 2) mouseR = true; });
@@ -507,7 +508,7 @@ const shell = new Shell({
   multiLabel: '👥 같이 하기', roomIcon: '🪂', startLabel: '🪂 비행선 출발!',
   keysHelp: 'F/Space 뛰어내리기 · WASD 이동 · 마우스 조준 · 클릭 사격 · 우클릭 조준경 · E 줍기 · 1~5 무기 · 7 붕대 · 8 구급상자 · G 수류탄 · R 장전 · Shift 달리기 · C 앉기 · M 지도',
   buttons: [{ id: 'practice-btn', label: '🪂 바로 하기 <small>젤리봇과 배틀로얄</small>', onClick: () => practice() }],
-  extraRow: [{ label: '🔫 젤리어택으로', onClick: () => { location.href = '/jelly-attack/'; } }],
+  extraRow: [{ label: '🖱️ 마우스 감도', onClick: () => openSens('bg') }, { label: '🔫 젤리어택으로', onClick: () => { location.href = '/jelly-attack/'; } }],
   screens: ['over'],
   describe: (o = {}) => `🪂 ${o.fill || 24}명 (젤리봇으로 채우기)`,
   options: { room: (el, o, host) => optsUI(el, o, host, (n) => shell.send({ t: 'opts', opts: n })) },

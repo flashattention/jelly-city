@@ -2,11 +2,13 @@
 import { account, store } from '/shared/js/account.js';
 import { Creator, thumbOf, DEFAULT_CHAR_KEY } from '/shared/js/char-studio.js';
 import { localChars, addLocal, updateLocal, removeLocal, LOCAL_MAX } from '/shared/js/local-chars.js';
+import { openSens } from '/shared/js/sens.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const err = (t) => { $('err').textContent = t || ''; };
 const MAX_CHARS = 4;
+$('sens-open').onclick = () => openSens();
 const q = new URLSearchParams(location.search);
 // 다른 게임에서 '새 캐릭터 만들기'로 왔으면 만든 뒤 그 게임으로 돌아간다
 const back = /^\/[a-z-]+\/$/.test(q.get('back') || '') ? q.get('back') : null;

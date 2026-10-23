@@ -18,6 +18,7 @@ import { housePrice, freeUnits, homeLabel, isHomeType } from './world-setup.js';
 import { moodLabel, moodEmoji } from './citizens.js';
 import { Roach } from '../../shared/js/roach.js';
 import { settings, saveSettings } from '../../shared/js/settings.js';
+import { openSens, sensOf } from '../../shared/js/sens.js';
 import { setMusic, applyVolumes } from '../../shared/js/audio.js';
 import { fmtTime, DAYS, escapeHtml, cityText, setBrand } from '../../shared/js/utils.js';
 
@@ -795,8 +796,10 @@ export class UI {
         <div class="set-row"><label><input type="checkbox" id="set-music" ${settings.music ? 'checked' : ''}/> 🎵 배경음악</label><input type="range" id="set-music-vol" min="0" max="1" step="0.05" value="${settings.musicVol}"></div>
         <div class="set-row"><label><input type="checkbox" id="set-sfx" ${settings.sfx ? 'checked' : ''}/> 🔊 효과음 (무기·차·동물·비명 등)</label><input type="range" id="set-sfx-vol" min="0" max="1" step="0.05" value="${settings.sfxVol}"></div>
         <div class="set-row"><b>🎯 조준점 색</b><div class="xh-row">${XH_COLORS.map((c) => `<button class="xh-sw" data-xh="${c}" style="background:${c}" title="${c}"></button>`).join('')}<input type="color" id="set-xh" value="${escapeHtml(settings.crosshairColor)}" title="직접 고르기"><span class="xh-prev" id="xh-prev">＋</span></div></div>
+        <div class="set-row"><b>🖱️ 마우스 감도</b><button class="btn ghost" id="set-sens">${sensOf('city').toFixed(2)}배 · 바꾸기</button></div>
         <button class="btn" id="set-save">저장</button>
         <button class="btn ghost" id="set-reset">👥 캐릭터 선택 화면으로</button>`;
+      $('set-sens').onclick = () => openSens('city', () => { const b = $('set-sens'); if (b) b.textContent = `${sensOf('city').toFixed(2)}배 · 바꾸기`; });
       $('set-save').onclick = () => {
         settings.shadows = $('set-shadow').checked;
         if (settings.bugMode !== $('set-bug').checked) this.setBugMode($('set-bug').checked);
