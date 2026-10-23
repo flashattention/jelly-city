@@ -13,6 +13,7 @@ import { weapon, KNIFE, NADE } from './weapons.js';
 import { buildMap } from './world.js';
 import { Player, ViewModel, gunModel } from './fps.js';
 import { sfx, unlock, toggleMute, sound } from './sound.js';
+import { explosion, smoke, updateFx as updateBig } from './fx.js';
 
 const $ = (id) => document.getElementById(id);
 const PICK_KEY = 'jellybg.pick';
@@ -472,6 +473,7 @@ function frame() {
       if (kickBack > 0) { const r = Math.min(kickBack, dt * 1.2); me.pitch -= r; kickBack -= r; }
       if (healing && now >= healing.end) { shell.send({ t: 'heal', k: healing.k }); cancelHeal(); }
       camera.position.copy(me.viewEye()); camera.rotation.set(me.pitch, me.yaw, 0);
+      if (game.shake > 0) { game.shake = Math.max(0, game.shake - dt * 1.6); const k = game.shake * game.shake * 0.35; camera.position.x += (Math.random() - 0.5) * k; camera.position.y += (Math.random() - 0.5) * k; camera.rotation.z += (Math.random() - 0.5) * k * 0.3; }
       const w = curW(), zoom = mouseR && w?.cls !== 'knife' && w?.cls !== 'nade' ? (w.scope ? w.zoom : Math.min(1.6, w.zoom)) : 1;
       const fov = (me.sprinting ? 80 : 72) / zoom;
       if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 14); camera.updateProjectionMatrix(); }
@@ -502,7 +504,7 @@ function frame() {
     camera.position.set(Math.cos(a) * 170, 90, Math.sin(a) * 170); camera.lookAt(0, 0, 0);
     if (camera.fov !== 60) { camera.fov = 60; camera.updateProjectionMatrix(); }
   }
-  updateFx(dt);
+  updateFx(dt); updateBig(dt);
   renderer.clear(); renderer.render(scene, camera);
   if (game.mode === 'ground') vm.render(renderer);
 }
@@ -563,7 +565,15 @@ shell.on('kill', (m) => {
   if (m.by === game.myId && m.to !== game.myId) { game.kills++; sfx('kill'); banner(m.head ? '🎯 헤드샷!' : `💥 ${game.kills}킬!`); }
   if (m.to === game.myId) { game.place = m.place; die(m.w === 'zone' ? null : K?.name); }
 });
-shell.on('boom', (m) => { const p = new THREE.Vector3(...m.p); puff(p, '#ffb36b', 24, 0.9, 9); puff(p, '#ffffff', 10, 1.4, 4); sfx('boom', null, Math.max(0.1, 1 - p.distanceTo(camera.position) / 90)); });
+shell.on('boom', (m) => {
+  const p = new THREE.Vector3(...m.p);
+  explosion(scene, p, NADE.r);
+  sfx('boom', null, Math.max(0.15, 1 - p.distanceTo(camera.position) / 110));
+  // 가까울수록 크게 흔들리고 하얗게 번쩍
+  const d = p.distanceTo(camera.position);
+  game.shake = Math.max(game.shake || 0, Math.max(0, 1 - d / 26) * 0.9);
+  if (d < 12) { const f = document.getElementById('nade-flash') || Object.assign(document.body.appendChild(document.createElement('div')), { id: 'nade-flash' }); f.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:4;background:#fff8e8;transition:opacity .6s;opacity:' + (0.85 * (1 - d / 12)).toFixed(2); requestAnimationFrame(() => requestAnimationFrame(() => { f.style.opacity = '0'; })); }
+});
 shell.on('gone', (m) => { game.others.get(m.id)?.remove(); game.others.delete(m.id); });
 function optsUI(el, o, editable, set) {
   el.innerHTML = `<div class="bots-row">🪂 판 인원 (젤리봇으로 채우기) ${editable ? '<button data-b="-2">−</button>' : ''}<b>${o.fill ?? 24}</b>${editable ? '<button data-b="2">＋</button>' : ''}</div>`;

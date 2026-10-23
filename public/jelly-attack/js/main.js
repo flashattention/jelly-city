@@ -9,6 +9,7 @@ import { weapon, PRIMARY, SECONDARY, CLASS_NAME, KNIFE, NADE } from './weapons.j
 import { buildMap } from './world.js';
 import { Player, ViewModel } from './fps.js';
 import { sfx, unlock, toggleMute, sound } from './sound.js';
+import { explosion, smoke, updateFx as updateBig } from './fx.js';
 
 const $ = (id) => document.getElementById(id);
 const LOAD_KEY = 'jellyattack.loadout', PICK_KEY = 'jellyattack.pick';
@@ -393,8 +394,12 @@ shell.on('kill', (m) => {
 });
 shell.on('boom', (m) => {
   const p = new THREE.Vector3(...m.p);
-  puff(p, '#ffb36b', 24, 0.9, 9); puff(p, '#ffffff', 10, 1.4, 4);
-  sfx('boom', null, Math.max(0.1, 1 - p.distanceTo(me.eye()) / 80));
+  explosion(scene, p, NADE.r);
+  sfx('boom', null, Math.max(0.15, 1 - p.distanceTo(me.eye()) / 110));
+  // 가까울수록 크게 흔들리고 하얗게 번쩍
+  const d = p.distanceTo(camera.position);
+  game.shake = Math.max(game.shake || 0, Math.max(0, 1 - d / 26) * 0.9);
+  if (d < 12) { const f = document.getElementById('nade-flash') || Object.assign(document.body.appendChild(document.createElement('div')), { id: 'nade-flash' }); f.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:4;background:#fff8e8;transition:opacity .6s;opacity:' + (0.85 * (1 - d / 12)).toFixed(2); requestAnimationFrame(() => requestAnimationFrame(() => { f.style.opacity = '0'; })); }
 });
 shell.on('gone', (m) => { game.others.get(m.id)?.remove(); game.others.delete(m.id); game.stats.delete(m.id); renderPlist(); });
 // 지금 같이 하는 사람들 · 체력 (왼쪽, 레이더 아래). 팀전이면 우리 팀이 위
@@ -515,6 +520,7 @@ function frame() {
     // 카메라: 살아 있으면 눈, 죽으면 그 자리에서 천천히 내려다본다
     const eye = me.viewEye();
     camera.position.copy(eye); camera.rotation.set(me.alive ? me.pitch : -0.5, me.yaw, 0);
+    if (game.shake > 0) { game.shake = Math.max(0, game.shake - dt * 1.6); const k = game.shake * game.shake * 0.35; camera.position.x += (Math.random() - 0.5) * k; camera.position.y += (Math.random() - 0.5) * k; camera.rotation.z += (Math.random() - 0.5) * k * 0.3; }
     const w = curW(), zoom = mouseR && me.alive && w?.cls !== 'knife' && w?.cls !== 'nade' ? (w.scope ? w.zoom : Math.min(1.6, w.zoom)) : 1;
     const fov = (me.sprinting && me.alive ? 80 : 72) / zoom; // 달릴 때 시야가 살짝 넓어진다
     if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 14); camera.updateProjectionMatrix(); }
@@ -528,7 +534,7 @@ function frame() {
     camera.position.set(Math.cos(a) * R, 26, Math.sin(a) * R); camera.lookAt(0, 0, 0);
     if (camera.fov !== 60) { camera.fov = 60; camera.updateProjectionMatrix(); }
   }
-  updateFx(dt);
+  updateFx(dt); updateBig(dt);
   renderer.clear();
   renderer.render(scene, camera);
   if (game.mode === 'play' && me.alive) vm.render(renderer);

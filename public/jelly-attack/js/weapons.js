@@ -27,7 +27,9 @@ export const SECONDARY = ['pistol', 'revolver', 'deagle', 'blaster'];
 export const CLASS_NAME = { rifle: '돌격소총', smg: '기관단총', sniper: '저격총', shotgun: '산탄총', lmg: '기관총', pistol: '권총' };
 export const HEAD = 2.5;          // 머리 배율 (저격총은 3)
 export const KNIFE = { id: 'knife', name: '군용 나이프', emoji: '🔪', cls: 'knife', dmg: 55, back: 100, rate: 0.55, range: 2.4 };
-export const NADE = { id: 'nade', name: '젤리 수류탄', emoji: '💣', cls: 'nade', dmg: 110, r: 6.5, fuse: 2.2 };
+export const NADE = { id: 'nade', name: '젤리 수류탄', emoji: '💣', cls: 'nade', dmg: 130, r: 8.5, inner: 3, fuse: 2.2 };
+// 수류탄 피해 (서든어택처럼): 3m 안은 거의 즉사 · 8.5m 까지 점점 약해진다
+export const nadeDmg = (d) => (d <= NADE.inner ? NADE.dmg : d >= NADE.r ? 0 : NADE.dmg * ((NADE.r - d) / (NADE.r - NADE.inner)) ** 1.3);
 
 const cache = new Map();
 export function weapon(id) {

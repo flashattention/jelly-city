@@ -2,7 +2,7 @@
 //   봇은 서버가 움직인다 (길찾기 격자 → 길 따라 이동 → 보이면 조준해서 쏜다)
 import { BaseRooms, clean } from '../shared/rooms.js';
 import { mapById, clearLine, rayBoxes } from '../../public/jelly-attack/js/maps.js';
-import { weapon, PRIMARY, SECONDARY, KNIFE, NADE, falloff } from '../../public/jelly-attack/js/weapons.js';
+import { weapon, PRIMARY, SECONDARY, KNIFE, NADE, nadeDmg, falloff } from '../../public/jelly-attack/js/weapons.js';
 
 const MAP_IDS = ['depot', 'desert', 'factory', 'harbor'];
 const TIME = Number(process.env.ATTACK_SEC) || 6 * 60; // 한 판 시간 (초)
@@ -114,7 +114,7 @@ export class AttackRooms extends BaseRooms {
         if (r.opts.mode === 'tdm' && t.team === c.team && t !== c) continue;
         const q = { x: t.pos.x, y: t.pos.y + 1, z: t.pos.z }, d = Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z);
         if (d > NADE.r || !clearLine(r.map, p, q)) continue;
-        this.damage(r, t, NADE.dmg * (1 - d / NADE.r) * (t === c ? 0.5 : 1), c, 'nade', false);
+        this.damage(r, t, nadeDmg(d) * (t === c ? 0.5 : 1), c, 'nade', false);
       }
     }
   }

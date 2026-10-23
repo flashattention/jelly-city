@@ -51,7 +51,7 @@ export function sfx(name, arg, vol = 1) {
     case 'kill': for (let i = 0; i < 3; i++) tone(o, t + i * 0.06, 0.12, 900 + i * 300, { type: 'triangle', vol: 0.12 }); break;
     case 'hurt': tone(o, t, 0.2, 220, { type: 'sawtooth', vol: 0.12, f2: 110 }); hiss(o, t, 0.12, { f: 800, vol: 0.15, type: 'lowpass' }); break;
     case 'die': tone(o, t, 0.8, 400, { type: 'triangle', vol: 0.18, f2: 70 }); break;
-    case 'boom': tone(o, t, 0.9, 70, { type: 'sine', vol: 0.9, f2: 28 }); hiss(o, t, 1.0, { f: 1200, vol: 0.7, type: 'lowpass', f2: 120 }); break;
+    case 'boom': hiss(o, t, 0.08, { f: 3500, vol: 0.9, type: 'highpass' }); tone(o, t, 1.4, 90, { type: 'sine', vol: 1.0, f2: 24 }); tone(o, t, 0.5, 55, { type: 'sawtooth', vol: 0.25, f2: 30 }); hiss(o, t, 1.6, { f: 1800, vol: 0.85, type: 'lowpass', f2: 90 }); hiss(o, t + 0.12, 1.2, { f: 4000, q: 0.5, vol: 0.12, f2: 600 }); break; // 쾅! + 길게 울리는 땅울림 + 파편 소리
     case 'throw': hiss(o, t, 0.25, { f: 800, q: 1.5, vol: 0.2, f2: 2500 }); break;
     case 'step': hiss(o, t, 0.06, { f: 500 + Math.random() * 200, vol: 0.18, type: 'lowpass' }); break;
     case 'jump': hiss(o, t, 0.08, { f: 700, vol: 0.12, type: 'lowpass' }); break;

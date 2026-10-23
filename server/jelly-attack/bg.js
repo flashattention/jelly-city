@@ -3,7 +3,7 @@
 import { BaseRooms } from '../shared/rooms.js';
 import { makeBgMap, BG_SIZE } from '../../public/jelly-attack/js/bgmap.js';
 import { clearLine } from '../../public/jelly-attack/js/maps.js';
-import { weapon, NADE, KNIFE, falloff } from '../../public/jelly-attack/js/weapons.js';
+import { weapon, NADE, nadeDmg, KNIFE, falloff } from '../../public/jelly-attack/js/weapons.js';
 import { ARMOR_CUT, HEALS, DROP, makeLoot, makeZones, zoneAt, makePlane, planeAt, emptyInv, rollItem } from '../../public/jelly-attack/js/bgrules.js';
 import { rng } from '../../public/jelly-apple/js/board.js';
 
@@ -98,7 +98,7 @@ export class BgRooms extends BaseRooms {
         if (!t.alive || !t.pos) continue;
         const q = { x: t.pos.x, y: t.pos.y + 1, z: t.pos.z }, dd = Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z);
         if (dd > NADE.r || !clearLine(MAP, p, q)) continue;
-        this.damage(r, t, NADE.dmg * (1 - dd / NADE.r) * (t === c ? 0.5 : 1), c, 'nade', false);
+        this.damage(r, t, nadeDmg(dd) * (t === c ? 0.5 : 1), c, 'nade', false);
       }
     }
   }
