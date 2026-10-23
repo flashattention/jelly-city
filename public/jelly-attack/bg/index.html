@@ -19,13 +19,14 @@
   <div id="hurt"></div>
   <div id="zone-tint"></div>
   <div id="scope" class="hidden"><div class="ring"></div></div>
+  <div id="reddot" class="hidden"><i></i></div>
   <div id="hud" class="hidden">
     <div id="cross"><i class="u"></i><i class="d"></i><i class="l"></i><i class="r"></i><b></b></div>
     <div id="hitmark" class="hidden">✕</div>
     <div id="bg-top"><span id="alive">🪂 0</span><span id="kills">🎯 0</span><span id="zone-txt"></span></div>
     <div id="feed"></div>
     <canvas id="mini" width="220" height="220"></canvas>
-    <div id="hp"><div id="gear"></div><b id="hp-n">100</b><div id="hp-bar"><i></i></div></div>
+    <div id="hp"><div id="gear"></div><b id="hp-n">100</b><div id="hp-bar"><i></i></div><div class="boostbar hidden" title="부스트: 조금씩 회복 · 60 넘으면 빨라져요"><i id="boost"></i></div></div>
     <div id="heals"></div>
     <div id="ammo"><div id="w-name"></div><b id="ammo-n"></b><span id="ammo-r"></span><div id="bg-slots"></div></div>
     <div id="prompt" class="hidden"></div>
@@ -34,6 +35,7 @@
     <div class="hud-r"><button id="b-mute" title="소리">🔊</button><button id="b-quit" title="나가기">✕</button></div>
     <div id="dirs"></div>
   </div>
+  <div id="inv" class="hidden"><div class="inv-card"><div class="inv-head"><b>🎒 가방</b><span>Tab 닫기 · 버리기 · 부착물 빼기</span><button id="inv-close">✕</button></div><div class="inv-body"></div></div></div>
   <div id="bigmap" class="hidden"><canvas id="big" width="720" height="720"></canvas><div class="note">M 으로 닫기</div></div>
   <div id="spec" class="hidden"><div id="spec-place"></div><div id="spec-who"></div><div class="note">Space · 클릭: 다른 사람 보기 · ✕ 나가기</div></div>
   <div id="lockmsg" class="hidden"><div class="card"><div class="logo small">🪂</div><b>화면을 클릭하면 조작을 시작해요</b><div class="note">마우스로 둘러보기 · Esc 로 마우스 풀기</div><div class="row2"><button id="lock-btn" class="btn big">▶ 계속하기</button><button id="sens-btn" class="btn ghost">🖱️ 감도</button><button id="fs-btn" class="btn ghost" title="전체화면이면 Ctrl(앉기)+W 를 눌러도 탭이 닫히지 않아요">⛶ 전체화면</button><button id="quit-btn" class="btn ghost">나가기</button></div></div></div>

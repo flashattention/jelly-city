@@ -4,7 +4,7 @@ import { BaseRooms } from '../shared/rooms.js';
 import { makeBgMap, BG_SIZE } from '../../public/jelly-attack/js/bgmap.js';
 import { clearLine } from '../../public/jelly-attack/js/maps.js';
 import { weapon, NADE, nadeDmg, KNIFE, falloff } from '../../public/jelly-attack/js/weapons.js';
-import { ARMOR_CUT, HEALS, DROP, makeLoot, makeZones, zoneAt, makePlane, planeAt, emptyInv, rollItem } from '../../public/jelly-attack/js/bgrules.js';
+import { ARMOR_CUT, HEALS, DROP, makeLoot, makeZones, zoneAt, makePlane, planeAt, emptyInv, rollItem, AMMO, AMMO_OF, ATTS, fits, CAP, BOOSTS, ammoTotal, makeVehicles, VEHICLES } from '../../public/jelly-attack/js/bgrules.js';
 import { rng } from '../../public/jelly-apple/js/board.js';
 
 const MAP = makeBgMap();
@@ -37,6 +37,7 @@ export class BgRooms extends BaseRooms {
     r.loot = new Map(makeLoot(MAP, seed).map((it) => [it.id, it]));
     r.nextLoot = 100000;
     r.zones = makeZones(seed); r.plane = makePlane(seed);
+    r.veh = makeVehicles(seed); r.smokes = []; r.vehAt = 0;
     r.t0 = r.startAt; r.lastZone = 0; r.ended = false;
     const R = rng(seed ^ 0x77);
     let bi = 0;
@@ -45,12 +46,18 @@ export class BgRooms extends BaseRooms {
       bi++;
     }
     for (const p of r.players) {
-      p.hp = 100; p.alive = true; p.inv = emptyInv(); p.k = 0; p.dmg = 0; p.place = 0; p.jumped = false; p.landed = false; p.lastFire = {}; p.healAt = 0;
+      p.hp = 100; p.alive = true; p.inv = emptyInv(); p.boost = 0; p.boostAcc = 0; p.veh = 0; p.k = 0; p.dmg = 0; p.place = 0; p.jumped = false; p.landed = false; p.lastFire = {}; p.healAt = 0;
       p.pos = { x: r.plane.a[0], y: r.plane.h, z: r.plane.a[1] }; p.st = null;
       if (p.bot) { p.path = null; p.target = null; p.react = 0; p.fireT = 0; p.lootT = 0; p.goal = null; p.scanT = 0; }
     }
     r.alive = r.players.length;
-    return { map: 'island', zones: r.zones, plane: r.plane, loot: [...r.loot.values()], total: r.players.length };
+    return { map: 'island', zones: r.zones, plane: r.plane, loot: [...r.loot.values()], total: r.players.length, veh: r.veh };
+  }
+  // 봇의 눈: 벽 · 연막에 가리면 못 본다
+  see(r, a, b) {
+    if (!clearLine(MAP, a, b)) return false;
+    for (const s of r.smokes) { const dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((s.x - a.x) * dx + (s.z - a.z) * dz) / L2)); if ((a.x + dx * t - s.x) ** 2 + (a.z + dz * t - s.z) ** 2 < 5.5 * 5.5) return false; }
+    return true;
   }
   sec(r, now = Date.now()) { return (now - r.t0) / 1000; }
   // ---------- 메시지 ----------
@@ -60,9 +67,36 @@ export class BgRooms extends BaseRooms {
     if (m.t === 'jump') { if (!c.jumped) { c.jumped = true; this.toRoom(r, { t: 'jumped', id: c.id }); } return; }
     if (m.t === 'pick') return this.pick(r, c, +m.id, +m.slot);
     if (m.t === 'heal') {
+      // 붕대 · 구급상자 = 바로 회복 · 에너지 음료 · 진통제 = 부스트 (조금씩 회복 + 빨라짐)
+      const B = BOOSTS[m.k];
+      if (B) { if (c.inv[m.k] <= 0 || now - c.healAt < B.sec * 900) return; c.healAt = now; c.inv[m.k]--; c.boost = Math.min(100, c.boost + B.add); this.send(c, { t: 'boost', v: Math.round(c.boost) }); this.send(c, { t: 'inv', inv: c.inv }); return; }
       const H = HEALS[m.k]; if (!H || c.inv[m.k] <= 0 || now - c.healAt < H.sec * 900 || c.hp >= H.cap) return;
       c.healAt = now; c.inv[m.k]--; c.hp = Math.min(H.cap, c.hp + H.hp);
       this.send(c, { t: 'hp', hp: Math.round(c.hp) }); this.send(c, { t: 'inv', inv: c.inv });
+      return;
+    }
+    // 장전: 가방의 탄을 꺼내 쓴다
+    if (m.t === 'rl') { const w = weapon(String(m.w || '')), a = w && AMMO_OF[w.id], n = Math.max(0, Math.min(200, Math.round(Number(m.n) || 0))); if (!a || !this.has(c, w.id)) return; c.inv.ammo[a] = Math.max(0, (c.inv.ammo[a] || 0) - n); this.send(c, { t: 'inv', inv: c.inv }); return; }
+    if (m.t === 'drop') return this.dropItem(r, c, m);
+    if (m.t === 'smoke') {
+      if (!Array.isArray(m.p) || c.inv.smoke <= 0) return;
+      const p = { x: +m.p[0], z: +m.p[2] }; if (![p.x, p.z].every(Number.isFinite)) return;
+      c.inv.smoke--; this.send(c, { t: 'inv', inv: c.inv });
+      r.smokes.push({ x: p.x, z: p.z, until: now + 19000 });
+      this.toRoom(r, { t: 'smoke', p: [p.x, +m.p[1] || 0, p.z] });
+      return;
+    }
+    if (m.t === 'enter') {
+      const v = r.veh.find((x) => x.id === +m.id);
+      if (!v || v.dead || v.driver || c.veh || !c.pos || Math.hypot(v.x - c.pos.x, v.z - c.pos.z) > 4.5) return;
+      v.driver = c.id; c.veh = v.id; this.vehUpdate(r); return;
+    }
+    if (m.t === 'exit') { const v = r.veh.find((x) => x.id === c.veh); if (v) { v.driver = 0; if (Array.isArray(m.v)) { const [x, y, z, yaw] = m.v.map(Number); if ([x, y, z, yaw].every(Number.isFinite)) Object.assign(v, { x, y, z, yaw }); } } c.veh = 0; this.vehUpdate(r); return; }
+    if (m.t === 'vhit') {
+      // 차를 쏘면 차 체력이 줄고 0 이면 폭발 (안에 있던 사람도 크게 다친다)
+      const v = r.veh.find((x) => x.id === +m.id); if (!v || v.dead || now - (c.firedAt || 0) > 600) return;
+      v.hp -= Math.max(0, Math.min(120, Number(m.dmg) || 0));
+      if (v.hp <= 0) this.wreck(r, v, c); else this.vehUpdate(r);
       return;
     }
     if (m.t === 'fire') {
@@ -70,12 +104,19 @@ export class BgRooms extends BaseRooms {
       if (!w || !this.has(c, w.id) || !Array.isArray(m.o) || !Array.isArray(m.d)) return;
       if (now - (c.lastFire[w.id] || 0) < w.rate * 1000 * 0.7) return;
       c.lastFire[w.id] = now; c.firedAt = now;
-      this.toRoom(r, { t: 'fire', by: c.id, w: w.id, o: m.o.slice(0, 3).map(Number), d: m.d.slice(0, 3).map(Number) }, c);
+      const att = c.inv.pistol === w.id ? c.inv.patt : c.inv.att[c.inv.guns.indexOf(w.id)] || {};
+      this.toRoom(r, { t: 'fire', by: c.id, w: w.id, o: m.o.slice(0, 3).map(Number), d: m.d.slice(0, 3).map(Number), s: att.muzzle === 'supp' ? 1 : 0 }, c);
       return;
     }
     if (m.t === 'wpn') { const w = String(m.w || ''); if (weapon(w) && this.has(c, w)) this.toRoom(r, { t: 'wpn', id: c.id, w }, c); return; }
     if (m.t === 'hit') {
       const w = weapon(String(m.w || '')), tgt = r.players.find((p) => p.id === +m.to);
+      if (m.w === 'car') {
+        // 차로 치기: 운전 중이어야 하고 차 가까이 · 빠르기만큼 아프다
+        const v = r.veh.find((x) => x.id === c.veh && x.driver === c.id); if (!v || !tgt || !tgt.alive || tgt === c || !tgt.pos || Math.hypot(tgt.pos.x - v.x, tgt.pos.z - v.z) > 5) return;
+        if (now - (tgt.runAt || 0) < 700) return; tgt.runAt = now;
+        return this.damage(r, tgt, Math.max(12, Math.min(110, (Number(m.n) || 0) * 4.5)), c, 'car', false);
+      }
       if (!w || !tgt || !tgt.alive || tgt === c || !c.st || !this.has(c, w.id)) return;
       if (w.cls !== 'knife' && now - (c.firedAt || 0) > 600) return;
       if (w.cls === 'knife') { if (now - (c.lastFire.knife || 0) < w.rate * 700) return; c.lastFire.knife = now; }
@@ -103,28 +144,84 @@ export class BgRooms extends BaseRooms {
     }
   }
   has(c, id) { return id === 'knife' || c.inv.guns.includes(id) || c.inv.pistol === id; }
-  // 줍기: 가까이 있는 것만 · 총은 빈 칸(없으면 지금 칸)과 바꿔 내려놓는다 · 방어구는 더 좋으면 바꾼다
+  // 줍기: 가까이 있는 것만 · 총은 빈 칸(없으면 지금 칸)과 바꿔 내려놓는다 · 방어구 · 가방은 더 좋으면 바꾼다 · 가방 용량 안에서만
   pick(r, c, id, slot) {
     const it = r.loot.get(id); if (!it || !c.pos) return;
     if (Math.hypot(it.x - c.pos.x, it.z - c.pos.z) > 3.2 || Math.abs(it.y - c.pos.y) > 2.5) return;
-    const inv = c.inv, drop = [], add = [];
+    const inv = c.inv, drop = [], bag = inv.bag, full = (msg) => this.send(c, { t: 'full', text: msg });
+    let rest = null; // 일부만 주운 탄약은 남은 만큼 다시 놓는다
     if (it.k === 'gun') {
       let i = inv.guns.indexOf(null); if (i < 0) i = slot === 1 ? 1 : 0;
-      if (inv.guns[i]) drop.push({ k: 'gun', w: inv.guns[i] });
-      inv.guns[i] = it.w;
-    } else if (it.k === 'pistol') { if (inv.pistol) drop.push({ k: 'pistol', w: inv.pistol }); inv.pistol = it.w; }
-    else if (it.k === 'armor' || it.k === 'helmet') { if (inv[it.k] >= it.lv) return; if (inv[it.k]) drop.push({ k: it.k, lv: inv[it.k] }); inv[it.k] = it.lv; }
-    else if (it.k === 'band') { if (inv.band >= 10) return; inv.band += it.n || 1; }
-    else if (it.k === 'med') { if (inv.med >= 3) return; inv.med += 1; }
-    else if (it.k === 'nade') { if (inv.nade >= 3) return; inv.nade += 1; }
+      if (inv.guns[i]) { drop.push({ k: 'gun', w: inv.guns[i] }); for (const a of Object.values(inv.att[i])) inv.spare.push(a); }
+      inv.guns[i] = it.w; inv.att[i] = {}; this.fitSpare(inv);
+    } else if (it.k === 'pistol') { if (inv.pistol) { drop.push({ k: 'pistol', w: inv.pistol }); for (const a of Object.values(inv.patt)) inv.spare.push(a); } inv.pistol = it.w; inv.patt = {}; this.fitSpare(inv); }
+    else if (it.k === 'armor' || it.k === 'helmet') { if (inv[it.k] >= it.lv && inv[it.k + 'D'] > 30) return full('이미 더 좋은 걸 입고 있어요'); if (inv[it.k]) drop.push({ k: it.k, lv: inv[it.k] }); inv[it.k] = it.lv; inv[it.k + 'D'] = 100; }
+    else if (it.k === 'bag') { if (inv.bag >= it.lv) return full('이미 더 큰 가방이 있어요'); if (inv.bag) drop.push({ k: 'bag', lv: inv.bag }); inv.bag = it.lv; }
+    else if (it.k === 'ammo') {
+      const room = CAP.ammo[bag] - ammoTotal(inv); if (room <= 0) return full('🎒 가방이 꽉 찼어요 (탄약)');
+      const take = Math.min(room, it.n); inv.ammo[it.a] = (inv.ammo[it.a] || 0) + take; if (take < it.n) rest = { k: 'ammo', a: it.a, n: it.n - take };
+    } else if (it.k === 'att') {
+      // 맞는 총에 바로 끼운다 (빈자리 먼저) · 없으면 가방에
+      if (inv.spare.length >= 6 + bag * 2) return full('🎒 가방이 꽉 찼어요 (부착물)');
+      inv.spare.push(it.a); this.fitSpare(inv);
+    } else if (it.k === 'band') { const room = CAP.band[bag] - inv.band; if (room <= 0) return full('🎒 붕대를 더 못 넣어요'); const take = Math.min(room, it.n || 1); inv.band += take; if (take < (it.n || 1)) rest = { k: 'band', n: (it.n || 1) - take }; }
+    else if (it.k === 'med') { if (inv.med >= CAP.med[bag]) return full('🎒 구급상자를 더 못 넣어요'); inv.med++; }
+    else if (it.k === 'drink' || it.k === 'pill') { if (inv.drink + inv.pill >= CAP.boost[bag]) return full('🎒 부스트 아이템을 더 못 넣어요'); inv[it.k]++; }
+    else if (it.k === 'nade' || it.k === 'smoke') { if (inv.nade + inv.smoke >= CAP.throw[bag]) return full('🎒 투척 무기를 더 못 넣어요'); inv[it.k]++; }
     r.loot.delete(id);
-    for (const d of drop) { const n = { id: r.nextLoot++, ...d, x: c.pos.x + (Math.random() - 0.5), y: c.pos.y + 0.05, z: c.pos.z + (Math.random() - 0.5) }; r.loot.set(n.id, n); add.push(n); }
+    const add = [];
+    if (rest) drop.push(rest);
+    for (const d of drop) { const n = { id: r.nextLoot++, ...d, x: d === rest ? it.x : c.pos.x + (Math.random() - 0.5), y: d === rest ? it.y : c.pos.y + 0.05, z: d === rest ? it.z : c.pos.z + (Math.random() - 0.5) }; r.loot.set(n.id, n); add.push(n); }
     this.toRoom(r, { t: 'loot', rm: [id], add });
     this.send(c, { t: 'inv', inv });
+    if (['armor', 'helmet', 'bag'].includes(it.k)) this.gear(r, c);
+  }
+  // 가방 속 부착물을 맞는 총의 빈자리에 끼운다 (더 좋은 스코프면 바꾼다)
+  fitSpare(inv) {
+    const rankScope = { red: 1, x2: 2, x4: 3, x8: 4 };
+    const guns = [[inv.guns[0], inv.att[0]], [inv.guns[1], inv.att[1]], [inv.pistol, inv.patt]];
+    for (let k = inv.spare.length - 1; k >= 0; k--) {
+      const a = inv.spare[k], A = ATTS[a];
+      for (const [g, att] of guns) {
+        const w = g && weapon(g); if (!w || !fits(a, w)) continue;
+        if (!att[A.slot]) { att[A.slot] = a; inv.spare.splice(k, 1); break; }
+        if (A.slot === 'scope' && rankScope[a] > rankScope[att.scope] && w.cls === 'sniper') { inv.spare[k] = att.scope; att.scope = a; break; }
+      }
+    }
+  }
+  dropItem(r, c, m) {
+    const inv = c.inv, P = c.pos; if (!P || !c.alive) return;
+    let d = null;
+    if (m.k === 'ammo' && inv.ammo[m.a] > 0) { d = { k: 'ammo', a: m.a, n: inv.ammo[m.a] }; inv.ammo[m.a] = 0; }
+    else if (['band', 'med', 'drink', 'pill', 'nade', 'smoke'].includes(m.k) && inv[m.k] > 0) { const n = m.k === 'band' ? inv.band : 1; d = { k: m.k, n }; inv[m.k] -= n; }
+    else if (m.k === 'att') { const i = inv.spare.indexOf(m.a); if (i < 0) return; inv.spare.splice(i, 1); d = { k: 'att', a: m.a }; }
+    else if (m.k === 'detach') { const att = m.g === 2 ? inv.patt : inv.att[m.g | 0]; if (!att?.[m.slot]) return; inv.spare.push(att[m.slot]); delete att[m.slot]; }
+    else if (m.k === 'gun' && inv.guns[m.g | 0]) { const g = m.g | 0; d = { k: 'gun', w: inv.guns[g] }; for (const a of Object.values(inv.att[g])) inv.spare.push(a); inv.guns[g] = null; inv.att[g] = {}; }
+    else if (m.k === 'pistol' && inv.pistol) { d = { k: 'pistol', w: inv.pistol }; for (const a of Object.values(inv.patt)) inv.spare.push(a); inv.pistol = null; inv.patt = {}; }
+    else return;
+    if (d) { const n = { id: r.nextLoot++, ...d, x: P.x + (Math.random() - 0.5), y: Math.max(0.05, P.y + 0.05), z: P.z + (Math.random() - 0.5) }; r.loot.set(n.id, n); this.toRoom(r, { t: 'loot', rm: [], add: [n] }); }
+    this.send(c, { t: 'inv', inv });
+  }
+  gear(r, c) { this.toRoom(r, { t: 'gear', id: c.id, a: c.inv.armor, h: c.inv.helmet, b: c.inv.bag }); }
+  vehUpdate(r) { r.vehAt = Date.now(); this.toRoom(r, { t: 'veh', v: r.veh.map((v) => [v.id, v.kind, +v.x.toFixed(2), +v.y.toFixed(2), +v.z.toFixed(2), +v.yaw.toFixed(3), Math.max(0, Math.round(v.hp)), v.driver, v.dead ? 1 : 0]) }); }
+  wreck(r, v, by) {
+    v.dead = true; v.hp = 0;
+    this.toRoom(r, { t: 'boom', p: [v.x, v.y + 0.8, v.z], by: by?.id || 0, car: 1 });
+    for (const t of r.players) {
+      if (!t.alive || !t.pos) continue;
+      const d = t.veh === v.id ? 0 : Math.hypot(t.pos.x - v.x, t.pos.z - v.z);
+      if (d < 7) this.damage(r, t, t.veh === v.id ? 90 : nadeDmg(d) * 0.8, by, 'car', false);
+      if (t.veh === v.id) t.veh = 0;
+    }
+    v.driver = 0; this.vehUpdate(r);
   }
   damage(r, t, dmg, by, w, head) {
     if (!t.alive || dmg <= 0) return;
-    if (by && w !== 'zone') dmg *= 1 - ARMOR_CUT[head ? t.inv.helmet : t.inv.armor];
+    if (by && w !== 'zone' && w !== 'car') {
+      // 조끼 · 헬멧: 막은 만큼 닳고 0 이 되면 부서진다
+      const k = head ? 'helmet' : 'armor', lv = t.inv[k];
+      if (lv) { const cut = dmg * ARMOR_CUT[lv]; dmg -= cut; t.inv[k + 'D'] = (t.inv[k + 'D'] || 100) - cut * 1.6 - 2; if (t.inv[k + 'D'] <= 0) { t.inv[k] = 0; t.inv[k + 'D'] = 0; this.gear(r, t); if (!t.bot) this.send(t, { t: 'broke', k }); } if (!t.bot) this.send(t, { t: 'inv', inv: t.inv }); }
+    }
     t.hp -= dmg;
     if (by && by !== t && w !== 'zone') by.dmg += Math.min(dmg, t.hp + dmg);
     this.toRoom(r, { t: 'dmg', to: t.id, hp: Math.max(0, Math.round(t.hp)), by: by?.id || 0, head: !!head, zone: w === 'zone', p: by?.pos ? [by.pos.x, by.pos.z] : null });
@@ -136,9 +233,11 @@ export class BgRooms extends BaseRooms {
     if (by && by !== t) by.k++;
     // 가방에 있던 것들을 그 자리에 떨군다 (젤리 상자)
     const add = [], inv = t.inv, P = t.pos || { x: 0, y: 0, z: 0 };
-    const items = [...inv.guns.filter(Boolean).map((g) => ({ k: 'gun', w: g })), ...(inv.pistol ? [{ k: 'pistol', w: inv.pistol }] : []), ...(inv.armor ? [{ k: 'armor', lv: inv.armor }] : []), ...(inv.helmet ? [{ k: 'helmet', lv: inv.helmet }] : []), ...(inv.band ? [{ k: 'band', n: inv.band }] : []), ...(inv.med ? [{ k: 'med', n: 1 }] : []), ...(inv.nade ? [{ k: 'nade', n: 1 }] : [])];
+    const atts = [...inv.spare, ...inv.att.flatMap((a) => Object.values(a)), ...Object.values(inv.patt || {})];
+    const items = [...inv.guns.filter(Boolean).map((g) => ({ k: 'gun', w: g })), ...(inv.pistol ? [{ k: 'pistol', w: inv.pistol }] : []), ...(inv.armor ? [{ k: 'armor', lv: inv.armor }] : []), ...(inv.helmet ? [{ k: 'helmet', lv: inv.helmet }] : []), ...(inv.bag ? [{ k: 'bag', lv: inv.bag }] : []), ...(inv.band ? [{ k: 'band', n: inv.band }] : []), ...['med', 'drink', 'pill', 'nade', 'smoke'].flatMap((k) => Array.from({ length: inv[k] || 0 }, () => ({ k, n: 1 }))), ...Object.entries(inv.ammo || {}).filter(([, n]) => n > 0).map(([a, n]) => ({ k: 'ammo', a, n })), ...atts.map((a) => ({ k: 'att', a }))];
     items.forEach((d, i) => { const a = (i / Math.max(1, items.length)) * Math.PI * 2; const n = { id: r.nextLoot++, ...d, x: P.x + Math.cos(a) * 0.9, y: Math.max(0.05, P.y + 0.05), z: P.z + Math.sin(a) * 0.9 }; r.loot.set(n.id, n); add.push(n); });
-    t.inv = emptyInv();
+    t.inv = emptyInv(); this.gear(r, t);
+    if (t.veh) { const v = r.veh.find((x) => x.id === t.veh); if (v) v.driver = 0; t.veh = 0; this.vehUpdate(r); }
     this.toRoom(r, { t: 'kill', by: by?.id || 0, to: t.id, w, head: !!head, place: t.place, alive: r.alive });
     if (add.length) this.toRoom(r, { t: 'loot', rm: [], add });
     const humansAlive = r.players.some((p) => !p.bot && p.alive);
@@ -160,6 +259,18 @@ export class BgRooms extends BaseRooms {
     if (now < r.startAt || r.ended) return;
     const sec = this.sec(r, now), dt = 1 / this.o.hz;
     for (const p of r.players) if (!p.bot && p.st) p.pos = { x: p.st[0], y: p.st[1], z: p.st[2] };
+    // 운전 중이면 차도 그 자리 (flags 16 = 운전)
+    for (const p of r.players) { if (!p.veh || !p.st) continue; const v = r.veh.find((x) => x.id === p.veh); if (v && v.driver === p.id) { v.x = p.st[0]; v.y = p.st[1]; v.z = p.st[2]; v.yaw = p.st[3]; } }
+    if (now - r.vehAt > 1500) this.vehUpdate(r);
+    r.smokes = r.smokes.filter((s) => s.until > now);
+    // 부스트: 조금씩 회복 (부스트가 높을수록 빠르게) · 서서히 줄어든다
+    for (const p of r.players) {
+      if (!p.alive || p.boost <= 0) continue;
+      p.boostAcc += dt * (p.boost >= 60 ? 1.6 : p.boost >= 20 ? 1.1 : 0.7);
+      p.boost = Math.max(0, p.boost - dt * 2.4);
+      if (p.boostAcc >= 1) { const h = Math.floor(p.boostAcc); p.boostAcc -= h; if (p.hp < 100) { p.hp = Math.min(100, p.hp + h); if (!p.bot) this.send(p, { t: 'hp', hp: Math.round(p.hp) }); } }
+      if (!p.bot && now - (p.boostSent || 0) > 1000) { p.boostSent = now; this.send(p, { t: 'boost', v: Math.round(p.boost) }); }
+    }
     // 비행선 끝: 아직 안 뛴 사람은 자동으로
     if (sec > r.plane.dur + 1) for (const p of r.players) if (!p.jumped && !p.bot && p.alive) { p.jumped = true; this.toRoom(r, { t: 'jumped', id: p.id }); }
     // 젤리 자기장 피해 (1초마다)
@@ -205,7 +316,7 @@ export class BgRooms extends BaseRooms {
       b.st = [b.pos.x, b.pos.y, b.pos.z, b.yaw || 0, 0, b.pos.y > DROP.openAt ? 8 : 4]; return;
     }
     // 2) 줍는 시간이 지나면 무기 · 방어구를 챙긴 것으로
-    if (b.lootT > 0) { b.lootT -= dt; if (b.lootT <= 0) { b.inv.guns[0] = BOT_GUNS[Math.floor(Math.random() * BOT_GUNS.length)]; if (Math.random() < 0.5) b.inv.armor = 1 + Math.floor(Math.random() * 2); if (Math.random() < 0.4) b.inv.helmet = 1 + Math.floor(Math.random() * 2); b.inv.band = 2; this.toRoom(r, { t: 'wpn', id: b.id, w: b.inv.guns[0] }); } }
+    if (b.lootT > 0) { b.lootT -= dt; if (b.lootT <= 0) { b.inv.guns[0] = BOT_GUNS[Math.floor(Math.random() * BOT_GUNS.length)]; if (Math.random() < 0.5) { b.inv.armor = 1 + Math.floor(Math.random() * 2); b.inv.armorD = 100; } if (Math.random() < 0.4) { b.inv.helmet = 1 + Math.floor(Math.random() * 2); b.inv.helmetD = 100; } if (Math.random() < 0.35) b.inv.bag = 1 + Math.floor(Math.random() * 2); b.inv.band = 2; this.gear(r, b); this.toRoom(r, { t: 'wpn', id: b.id, w: b.inv.guns[0] }); } }
     const gun = b.inv.guns[0] && weapon(b.inv.guns[0]);
     const eye = { x: b.pos.x, y: EYE, z: b.pos.z };
     // 3) 보이는 적 (0.5초마다 확인 · 50m 안). 봇끼리는 덜 싸워서 판이 너무 빨리 끝나지 않게
@@ -213,7 +324,7 @@ export class BgRooms extends BaseRooms {
     if (b.scanT <= 0) {
       b.scanT = 0.5;
       let tgt = null, td = 50;
-      for (const p of r.players) { if (p === b || !p.alive || !p.pos || (p.bot && !p.landed) || (!p.bot && (!p.st || (p.st[5] & 12)))) continue; if (p.bot && b.target !== p && Math.random() < 0.55) continue; /* 하늘에 있는 사람은 아직 */ const d = dist(b.pos, p.pos); if (d < td && clearLine(MAP, eye, { x: p.pos.x, y: p.pos.y + 1.2, z: p.pos.z })) { td = d; tgt = p; } }
+      for (const p of r.players) { if (p === b || !p.alive || !p.pos || (p.bot && !p.landed) || (!p.bot && (!p.st || (p.st[5] & 12)))) continue; if (p.bot && b.target !== p && Math.random() < 0.55) continue; /* 하늘에 있는 사람은 아직 */ const d = dist(b.pos, p.pos); if (d < td && this.see(r, eye, { x: p.pos.x, y: p.pos.y + 1.2, z: p.pos.z })) { td = d; tgt = p; } }
       if (tgt !== b.target) { b.target = tgt; b.react = 0.4 + Math.random() * 0.5 * (1.3 - b.skill); }
     }
     const tgt = b.target && b.target.alive ? b.target : null;
@@ -232,7 +343,7 @@ export class BgRooms extends BaseRooms {
         const aim = { x: tgt.pos.x + (hitIt ? 0 : (Math.random() - 0.5) * 3), y: tgt.pos.y + 1.2 + (hitIt ? 0 : (Math.random() - 0.3) * 1.4), z: tgt.pos.z + (hitIt ? 0 : (Math.random() - 0.5) * 3) };
         const L = Math.hypot(aim.x - eye.x, aim.y - eye.y, aim.z - eye.z) || 1;
         this.toRoom(r, { t: 'fire', by: b.id, w: gun.id, o: [eye.x, eye.y, eye.z], d: [(aim.x - eye.x) / L, (aim.y - eye.y) / L, (aim.z - eye.z) / L] });
-        if (hitIt && clearLine(MAP, eye, { x: tgt.pos.x, y: tgt.pos.y + 1.2, z: tgt.pos.z })) {
+        if (hitIt && this.see(r, eye, { x: tgt.pos.x, y: tgt.pos.y + 1.2, z: tgt.pos.z })) {
           const head = Math.random() < 0.1 * b.skill, n = gun.pellets > 1 ? Math.max(1, Math.round(gun.pellets * Math.max(0.2, 1 - td / 18))) : 1;
           this.damage(r, tgt, gun.dmg * n * (head ? gun.head : 1) * falloff(gun, td) * (tgt.bot ? 0.55 : 1), b, gun.id, head);
         }
