@@ -80,5 +80,6 @@ export class Chat {
     this.log.scrollTop = this.log.scrollHeight;
     if (!this.isOpen && !quiet && !m.sys && m.id !== this.o.myId()) { this.unread++; this.badge.textContent = this.unread > 99 ? '99+' : this.unread; }
     if (!quiet && !m.sys && m.id !== this.o.myId()) this.o.onMessage?.(m);
+    if (!quiet && !m.sys) this.o.onBubble?.(m); // 내 말까지 (캐릭터 머리 위 말풍선)
   }
 }

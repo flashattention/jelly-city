@@ -16,9 +16,11 @@ for (let i = 0; i < 14; i++) { const b = document.createElement('i'); const s = 
 // ---------- 화면 ----------
 const hearts = (n, max) => Array.from({ length: max }, (_, i) => `<span class="${i < n ? '' : 'gone'}">🍬</span>`).join('');
 function renderPlayers() {
+  const n = game.order.length, big = n <= 4 ? 'xl' : n <= 6 ? 'lg' : 'md', fs = { xl: 132, lg: 104, md: 84 }[big];
+  $('players').className = big;
   $('players').innerHTML = game.order.map((id) => {
     const p = game.players.get(id); if (!p) return '';
-    return `<div class="pl${id === game.turn ? ' turn' : ''}${id === game.myId ? ' me' : ''}${p.out ? ' out' : ''}" id="pl-${id}">${p.say ? `<div class="say${p.sayBad ? ' bad' : ''}">${esc(p.say)}</div>` : ''}${faceHtml(p, 56)}<div class="nm">${p.bot ? '🤖 ' : ''}${esc(p.name)}</div><div class="hp">${hearts(p.lives, game.maxLives)}</div><div class="sc">${p.score}점</div></div>`;
+    return `<div class="pl${id === game.turn ? ' turn' : ''}${id === game.myId ? ' me' : ''}${p.out ? ' out' : ''}" id="pl-${id}">${p.chat ? `<div class="chatb${p.say ? ' up' : ''}">💬 ${esc(p.chat)}</div>` : ''}${p.say ? `<div class="say${p.sayBad ? ' bad' : ''}">${esc(p.say)}</div>` : ''}${faceHtml(p, fs)}<div class="nm">${p.bot ? '🤖 ' : ''}${esc(p.name)}</div><div class="hp">${hearts(p.lives, game.maxLives)}</div><div class="sc">${p.score}점</div></div>`;
   }).join('');
 }
 function say(id, text, bad) { const p = game.players.get(id); if (!p) return; p.say = text; p.sayBad = !!bad; renderPlayers(); clearTimeout(p.sayT); if (bad || !text) p.sayT = setTimeout(() => { p.say = ''; renderPlayers(); }, bad ? 1600 : 0); }
@@ -122,6 +124,8 @@ const shell = new Shell({
   onStart: (m) => start(m),
   onFinish: (m) => results(m),
   onDisconnect: () => { if (game.mode === 'play') toTitle(); },
+  // 채팅: 기존 채팅창에도 뜨고, 그 사람 곰돌이 머리 위에 말풍선 (4초)
+  onChatBubble: (m) => { const p = game.players.get(m.id); if (!p || game.mode === 'title') return; p.chat = String(m.s || '').slice(0, 60); clearTimeout(p.chatT); p.chatT = setTimeout(() => { p.chat = ''; renderPlayers(); }, 4000); renderPlayers(); },
   onChatClose: () => { if (game.mode === 'play' && game.turn === game.myId) $('word-in').focus(); }, // 채팅을 닫으면 다시 단어 칸으로
 });
 shell.pickOpts = () => ({ ...game.pick });
