@@ -19,6 +19,7 @@ function glowTex() {
   x.fillStyle = g; x.fillRect(0, 0, 64, 64);
   return (_glowTex = new THREE.CanvasTexture(c));
 }
+const STREAK_G = new THREE.BoxGeometry(0.035, 0.035, 1);
 class Booster {
   constructor(scene) {
     this.scene = scene;
@@ -26,8 +27,8 @@ class Booster {
     const mat = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
     // 양쪽 엉덩이 뒤로 두 줄기 (바깥 주황 · 안쪽 하늘빛)
     this.flames = [-0.2, 0.2].map((x) => {
-      const f = new THREE.Group(); f.position.set(x, 0, 0); f.rotation.x = Math.PI / 2; // 아래(-y) 로 뻗던 불꽃을 뒤(-z)로
-      const outer = new THREE.Mesh(FLAME_G, mat('#ff8a3d', 0.75)); outer.scale.set(0.2, 1, 0.2);
+      const f = new THREE.Group(); f.position.set(x, 0, 0); f.rotation.x = 0.75; // 뒤 · 아래로 비스듬히 (정뒤로 뿜으면 뒤에서 보는 카메라엔 동그란 덩어리로만 보인다)
+      const outer = new THREE.Mesh(FLAME_G, mat('#ff8a3d', 0.5)); outer.scale.set(0.2, 1, 0.2);
       const inner = new THREE.Mesh(FLAME_G, mat('#9be7ff', 0.95)); inner.scale.set(0.1, 0.65, 0.1);
       f.add(outer, inner); this.g.add(f);
       return { f, outer, inner };
@@ -43,11 +44,11 @@ class Booster {
     if (this.g.visible) {
       for (const [i, fl] of this.flames.entries()) {
         const fk = 0.75 + Math.sin(t * 40 + i * 2) * 0.15 + Math.random() * 0.1;
-        fl.outer.scale.set(0.2 + 0.08 * k, (0.5 + 1.4 * k) * fk, 0.2 + 0.08 * k);
-        fl.inner.scale.set(0.1, (0.35 + 0.9 * k) * fk, 0.1);
-        fl.outer.material.opacity = 0.75 * Math.min(1, k * 1.5);
+        fl.outer.scale.set(0.13 + 0.05 * k, (0.7 + 2.2 * k) * fk, 0.13 + 0.05 * k); // 가늘고 길게 뿜는 제트
+        fl.inner.scale.set(0.06, (0.5 + 1.5 * k) * fk, 0.06);
+        fl.outer.material.opacity = 0.5 * Math.min(1, k * 1.5);
       }
-      this.halo.scale.setScalar(0.6 + 0.9 * k); this.halo.material.opacity = 0.8 * k;
+      this.halo.scale.set(0.35 + 0.35 * k, 0.22 + 0.2 * k, 1); this.halo.material.opacity = 0.45 * k; // 작게 (둥근 빛무리가 물방울처럼 보이지 않게)
       // 불꽃 가루: 세게 뿜을수록 많이
       this.emitT -= dt;
       if (this.emitT <= 0) { this.emitT = 0.025 / Math.max(0.2, k); this.spark(k); }
@@ -56,7 +57,7 @@ class Booster {
       if (p.life <= 0) continue;
       p.life -= dt; p.m.position.addScaledVector(p.v, dt); p.v.y -= 3 * dt;
       p.m.material.opacity = Math.max(0, p.life / p.max);
-      p.m.scale.setScalar(p.size * (0.5 + p.life / p.max));
+      const u = p.life / p.max; p.m.scale.set(1, 1, p.size * (0.4 + u)); // 길이만 줄어든다
       p.m.visible = p.life > 0;
     }
   }
@@ -64,15 +65,15 @@ class Booster {
     let p = this.sparks.find((q) => q.life <= 0);
     if (!p) {
       if (this.sparks.length > 60) return;
-      p = { m: new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })), v: new THREE.Vector3(), life: 0 };
+      p = { m: new THREE.Mesh(STREAK_G, new THREE.MeshBasicMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })), v: new THREE.Vector3(), life: 0 }; // 뒤로 쭉 늘어나는 빛줄기
       this.scene.add(p.m); this.sparks.push(p);
     }
     this.g.updateWorldMatrix(true, false);
     p.m.position.setFromMatrixPosition(this.g.matrixWorld);
     p.m.position.x += (Math.random() - 0.5) * 0.4; p.m.position.y += (Math.random() - 0.5) * 0.3;
-    p.v.set((Math.random() - 0.5) * 2, Math.random() * 1.5, 3 + Math.random() * 4); // 뒤(+z)로 흩날린다
-    p.max = p.life = 0.25 + Math.random() * 0.3; p.size = 0.25 + Math.random() * 0.25 * k;
-    p.m.material.color.set(Math.random() < 0.5 ? '#ffd27a' : '#ff8a3d');
+    p.v.set((Math.random() - 0.5) * 1.2, (Math.random() - 0.3) * 0.8, 9 + Math.random() * 8); // 뒤(+z)로 휙
+    p.max = p.life = 0.18 + Math.random() * 0.2; p.size = 0.6 + Math.random() * 0.8 * k;
+    p.m.material.color.set(Math.random() < 0.35 ? '#ffffff' : Math.random() < 0.5 ? '#ffd27a' : '#ff9a4d');
     p.m.visible = true;
   }
   dispose() { this.g.removeFromParent(); for (const p of this.sparks) this.scene.remove(p.m); }

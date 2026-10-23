@@ -656,8 +656,30 @@ function followCamera(dt) {
   camera.position.z = dead ? camera.position.z : z + 7.4;
   camLook.set(x, Math.max(y, -8) + 1.2, z - 9);
   camera.lookAt(camLook);
-  const fov = 60 + (v - V0) * 0.55;
+  const fov = 60 + (v - V0) * 0.55 + (w ? 0 : runner.boost * 6); // 가속하면 시야가 확 넓어진다
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * k; camera.updateProjectionMatrix(); }
+}
+// 가속 집중선: 화면 가장자리에서 가운데 바깥쪽으로 쏟아지는 흰 줄 (가속할수록 많고 빠르게)
+const SL = { c: null, x: null, lines: [], last: performance.now() };
+function drawSpeed(k) {
+  const el = $('speedlines');
+  if (!SL.c) { SL.c = document.createElement('canvas'); SL.c.style.cssText = 'width:100%;height:100%;display:block'; el.appendChild(SL.c); el.style.background = 'none'; el.style.webkitMaskImage = el.style.maskImage = 'none'; SL.x = SL.c.getContext('2d'); }
+  const now = performance.now(), dt = Math.min(0.05, (now - SL.last) / 1000); SL.last = now;
+  el.style.opacity = k > 0.02 ? '1' : '0';
+  if (k <= 0.02 && !SL.lines.length) return;
+  const W = innerWidth, H = innerHeight;
+  if (SL.c.width !== W || SL.c.height !== H) { SL.c.width = W; SL.c.height = H; }
+  const x = SL.x, cx = W / 2, cy = H * 0.45, R = Math.hypot(W, H) / 2;
+  for (let i = 0; i < Math.round(k * 7); i++) SL.lines.push({ a: Math.random() * Math.PI * 2, r: R * (0.35 + Math.random() * 0.2), sp: R * (1.6 + Math.random() * 1.6) * (0.6 + k), len: R * (0.12 + Math.random() * 0.25) * (0.5 + k), w: 1 + Math.random() * 2.2, o: 0.25 + Math.random() * 0.45 });
+  x.clearRect(0, 0, W, H);
+  x.lineCap = 'round';
+  for (const l of SL.lines) {
+    l.r += l.sp * dt;
+    const r0 = l.r, r1 = l.r + l.len, c = Math.cos(l.a), s = Math.sin(l.a);
+    x.strokeStyle = `rgba(255,255,255,${(l.o * Math.min(1, k * 1.4 + 0.2)).toFixed(3)})`; x.lineWidth = l.w;
+    x.beginPath(); x.moveTo(cx + c * r0, cy + s * r0); x.lineTo(cx + c * r1, cy + s * r1); x.stroke();
+  }
+  SL.lines = SL.lines.filter((l) => l.r < R * 1.2).slice(-160);
 }
 // 달리는 중 생기는 일 (소리 · 아이템 칸)
 function onFx(n, a) {
@@ -718,7 +740,7 @@ function hud() {
   $('h-stars').textContent = runner.stars;
   $('h-speed').textContent = `${Math.round(runner.v * 3.6)}km/h`;
   $('h-speed').classList.toggle('on', runner.boost > 0.3);
-  $('speedlines').style.opacity = game.mode === 'run' ? (runner.boost * 0.9).toFixed(2) : '0';
+  drawSpeed(game.mode === 'run' ? Math.max(runner.boost, runner.rocketK || 0) : 0);
   const b0 = track.bounds[game.dream] ?? 0, b1 = track.nextBoundary(runner.s);
   $('h-next').firstElementChild.style.width = `${Math.max(0, Math.min(1, (runner.s - b0) / Math.max(1, b1 - b0))) * 100}%`;
   if (game.multi) $('h-alive').textContent = `🐻 ${(runner.alive ? 1 : 0) + [...game.ghosts.values()].filter((g) => g.alive).length}/${game.members.length}`;
