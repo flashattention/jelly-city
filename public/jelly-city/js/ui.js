@@ -113,7 +113,6 @@ export class UI {
     };
     $('tb-badges').onclick = () => this.openBadges();
     $('tb-map').onclick = () => this.openWorldMap();
-    $('tb-mode').onclick = () => this.setBugMode(!settings.bugMode);
     $('tb-shops').onclick = () => this.openShopDirectory();
     const musicBtn = () => { $('tb-music').textContent = settings.music ? '🎵 음악 켬' : '🔇 음악 끔'; };
     $('tb-music').onclick = () => { setMusic(!settings.music); musicBtn(); };
@@ -144,9 +143,12 @@ export class UI {
     this.openModal(`<h3 class="mh">⌨️ 조작법 <small>H 키로 열고 닫아요</small></h3>
       <div class="keys">${groups.map(([t, rows]) => `<div class="keygroup"><b>${t}</b>${rows.map(([k, d]) => `<div class="keyrow"><span class="kk">${K(k)}</span><span>${d}</span></div>`).join('')}</div>`).join('')}</div>
       <div class="keynote">* 3단 점프 · 대쉬 거리 강화 · 점프력 강화는 무릉도장 🥋 수련으로 배워요. 처음 화면을 클릭하면 마우스가 화면에 고정되고, Esc로 풀 수 있어요.</div>
-      <div style="margin-top:12px"><button class="btn" id="keys-ok">알겠어요! 🎮 <kbd>H</kbd></button></div>`, 'keys');
+      <div style="margin-top:12px"><button class="btn" id="keys-ok">알겠어요! 🎮 <kbd>H</kbd></button> <button class="btn ghost" id="keys-bug" title="곰돌이 젤리 ↔ 바퀴벌레 모습 바꾸기 (내 화면에서만)"></button></div>`, 'keys');
     $('modal-inner').classList.add('wide');
     $('keys-ok').onclick = () => this.closeModal();
+    const bugBtn = () => { $('keys-bug').textContent = settings.bugMode ? '🐻 젤리 모드로' : '🪳 바퀴 모드로'; };
+    $('keys-bug').onclick = () => { this.setBugMode(!settings.bugMode); bugBtn(); };
+    bugBtn();
     try { localStorage.setItem('roachcity.keysSeen', '1'); } catch { /* 무시 */ }
   }
   setLocked(v) { this.locked = v; }
@@ -1494,7 +1496,6 @@ export class UI {
     settings.bugMode = !!on; saveSettings();
     Roach.setStyle(on ? 'roach' : 'gummy');
     setBrand(on); // 바퀴 모드일 때만 '바퀴시티', 아니면 '젤리시티'
-    $('tb-mode').textContent = on ? '🐻 젤리 모드로' : '🪳 바퀴 모드로';
     if (!quiet) this.toast(on ? '🪳 바퀴 모드! 모두 바퀴벌레로, 도시 이름은 바퀴시티로 보여요' : '🐻 곰돌이 젤리 모드! 모두 말랑한 젤리 곰이에요 (젤리시티)');
   }
 
