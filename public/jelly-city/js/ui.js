@@ -18,7 +18,7 @@ import { housePrice, freeUnits, homeLabel, isHomeType } from './world-setup.js';
 import { moodLabel, moodEmoji } from './citizens.js';
 import { Roach } from '../../shared/js/roach.js';
 import { settings, saveSettings } from '../../shared/js/settings.js';
-import { GFX, LEVELS, detectLevel } from './gfx.js';
+import { GFX, LEVELS, detectLevel, explainLevel, specInfo, gfxLevel } from './gfx.js';
 import { openSens, sensOf } from '../../shared/js/sens.js';
 import { setMusic, applyVolumes } from '../../shared/js/audio.js';
 import { fmtTime, DAYS, escapeHtml, cityText, setBrand } from '../../shared/js/utils.js';
@@ -117,6 +117,8 @@ export class UI {
     const musicBtn = () => { $('tb-music').textContent = settings.music ? '🎵 음악 켬' : '🔇 음악 끔'; };
     $('tb-music').onclick = () => { setMusic(!settings.music); musicBtn(); };
     musicBtn();
+    $('tb-gfx').onclick = () => this.openGfx();
+    this.updateGfxBtn();
     this.setBugMode(settings.bugMode, true);
     this.applyCrosshair();
     this.renderQuests();
@@ -150,6 +152,42 @@ export class UI {
     $('keys-bug').onclick = () => { this.setBugMode(!settings.bugMode); bugBtn(); };
     bugBtn();
     try { localStorage.setItem('roachcity.keysSeen', '1'); } catch { /* 무시 */ }
+  }
+  // 상단 🖥️ 그래픽 단추: 지금 단계
+  updateGfxBtn() {
+    const lv = gfxLevel();
+    $('tb-gfx').textContent = `🖥️ 그래픽 ${GFX[lv].label}${GFX[settings.gfx] ? '' : ' (자동)'}`;
+  }
+  // 그래픽 창: 이 컴퓨터 사양 · 왜 이 단계인지 · 직접 고르기
+  openGfx() {
+    const g = this.game, sp = specInfo(), ex = explainLevel(), lv = gfxLevel();
+    const manual = !!GFX[settings.gfx];
+    const drops = (!manual && settings.gfxAuto?.drops) || [];
+    const why = manual
+      ? [`직접 '${GFX[lv].label}'(으)로 골랐어요 (이 컴퓨터 추천은 '${GFX[ex.level].label}')`]
+      : [...ex.why, ...drops.map((d) => `플레이 중 ${d.fps}fps로 느려서 '${GFX[d.from].label}' → '${GFX[d.to].label}'(으)로 낮춤`)];
+    const row = (k, v) => `<div class="keyrow"><span class="kk"><b>${k}</b></span><span>${escapeHtml(v)}</span></div>`;
+    const opt = (k, label, sub) => `<button class="btn ${(k === 'auto' ? !manual : settings.gfx === k) ? '' : 'ghost'}" data-gfx="${k}">${label}${sub ? `<br><small>${sub}</small>` : ''}</button>`;
+    this.openModal(`<h3 class="mh">🖥️ 그래픽 <small>지금: ${GFX[lv].label}${manual ? '' : ' (자동)'}</small></h3>
+      <div class="keygroup"><b>💻 이 컴퓨터</b>${row('그래픽 카드', sp.gpu)}${row('CPU 코어', sp.cores)}${row('메모리', sp.memory)}${row('화면', sp.screen)}</div>
+      <div class="keygroup"><b>🤔 왜 '${GFX[lv].label}'인가요?</b>${why.map((w) => `<div class="keyrow"><span>• ${escapeHtml(w)}</span></div>`).join('')}</div>
+      <div class="keygroup"><b>🎚️ 직접 고르기</b><div class="gfx-pick">
+        ${opt('auto', '자동', `추천 ${GFX[ex.level].label}`)}${[...LEVELS].reverse().map((k) => opt(k, GFX[k].label, k === ex.level ? '이 컴퓨터 추천' : '')).join('')}
+      </div>${[...LEVELS].reverse().map((k) => `<div class="keyrow"><span class="kk"><b>${GFX[k].label}</b></span><span>${GFX[k].desc}<br><small>추천: ${GFX[k].rec}</small></span></div>`).join('')}
+      <div class="keynote">추천보다 높게 골라도 돼요. 자동은 플레이 중 계속 30fps 아래면 한 단계씩 낮춰요. 계단 현상 설정은 새로고침(F5)해야 바뀌어요.</div></div>
+      <div style="margin-top:12px"><button class="btn" id="gfx-ok">닫기</button></div>`, 'gfx');
+    $('modal-inner').classList.add('wide');
+    $('gfx-ok').onclick = () => this.closeModal();
+    $('modal-inner').querySelectorAll('[data-gfx]').forEach((b) => {
+      b.onclick = () => {
+        const v = b.dataset.gfx;
+        if (v === 'auto' && settings.gfx !== 'auto') delete settings.gfxAuto; // 자동으로 돌아오면 사양부터 다시 본다
+        settings.gfx = v;
+        const reload = g.applySettings();
+        this.toast(`🖥️ 그래픽 '${GFX[gfxLevel()].label}'${v === 'auto' ? ' (자동)' : ''}${reload ? ' · 계단 현상은 새로고침(F5)하면 바뀌어요' : ''}`);
+        this.openGfx();
+      };
+    });
   }
   setLocked(v) { this.locked = v; }
 
@@ -795,7 +833,7 @@ export class UI {
         <div class="set-row"><b>🤖 서버 LLM</b><span>${g.llm ? `${escapeHtml(st.model || 'gpt-4o-mini')} 사용 중 ✅ (키는 서버에만 있어요)` : '키 없음 — 기본 대사 사용 중 💤'}</span></div>
         <div class="set-row"><b>⏱️ 시간 속도</b><span>현실 1초 = 게임 ${g.timeSpeed}분 (서버 설정, 모든 플레이어 공통)</span></div>
         <div class="set-row"><b>🖥️ 그래픽</b><select id="set-gfx">
-          <option value="auto">자동 (지금: ${GFX[g.gfxLevel()].label})</option>
+          <option value="auto">자동 (지금: ${GFX[gfxLevel()].label})</option>
           ${[...LEVELS].reverse().map((k) => `<option value="${k}">${GFX[k].label}${k === detectLevel() ? ' · 이 컴퓨터 추천' : ''}</option>`).join('')}
         </select></div>
         <div class="set-gfx-help">${[...LEVELS].reverse().map((k) => `<div><b>${GFX[k].label}</b> — ${GFX[k].desc}<br><small>추천: ${GFX[k].rec}</small></div>`).join('')}

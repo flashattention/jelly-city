@@ -35,25 +35,47 @@ function readGpu() {
   } catch { return ''; }
 }
 
-// 사양으로 처음 단계를 고른다
-export function detectLevel(gpu = gpuName()) {
+const isMobile = () => /android|iphone|ipad|mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /mac/i.test(navigator.platform) && !/mac os x/i.test(navigator.userAgent));
+
+// 사양으로 처음 단계를 고른다 (왜 그 단계인지 이유도 함께)
+export function explainLevel(gpu = gpuName()) {
   const g = gpu.toLowerCase();
-  const mobile = /android|iphone|ipad|mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /mac/i.test(navigator.platform) && !/mac os x/i.test(navigator.userAgent));
+  const mobile = isMobile();
+  const why = [];
   let lv;
-  if (/swiftshader|llvmpipe|software|basic render|microsoft basic/.test(g)) lv = 'low';
-  else if (/mali|adreno|powervr|videocore/.test(g)) lv = 'low';
-  else if (/nvidia|geforce|rtx|gtx|quadro/.test(g)) lv = 'high';
-  else if (/radeon.*\b(rx|pro|vega \d{2})|\brx ?\d{3,4}/.test(g)) lv = 'high'; // 라데온 외장
-  else if (/arc.*\ba\d{3}/.test(g)) lv = 'high'; // 인텔 Arc 외장(A380 · A770 …)
-  else if (/apple/.test(g)) lv = mobile ? 'mid' : 'high'; // 맥 M 시리즈
-  else if (/radeon|amd/.test(g)) lv = 'mid'; // 라데온 내장(780M · Radeon Graphics)
-  else if (/iris|arc/.test(g)) lv = 'mid'; // 인텔 Iris Xe · Arc 내장
-  else if (/intel/.test(g)) lv = 'low'; // 인텔 UHD · HD (N100 · 셀러론 …)
-  else lv = 'mid'; // 모르면 중간
+  if (!g) { lv = 'mid'; why.push('브라우저가 그래픽 카드 이름을 알려 주지 않아서 중간(중)으로 시작'); }
+  else if (/swiftshader|llvmpipe|software|basic render|microsoft basic/.test(g)) { lv = 'low'; why.push('그래픽 가속이 꺼져 있어 CPU로 그리고 있음 → 하 (크롬 설정 → 시스템 → 그래픽 가속 사용을 켜 보세요)'); }
+  else if (/mali|adreno|powervr|videocore/.test(g)) { lv = 'low'; why.push('휴대폰 · 태블릿용 그래픽 → 하'); }
+  else if (/nvidia|geforce|rtx|gtx|quadro/.test(g)) { lv = 'high'; why.push('엔비디아 외장 그래픽 → 상'); }
+  else if (/radeon.*\b(rx|pro|vega \d{2})|\brx ?\d{3,4}/.test(g)) { lv = 'high'; why.push('라데온 외장 그래픽 → 상'); }
+  else if (/arc.*\ba\d{3}/.test(g)) { lv = 'high'; why.push('인텔 Arc 외장 그래픽 → 상'); }
+  else if (/apple/.test(g)) { lv = mobile ? 'mid' : 'high'; why.push(mobile ? '아이패드 · 아이폰의 애플 그래픽 → 중' : '맥 애플 실리콘(M 시리즈) 그래픽 → 상'); }
+  else if (/radeon|amd/.test(g)) { lv = 'mid'; why.push('AMD 라데온 내장 그래픽(680M · 780M 등) → 중'); }
+  else if (/iris|arc/.test(g)) { lv = 'mid'; why.push('인텔 Iris Xe · Arc 내장 그래픽 → 중'); }
+  else if (/intel/.test(g)) { lv = 'low'; why.push('인텔 UHD · HD 내장 그래픽(N100 · 셀러론 등) → 하'); }
+  else { lv = 'mid'; why.push('잘 모르는 그래픽 카드라서 중간(중)으로 시작'); }
   // CPU 코어 · 메모리가 적으면 한 단계 낮게
-  if ((navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4) lv = down(lv);
-  if (mobile) lv = lower(lv, 'mid');
-  return lv;
+  const cores = navigator.hardwareConcurrency || 0, mem = navigator.deviceMemory || 0;
+  if ((cores && cores <= 4) || (mem && mem <= 4)) {
+    const to = down(lv);
+    if (to !== lv) why.push(`${cores && cores <= 4 ? `CPU 코어가 ${cores}개뿐` : `메모리가 ${mem}GB 이하`}이라 한 단계 낮춤 → ${GFX[to].label}`);
+    lv = to;
+  }
+  if (mobile && lv === 'high') { lv = 'mid'; why.push('휴대 기기라 최대 중'); }
+  return { level: lv, why };
+}
+export const detectLevel = (gpu) => explainLevel(gpu).level;
+
+// 이 컴퓨터 사양 (브라우저가 알려 주는 만큼)
+export function specInfo() {
+  const dpr = window.devicePixelRatio || 1;
+  return {
+    gpu: gpuName() || '알 수 없음',
+    cores: navigator.hardwareConcurrency ? `${navigator.hardwareConcurrency}개` : '알 수 없음',
+    memory: navigator.deviceMemory ? `${navigator.deviceMemory >= 8 ? '8GB 이상' : `${navigator.deviceMemory}GB`}` : '알 수 없음 (크롬 · 엣지만 알려 줘요)',
+    screen: `${Math.round(window.innerWidth * dpr)} × ${Math.round(window.innerHeight * dpr)} (배율 ${+dpr.toFixed(2)})`,
+    mobile: isMobile(),
+  };
 }
 
 // 지금 쓰는 단계 (auto 면 사양 + 실제 느렸던 기록)
@@ -79,7 +101,9 @@ export function watchFps(onDrop) {
     frames = 0; t0 = now;
     const cur = gfxLevel();
     if (fps < 32 && cur !== 'low') {
-      settings.gfxAuto.level = down(cur); saveSettings();
+      settings.gfxAuto.level = down(cur);
+      settings.gfxAuto.drops = [...(settings.gfxAuto.drops || []), { from: cur, to: settings.gfxAuto.level, fps: Math.round(fps) }];
+      saveSettings();
       skipUntil = now + 8000;
       onDrop(settings.gfxAuto.level, fps);
     }

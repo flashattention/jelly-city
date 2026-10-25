@@ -2562,6 +2562,7 @@ game.applySettings = () => {
   scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
   fpsEl.style.display = settings.showFps ? '' : 'none';
   saveSettings();
+  ui.updateGfxBtn();
   return renderer.getContextAttributes()?.antialias !== q.antialias; // true 면 다시 불러와야 다 적용된다
 };
 game.gfxLevel = gfxLevel;
