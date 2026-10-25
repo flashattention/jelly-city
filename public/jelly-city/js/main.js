@@ -15,6 +15,7 @@ import { routeTo, routeLength } from './citizens.js';
 import { Net } from './net.js';
 import { UI } from './ui.js';
 import { settings, saveSettings } from '../../shared/js/settings.js';
+import { gfx, gfxLevel, GFX, watchFps } from './gfx.js';
 import { getJob } from './data.js';
 import { DAYS, clamp, lerp, angleLerp, windowMaterials, retitleSign, initBrand, cityText, brand } from '../../shared/js/utils.js';
 import { expNeed, levelStats, addExp } from './level.js';
@@ -38,11 +39,12 @@ import { WORLD_HALF, WATER_Y, regionAt } from './terrain.js';
 // 렌더러 & 장면
 // ------------------------------------------------------------------
 const canvas = document.getElementById('game');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// 계단 현상 없애기(antialias)는 렌더러를 만들 때만 정할 수 있어서, 바꾸면 다시 불러올 때 적용된다
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: gfx().antialias, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, gfx().pixelRatio));
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = settings.shadows;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.enabled = gfx().shadowMap > 0;
+renderer.shadowMap.type = gfx().softShadow ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
@@ -64,7 +66,7 @@ const hemi = new THREE.HemisphereLight('#fff6e8', '#9fc88a', 1.1);
 scene.add(hemi);
 const sun = new THREE.DirectionalLight('#fff3d6', 2.0);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.setScalar(gfx().shadowMap || 1024);
 const SC = 70;
 Object.assign(sun.shadow.camera, { left: -SC, right: SC, top: SC, bottom: -SC, near: 1, far: 400 });
 sun.shadow.bias = -0.0008;
@@ -161,7 +163,7 @@ function updateEnvironment(h, focus, dt) {
   hemi.intensity = indoor ? 0.55 : s.hemi;
   if (indoor) sun.intensity = Math.min(sun.intensity, 0.9);
   // 실내에서는 바깥 해 그림자를 끈다 (해가 움직일 때 어두운 바닥이 파바박 깜빡이던 문제)
-  const wantShadow = settings.shadows && !indoor;
+  const wantShadow = gfx().shadowMap > 0 && !indoor;
   if (sun.castShadow !== wantShadow) sun.castShadow = wantShadow;
   hemi.color.copy(s.sunColor).lerp(new THREE.Color('#ffffff'), 0.5);
   sky.position.copy(camera.position);
@@ -2441,8 +2443,10 @@ function frame() {
   updateListenedSong();
   // 저격 조준 중에는 멀리 있는 시민·동물까지 그려서 맞힐 수 있게
   const far = game.zoomNow > 2.5;
-  game.citizens.viewDist = far ? 130 * Math.min(4, game.zoomNow / 1.5) : 130;
-  game.animals.viewDist = far ? 220 * Math.min(3, game.zoomNow / 2) : 220;
+  const q = gfx();
+  game.citizens.viewDist = far ? Math.max(130, q.citizens) * Math.min(4, game.zoomNow / 1.5) : q.citizens;
+  game.citizens.lodDist = q.lod;
+  game.animals.viewDist = far ? Math.max(220, q.animals) * Math.min(3, game.zoomNow / 2) : q.animals;
   if (p.inCar) { seatRoach(p.roach, p.inCar); p.roach.update(dt, 0, {}); }
   game.citizens.update(dt, camera.position, game.loc());
   game.animals.camQuat = camera.quaternion;
@@ -2451,7 +2455,7 @@ function frame() {
   if (p.mount && (indoor || p.inCar || game.dead || game.jail)) dismount(false);
   updateCapture(dt);
   if ((game.safeT = (game.safeT || 0) - dt) <= 0) { game.safeT = 0.4; ui.safeBadge(!game.dead && game.inSafeZone()); }
-  if (!indoor) game.wild.update(camera.position);
+  if (!indoor) game.wild.update(camera.position, gfx().wild);
   // 지역에 들어서면 알려준다
   if ((game.regionT = (game.regionT || 0) - dt) <= 0) {
     game.regionT = 1;
@@ -2504,6 +2508,7 @@ function frame() {
   ui.setPrompt(focus);
   ui.update(dt);
   renderer.render(scene, camera);
+  fpsTick();
   if (game.capture) { const cb = game.capture; game.capture = null; cb(grabCanvas()); }
   game.input.jumpPressed = false;
   game.input.dashPressed = false;
@@ -2520,7 +2525,7 @@ function spectateFrame(dt, t) {
     car.heading = angleLerp(car.heading, tg.h, k);
   }
   tourFrame(dt, t);
-  game.wild.update(camera.position);
+  game.wild.update(camera.position, gfx().wild);
   game.traffic.render(true, camera.position, dt);
   game.runners?.update(dt);
   game.citizens.update(dt, camera.position, -1);
@@ -2544,8 +2549,40 @@ function windowGlow(night) {
 requestAnimationFrame(frame);
 
 game.applySettings = () => {
-  renderer.shadowMap.enabled = settings.shadows;
-  sun.castShadow = settings.shadows;
+  const q = gfx();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, q.pixelRatio));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = q.shadowMap > 0;
+  renderer.shadowMap.type = q.softShadow ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+  sun.castShadow = q.shadowMap > 0 && game.mode !== 'interior';
+  if (q.shadowMap && sun.shadow.mapSize.x !== q.shadowMap) {
+    sun.shadow.mapSize.setScalar(q.shadowMap);
+    sun.shadow.map?.dispose(); sun.shadow.map = null;
+  }
   scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
+  fpsEl.style.display = settings.showFps ? '' : 'none';
   saveSettings();
+  return renderer.getContextAttributes()?.antialias !== q.antialias; // true 면 다시 불러와야 다 적용된다
 };
+game.gfxLevel = gfxLevel;
+
+// FPS 표시 · 자동 그래픽: 계속 느리면 한 단계 낮춘다
+const fpsEl = document.createElement('div');
+fpsEl.id = 'fps';
+fpsEl.style.cssText = 'position:fixed;right:8px;bottom:8px;z-index:50;padding:2px 8px;border-radius:8px;background:rgba(0,0,0,.45);color:#fff;font:12px/1.6 monospace;pointer-events:none';
+fpsEl.style.display = settings.showFps ? '' : 'none';
+document.body.appendChild(fpsEl);
+let fpsN = 0, fpsT = performance.now();
+const autoFps = watchFps((lv, fps) => {
+  game.applySettings();
+  ui.toast(`⚙️ 화면이 느려서(${Math.round(fps)}fps) 그래픽을 '${GFX[lv].label}'(으)로 낮췄어요 · 설정에서 바꿀 수 있어요`);
+});
+function fpsTick() {
+  autoFps();
+  fpsN++;
+  const now = performance.now();
+  if (now - fpsT >= 500) {
+    if (settings.showFps) fpsEl.textContent = `${Math.round((fpsN * 1000) / (now - fpsT))} fps · ${GFX[gfxLevel()].label}`;
+    fpsN = 0; fpsT = now;
+  }
+}

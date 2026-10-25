@@ -100,6 +100,8 @@ button { font-family: 'Jua', sans-serif; cursor: pointer; }
 .btn { background: var(--accent); color: #fff; border: 0; border-radius: 12px; padding: 8px 14px; font-size: 15px; margin: 4px 4px 0 0; }
 .btn.ghost { background: var(--line); color: var(--ink); }
 .set-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.set-gfx-help { display: flex; flex-direction: column; gap: 6px; margin: -6px 0 14px; padding: 10px 12px; border-radius: 12px; background: rgba(0,0,0,.04); font-size: 12.5px; line-height: 1.5; }
+.set-gfx-help small { opacity: .7; }
 .set-row input[type=text], .set-row input[type=password], .set-row select { padding: 9px 12px; border-radius: 12px; border: 2px solid var(--line); font-family: inherit; font-size: 14px; background: #fff; color: #4a3428; }
 .job-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 10px; }
 .job { background: rgba(255,255,255,.6); border-radius: 12px; padding: 8px; cursor: pointer; border: 2px solid transparent; font-size: 13px; }

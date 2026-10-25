@@ -18,6 +18,7 @@ import { housePrice, freeUnits, homeLabel, isHomeType } from './world-setup.js';
 import { moodLabel, moodEmoji } from './citizens.js';
 import { Roach } from '../../shared/js/roach.js';
 import { settings, saveSettings } from '../../shared/js/settings.js';
+import { GFX, LEVELS, detectLevel } from './gfx.js';
 import { openSens, sensOf } from '../../shared/js/sens.js';
 import { setMusic, applyVolumes } from '../../shared/js/audio.js';
 import { fmtTime, DAYS, escapeHtml, cityText, setBrand } from '../../shared/js/utils.js';
@@ -791,7 +792,13 @@ export class UI {
       body.innerHTML = `
         <div class="set-row"><b>🤖 서버 LLM</b><span>${g.llm ? `${escapeHtml(st.model || 'gpt-4o-mini')} 사용 중 ✅ (키는 서버에만 있어요)` : '키 없음 — 기본 대사 사용 중 💤'}</span></div>
         <div class="set-row"><b>⏱️ 시간 속도</b><span>현실 1초 = 게임 ${g.timeSpeed}분 (서버 설정, 모든 플레이어 공통)</span></div>
-        <div class="set-row"><label><input type="checkbox" id="set-shadow" ${settings.shadows ? 'checked' : ''}/> 그림자 (끄면 더 빨라요)</label></div>
+        <div class="set-row"><b>🖥️ 그래픽</b><select id="set-gfx">
+          <option value="auto">자동 (지금: ${GFX[g.gfxLevel()].label})</option>
+          ${[...LEVELS].reverse().map((k) => `<option value="${k}">${GFX[k].label}${k === detectLevel() ? ' · 이 컴퓨터 추천' : ''}</option>`).join('')}
+        </select></div>
+        <div class="set-gfx-help">${[...LEVELS].reverse().map((k) => `<div><b>${GFX[k].label}</b> — ${GFX[k].desc}<br><small>추천: ${GFX[k].rec}</small></div>`).join('')}
+          <div><small>자동은 사양을 보고 고르고, 플레이 중 계속 느리면(30fps 아래) 한 단계씩 낮춰요. 렉이 있으면 한 단계 낮춰 보세요.</small></div></div>
+        <div class="set-row"><label><input type="checkbox" id="set-fps" ${settings.showFps ? 'checked' : ''}/> 📈 FPS 표시 (오른쪽 아래)</label></div>
         <div class="set-row"><label><input type="checkbox" id="set-bug" ${settings.bugMode ? 'checked' : ''}/> 🪳 바퀴 모드 (끄면 모두 🐻 곰돌이 젤리로 보여요)</label></div>
         <div class="set-row"><label><input type="checkbox" id="set-music" ${settings.music ? 'checked' : ''}/> 🎵 배경음악</label><input type="range" id="set-music-vol" min="0" max="1" step="0.05" value="${settings.musicVol}"></div>
         <div class="set-row"><label><input type="checkbox" id="set-sfx" ${settings.sfx ? 'checked' : ''}/> 🔊 효과음 (무기·차·동물·비명 등)</label><input type="range" id="set-sfx-vol" min="0" max="1" step="0.05" value="${settings.sfxVol}"></div>
@@ -801,12 +808,15 @@ export class UI {
         <button class="btn ghost" id="set-reset">👥 캐릭터 선택 화면으로</button>`;
       $('set-sens').onclick = () => openSens('city', () => { const b = $('set-sens'); if (b) b.textContent = `${sensOf('city').toFixed(2)}배 · 바꾸기`; });
       $('set-save').onclick = () => {
-        settings.shadows = $('set-shadow').checked;
+        if ($('set-gfx').value === 'auto' && settings.gfx !== 'auto') delete settings.gfxAuto; // 자동으로 돌아오면 사양부터 다시 본다
+        settings.gfx = $('set-gfx').value;
+        settings.showFps = $('set-fps').checked;
         if (settings.bugMode !== $('set-bug').checked) this.setBugMode($('set-bug').checked);
         saveSettings();
-        g.applySettings();
-        this.toast('⚙️ 설정을 저장했어요');
+        const reload = g.applySettings();
+        this.toast(reload ? '⚙️ 저장했어요 · 계단 현상 설정은 새로고침(F5)하면 적용돼요' : '⚙️ 설정을 저장했어요');
       };
+      $('set-gfx').value = settings.gfx in GFX ? settings.gfx : 'auto';
       $('set-reset').onclick = () => g.resetSave();
       // 조준점 색은 고르는 즉시 적용·저장
       const pickXh = (c) => {

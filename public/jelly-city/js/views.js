@@ -99,7 +99,7 @@ export class CitizenView {
           visible = d2 < vd * vd;
           if (visible) {
             root.position.set(c.pos.x, this.city.groundY(c.pos.x, c.pos.z), c.pos.z);
-            c.roach.setLod(d2 > 38 * 38);
+            const lod = this.lodDist || 38; c.roach.setLod(d2 > lod * lod);
           }
           src = c.pos;
         }

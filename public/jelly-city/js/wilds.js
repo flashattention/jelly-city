@@ -253,7 +253,7 @@ export function buildWilds(scene, city) {
       for (let i = x0; i <= x1; i++) for (let j = z0; j <= z1; j++) { const l = cells.get(`${i},${j}`); if (l) out.push(...l); }
       return out;
     },
-    update(camPos) { props.cull(camPos, 650); },
+    update(camPos, maxDist = 650) { props.cull(camPos, maxDist); },
   };
   return wild;
 }
