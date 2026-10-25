@@ -2577,7 +2577,7 @@ let fpsN = 0, fpsT = performance.now();
 const autoFps = watchFps((lv, fps) => {
   game.applySettings();
   ui.toast(`⚙️ 화면이 느려서(${Math.round(fps)}fps) 그래픽을 '${GFX[lv].label}'(으)로 낮췄어요 · 상단 🖥️ 그래픽에서 바꿀 수 있어요`);
-}, (fps) => ui.suggestLowGfx(fps));
+}, (fps, to) => ui.suggestGfx(fps, to));
 function fpsTick() {
   autoFps();
   fpsN++;

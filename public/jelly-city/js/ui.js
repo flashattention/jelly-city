@@ -159,22 +159,25 @@ export class UI {
     const lv = gfxLevel();
     $('tb-gfx').textContent = `🖥️ 그래픽 ${GFX[lv].label}${GFX[settings.gfx] ? '' : ' (자동)'}`;
   }
-  // '중'에서도 렉이 심할 때: '하'를 권하는 알림 (추천은 아니지만 이 컴퓨터엔 맞을 수도 있어요)
-  suggestLowGfx(fps) {
+  // 렉이 심할 때 한 단계 낮춰 보라는 알림: '상'이면 '중'을, '중'이면 '하'를 (하는 추천은 아니지만 이 컴퓨터엔 맞을 수도 있어요)
+  suggestGfx(fps, to) {
     if ($('gfx-hint')) return;
-    const low = explainLevel().lowSpec;
+    const low = explainLevel().lowSpec, L = GFX[to].label;
+    const msg = to === 'low'
+      ? `${low ? '이 컴퓨터는 그래픽 성능이 낮은 편이에요. ' : ''}렉이 심하면 그래픽 <b>하</b>로 시도해 보세요. 화면이 거칠어져서 추천하지는 않지만, 컴퓨터 성능상 <b>하</b>가 더 맞을 수도 있어요.`
+      : `렉이 있으면 그래픽 <b>${L}</b>(으)로 바꿔 보세요. 화면은 조금 덜 선명해지지만 더 부드럽게 움직여요.`;
     const el = document.createElement('div');
     el.id = 'gfx-hint';
     el.innerHTML = `<b>🐢 화면이 조금 느려요 (${Math.round(fps)}fps)</b>
-      <span>${low ? '이 컴퓨터는 그래픽 성능이 낮은 편이에요. ' : ''}렉이 심하면 그래픽 <b>하</b>로 시도해 보세요. 화면이 거칠어져서 추천하지는 않지만, 컴퓨터 성능상 <b>하</b>가 더 맞을 수도 있어요.</span>
-      <div><button class="btn" id="gfx-hint-low">하로 바꿔 보기</button> <button class="btn ghost" id="gfx-hint-no">괜찮아요</button></div>`;
+      <span>${msg}</span>
+      <div><button class="btn" id="gfx-hint-go">${L}(으)로 바꿔 보기</button> <button class="btn ghost" id="gfx-hint-no">괜찮아요</button></div>`;
     document.body.appendChild(el);
     const close = () => el.remove();
     $('gfx-hint-no').onclick = close;
-    $('gfx-hint-low').onclick = () => {
-      settings.gfx = 'low';
+    $('gfx-hint-go').onclick = () => {
+      settings.gfx = to;
       const reload = this.game.applySettings();
-      this.toast(`🖥️ 그래픽 '하'로 바꿨어요 · 상단 🖥️ 그래픽에서 언제든 되돌릴 수 있어요${reload ? ' · 계단 현상은 새로고침(F5)하면 바뀌어요' : ''}`);
+      this.toast(`🖥️ 그래픽 '${L}'(으)로 바꿨어요 · 상단 🖥️ 그래픽에서 언제든 되돌릴 수 있어요${reload ? ' · 계단 현상은 새로고침(F5)하면 바뀌어요' : ''}`);
       close();
     };
     setTimeout(close, 20000);
@@ -195,7 +198,7 @@ export class UI {
       <div class="keygroup"><b>🎚️ 직접 고르기</b><div class="gfx-pick">
         ${opt('auto', '자동', `추천 ${GFX[ex.level].label}`)}${[...LEVELS].reverse().map((k) => opt(k, GFX[k].label, k === ex.level ? '이 컴퓨터 추천' : k === 'low' ? (ex.lowSpec ? '렉이 심할 때' : '추천 안 함') : '')).join('')}
       </div>${[...LEVELS].reverse().map((k) => `<div class="keyrow"><span class="kk"><b>${GFX[k].label}</b></span><span>${GFX[k].desc}<br><small>추천: ${GFX[k].rec}</small></span></div>`).join('')}
-      <div class="keynote">추천보다 높게 골라도 돼요. 자동은 '중' 아래로는 내리지 않아요 — '상'에서 계속 30fps 아래면 '중'으로 낮추고, '중'에서도 느리면 '하'를 써 볼지 물어봐요. 계단 현상 설정은 새로고침(F5)해야 바뀌어요.</div></div>
+      <div class="keynote">추천보다 높게 골라도 돼요. 자동은 '중' 아래로는 내리지 않아요 — '상'에서 계속 30fps 아래면 '중'으로 낮추고, '중'에서도 느리면 '하'를 써 볼지 물어봐요. 직접 고른 '상'이 느리면 '중'을 먼저 권해요. 계단 현상 설정은 새로고침(F5)해야 바뀌어요.</div></div>
       <div style="margin-top:12px"><button class="btn" id="gfx-ok">닫기</button></div>`, 'gfx');
     $('modal-inner').classList.add('wide');
     $('gfx-ok').onclick = () => this.closeModal();

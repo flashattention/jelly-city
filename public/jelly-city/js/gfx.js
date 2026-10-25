@@ -91,10 +91,11 @@ export function gfxLevel() {
 }
 export const gfx = () => GFX[gfxLevel()];
 
-// 6초 평균이 32fps 아래면: 자동 '상'은 '중'으로 낮추고(onDrop), '중' 이상인데도 느리면 '하'를 권한다(onSlow, 한 번만)
+// 6초 평균이 32fps 아래면: 자동 '상'은 '중'으로 낮추고(onDrop), 직접 고른 '상'이면 '중'을, '중'이면 '하'를 권한다(onSlow, 단계마다 한 번)
 // 불러온 직후 10초 · 다른 탭에 있을 때는 재지 않는다
 export function watchFps(onDrop, onSlow) {
-  let frames = 0, t0 = 0, skipUntil = performance.now() + 10000, suggested = false;
+  let frames = 0, t0 = 0, skipUntil = performance.now() + 10000;
+  const suggested = new Set();
   document.addEventListener('visibilitychange', () => { skipUntil = performance.now() + 3000; frames = 0; t0 = 0; });
   return () => {
     const now = performance.now();
@@ -112,9 +113,9 @@ export function watchFps(onDrop, onSlow) {
       saveSettings();
       skipUntil = now + 8000;
       onDrop('mid', fps);
-    } else if (cur !== 'low' && !suggested) {
-      suggested = true;
-      onSlow(fps);
+    } else if (cur !== 'low' && !suggested.has(cur)) {
+      suggested.add(cur);
+      onSlow(fps, down(cur));
     }
   };
 }
