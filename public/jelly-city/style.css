@@ -100,8 +100,6 @@ button { font-family: 'Jua', sans-serif; cursor: pointer; }
 .btn { background: var(--accent); color: #fff; border: 0; border-radius: 12px; padding: 8px 14px; font-size: 15px; margin: 4px 4px 0 0; }
 .btn.ghost { background: var(--line); color: var(--ink); }
 .set-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
-.set-gfx-help { display: flex; flex-direction: column; gap: 6px; margin: -6px 0 14px; padding: 10px 12px; border-radius: 12px; background: rgba(0,0,0,.04); font-size: 12.5px; line-height: 1.5; }
-.set-gfx-help small { opacity: .7; }
 .gfx-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 6px 0 8px; }
 .gfx-pick .btn { padding: 8px 6px; line-height: 1.3; }
 .gfx-pick small { font-size: 11px; opacity: .8; }

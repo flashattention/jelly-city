@@ -18,7 +18,7 @@ import { housePrice, freeUnits, homeLabel, isHomeType } from './world-setup.js';
 import { moodLabel, moodEmoji } from './citizens.js';
 import { Roach } from '../../shared/js/roach.js';
 import { settings, saveSettings } from '../../shared/js/settings.js';
-import { GFX, LEVELS, detectLevel, explainLevel, specInfo, gfxLevel } from './gfx.js';
+import { GFX, LEVELS, explainLevel, specInfo, gfxLevel } from './gfx.js';
 import { openSens, sensOf } from '../../shared/js/sens.js';
 import { setMusic, applyVolumes } from '../../shared/js/audio.js';
 import { fmtTime, DAYS, escapeHtml, cityText, setBrand } from '../../shared/js/utils.js';
@@ -118,6 +118,7 @@ export class UI {
     $('tb-music').onclick = () => { setMusic(!settings.music); musicBtn(); };
     musicBtn();
     $('tb-gfx').onclick = () => this.openGfx();
+    $('tb-settings').onclick = () => this.openSettings();
     this.updateGfxBtn();
     this.setBugMode(settings.bugMode, true);
     this.applyCrosshair();
@@ -188,6 +189,53 @@ export class UI {
         this.openGfx();
       };
     });
+  }
+  // 게임 설정 (상단 ⚙️ 설정)
+  openSettings() {
+    const g = this.game;
+    this.openModal(`<h3 class="mh">⚙️ 설정</h3><div id="settings-body"></div>`, 'settings');
+    const body = $('settings-body');
+    const st = this.serverStatus || {};
+    body.innerHTML = `
+      <div class="set-row"><b>🤖 서버 LLM</b><span>${g.llm ? `${escapeHtml(st.model || 'gpt-4o-mini')} 사용 중 ✅ (키는 서버에만 있어요)` : '키 없음 — 기본 대사 사용 중 💤'}</span></div>
+      <div class="set-row"><b>⏱️ 시간 속도</b><span>현실 1초 = 게임 ${g.timeSpeed}분 (서버 설정, 모든 플레이어 공통)</span></div>
+      <div class="set-row"><b>🖥️ 그래픽</b><button class="btn ghost" id="set-gfx">${GFX[gfxLevel()].label}${GFX[settings.gfx] ? '' : ' (자동)'} · 사양 보기 · 바꾸기</button></div>
+      <div class="set-row"><label><input type="checkbox" id="set-fps" ${settings.showFps ? 'checked' : ''}/> 📈 FPS 표시 (오른쪽 아래)</label></div>
+      <div class="set-row"><label><input type="checkbox" id="set-bug" ${settings.bugMode ? 'checked' : ''}/> 🪳 바퀴 모드 (끄면 모두 🐻 곰돌이 젤리로 보여요)</label></div>
+      <div class="set-row"><label><input type="checkbox" id="set-music" ${settings.music ? 'checked' : ''}/> 🎵 배경음악</label><input type="range" id="set-music-vol" min="0" max="1" step="0.05" value="${settings.musicVol}"></div>
+      <div class="set-row"><label><input type="checkbox" id="set-sfx" ${settings.sfx ? 'checked' : ''}/> 🔊 효과음 (무기·차·동물·비명 등)</label><input type="range" id="set-sfx-vol" min="0" max="1" step="0.05" value="${settings.sfxVol}"></div>
+      <div class="set-row"><b>🎯 조준점 색</b><div class="xh-row">${XH_COLORS.map((c) => `<button class="xh-sw" data-xh="${c}" style="background:${c}" title="${c}"></button>`).join('')}<input type="color" id="set-xh" value="${escapeHtml(settings.crosshairColor)}" title="직접 고르기"><span class="xh-prev" id="xh-prev">＋</span></div></div>
+      <div class="set-row"><b>🖱️ 마우스 감도</b><button class="btn ghost" id="set-sens">${sensOf('city').toFixed(2)}배 · 바꾸기</button></div>
+      <button class="btn" id="set-save">저장</button>
+      <button class="btn ghost" id="set-close">닫기</button>
+      <button class="btn ghost" id="set-reset">👥 캐릭터 선택 화면으로</button>`;
+    $('set-sens').onclick = () => openSens('city', () => { const b = $('set-sens'); if (b) b.textContent = `${sensOf('city').toFixed(2)}배 · 바꾸기`; });
+    $('set-save').onclick = () => {
+      settings.showFps = $('set-fps').checked;
+      if (settings.bugMode !== $('set-bug').checked) this.setBugMode($('set-bug').checked);
+      saveSettings();
+      g.applySettings();
+      this.toast('⚙️ 설정을 저장했어요');
+    };
+    $('set-gfx').onclick = () => this.openGfx();
+    $('set-reset').onclick = () => g.resetSave();
+    $('set-close').onclick = () => this.closeModal();
+    // 조준점 색은 고르는 즉시 적용·저장
+    const pickXh = (c) => {
+      settings.crosshairColor = c; saveSettings(); this.applyCrosshair();
+      $('set-xh').value = c; $('xh-prev').style.color = c;
+      body.querySelectorAll('[data-xh]').forEach((b) => b.classList.toggle('on', b.dataset.xh === c));
+    };
+    body.querySelectorAll('[data-xh]').forEach((b) => { b.onclick = () => pickXh(b.dataset.xh); });
+    // 소리: 바꾸는 즉시 적용·저장
+    const snd = () => {
+      Object.assign(settings, { music: $('set-music').checked, musicVol: +$('set-music-vol').value, sfx: $('set-sfx').checked, sfxVol: +$('set-sfx-vol').value });
+      saveSettings(); applyVolumes();
+      $('tb-music').textContent = settings.music ? '🎵 음악 켬' : '🔇 음악 끔';
+    };
+    for (const id of ['set-music', 'set-music-vol', 'set-sfx', 'set-sfx-vol']) $(id).oninput = snd;
+    $('set-xh').oninput = (e) => pickXh(e.target.value);
+    pickXh(settings.crosshairColor);
   }
   setLocked(v) { this.locked = v; }
 
@@ -728,7 +776,7 @@ export class UI {
       ['quests', '📋', '퀘스트', '#7e57c2'], ['camera', '📷', '카메라', '#455a64'], ['gallery', '🖼️', '사진', '#ffb300'], ['insta', '📸', '인스타', 'linear-gradient(135deg,#f58529,#dd2a7b,#8134af)'],
       ['tinder', '🔥', '튄더', 'linear-gradient(135deg,#ff6a3d,#ff2d6f)'], ['contacts', '📞', '연락처', '#43a047'], ['sms', '💬', '메시지', '#2ecc71', unread], ['police', '🚨', '112', '#e53935'],
       ['map', '🗺️', '지도', '#29b6f6'], ['online', '👥', '접속자', '#5c6bc0'], ['badges', '🏅', '훈장', '#ff8f00'], ['me', '🙂', '내 정보', '#8d6e63'],
-      ['feedback', '💡', '건의하기', '#fdd835'], ['help', '❓', '도움말', '#78909c'], ['settings', '⚙️', '설정', '#9e9e9e'],
+      ['feedback', '💡', '건의하기', '#fdd835'], ['help', '❓', '도움말', '#78909c'],
     ];
     if (g.admin) apps.push(['admin', '📮', '건의함', '#d81b60']);
     const icon = ([id, e, n, bg, badge]) => `<button class="app" data-app="${id}"><span class="ai" style="background:${bg}">${e}${badge ? `<i>${badge}</i>` : ''}</span><span class="an">${n}</span></button>`;
@@ -760,6 +808,7 @@ export class UI {
     if (!tab || tab === 'citizens') { this.phoneHome(); return; }
     if (tab === 'online') { this.closePhone(); this.openOnline(); return; }
     if (tab === 'badges') { this.closePhone(); this.openBadges(); return; }
+    if (tab === 'settings') { this.closePhone(); this.openSettings(); return; }
     this.phoneTab = tab;
     $('phone-home').classList.add('hidden');
     $('phone-app').classList.remove('hidden');
@@ -827,53 +876,6 @@ export class UI {
         for (const b of g.city.buildings) { const d = Math.hypot(b.x - x, b.z - z); if (d < bd) { bd = d; best = b; } }
         if (best) this.setWaypoint(best);
       };
-    } else if (tab === 'settings') {
-      const st = this.serverStatus || {};
-      body.innerHTML = `
-        <div class="set-row"><b>🤖 서버 LLM</b><span>${g.llm ? `${escapeHtml(st.model || 'gpt-4o-mini')} 사용 중 ✅ (키는 서버에만 있어요)` : '키 없음 — 기본 대사 사용 중 💤'}</span></div>
-        <div class="set-row"><b>⏱️ 시간 속도</b><span>현실 1초 = 게임 ${g.timeSpeed}분 (서버 설정, 모든 플레이어 공통)</span></div>
-        <div class="set-row"><b>🖥️ 그래픽</b><select id="set-gfx">
-          <option value="auto">자동 (지금: ${GFX[gfxLevel()].label})</option>
-          ${[...LEVELS].reverse().map((k) => `<option value="${k}">${GFX[k].label}${k === detectLevel() ? ' · 이 컴퓨터 추천' : ''}</option>`).join('')}
-        </select></div>
-        <div class="set-gfx-help">${[...LEVELS].reverse().map((k) => `<div><b>${GFX[k].label}</b> — ${GFX[k].desc}<br><small>추천: ${GFX[k].rec}</small></div>`).join('')}
-          <div><small>자동은 사양을 보고 고르고, 플레이 중 계속 느리면(30fps 아래) 한 단계씩 낮춰요. 렉이 있으면 한 단계 낮춰 보세요.</small></div></div>
-        <div class="set-row"><label><input type="checkbox" id="set-fps" ${settings.showFps ? 'checked' : ''}/> 📈 FPS 표시 (오른쪽 아래)</label></div>
-        <div class="set-row"><label><input type="checkbox" id="set-bug" ${settings.bugMode ? 'checked' : ''}/> 🪳 바퀴 모드 (끄면 모두 🐻 곰돌이 젤리로 보여요)</label></div>
-        <div class="set-row"><label><input type="checkbox" id="set-music" ${settings.music ? 'checked' : ''}/> 🎵 배경음악</label><input type="range" id="set-music-vol" min="0" max="1" step="0.05" value="${settings.musicVol}"></div>
-        <div class="set-row"><label><input type="checkbox" id="set-sfx" ${settings.sfx ? 'checked' : ''}/> 🔊 효과음 (무기·차·동물·비명 등)</label><input type="range" id="set-sfx-vol" min="0" max="1" step="0.05" value="${settings.sfxVol}"></div>
-        <div class="set-row"><b>🎯 조준점 색</b><div class="xh-row">${XH_COLORS.map((c) => `<button class="xh-sw" data-xh="${c}" style="background:${c}" title="${c}"></button>`).join('')}<input type="color" id="set-xh" value="${escapeHtml(settings.crosshairColor)}" title="직접 고르기"><span class="xh-prev" id="xh-prev">＋</span></div></div>
-        <div class="set-row"><b>🖱️ 마우스 감도</b><button class="btn ghost" id="set-sens">${sensOf('city').toFixed(2)}배 · 바꾸기</button></div>
-        <button class="btn" id="set-save">저장</button>
-        <button class="btn ghost" id="set-reset">👥 캐릭터 선택 화면으로</button>`;
-      $('set-sens').onclick = () => openSens('city', () => { const b = $('set-sens'); if (b) b.textContent = `${sensOf('city').toFixed(2)}배 · 바꾸기`; });
-      $('set-save').onclick = () => {
-        if ($('set-gfx').value === 'auto' && settings.gfx !== 'auto') delete settings.gfxAuto; // 자동으로 돌아오면 사양부터 다시 본다
-        settings.gfx = $('set-gfx').value;
-        settings.showFps = $('set-fps').checked;
-        if (settings.bugMode !== $('set-bug').checked) this.setBugMode($('set-bug').checked);
-        saveSettings();
-        const reload = g.applySettings();
-        this.toast(reload ? '⚙️ 저장했어요 · 계단 현상 설정은 새로고침(F5)하면 적용돼요' : '⚙️ 설정을 저장했어요');
-      };
-      $('set-gfx').value = settings.gfx in GFX ? settings.gfx : 'auto';
-      $('set-reset').onclick = () => g.resetSave();
-      // 조준점 색은 고르는 즉시 적용·저장
-      const pickXh = (c) => {
-        settings.crosshairColor = c; saveSettings(); this.applyCrosshair();
-        $('set-xh').value = c; $('xh-prev').style.color = c;
-        body.querySelectorAll('[data-xh]').forEach((b) => b.classList.toggle('on', b.dataset.xh === c));
-      };
-      body.querySelectorAll('[data-xh]').forEach((b) => { b.onclick = () => pickXh(b.dataset.xh); });
-      // 소리: 바꾸는 즉시 적용·저장
-      const snd = () => {
-        Object.assign(settings, { music: $('set-music').checked, musicVol: +$('set-music-vol').value, sfx: $('set-sfx').checked, sfxVol: +$('set-sfx-vol').value });
-        saveSettings(); applyVolumes();
-        $('tb-music').textContent = settings.music ? '🎵 음악 켬' : '🔇 음악 끔';
-      };
-      for (const id of ['set-music', 'set-music-vol', 'set-sfx', 'set-sfx-vol']) $(id).oninput = snd;
-      $('set-xh').oninput = (e) => pickXh(e.target.value);
-      pickXh(settings.crosshairColor);
     } else if (tab === 'help') {
       body.innerHTML = `<div class="profile-big">
         <h3>📘 젤리시티 생활 가이드</h3>
