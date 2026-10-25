@@ -8,10 +8,10 @@ export const GFX = {
     rec: '맥북 M1 이상 · 외장 그래픽(지포스 GTX 1060 · 라데온 RX 580 이상) 데스크톱 · 게이밍 노트북',
     desc: '선명한 화면(최대 2배) · 부드러운 그림자 · 계단 현상 없애기 · 멀리 있는 시민 · 동물까지' },
   mid: { label: '중', pixelRatio: 1, antialias: true, shadowMap: 1024, softShadow: false, citizens: 100, animals: 170, lod: 28, wild: 450,
-    rec: '내장 그래픽 미니PC · 노트북(라데온 680M · 780M, 인텔 Iris Xe · Arc), 아이패드',
+    rec: '내장 그래픽 미니PC · 노트북(라데온 680M · 780M, 인텔 Iris Xe · Arc · UHD), 아이패드 — 사양이 낮아도 기본은 중이에요',
     desc: '보통 화면(1배) · 단순한 그림자 · 보이는 거리 조금 짧게' },
   low: { label: '하', pixelRatio: 0.75, antialias: false, shadowMap: 0, softShadow: false, citizens: 75, animals: 130, lod: 20, wild: 340,
-    rec: '인텔 UHD(N100 · 셀러론 등) · 오래된 노트북 · 저가 태블릿 · 휴대폰',
+    rec: '추천하지 않아요 · 중에서도 렉이 심할 때만 (인텔 N100 · 셀러론 · 오래된 노트북 · 저가 태블릿 · 휴대폰)',
     desc: '낮은 해상도(0.75배) · 그림자 끔 · 계단 현상 없애기 끔 · 보이는 거리 짧게' },
 };
 export const LEVELS = ['low', 'mid', 'high'];
@@ -62,7 +62,10 @@ export function explainLevel(gpu = gpuName()) {
     lv = to;
   }
   if (mobile && lv === 'high') { lv = 'mid'; why.push('휴대 기기라 최대 중'); }
-  return { level: lv, why };
+  // 원만한 플레이를 위해 자동은 '중' 아래로 내리지 않는다. 사양이 낮으면 렉이 심할 때 '하'를 권한다
+  const lowSpec = lv === 'low';
+  if (lowSpec) { lv = 'mid'; why.push("화면이 너무 거칠어지지 않게 자동은 '중'부터 시작해요 · 렉이 심하면 '하'가 맞을 수도 있어요"); }
+  return { level: lv, why, lowSpec };
 }
 export const detectLevel = (gpu) => explainLevel(gpu).level;
 
@@ -83,29 +86,35 @@ export function gfxLevel() {
   if (GFX[settings.gfx]) return settings.gfx;
   const gpu = gpuName();
   if (settings.gfxAuto?.gpu !== gpu) { settings.gfxAuto = { gpu, level: detectLevel(gpu) }; saveSettings(); }
+  if (settings.gfxAuto.level === 'low') { settings.gfxAuto.level = 'mid'; saveSettings(); } // 예전에 자동으로 '하'가 됐던 기록
   return settings.gfxAuto.level;
 }
 export const gfx = () => GFX[gfxLevel()];
 
-// 자동일 때: 6초 평균이 32fps 아래면 한 단계 낮춘다 (불러온 직후 10초 · 다른 탭에 있을 때는 재지 않는다)
-export function watchFps(onDrop) {
-  let frames = 0, t0 = 0, skipUntil = performance.now() + 10000;
+// 6초 평균이 32fps 아래면: 자동 '상'은 '중'으로 낮추고(onDrop), '중' 이상인데도 느리면 '하'를 권한다(onSlow, 한 번만)
+// 불러온 직후 10초 · 다른 탭에 있을 때는 재지 않는다
+export function watchFps(onDrop, onSlow) {
+  let frames = 0, t0 = 0, skipUntil = performance.now() + 10000, suggested = false;
   document.addEventListener('visibilitychange', () => { skipUntil = performance.now() + 3000; frames = 0; t0 = 0; });
   return () => {
     const now = performance.now();
-    if (now < skipUntil || settings.gfx !== 'auto' || document.hidden) { frames = 0; t0 = 0; return; }
+    if (now < skipUntil || document.hidden) { frames = 0; t0 = 0; return; }
     if (!t0) t0 = now;
     frames++;
     if (now - t0 < 6000) return;
     const fps = (frames * 1000) / (now - t0);
     frames = 0; t0 = now;
+    if (fps >= 32) return;
     const cur = gfxLevel();
-    if (fps < 32 && cur !== 'low') {
-      settings.gfxAuto.level = down(cur);
-      settings.gfxAuto.drops = [...(settings.gfxAuto.drops || []), { from: cur, to: settings.gfxAuto.level, fps: Math.round(fps) }];
+    if (settings.gfx === 'auto' && cur === 'high') {
+      settings.gfxAuto.level = 'mid';
+      settings.gfxAuto.drops = [...(settings.gfxAuto.drops || []), { from: cur, to: 'mid', fps: Math.round(fps) }];
       saveSettings();
       skipUntil = now + 8000;
-      onDrop(settings.gfxAuto.level, fps);
+      onDrop('mid', fps);
+    } else if (cur !== 'low' && !suggested) {
+      suggested = true;
+      onSlow(fps);
     }
   };
 }
