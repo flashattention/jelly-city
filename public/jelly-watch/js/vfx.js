@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { Roach } from '../../shared/js/roach.js';
 import { PROJ, shieldRect } from './heroes.js';
+import { dressHero, hasLook } from './herolooks.js';
 
 const toon = (c, o = {}) => new THREE.MeshToonMaterial({ color: c, ...o });
 const glowM = (c, op = 0.9) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false });
@@ -43,7 +44,9 @@ function customHeld(bear, kind, col) {
   bear.detailsDirty = true;
 }
 export function heroBear(h, { name, look } = {}) {
-  const bear = new Roach({ own: true, seed: name || h.id, color: h.color, age: 25, look: { ...(look || {}), hat: 0, face: 0, outfit: 0, extra: 0 }, accessories: h.acc || [] });
+  // 영웅 장비는 herolooks.js 가 직접 입힌다 (없는 영웅만 예전 꾸미기)
+  const bear = new Roach({ own: true, seed: name || h.id, color: h.color, age: 25, look: { ...(look || {}), hat: 0, face: 0, outfit: 0, extra: 0, ears: 0 }, accessories: hasLook(h.id) ? [] : h.acc || [] });
+  dressHero(bear, h.id);
   const held = h.held || null;
   if (['hammer', 'staff', 'cannons', 'scrap', 'particle', 'tesla'].includes(held)) { bear.setHeld(null); customHeld(bear, held, h.color); }
   else bear.setHeld(held ? (held.includes(':') ? held : `${held}:${h.color}`) : null);
@@ -57,7 +60,12 @@ export function dvaMech() {
   part(g, SPH, pink, 0, 1.25, 0, 0.95, 0.75, 0.95); part(g, SPH, white, 0, 1.35, -0.45, 0.6, 0.45, 0.4);
   for (const s of [-1, 1]) { part(g, CYL, dark, s * 0.45, 0.45, 0.1, 0.16, 0.9, 0.16); part(g, BOX, pink, s * 0.45, 0.08, 0, 0.36, 0.18, 0.55); part(g, BOX, pink, s * 1.0, 1.2, -0.3, 0.32, 0.32, 0.8); part(g, CYL, dark, s * 1.0, 1.2, -0.85, 0.1, 0.4, 0.1, Math.PI / 2); part(g, SPH, glowM('#ffd0ec', 0.8), s * 0.6, 1.1, 0.95, 0.12, 0.08, 0.04); }
   part(g, BOX, toon('#7cd8ff'), 0, 1.45, -0.86, 0.5, 0.12, 0.05);
-  return g;
+  // 오버워치 메카처럼: 뒤 부스터 둘 · 앞 토끼 무늬 · 흰 줄 · 어깨 범퍼
+  for (const s of [-1, 1]) { part(g, CYL, dark, s * 0.45, 1.35, 0.85, 0.2, 0.5, 0.2, Math.PI / 2); part(g, SPH, glowM('#ffb3e6', 0.7), s * 0.45, 1.35, 1.12, 0.14, 0.14, 0.08); part(g, SPH, white, s * 0.78, 1.55, -0.1, 0.3, 0.22, 0.32); part(g, BOX, white, s * 0.55, 1.15, -0.82, 0.12, 0.5, 0.05); }
+  part(g, SPH, toon('#ff5fa2'), 0, 1.0, -0.92, 0.12, 0.1, 0.04); for (const s of [-1, 1]) part(g, SPH, toon('#ff5fa2'), s * 0.07, 1.14, -0.9, 0.04, 0.1, 0.03);
+  // 로봇 앞(-z)을 곰돌이 얼굴 쪽(+z)으로 돌려서 묶는다 (같은 방향을 보게)
+  const outer = new THREE.Group(); g.rotation.y = Math.PI; outer.add(g);
+  return outer;
 }
 
 // ---------- 머리 위 이름 · 체력 ----------

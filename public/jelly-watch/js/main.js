@@ -436,6 +436,28 @@ function kitHTML(hh) {
     ${row('우클릭', hh.s ? { icon: hh.s.icon, name: hh.s.name, desc: hh.s.desc || (hh.s.type === 'scope' ? '조준경' : ''), cd: hh.s.cd } : null)}
     ${row('Shift', hh.shift)}${row('E', hh.e)}${row('Q', { ...hh.q, desc: `궁극기 · ${hh.q.desc}` })}`;
 }
+// 영웅 고르기 · 도감: 고른 영웅 3D 모습이 빙글빙글 (작은 화면 하나)
+const pv = { r: null, scene: null, cam: null, bear: null, mech: null, id: null };
+function showPreview(id, host) {
+  if (!pv.r) {
+    const c = document.createElement('canvas'); c.className = 'hero3d'; c.width = 360; c.height = 300;
+    pv.r = new THREE.WebGLRenderer({ canvas: c, antialias: true, alpha: true }); pv.r.setPixelRatio(Math.min(2, devicePixelRatio || 1)); pv.r.setSize(360, 300, false); pv.r.outputColorSpace = THREE.SRGBColorSpace;
+    pv.scene = new THREE.Scene(); pv.scene.add(new THREE.HemisphereLight('#ffffff', '#8a7a9a', 1.8)); const dl = new THREE.DirectionalLight('#ffffff', 1.6); dl.position.set(2, 4, 3); pv.scene.add(dl);
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(1.6, 40), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.12 })); floor.rotation.x = -Math.PI / 2; pv.scene.add(floor);
+    pv.cam = new THREE.PerspectiveCamera(34, 360 / 300, 0.1, 50); pv.cam.position.set(0, 1.6, 6.2); pv.cam.lookAt(0, 1.2, 0);
+  }
+  host.prepend(pv.r.domElement);
+  if (pv.id === id) return; pv.id = id;
+  if (pv.bear) pv.scene.remove(pv.bear.root); if (pv.mech) { pv.scene.remove(pv.mech); pv.mech = null; }
+  const h = heroById(id); pv.bear = heroBear(h, { name: h.name }); pv.scene.add(pv.bear.root);
+  if (id === 'dva') { pv.mech = dvaMech(); pv.scene.add(pv.mech); pv.bear.root.position.y = 1.35; pv.bear.root.scale.setScalar(0.85 * 0.55); pv.bear.setSeated?.(true); }
+  pv.bear.playEmote?.(['ganbare', 'heart', 'apt'][Math.floor(Math.random() * 3)]); setTimeout(() => pv.bear?.playEmote?.(null), 1800);
+}
+function drawPreview(dt) {
+  if (!pv.r || !pv.bear || !pv.r.domElement.isConnected || pv.r.domElement.offsetParent === null) return;
+  const a = performance.now() / 1600; pv.bear.root.rotation.y = Math.sin(a) * 0.9; if (pv.mech) pv.mech.rotation.y = pv.bear.root.rotation.y;
+  pv.bear.update(dt, 0, {}); pv.r.render(pv.scene, pv.cam);
+}
 function renderSelect(swap) {
   const mates = [...game.stats.entries()].filter(([, s]) => s.team === game.team);
   const takenBy = (hid) => mates.find(([id, s]) => s.hero === hid && id !== game.myId)?.[1].name;
@@ -446,6 +468,7 @@ function renderSelect(swap) {
     b.onclick = () => { if (b.classList.contains('taken')) { shell.toast('이미 우리 팀이 고른 영웅이에요'); return; } game.sel = b.dataset.h; sfx('pick'); if (!swap) send({ t: 'pick', h: game.sel }); store.set(HERO_KEY, game.sel); renderSelect(swap); };
   });
   $('sel-kit').innerHTML = kitHTML(heroById(game.sel));
+  showPreview(game.sel, $('sel-kit'));
   const m = wmapById(game.map?.id);
   $('sel-head').innerHTML = `${m.emoji} ${esc(m.name)} · ${game.mmode === 'assault' ? (game.atk === game.team ? '⚔️ 공격 — A → B 거점을 점령하세요' : '🛡️ 수비 — 거점을 지키세요') : '🏛️ 쟁탈전 — 가운데 거점을 차지하세요'}`;
   $('sel-team').innerHTML = mates.map(([id, s]) => { const x = s.hero ? heroById(s.hero) : null; return `<div class="tm${id === game.myId ? ' me' : ''}"><span>${x ? x.emoji : '❔'}</span><b>${s.bot ? '🤖 ' : ''}${esc(s.name)}</b><small>${x ? `${ROLES[x.role].icon} ${esc(x.name)}` : '고르는 중…'}</small></div>`; }).join('');
@@ -464,7 +487,7 @@ $('sel-close').onclick = closeSwap;
 function roomOf(team) { const rm = game.map.rooms; if (game.mmode === 'assault') return team === game.atk ? (game.obj?.pi >= 1 ? rm.atk2 : rm.atk) : (!(game.obj?.pi >= 1) && rm.def1 ? rm.def1 : rm.def); return rm[team]; }
 function openDex() {
   game.dexSel = game.dexSel || 'rein';
-  const draw = () => { $('dex-grid').innerHTML = ['tank', 'dps', 'sup'].map((ro) => `<div class="role"><div class="rh" style="color:${ROLES[ro].color}">${ROLES[ro].icon} ${ROLES[ro].name}</div><div class="rg">${HEROES.filter((x) => x.role === ro).map((x) => heroCard(x, null, x.id === game.dexSel)).join('')}</div></div>`).join(''); $('dex-kit').innerHTML = kitHTML(heroById(game.dexSel)); $('dex-grid').querySelectorAll('[data-h]').forEach((b) => { b.onclick = () => { game.dexSel = b.dataset.h; sfx('pick'); draw(); }; }); };
+  const draw = () => { $('dex-grid').innerHTML = ['tank', 'dps', 'sup'].map((ro) => `<div class="role"><div class="rh" style="color:${ROLES[ro].color}">${ROLES[ro].icon} ${ROLES[ro].name}</div><div class="rg">${HEROES.filter((x) => x.role === ro).map((x) => heroCard(x, null, x.id === game.dexSel)).join('')}</div></div>`).join(''); $('dex-kit').innerHTML = kitHTML(heroById(game.dexSel)); showPreview(game.dexSel, $('dex-kit')); $('dex-grid').querySelectorAll('[data-h]').forEach((b) => { b.onclick = () => { game.dexSel = b.dataset.h; sfx('pick'); draw(); }; }); };
   draw(); shell.show('dex');
 }
 $('dex-back').onclick = () => shell.show('title');
@@ -963,6 +986,7 @@ function frame() {
     if (game.phase === 'select') { const left = Math.max(0, Math.ceil((game.selUntil - now) / 1000)); $('sel-time').textContent = `⏱️ ${left}`; }
   }
   drawBeams(t);
+  drawPreview(dt);
   updateFx(dt, scene); updateBig(dt, camera);
   renderer.clear();
   renderer.render(scene, camera);

@@ -176,3 +176,6 @@ body #chat { bottom: 120px; }
 #ov.breath { box-shadow: inset 0 0 70px rgba(255,230,180,.6); }
 #ov.barrage { box-shadow: inset 0 0 80px rgba(130,200,255,.6); }
 #ov.dash { background: radial-gradient(ellipse at center, transparent 45%, rgba(255,255,255,.28) 75%, rgba(255,255,255,.05) 100%); }
+
+/* 영웅 3D 미리보기 */
+.hero3d { width: 100%; max-width: 360px; height: auto; aspect-ratio: 6 / 5; display: block; margin: 0 auto -6px; border-radius: 18px; background: radial-gradient(circle at 50% 70%, rgba(255,255,255,.12), transparent 70%); }
