@@ -487,6 +487,32 @@ function start(m) {
   shell.hideScreens(); $('select').classList.remove('hidden', 'swap'); $('hud').classList.add('hidden'); $('death').classList.add('hidden'); $('cut').classList.add('hidden');
   if (store.get(HERO_KEY)) setTimeout(() => send({ t: 'pick', h: store.get(HERO_KEY) }), 300);
 }
+
+// ---------- 영웅마다 다른 조준점 (오버워치처럼) ----------
+const CROSS = {
+  rein: '<circle r="3" fill="none" stroke-width="1.5"/>',
+  winston: '<circle r="44" fill="none" stroke-dasharray="3 9" stroke-width="2"/><circle r="2.5"/>',
+  dva: '<path d="M-24-26A35 35 0 0 0-24 26M24-26A35 35 0 0 1 24 26" fill="none" stroke-width="2.6"/><circle r="2.5"/>',
+  hog: '<circle r="34" fill="none" stroke-width="2"/><circle r="2.5"/>',
+  zarya: '<circle r="14" fill="none" stroke-width="2"/><circle r="2"/>',
+  pharah: '<path d="M0-16V-7M0 7V16M-16 0H-7M7 0H16" stroke-width="2"/><circle r="11" fill="none" stroke-width="1.2" opacity=".6"/>',
+  reaper: '<circle r="30" fill="none" stroke-width="2"/><circle r="2"/>',
+  cassidy: '<path d="M0-12V-4M0 4V12M-12 0H-4M4 0H12" stroke-width="2"/><circle r="1.6"/>',
+  soldier: '<circle r="9" fill="none" stroke-width="1.6"/><path d="M0-15V-11M0 11V15M-15 0H-11M11 0H15" stroke-width="2"/>',
+  genji: '<circle cx="-10" r="2.2"/><circle r="2.2"/><circle cx="10" r="2.2"/>',
+  widow: '<circle r="2.2"/><circle r="7" fill="none" stroke-width="1" opacity=".6"/>',
+  tracer: '<path d="M-14-9Q-20 0-14 9M14-9Q20 0 14 9" fill="none" stroke-width="2.4"/><circle r="1.8"/>',
+  mercy: '<circle r="12" fill="none" stroke-width="1.8"/><circle r="2"/>',
+  ana: '<circle r="10" fill="none" stroke-width="1.6"/><circle r="2.2"/><path d="M0-16V-12M0 12V16" stroke-width="1.6"/>',
+  lucio: '<rect x="-11" y="-11" width="22" height="22" rx="7" fill="none" stroke-width="2"/><circle r="2"/>',
+  moira: '<path d="M-22-14A26 26 0 0 0-22 14M22-14A26 26 0 0 1 22 14" fill="none" stroke-width="2.4"/><circle r="2"/>',
+  blade: '<path d="M-20 14L20-14" stroke-width="2.5"/><circle r="2"/>',
+  primal: '<circle r="22" fill="none" stroke-width="3"/>',
+};
+function setCross(id) {
+  const k = has('blade') ? 'blade' : has('primal') ? 'primal' : id; if (game.crossK === k) return; game.crossK = k;
+  $('cross').innerHTML = `<svg viewBox="-50 -50 100 100" width="100" height="100" fill="#fff" stroke="#fff">${CROSS[k] || CROSS.soldier}</svg>`;
+}
 function setMyHero(hid) {
   const hh = heroById(hid);
   if (game.h?.id !== hid) { game.h = hh; game.kit = makeKit(hh, G); for (const k of Object.keys(game.cd)) delete game.cd[k]; renderAbils(); }
@@ -718,8 +744,54 @@ function hud(now) {
   // 조준점
   const c = $('cross'); c.classList.toggle('hidden', !me.alive || scopeZoom() > 2);
   $('scope').classList.toggle('hidden', !(me.alive && scopeZoom() > 2));
-  c.classList.toggle('melee', game.h?.p.type === 'melee' || has('blade'));
+  if (game.h) setCross(game.h.id);
   c.classList.toggle('lock', !!(game.kit?.st.beams?.length || game.kit?.st.beamsS?.length));
+  c.classList.toggle('heal', !!(game.kit?.st.beams?.length && ['mercy', 'moira'].includes(game.h?.id)));
+  // 화면 테두리: 내 상태 (망령화 · 보호막 · 나노 · 강화 · 용검 · 발키리 · 원시 · 무법자 · 조준경 · 튕겨내기 · 기절 · 수면 · 중력 · 시간 역행)
+  const ov = $('ov');
+  for (const k of ['ghost', 'bub', 'nano', 'boost', 'blade', 'valk', 'primal', 'deadeye', 'visor', 'deflect', 'stun', 'sleep', 'grav', 'anti', 'amp', 'coal', 'blossom', 'hogult', 'breath', 'barrage']) ov.classList.toggle(k, me.alive && has(k));
+  ov.classList.toggle('recall', game.kit?.st.mode === 'recall'); ov.classList.toggle('dash', ['charge', 'boost', 'dash', 'roll', 'ga', 'grap', 'leap'].includes(game.kit?.st.mode)); ov.classList.toggle('tp', game.kit?.st.mode === 'tp' || game.kit?.st.aim === 'tp');
+  drawAims(now);
+}
+
+// ---------- 기술 조준 도움: 그림자 밟기 착지 자리 · 아군 대상 · 갈고리 · 황야의 무법자 해골 · 전술 조준경 ----------
+const tpMark = new THREE.Group();
+{
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.75, 1.0, 40), new THREE.MeshBasicMaterial({ color: '#b07cff', transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthTest: false })); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05; ring.renderOrder = 6; tpMark.add(ring);
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(0.75, 32), new THREE.MeshBasicMaterial({ color: '#2a1440', transparent: true, opacity: 0.45, depthTest: false })); disc.rotation.x = -Math.PI / 2; disc.position.y = 0.04; disc.renderOrder = 5; tpMark.add(disc);
+  const col = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 2, 20, 1, true), new THREE.MeshBasicMaterial({ color: '#7a4cc0', transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false })); col.position.y = 1; tpMark.add(col);
+  tpMark.userData = { ring, col }; tpMark.visible = false; scene.add(tpMark);
+}
+// 방어 매트릭스: 앞으로 뻗는 분홍 그물 부채꼴 (면 + 격자 선)
+const matrixFan = new THREE.Group();
+{
+  const geo = new THREE.CylinderGeometry(2.2, 0.35, 10, 16, 4, true); geo.rotateX(Math.PI / 2); geo.translate(0, -0.25, -6);
+  matrixFan.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: '#ff5fd0', transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false })));
+  matrixFan.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: '#ff9fe8', transparent: true, opacity: 0.28, wireframe: true, depthWrite: false })));
+  matrixFan.visible = false; scene.add(matrixFan);
+}
+const auraRing = new THREE.Mesh(new THREE.RingGeometry(11.6, 12, 64), new THREE.MeshBasicMaterial({ color: '#a6ff5e', transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false })); auraRing.rotation.x = -Math.PI / 2; auraRing.visible = false; scene.add(auraRing);
+const scr = (v) => { const p = v.clone().project(camera); return p.z < 1 ? [(p.x + 1) / 2 * innerWidth, (1 - p.y) / 2 * innerHeight] : null; };
+function drawAims(now) {
+  const list = me.alive && game.kit ? game.kit.aims() : [];
+  const tp = list.find((a) => a.k === 'tp');
+  tpMark.visible = !!tp;
+  if (tp) { tpMark.position.copy(tp.p); const c = tp.ok ? '#b07cff' : '#ff5a6e'; tpMark.userData.ring.material.color.set(c); tpMark.userData.col.material.color.set(tp.ok ? '#7a4cc0' : '#c03a4a'); tpMark.userData.ring.scale.setScalar(1 + Math.sin(now / 120) * 0.06); }
+  $('aimhint').classList.toggle('hidden', !tp); if (tp) $('aimhint').textContent = tp.ok ? '🌑 클릭 · E: 그림자 밟기   우클릭: 취소' : '🌑 여기는 갈 수 없어요';
+  // 화면 위 표시 (아군 대상 · 해골 · 조준경 고정)
+  const html = [];
+  for (const a of list) {
+    if (a.k === 'ally') { const q = scr(a.o.chest().setY(a.o.pos.y + 2.4 * a.o.size)); if (q) html.push(`<div class="mk ally" style="left:${q[0]}px;top:${q[1]}px;--c:${a.col}"><i></i><span>${esc(a.label)} ${esc(a.o.name)}</span></div>`); }
+    if (a.k === 'dead') { const q = scr(a.o.chest().setY(a.o.pos.y + 1.7 * a.o.size)); if (q) html.push(`<div class="mk skull${a.kill ? ' kill' : ''}" style="left:${q[0]}px;top:${q[1]}px;--k:${Math.min(1, a.v / Math.max(1, a.o.hp + a.o.temp))}">💀</div>`); }
+  }
+  if (game.visor && me.alive) { let best = null, bd = 0.55; const e = eye(), f = fwd(); for (const o of game.others.values()) { if (!enemy(o) || !o.alive || !o.seen) continue; const dd = o.chest().sub(e).normalize().dot(f); if (dd > bd) { bd = dd; best = o; } } if (best) { const q = scr(best.chest()); if (q) html.push(`<div class="mk lockon" style="left:${q[0]}px;top:${q[1]}px"></div>`); } }
+  $('marks').innerHTML = html.join('');
+  const g = list.find((a) => a.k === 'grap'); $('grap').classList.toggle('hidden', !g); if (g) $('grap').classList.toggle('ok', g.ok);
+  // 디바 방어 매트릭스: 앞에 분홍 부채꼴 · 젤리우: 곡이 닿는 범위
+  matrixFan.visible = me.alive && game.h?.id === 'dva' && has('matrix');
+  if (matrixFan.visible) { matrixFan.position.copy(camera.position); matrixFan.quaternion.copy(camera.quaternion); matrixFan.children[0].material.opacity = 0.18 + Math.sin(now / 60) * 0.05; }
+  auraRing.visible = me.alive && game.h?.id === 'lucio';
+  if (auraRing.visible) { auraRing.position.set(me.pos.x, me.pos.y + 0.06, me.pos.z); auraRing.material.color.set(has('songheal') ? '#a6ff5e' : '#ffd84d'); auraRing.material.opacity = has('amp') ? 0.7 : 0.3; }
 }
 function renderBoard() {
   const rows = (team) => [...game.stats.entries()].filter(([, s]) => s.team === team).map(([id, s]) => { const x = s.hero ? heroById(s.hero) : null; return `<tr class="${id === game.myId ? 'me' : ''}"><td>${x?.emoji || '❔'} ${s.bot ? '🤖 ' : ''}${esc(s.name)}</td><td>${s.k}</td><td>${s.fb}</td><td>${s.d}</td><td>${s.dmg}</td><td>${s.heal}</td><td>${s.obj}s</td></tr>`; }).join('');
@@ -805,22 +877,33 @@ function toTitle() {
 // ---------- 줄기 그리기 ----------
 const beamPool = []; let beamUsed = 0;
 function beam(a, b, col, w = 0.06, wob = 0) { let g = beamPool[beamUsed]; if (!g) { g = beamMesh(col, w); beamPool.push(g); scene.add(g); } beamUsed++; g.visible = true; g.children[0].material.color.set(col); g.userData.w = w; setBeam(g, a, b, wob); }
+// 번개 (젤리스턴 테슬라): 꺾인 줄 몇 가닥
+function bolt(a, b, col = '#bfefff') {
+  for (let k = 0; k < 2; k++) {
+    let prev = a.clone(); const n = 7;
+    for (let i = 1; i <= n; i++) { const p = a.clone().lerp(b, i / n); if (i < n) p.add(new THREE.Vector3((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5)); line(scene, prev, p, col, 0.05, 0.02); prev = p; }
+  }
+}
 function drawBeams(t) {
   beamUsed = 0;
   const kit = game.kit;
   if (kit && me.alive && game.mode === 'play') {
     // 내 줄기: 총구 조금 앞에서 · 가늘게 (화면 앞을 가리지 않게)
     const mz = muzzle(0).addScaledVector(fwd(), 0.5), col = game.h.id === 'mercy' ? '#ffe48a' : BEAM_COL[game.h.id] || '#ffffff';
-    for (const o of kit.st.beams || []) beam(mz, o.chest(), col, game.h.id === 'winston' ? 0.025 : 0.035, game.h.id === 'winston' ? 0.8 : 0.2);
+    for (const o of kit.st.beams || []) { if (game.h.id === 'winston') bolt(mz, o.chest()); else beam(mz, o.chest(), col, 0.035, 0.2); }
     for (const o of kit.st.beamsS || []) beam(mz, o.chest(), game.h.id === 'mercy' ? '#ffb347' : '#c07bff', 0.035, 0.2);
     if (mouseL && kit.st.beamFree && game.h.id === 'zarya') beam(mz, eye().addScaledVector(fwd(), Math.min(15, rayBoxes(game.map, eye(), fwd(), 15))), '#ff8fd0', 0.035, 0.3);
-    if (mouseL && game.h.id === 'winston' && !kit.st.beams?.length && !has('primal')) for (let i = 0; i < 2; i++) { const d = fwd().add(new THREE.Vector3((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.5)); beam(mz, eye().addScaledVector(d, 6), '#9fe8ff', 0.025, 1); }
+    if (mouseL && game.h.id === 'winston' && !kit.st.beams?.length && !has('primal')) for (let i = 0; i < 2; i++) { const d = fwd().add(new THREE.Vector3((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.5)); bolt(mz, eye().addScaledVector(d, 7)); }
     if (mouseL && game.h.id === 'moira' && kit.st.spray && Math.random() < 0.6) puff(scene, eye().addScaledVector(fwd(), 2 + Math.random() * 6).add(new THREE.Vector3((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 2)), '#ffe48a', 1, 0.6, 0.5, 0.4);
     kit.st.spray = false;
     if (has('coal')) { const e = eye(), end = e.clone().addScaledVector(fwd(), 30); beam(mz, end, '#c07bff', 0.07, 0.15); beam(muzzle(1).addScaledVector(fwd(), 0.5), end, '#ffe48a', 0.05, 0.15); }
     if (game.hookLine) beam(mz, game.hookLine, '#8a8a99', 0.03);
     if (game.grapLine && kit.st.mode === 'grap') beam(mz, game.grapLine, '#9466e0', 0.02);
     if (game.jets) puff(scene, me.pos.clone().setY(me.pos.y + 0.2), '#9fd8ff', 1, 0.4, 0.5, 0.3);
+    // 내 궁극기 입자: 죽음의 꽃(빙글) · 돼지우리(앞으로 고철) · 발키리(금빛 날개)
+    if (has('blossom') && Math.random() < 0.8) for (let i = 0; i < 3; i++) { const a = t * 9 + i * 2.1; puff(scene, me.pos.clone().add(new THREE.Vector3(Math.cos(a) * 3.5, 1.2, Math.sin(a) * 3.5)), '#ff4a6a', 1, 0.6, 1, 0.3); }
+    if (has('hogult')) { const f = fwd(); for (let i = 0; i < 2; i++) puff(scene, eye().addScaledVector(f, 2 + Math.random() * 10).add(new THREE.Vector3((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 4)), '#d9a066', 1, 0.5, 2, 0.3); }
+    if (has('valk') && Math.random() < 0.5) puff(scene, eye().add(new THREE.Vector3(Math.cos(me.yaw) * (Math.random() < 0.5 ? -1 : 1) * 1.2, -0.3, -Math.sin(me.yaw) * 0.5)), '#ffe48a', 1, 0.35, 1, 0.5);
   }
   for (const o of game.others.values()) {
     if (!o.alive || !o.bear?.root.visible) continue;
@@ -828,7 +911,8 @@ function drawBeams(t) {
     if (o.beamTo) {
       const t2 = o.beamTo === game.myId ? me.pos.clone().setY(me.pos.y + 1.1) : game.others.get(o.beamTo)?.chest();
       const tTeam = o.beamTo === game.myId ? game.team : game.others.get(o.beamTo)?.team;
-      if (t2) beam(o.hand(), t2, hh.id === 'mercy' ? '#ffe48a' : hh.id === 'moira' ? (tTeam === o.team ? '#ffe48a' : '#c07bff') : BEAM_COL[hh.id] || '#ffffff', 0.06, hh.id === 'winston' ? 0.8 : 0.2);
+      if (t2 && hh.id === 'winston') bolt(o.hand(), t2);
+      else if (t2) beam(o.hand(), t2, hh.id === 'mercy' ? '#ffe48a' : hh.id === 'moira' ? (tTeam === o.team ? '#ffe48a' : '#c07bff') : BEAM_COL[hh.id] || '#ffffff', 0.06, 0.2);
     }
     if (o.flags & F.coal) { const d = new THREE.Vector3(-Math.sin(o.yaw) * Math.cos(o.pitch), Math.sin(o.pitch), -Math.cos(o.yaw) * Math.cos(o.pitch)); beam(o.hand(), o.hand().addScaledVector(d, 30), '#c07bff', 0.16, 0.15); }
   }

@@ -20,7 +20,7 @@ export function makeKit(h, G) {
   K.spawned = () => { st.mag = spec().mag || 0; st.reloadEnd = 0; st.mode = null; st.fuel = 1; st.blinks = 3; st.hist = []; st.acc.clear(); };
   K.vmKind = () => G.has('blade') ? 'sword' : G.has('primal') ? 'paws' : h.id === 'dva' && G.has('pilot') ? 'pilot' : VM_KIND[h.id];
   // 지금 쏠 수 없는 상태 (기절 · 망령화 · 방벽 들고 · 돌진 …)
-  const busy = () => G.has('stun') || G.has('sleep') || G.has('ghost') || G.has('blossom') || G.has('hogult') || G.has('coal') || st.mode === 'charge' || st.mode === 'tp' || st.mode === 'recall' || st.mode === 'grap' || st.mode === 'ga' || (h.id === 'rein' && G.mouseR) || (h.id === 'dva' && G.mouseR && !G.has('pilot')) || G.has('deflect');
+  const busy = () => !!st.aim || G.has('stun') || G.has('sleep') || G.has('ghost') || G.has('blossom') || G.has('hogult') || G.has('coal') || st.mode === 'charge' || st.mode === 'tp' || st.mode === 'recall' || st.mode === 'grap' || st.mode === 'ga' || (h.id === 'rein' && G.mouseR) || (h.id === 'dva' && G.mouseR && !G.has('pilot')) || G.has('deflect');
 
   // ---------- 기본 공격 ----------
   function fireHit(sp, a, now, opt = {}) {
@@ -44,8 +44,24 @@ export function makeKit(h, G) {
     G.send({ t: 'beam', k, to: list.map((o) => o.id) });
     if (snd) G.sfx('beam', snd, 0.6);
   }
+  // 그림자 밟기 착지 자리: 조준한 곳 (벽이면 벽 앞 · 땅이면 그 자리) · 35m 안
+  K.tpTarget = () => {
+    const e = G.eye(), f = G.fwd();
+    let t = Math.min(35, rayBoxes(G.map, e, f, 35));
+    if (f.y < -0.01) t = Math.min(t, (e.y - 0.05) / -f.y);
+    if (t >= 35) return { p: e.clone().addScaledVector(f, 35), ok: false };
+    const p = e.clone().addScaledVector(f, Math.max(0, t - 0.6));
+    const y = floorAt(G.map, p.x, p.z, p.y + 0.8);
+    return { p: new THREE.Vector3(p.x, y, p.z), ok: Math.abs(y - p.y) < 3 };
+  };
+  K.confirmTp = (now) => {
+    const T = K.tpTarget(); if (!T.ok) { G.toast('🌑 갈 수 없는 곳이에요'); G.sfx('cd'); return; }
+    st.aim = null; if (!useCd('e', h.e.cd)) return;
+    abil('e', { p: [T.p.x, T.p.y, T.p.z] }); st.mode = 'tp'; st.until = now + 900; st.tpTo = T.p; G.sfx('abil');
+  };
   K.primary = (now, held, edge) => {
     st.beams = [];
+    if (st.aim === 'tp') { if (edge) K.confirmTp(now); return; }
     if (!held) { st.latch = false; st.tgt = null; return; }
     if (busy() || reloading()) return;
     // 궁극기 · 변신 중 기본 공격
@@ -87,6 +103,7 @@ export function makeKit(h, G) {
   // ---------- 우클릭 ----------
   K.secondary = (now, held, edge, released) => {
     const s = h.s; st.beamsS = [];
+    if (st.aim) { if (edge) { st.aim = null; G.sfx('cd'); } return; }
     if (h.id === 'rein' || (h.id === 'dva' && !G.has('pilot'))) {
       if (edge) abil('s', { on: true }); if (released) abil('s', { on: false });
       return;
@@ -155,12 +172,9 @@ export function makeKit(h, G) {
       case 'pharah.e': if (!useCd('e', sp.cd)) return; abil('e'); G.fireProj('conc', { a: 'e' }); G.sfx('throw'); return;
       case 'reaper.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); st.mag = h.p.mag; G.sfx('abil'); return;
       case 'reaper.e': {
-        const e = G.eye(), t = Math.min(35, rayBoxes(G.map, e, f, 35));
-        const p = e.clone().addScaledVector(f, Math.max(0, t - 0.7));
-        const y = floorAt(G.map, p.x, p.z, p.y + 0.6);
-        if (t >= 35 && f.y > -0.05) { G.toast('🌑 땅이나 벽을 조준해요'); return; }
-        if (!useCd('e', sp.cd)) return;
-        abil('e', { p: [p.x, y, p.z] }); st.mode = 'tp'; st.until = now + 900; st.tpTo = new THREE.Vector3(p.x, y, p.z); G.sfx('abil'); return;
+        // 오버워치처럼: E → 착지 자리가 보이는 조준 → 클릭 · E 로 확정 / 우클릭 취소
+        if (st.aim !== 'tp') { if (cdLeft('e') > 0) { G.sfx('cd'); return; } st.aim = 'tp'; G.sfx('pick'); return; }
+        return K.confirmTp(now);
       }
       case 'cassidy.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); { const d = G.moveDir(); st.mode = 'roll'; st.until = now + 380; st.dir = d.lengthSq() > 0.01 ? d : flat.clone(); } G.sfx('dash'); return;
       case 'cassidy.e': if (!useCd('e', sp.cd)) return; abil('e'); G.fireProj('flash', { a: 'e' }); G.sfx('throw'); return;
@@ -284,7 +298,22 @@ export function makeKit(h, G) {
       for (const o of G.enemies()) { if (o.onScreen && G.visible(o)) st.acc.set(o.id, (st.acc.get(o.id) || 0) + dt * (140 + 120 * el)); }
     } else st.deadAt = now;
     if (h.id === 'soldier' && G.has('visor')) G.visor = true; else G.visor = false;
+    // 황야의 무법자: 6.5초가 지나면 저절로 쏜다
+    if (h.id === 'cassidy' && G.has('deadeye') && now - st.deadAt > 6500 && st.acc.size) K.deadeyeFire();
+    if (st.aim && (G.has('stun') || G.has('sleep') || !me.alive)) st.aim = null;
     if (h.id === 'moira' && G.has('coal')) { st.beams = []; }
+  };
+  // 화면에 그릴 조준 도움 (main 이 그린다)
+  K.aims = () => {
+    const out = [], now = performance.now(), ready = (sl) => cdLeft(sl) <= 0;
+    if (st.aim === 'tp') out.push({ k: 'tp', ...K.tpTarget() });
+    // 아군 대상 기술: 젤리시 수호천사 · 자리젤리 방벽 씌우기 · 젤리아나 나노
+    const allyAim = h.id === 'mercy' && ready('shift') ? { range: 30, arc: 0.9, label: '🪽 Shift' } : h.id === 'zarya' && ready('e') ? { range: 30, arc: 0.95, label: '🛡️ E' } : null;
+    if (allyAim) { const t = G.findTarget({ range: allyAim.range, arc: allyAim.arc, lock: 'ally' }); if (t) out.push({ k: 'ally', o: t, label: allyAim.label, col: h.id === 'mercy' ? '#ffe48a' : '#ff8fd0' }); }
+    if (h.id === 'ana' && (G.ps?.[4] ?? 0) >= 100) { const t = G.findTarget({ range: 45, arc: 0.93, lock: 'ally' }); if (t) out.push({ k: 'ally', o: t, label: '💉 Q', col: '#7cf0ff' }); }
+    if (h.id === 'widow' && ready('shift')) { const e = G.eye(), tt = rayBoxes(G.map, e, G.fwd(), 26); out.push({ k: 'grap', ok: tt < 26 }); }
+    if (h.id === 'cassidy' && G.has('deadeye')) for (const [id, v] of st.acc) { const o = G.others.get(id); if (o?.alive) out.push({ k: 'dead', o, v, kill: v >= o.hp + o.temp }); }
+    void now; return out;
   };
   K.barrage = (now) => {
     if (now < (st.barT || 0)) return; st.barT = now + 95; st.barSide = -(st.barSide || 1);
