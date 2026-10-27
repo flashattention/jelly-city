@@ -443,11 +443,14 @@ function results(m) {
   game.mode = 'over'; document.exitPointerLock?.();
   for (const id of ['hud', 'death', 'lockmsg', 'scoreboard', 'scope']) $(id).classList.add('hidden');
   const mine = m.rank.find((e) => e.id === game.myId);
-  const won = m.team ? m.team.winner === game.team : mine?.rank === 1;
-  $('ov-title').textContent = m.team ? (m.team.winner === 'draw' ? '🤝 무승부!' : `🏆 ${TEAMS[m.team.winner].name} 승리!`) : `🏆 ${m.rank[0]?.name} 우승!`;
-  $('ov-me').textContent = mine ? `${won ? '이겼어요! 🎉' : '아쉽게 졌어요'} · ${mine.k}킬 ${mine.d}데스${m.team ? ` · ${TEAMS.red.name} ${m.team.red} : ${m.team.blue} ${TEAMS.blue.name}` : ''}` : '';
+  // 팀전 동점 = 무승부 · 개인전에서 1등 킬 수가 같으면 공동 1등
+  const top = m.rank[0]?.k ?? 0, tops = m.rank.filter((e) => e.k === top);
+  const draw = m.team ? m.team.winner === 'draw' : tops.length > 1 && mine?.k === top;
+  const won = !draw && (m.team ? m.team.winner === game.team : mine?.k === top);
+  $('ov-title').textContent = m.team ? (m.team.winner === 'draw' ? '🤝 무승부!' : `🏆 ${TEAMS[m.team.winner].name} 승리!`) : tops.length > 1 ? `🤝 공동 1등! (${tops.map((e) => e.name).join(' · ')})` : `🏆 ${m.rank[0]?.name} 우승!`;
+  $('ov-me').textContent = mine ? `${draw ? (m.team ? '🤝 비겼어요!' : '🤝 공동 1등이에요!') : won ? '이겼어요! 🎉' : '아쉽게 졌어요'} · ${mine.k}킬 ${mine.d}데스${m.team ? ` · ${TEAMS.red.name} ${m.team.red} : ${m.team.blue} ${TEAMS.blue.name}` : ''}` : '';
   $('ov-rank').innerHTML = m.rank.map((e) => `<div class="brow${e.id === game.myId ? ' me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="dot" style="background:${e.team ? TEAMS[e.team].color : esc(e.color)}"></span>${e.bot ? '🤖 ' : ''}${esc(e.name)}</span><span class="sc">${e.k}<small>킬 · ${e.d}데스</small></span></div>`).join('');
-  sfx(won ? 'win' : 'lose');
+  sfx(won || draw ? 'win' : 'lose');
   shell.show('over');
 }
 $('again-btn').onclick = () => { game.mode = 'room'; shell.backToRoom(); };

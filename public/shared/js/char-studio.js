@@ -1,7 +1,7 @@
 // 캐릭터 만들기 · 꾸미기 (메인 화면 · 젤리시티가 같이 쓴다): 3D 미리보기 + 탭(기본 · 색 · 얼굴 · 악세서리)
 import * as THREE from 'three';
 import { Roach, GUMMY_COLORS } from './roach.js';
-import { LOOK_PARTS, LOOK_COLORS, SKIN_COLORS, DEFAULT_LOOK, BASIC_ACC } from './look.js';
+import { LOOK_PARTS, LOOK_COLORS, SKIN_COLORS, DEFAULT_LOOK, BASIC_ACC, COSTUME } from './look.js';
 import { PERSONALITIES } from '../../jelly-city/js/data.js';
 import { ITEMS } from '../../jelly-city/js/items.js';
 
@@ -61,6 +61,7 @@ export class Creator {
     const d = this.draft, pick = (a) => a[Math.floor(Math.random() * a.length)];
     d.color = pick(bodyColors());
     for (const [k, p] of Object.entries(LOOK_PARTS)) d.look[k] = Math.floor(Math.random() * p.options.length);
+    for (const [k, C] of Object.entries(COSTUME)) d.look[k] = Math.random() < 0.45 ? 1 + Math.floor(Math.random() * (C.items.length - 1)) : 0; // 옷 · 모자도 가끔
     for (const [k, p] of Object.entries(LOOK_COLORS)) d.look[k] = pick(p.options);
     if (!this.edit) for (const [slot, list] of Object.entries(BASIC_ACC)) d.starter[slot] = Math.random() < 0.7 ? pick(list)[0] : null;
     this.renderTabs(); this.updatePreview();
@@ -68,7 +69,7 @@ export class Creator {
   // 서버에 보낼 값
   profile() { const d = this.draft; return { name: (d.name || '').trim(), gender: d.gender, age: d.age, personality: d.personality, color: d.color, look: d.look }; }
   renderTabs() {
-    const all = Roach.style === 'roach' ? { basic: '📝 기본', body: '🎨 몸·날개', face: '😊 얼굴', antenna: '📡 더듬이', acc: '🎀 악세서리' } : { basic: '📝 기본', body: '🎨 젤리 색·날개', face: '😊 얼굴', acc: '🎀 악세서리' };
+    const all = Roach.style === 'roach' ? { basic: '📝 기본', body: '🎨 몸·날개', face: '😊 얼굴', antenna: '📡 더듬이', wear: '👒 옷·모자', acc: '🎀 악세서리' } : { basic: '📝 기본', body: '🎨 젤리 색·날개', face: '😊 얼굴', wear: '👒 옷·모자', acc: '🎀 악세서리' };
     const tabs = this.edit ? Object.fromEntries(Object.entries(all).filter(([k]) => k !== 'basic' && k !== 'acc')) : all;
     const { tabs: tabsEl, body } = this.els;
     tabsEl.innerHTML = Object.entries(tabs).map(([k, v]) => `<button class="${k === this.tab ? 'active' : ''}" data-tab="${k}">${v}</button>`).join('');
@@ -87,6 +88,9 @@ export class Creator {
         + colors('belly', LOOK_COLORS.belly) + chips('wings', LOOK_PARTS.wings) + chips('tail', LOOK_PARTS.tail);
     } else if (this.tab === 'face') {
       html = chips('eyes', LOOK_PARTS.eyes) + colors('pupil', LOOK_COLORS.pupil) + (Roach.style === 'roach' ? '' : chips('ears', LOOK_PARTS.ears)) + chips('nose', LOOK_PARTS.nose) + chips('mouth', LOOK_PARTS.mouth) + colors('cheek', LOOK_COLORS.cheek);
+    } else if (this.tab === 'wear') {
+      html = Object.entries(COSTUME).map(([k, C]) => `<div class="opt-row"><div class="opt-label">${C.label}</div><div class="chips">${C.items.map(([name], i) => `<button class="chip ${(d.look[k] | 0) === i ? 'sel' : ''}" data-look="${k}" data-v="${i}">${esc(name)}</button>`).join('')}</div></div>`).join('')
+        + '<p class="hint">모든 게임에서 보여요 · 젤리시티에서 같은 자리 장비를 끼면 장비가 먼저 보여요</p>';
     } else if (this.tab === 'antenna') {
       html = chips('antenna', LOOK_PARTS.antenna);
     } else {

@@ -20,7 +20,21 @@ export const LOOK_COLORS = {
 
 export const SKIN_COLORS = ['#8a5634', '#6d4c41', '#a1887f', '#3e2723', '#c0794a', '#ff9fb2', '#7ec8a9', '#9fa8ff', '#ffd54f', '#90caf9', '#b39ddb', '#ef9a9a', '#80cbc4', '#bcaaa4', '#455a64', '#f5f5f5'];
 
-export const DEFAULT_LOOK = { eyes: 0, pupil: '#1d1410', nose: 0, mouth: 0, antenna: 0, wings: 0, ears: 0, tail: 0, belly: 'auto', cheek: '#ff9fb2' };
+export const DEFAULT_LOOK = { eyes: 0, pupil: '#1d1410', nose: 0, mouth: 0, antenna: 0, wings: 0, ears: 0, tail: 0, belly: 'auto', cheek: '#ff9fb2', hat: 0, face: 0, outfit: 0, extra: 0 };
+
+// 옷 · 모자 꾸미기 (모든 게임에서 보인다 · 젤리시티에서 같은 자리 장비를 끼면 장비가 먼저)
+//   [이름, 곰돌이 모양 이름(:색)] · 뒤에만 덧붙인다 (저장된 번호가 바뀌지 않게)
+export const COSTUME = {
+  hat: { label: '👒 모자', items: [['없음', ''], ['초록 캡', 'cap:#66bb6a'], ['빨간 캡', 'cap:#e53935'], ['파란 캡', 'cap:#42a5f5'], ['노랑 비니', 'beanie:#ffd54f'], ['분홍 비니', 'beanie:#f48fb1'], ['베레모', 'beret:#c62828'], ['카우보이', 'cowboy'], ['해적 모자', 'pirate'], ['마법사 모자', 'wizard'], ['왕관', 'crown'], ['꽃왕관', 'flowercrown'], ['고깔모자', 'partyhat'], ['실크햇', 'top'], ['졸업모', 'grad'], ['셰프 모자', 'chef'], ['토끼 귀', 'bunny'], ['고양이 귀', 'catears'], ['핑크 리본', 'bow:#ff7aa2'], ['하늘 리본', 'bow:#7cd8ff'], ['새싹', 'sprout'], ['천사 링', 'halo'], ['헤드폰', 'headphones'], ['민트 머리띠', 'headband:#7ec8a9'], ['데이지 꽃핀', 'flowerpin'], ['별 머리핀', 'starpin']] },
+  face: { label: '👓 얼굴', items: [['없음', ''], ['뿔테 안경', 'glasses'], ['선글라스', 'sunglasses'], ['미니 선글라스', 'minishades'], ['하트 안경', 'heartglasses'], ['별 안경', 'starglasses'], ['금테 선글라스', 'goldshades'], ['고글', 'goggles'], ['외알 안경', 'monocle'], ['VR 고글', 'vr'], ['안대', 'eyepatch'], ['마스크', 'mask'], ['콧수염', 'stache'], ['주근깨', 'freckles'], ['매력점', 'mole'], ['반창고', 'bandaid'], ['하트 스티커', 'heartcheek'], ['빨간 코', 'clownnose']] },
+  outfit: { label: '👕 옷', items: [['없음', ''], ['흰 티셔츠', 'tee:#fafafa'], ['분홍 티셔츠', 'tee:#f8bbd0'], ['검정 티셔츠', 'tee:#37474f'], ['파랑 줄무늬', 'stripes:#4a90e2'], ['빨강 줄무늬', 'stripes:#e53935'], ['멜빵바지', 'overalls:#5c7cfa'], ['분홍 후드티', 'hoodie:#f8bbd0'], ['회색 후드티', 'hoodie:#9e9e9e'], ['노랑 우비', 'raincoat'], ['축구 유니폼', 'jersey:#43a047'], ['파랑 유니폼', 'jersey:#1e88e5'], ['노랑 앞치마', 'apron:#ffd54f'], ['트렌치코트', 'coat:#a1887f'], ['가죽 재킷', 'leather'], ['턱시도', 'tuxedo'], ['분홍 드레스', 'dress:#f48fb1'], ['하늘 드레스', 'dress:#90caf9'], ['공주 드레스', 'princess'], ['한복', 'hanbok'], ['아이돌 의상', 'idol'], ['황금 정장', 'goldsuit'], ['도복', 'dobok'], ['마법사 로브', 'robe']] },
+  extra: { label: '🎀 소품', items: [['없음', ''], ['빨간 망토', 'cape:#e53935'], ['보라 망토', 'cape:#7e57c2'], ['파란 넥타이', 'tie:#1e88e5'], ['나비넥타이', 'bowtie'], ['민트 스카프', 'scarf:#7ec8a9'], ['빨간 목도리', 'scarf:#e53935'], ['책가방', 'backpack:#ef5350'], ['크로스백', 'bag'], ['하트 목걸이', 'locket'], ['진주 목걸이', 'pearls'], ['방울 목걸이', 'bell'], ['목걸이 카메라', 'camera'], ['손목시계', 'watch'], ['구슬 팔찌', 'bracelet'], ['풍선', 'balloon'], ['천사 날개', 'wings']] },
+};
+// 모양 이름 → 자리 (같은 자리 장비가 있으면 꾸미기는 숨긴다)
+const SLOT_KINDS = { hat: ['chef', 'police', 'fire', 'hard', 'nurse', 'helm_leather', 'helm_iron', 'helm_general', 'kevlar_helmet', 'storm_helmet'], face: [], outfit: ['vest', 'robe', 'jedi_robe', 'mando_armor', 'armor_leather', 'armor_iron', 'armor_legend', 'vest_kevlar'], extra: [] };
+for (const [k, C] of Object.entries(COSTUME)) for (const [, spec] of C.items) if (spec) SLOT_KINDS[k].push(spec.split(':')[0]);
+export function slotOfSpec(spec) { const kind = String(spec).split(':')[0]; for (const [k, list] of Object.entries(SLOT_KINDS)) if (list.includes(kind)) return k; return null; }
+export const costumeOf = (look = {}) => Object.entries(COSTUME).map(([k, C]) => C.items[look?.[k] | 0]?.[1]).filter(Boolean);
 
 export function sanitizeLook(l = {}) {
   const out = { ...DEFAULT_LOOK };
@@ -30,6 +44,7 @@ export function sanitizeLook(l = {}) {
     if (Number.isInteger(v) && v >= 0 && v < part.options.length) out[k] = v;
   }
   for (const [k, part] of Object.entries(LOOK_COLORS)) if (part.options.includes(l[k])) out[k] = l[k];
+  for (const [k, C] of Object.entries(COSTUME)) { const v = Number(l[k]); if (Number.isInteger(v) && v >= 0 && v < C.items.length) out[k] = v; }
   return out;
 }
 

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { toon, geo, G } from './utils.js';
-import { DEFAULT_LOOK } from './look.js';
+import { DEFAULT_LOOK, costumeOf, slotOfSpec } from './look.js';
 
 const rsph = () => geo('rsph', () => new THREE.SphereGeometry(1, 14, 10));
 const limbGeo = () => geo('limb', () => new THREE.CapsuleGeometry(0.065, 0.32, 4, 8));
@@ -224,6 +224,7 @@ export class Roach {
 
     this.accGroup = new THREE.Group();
     this.torso.add(this.accGroup);
+    this.costume = costumeOf(look); // 옷 · 모자 꾸미기
     this.setAccessories(o.accessories || []);
 
     // 나이에 따른 크기
@@ -491,6 +492,9 @@ export class Roach {
 
   setAccessories(list) {
     this.accList = list;
+    // 꾸미기(옷 · 모자)는 같은 자리 장비가 없을 때만 함께 입는다
+    const taken = new Set(list.map(slotOfSpec).filter(Boolean));
+    list = [...list, ...(this.costume || []).filter((c) => !taken.has(slotOfSpec(c)))];
     this.accGroup.clear();
     this.detailsDirty = true;
     this.hasCane = false;

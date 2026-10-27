@@ -170,7 +170,8 @@ export class Track {
     this.stars.push({ s, x, y, mesh: m, got: false });
   }
   starLine(s0, s1, x, y, n) { for (let i = 0; i < n; i++) this.star(s0 + (s1 - s0) * (i + 0.5) / n, x, y + 1); }
-  starArc(s0, s1, x, y0, y1) { const n = Math.max(2, Math.round((s1 - s0) / 2.5)); for (let i = 0; i <= n; i++) { const k = i / n; this.star(s0 + (s1 - s0) * k, x, y0 + (y1 - y0) * k + Math.sin(k * Math.PI) * 2 + 1); } }
+  // 점프 별: 출발 발판(x0) → 도착 발판(x1) 으로 가로 위치도 이어진다 (앞의 별 줄과 끊기지 않게)
+  starArc(s0, s1, x0, y0, y1, x1 = x0) { const n = Math.max(2, Math.round((s1 - s0) / 2.5)); for (let i = 0; i <= n; i++) { const k = i / n; this.star(s0 + (s1 - s0) * k, x0 + (x1 - x0) * k, y0 + (y1 - y0) * k + Math.sin(k * Math.PI) * 2 + 1); } }
   portal(s, x, y, w) {
     const th = this.themeOf(this.dream);
     const g = new THREE.Group();
@@ -233,8 +234,8 @@ export class Track {
     let at = s;
     const flat = (len, w = W(), gap = 0) => { at += gap; const p = this.plat(at, at + len, this.cx, w, this.cy); at += len; return p; };
     switch (pick) {
-      case 'flat': { const p = flat(r.range(18, 34) * (1 + v / 40)); if (r.chance(0.6)) this.starLine(p.s0 + 4, p.s1 - 4, this.cx + r.range(-1.5, 1.5), this.cy, r.int(3, 6)); break; }
-      case 'gap': { const g = gapS(); const a0 = at; drift(); flat(r.range(14, 26), W(), g); this.starArc(a0 - 1, a0 + g + 1, this.cx, this.cy, this.cy); break; }
+      case 'flat': { const p = flat(r.range(18, 34) * (1 + v / 40)); if (r.chance(0.6)) { r.range(-1.5, 1.5); /* 예전 무작위 비킴 (씨앗 순서 유지용, 이제는 길 가운데) */ this.starLine(p.s0 + 4, p.s1 - 4, this.cx, this.cy, r.int(3, 6)); } break; }
+      case 'gap': { const g = gapS(); const a0 = at, x0 = this.cx; drift(); flat(r.range(14, 26), W(), g); this.starArc(a0 - 1, a0 + g + 1, x0, this.cy, this.cy, this.cx); break; }
       case 'bridge': { flat(r.range(16, 30), r.range(1.7, 2.6), r.chance(0.5) ? gapS() * 0.6 : 0); this.starLine(at - 12, at - 2, this.cx, this.cy, 4); break; }
       case 'stones': {
         at += gapS() * 0.6;
