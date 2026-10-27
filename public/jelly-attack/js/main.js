@@ -124,7 +124,7 @@ const shell = new Shell({
   multiLabel: '👥 같이 하기', roomIcon: '🔫', startLabel: '🔫 작전 시작!',
   keysHelp: 'WASD 이동 · 마우스 조준 · 클릭 사격 · 우클릭 조준경 · R 장전 · 1~4 무기 · G 수류탄 · Space 점프 · Shift 달리기 · C/Ctrl 앉기 · Tab 점수 · B 무기 고르기',
   buttons: [{ id: 'practice-btn', label: '🎯 연습전 <small>봇과 바로 대결</small>', onClick: () => practice() }],
-  extraRow: [{ label: '🎒 무기 고르기', onClick: () => openLoadout() }, { label: '🖱️ 마우스 감도', onClick: () => openSens('attack') }, { label: '🪂 젤리배그 (배틀로얄)', onClick: () => { location.href = '/jelly-attack/bg/'; } }],
+  extraRow: [{ label: '🎒 무기 고르기', onClick: () => openLoadout() }, { label: '🖱️ 마우스 감도', onClick: () => openSens('attack') }],
   screens: ['over', 'loadout'],
   describe,
   teamChat: (o) => o.mode !== 'ffa', // 팀 데스매치면 팀 채팅

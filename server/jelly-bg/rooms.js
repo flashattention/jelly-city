@@ -1,10 +1,10 @@
 // 젤리배그 방: 최대 30명(사람 + 젤리봇으로 채우기) · 젤리 비행선에서 뛰어내려 · 줍고 · 싸우고 · 줄어드는 젤리 자기장 · 마지막 한 명
 //   아이템 · 가방 · 피해(방어구) · 회복 · 자기장 피해 · 순위는 서버가 정한다. 움직임은 각자 화면이 보내고, 맞힘은 서버가 벽 · 거리 · 연사로 확인
 import { BaseRooms } from '../shared/rooms.js';
-import { makeBgMap, BG_SIZE } from '../../public/jelly-attack/js/bgmap.js';
+import { makeBgMap, BG_SIZE } from '../../public/jelly-bg/js/bgmap.js';
 import { clearLine } from '../../public/jelly-attack/js/maps.js';
 import { weapon, NADE, nadeDmg, KNIFE, falloff } from '../../public/jelly-attack/js/weapons.js';
-import { ARMOR_CUT, HEALS, DROP, makeLoot, makeZones, zoneAt, makePlane, planeAt, emptyInv, rollItem, AMMO, AMMO_OF, ATTS, fits, CAP, BOOSTS, ammoTotal, makeVehicles, VEHICLES } from '../../public/jelly-attack/js/bgrules.js';
+import { ARMOR_CUT, HEALS, DROP, makeLoot, makeZones, zoneAt, makePlane, planeAt, emptyInv, rollItem, AMMO, AMMO_OF, ATTS, fits, CAP, BOOSTS, ammoTotal, makeVehicles, VEHICLES } from '../../public/jelly-bg/js/bgrules.js';
 import { rng } from '../../public/jelly-apple/js/board.js';
 
 const MAP = makeBgMap();

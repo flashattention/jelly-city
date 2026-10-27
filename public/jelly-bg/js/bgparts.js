@@ -1,6 +1,6 @@
 // 젤리배그 조각들: 차량(모양 · 운전) · 헬멧 · 조끼 · 가방(곰돌이에 입히기) · 바닥 아이템 모양
 import * as THREE from 'three';
-import { boxesIn, floorAt } from './maps.js';
+import { boxesIn, floorAt } from '../../jelly-attack/js/maps.js';
 import { VEHICLES, BOOSTS } from './bgrules.js';
 
 const toon = (c, o = {}) => new THREE.MeshToonMaterial({ color: c, ...o });

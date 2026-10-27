@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>젤리워치</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/css/shell.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="hurt"></div>
+  <div id="flash"></div>
+  <div id="scope" class="hidden"><div class="ring"></div></div>
+  <!-- 싸우는 동안 -->
+  <div id="hud" class="hidden">
+    <div id="cross"><i class="u"></i><i class="d"></i><i class="l"></i><i class="r"></i><b></b></div>
+    <div id="hitmark" class="hidden">✕</div>
+    <div id="teams"><div id="tm-us"></div><div id="obj"></div><div id="tm-them"></div></div>
+    <div id="feed"></div>
+    <div id="elims"></div>
+    <div id="ults"></div>
+    <div id="hp"><div class="hero"><span id="hero-em"></span><b id="hero-nm"></b></div><div class="hpline"><b id="hp-n">0</b><small id="hp-max"></small></div><div id="hp-segs"></div><div id="tags"></div></div>
+    <div id="ult"><span id="ult-ic">⭐</span><b id="ult-n">0%</b></div>
+    <div id="abils"></div>
+    <div id="ammo"><b id="ammo-n"></b><small id="ammo-r"></small></div>
+    <div id="extra" class="hidden"></div>
+    <div class="hud-r"><button id="b-mute" title="소리">🔊</button><button id="b-quit" title="나가기">✕</button></div>
+    <div id="dirs"></div>
+  </div>
+  <div id="banner" class="hidden"></div>
+  <div id="banner2" class="hidden"></div>
+  <div id="death" class="hidden"><div id="death-by"></div><div id="death-t"></div><div class="note">H: 영웅 바꾸기 · 다음 부활부터</div></div>
+  <div id="lockmsg" class="hidden"><div class="card"><div class="logo small">⚡</div><b>화면을 클릭하면 조작을 시작해요</b><div class="note">마우스로 둘러보기 · Esc 로 마우스 풀기</div><div class="row2"><button id="lock-btn" class="btn big">▶ 계속하기</button><button id="swap-btn" class="btn ghost">🔁 영웅 바꾸기 (H)</button><button id="sens-btn" class="btn ghost">🖱️ 감도</button><button id="fs-btn" class="btn ghost">⛶ 전체화면</button><button id="quit-btn" class="btn ghost">나가기</button></div></div></div>
+  <div id="scoreboard" class="hidden"></div>
+  <!-- 영웅 고르기 -->
+  <div id="select" class="screen hidden"><div class="sel-wrap">
+    <div class="sel-top"><div id="sel-head"></div><div id="sel-time"></div><button id="sel-close" class="btn ghost hidden">닫기</button></div>
+    <div class="sel-body">
+      <div id="sel-grid"></div>
+      <div class="sel-side"><div id="sel-kit"></div><div class="ptitle">👥 우리 팀</div><div id="sel-team"></div><button id="sel-ok" class="btn big">✅ 준비 완료</button></div>
+    </div>
+  </div></div>
+  <!-- 영웅 도감 -->
+  <div id="dex" class="screen hidden"><div class="sel-wrap">
+    <div class="sel-top"><div>📖 젤리워치 영웅 도감 · 16명</div><button id="dex-back" class="btn ghost">닫기</button></div>
+    <div class="sel-body"><div id="dex-grid"></div><div class="sel-side"><div id="dex-kit"></div></div></div>
+  </div></div>
+  <!-- 승리 · 패배 -->
+  <div id="cut" class="hidden"><div id="cut-big"></div><div id="cut-sub"></div><div id="cut-mvp" class="hidden"></div></div>
+  <div id="over" class="screen hidden"><div class="card wide">
+    <div id="ov-title"></div><div id="ov-me"></div>
+    <div id="ov-rank" class="board"></div>
+    <div class="row2"><button id="again-btn" class="btn big">🔁 방으로 돌아가기</button><button id="home-btn" class="btn ghost">처음으로</button></div>
+  </div></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

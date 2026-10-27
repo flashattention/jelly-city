@@ -22,10 +22,11 @@ export class Player {
     const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw), rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
     let wx = fx * inp.f + rx * inp.s, wz = fz * inp.f + rz * inp.s;
     const L = Math.hypot(wx, wz); if (L > 1) { wx /= L; wz /= L; }
-    const k = Math.min(1, dt * (this.onGround ? 14 : 3));
-    this.vel.x += (wx * speed - this.vel.x) * k; this.vel.z += (wz * speed - this.vel.z) * k;
-    if (inp.jump && this.onGround) { this.vel.y = 7; this.onGround = false; ev.push('jump'); }
-    this.vel.y -= 21 * dt;
+    // keepVel: 돌진 · 넉백처럼 정해진 속도로 (젤리워치) · airCtl: 공중 조작 배수 · noGrav: 날기
+    const k = Math.min(1, dt * (this.onGround ? 14 : 3 * (inp.airCtl || 1)));
+    if (!inp.keepVel) { this.vel.x += (wx * speed - this.vel.x) * k; this.vel.z += (wz * speed - this.vel.z) * k; }
+    if (inp.jump && this.onGround) { this.vel.y = inp.jumpV || 7; this.onGround = false; ev.push('jump'); }
+    if (!inp.noGrav) this.vel.y -= 21 * dt;
     // 옆으로: x 축 · z 축 따로 움직이고 벽에서 밀어낸다
     this.pos.x += this.vel.x * dt; this.push(map, 'x');
     this.pos.z += this.vel.z * dt; this.push(map, 'z');

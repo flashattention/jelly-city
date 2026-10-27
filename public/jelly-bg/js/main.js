@@ -6,15 +6,15 @@ import { openSens, sensOf } from '../../shared/js/sens.js';
 import { Shell, esc } from '../../shared/js/shell.js';
 import { Roach } from '../../shared/js/roach.js';
 import { confetti } from '../../shared/js/party.js';
-import { rayBoxes, floorAt } from './maps.js';
+import { rayBoxes, floorAt } from '../../jelly-attack/js/maps.js';
 import { makeBgMap, PLACES, BG_SIZE } from './bgmap.js';
 import { HEALS, DROP, zoneAt, planeAt, itemLabel, emptyInv, ARMOR_NAME, AMMO, AMMO_OF, ATTS, SLOTS, CAP, BOOSTS, BAG_NAME, ammoTotal, VEHICLES } from './bgrules.js';
 import { buildVehicle, drive, poseVehicle, dressGear, extraLoot } from './bgparts.js';
-import { weapon, KNIFE, NADE, SMOKE } from './weapons.js';
-import { buildMap } from './world.js';
-import { Player, ViewModel, gunModel } from './fps.js';
-import { sfx, unlock, toggleMute, sound } from './sound.js';
-import { explosion, smoke, updateFx as updateBig, stepNade, NadeArc } from './fx.js';
+import { weapon, KNIFE, NADE, SMOKE } from '../../jelly-attack/js/weapons.js';
+import { buildMap } from '../../jelly-attack/js/world.js';
+import { Player, ViewModel, gunModel } from '../../jelly-attack/js/fps.js';
+import { sfx, unlock, toggleMute, sound } from '../../jelly-attack/js/sound.js';
+import { explosion, smoke, updateFx as updateBig, stepNade, NadeArc } from '../../jelly-attack/js/fx.js';
 
 const $ = (id) => document.getElementById(id);
 const PICK_KEY = 'jellybg.pick';
@@ -702,7 +702,7 @@ const shell = new Shell({
   multiLabel: '👥 같이 하기', roomIcon: '🪂', startLabel: '🪂 비행선 출발!',
   keysHelp: 'F/Space 뛰어내리기 · WASD 이동 · 마우스 조준 · 클릭 사격 · 우클릭 조준(스코프 배율) · E 줍기 · R 장전 · 1~5 무기(5 두 번: 수류탄/연막) · 7 붕대 · 8 구급상자 · 9 음료 · 0 진통제 · G 던지기 · Tab 가방 · F 차 타기/내리기 · Shift 달리기 · C/Ctrl 앉기 · M 지도',
   buttons: [{ id: 'practice-btn', label: '🪂 바로 하기 <small>젤리봇과 배틀로얄</small>', onClick: () => practice() }],
-  extraRow: [{ label: '🖱️ 마우스 감도', onClick: () => openSens('bg') }, { label: '🔫 젤리어택으로', onClick: () => { location.href = '/jelly-attack/'; } }],
+  extraRow: [{ label: '🖱️ 마우스 감도', onClick: () => openSens('bg') }],
   screens: ['over'],
   describe: (o = {}) => `🪂 ${o.fill || 24}명 (젤리봇으로 채우기)`,
   options: { room: (el, o, host) => optsUI(el, o, host, (n) => shell.send({ t: 'opts', opts: n })) },

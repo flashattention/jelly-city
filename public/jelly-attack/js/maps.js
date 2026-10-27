@@ -333,3 +333,6 @@ export function floorAt(map, x, z, y, r = 0.35) {
   }
   return top;
 }
+
+// 다른 게임(젤리워치)도 같은 상자 · 건물 도구로 맵을 짓는다
+export { B, walls, crates, building, stairs };
