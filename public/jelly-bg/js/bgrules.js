@@ -39,9 +39,23 @@ export function fits(a, w) {
 }
 // 가방: 단계마다 담을 수 있는 양 (0 = 가방 없음)
 export const BAG_NAME = ['없음', '1단계 가방', '2단계 가방', '3단계 가방'];
-export const CAP = { ammo: [90, 180, 270, 360], band: [5, 10, 15, 20], med: [1, 2, 3, 4], boost: [2, 4, 6, 8], throw: [2, 3, 4, 5] };
-export const BOOSTS = { drink: { name: '에너지 젤리 음료', emoji: '🥤', sec: 4, add: 40 }, pill: { name: '진통 젤리', emoji: '💊', sec: 6, add: 60 } };
-const KINDS = [['gun', 28], ['pistol', 8], ['ammo', 26], ['att', 16], ['armor', 8], ['helmet', 8], ['bag', 6], ['band', 12], ['med', 3], ['drink', 5], ['pill', 3], ['nade', 6], ['smoke', 5]];
+export const CAP = { ammo: [90, 180, 270, 360], band: [5, 10, 15, 20], med: [1, 2, 3, 4], boost: [2, 4, 6, 8], throw: [2, 3, 4, 5], gas: [1, 1, 2, 2] };
+export const BOOSTS = { drink: { name: '에너지 젤리 음료', emoji: '🥤', sec: 4, add: 40 }, pill: { name: '진통 젤리', emoji: '💊', sec: 6, add: 60 }, adren: { name: '젤리 아드레날린', emoji: '💉', sec: 8, add: 100 } };
+// 투척 (5번 칸에서 차례로): 수류탄 · 연막 · 화염병 · 섬광탄 · 신호탄 총
+export const THROWS = {
+  molotov: { id: 'molotov', name: '젤리 화염병', emoji: '🔥', cls: 'nade', fuse: 1.3, r: 3.6, dps: 12, sec: 7, impact: true },
+  flash: { id: 'flash', name: '섬광탄', emoji: '⚡', cls: 'nade', fuse: 1.8, r: 24 },
+  flare: { id: 'flare', name: '신호탄 총', emoji: '🎆', cls: 'nade', fuse: 0, r: 0, flare: true },
+};
+export const THROW_ORDER = ['nade', 'smoke', 'molotov', 'flash', 'flare'];
+export const throwCount = (inv) => (inv.nade || 0) + (inv.smoke || 0) + (inv.molotov || 0) + (inv.flash || 0);
+// 보급상자 안: 좋은 것만
+export function rollCrate(r) {
+  const pick = (list) => list[Math.floor(r() * list.length)];
+  const gun = pick(['barrett', 'm249', 'kar98', 'scar', 'vector']), AM = { barrett: '300', m249: '556', kar98: '762', scar: '762', vector: '9mm' };
+  return [{ k: 'gun', w: gun }, { k: 'ammo', a: AM[gun], n: AMMO[AM[gun]].n * 2 }, pick([{ k: 'armor', lv: 3 }, { k: 'helmet', lv: 3 }, { k: 'bag', lv: 3 }]), pick([{ k: 'att', a: 'x8' }, { k: 'att', a: 'x4' }, { k: 'att', a: 'extq' }, { k: 'att', a: 'supp' }]), { k: 'adren', n: 1 }, { k: 'med', n: 1 }];
+}
+const KINDS = [['gun', 28], ['pistol', 8], ['ammo', 26], ['att', 16], ['armor', 8], ['helmet', 8], ['bag', 6], ['band', 12], ['med', 3], ['drink', 5], ['pill', 3], ['nade', 6], ['smoke', 5], ['molotov', 4], ['flash', 4], ['adren', 0.6], ['flare', 0.5], ['gas', 3]];
 const pickW = (list, r) => { let t = list.reduce((a, [, w]) => a + w, 0) * r(); for (const [v, w] of list) { if ((t -= w) <= 0) return v; } return list[0][0]; };
 const lvl = (r) => { const x = r(); return x < 0.58 ? 1 : x < 0.9 ? 2 : 3; };
 export function rollItem(r) {
@@ -82,19 +96,26 @@ export function itemLabel(it, weapon) {
   if (it.k === 'drink' || it.k === 'pill') return `${BOOSTS[it.k].emoji} ${BOOSTS[it.k].name}`;
   if (it.k === 'nade') return '💣 젤리 수류탄';
   if (it.k === 'smoke') return '💨 연막탄';
+  if (THROWS[it.k]) return `${THROWS[it.k].emoji} ${THROWS[it.k].name}`;
+  if (it.k === 'adren') return '💉 젤리 아드레날린';
+  if (it.k === 'gas') return '⛽ 젤리 기름통';
   return '❔';
 }
-export const emptyInv = () => ({ guns: [null, null], pistol: null, att: [{}, {}], patt: {}, spare: [], ammo: {}, armor: 0, helmet: 0, armorD: 0, helmetD: 0, bag: 0, band: 0, med: 0, drink: 0, pill: 0, nade: 0, smoke: 0 });
+export const emptyInv = () => ({ guns: [null, null], pistol: null, att: [{}, {}], patt: {}, spare: [], ammo: {}, armor: 0, helmet: 0, armorD: 0, helmetD: 0, bag: 0, band: 0, med: 0, drink: 0, pill: 0, adren: 0, nade: 0, smoke: 0, molotov: 0, flash: 0, flare: 0, gas: 0 });
 export const ammoTotal = (inv) => Object.values(inv.ammo || {}).reduce((a, b) => a + b, 0);
 
 // ---------- 젤리 차량 ----------
 //   길 위에 세워 둔 차 (F 타기 · 내리기). 버기는 빠르고 가볍게, 젤리 밴은 튼튼하게
-export const VEHICLES = { buggy: { name: '젤리 버기', max: 26, acc: 15, turn: 1.9, hp: 160, r: 1.4, len: 3.2 }, van: { name: '젤리 밴', max: 21, acc: 11, turn: 1.5, hp: 260, r: 1.7, len: 4.4 } };
-export function makeVehicles(seed) {
+export const VEHICLES = { buggy: { name: '젤리 버기', max: 26, acc: 15, turn: 1.9, hp: 160, r: 1.4, len: 3.2, burn: 0.045 }, van: { name: '젤리 밴', max: 21, acc: 11, turn: 1.5, hp: 260, r: 1.7, len: 4.4, burn: 0.035 }, boat: { name: '젤리 보트', max: 18, acc: 9, turn: 1.4, hp: 200, r: 1.5, len: 3.6, burn: 0.03, water: true } };
+// 물: 맵의 물 칸 안인가 (수영 · 보트)
+export const inWater = (map, x, z, pad = 0) => (map.water || []).some((w) => x > w.x - w.w / 2 + pad && x < w.x + w.w / 2 - pad && z > w.z - w.d / 2 + pad && z < w.z + w.d / 2 - pad);
+export function makeVehicles(seed, map) {
   const r = rng(seed ^ 0x3c6ef372), out = [];
   // 큰길 가장자리에 길 방향으로 (가로길: ±x 방향 · 세로길: ±z 방향)
   const H = Math.PI / 2, spots = [[-80, -1.8, -H], [-40, 1.8, H], [30, -1.8, H], [75, 1.8, H], [-1.8, -80, Math.PI], [1.8, -35, 0], [-1.8, 40, Math.PI], [1.8, 85, 0], [-62, -12, Math.PI], [62, 10, 0], [-100, 1.8, H], [100, -1.8, -H]];
-  spots.forEach(([x, z, yaw], i) => { if (r() < 0.8) { const kind = r() < 0.62 ? 'buggy' : 'van'; out.push({ id: i + 1, kind, x, z, y: 0, yaw: yaw + (r() - 0.5) * 0.2, hp: VEHICLES[kind].hp, driver: 0 }); } });
+  spots.forEach(([x, z, yaw], i) => { if (r() < 0.8) { const kind = r() < 0.62 ? 'buggy' : 'van'; out.push({ id: i + 1, kind, x, z, y: 0, yaw: yaw + (r() - 0.5) * 0.2, hp: VEHICLES[kind].hp, driver: 0, fuel: 60 + Math.round(r() * 40) }); } });
+  // 보트: 물가에
+  (map?.boats || []).forEach(([x, z, yaw], i) => out.push({ id: 50 + i, kind: 'boat', x, z, y: 0, yaw, hp: VEHICLES.boat.hp, driver: 0, fuel: 80 }));
   return out;
 }
 

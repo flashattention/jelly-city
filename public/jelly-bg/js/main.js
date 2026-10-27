@@ -8,7 +8,8 @@ import { Roach } from '../../shared/js/roach.js';
 import { confetti } from '../../shared/js/party.js';
 import { rayBoxes, floorAt } from '../../jelly-attack/js/maps.js';
 import { getBgMap, BG_MAPS, BG_SIZE } from './bgmap.js';
-import { HEALS, DROP, zoneAt, planeAt, itemLabel, emptyInv, ARMOR_NAME, AMMO, AMMO_OF, ATTS, SLOTS, CAP, BOOSTS, BAG_NAME, ammoTotal, VEHICLES } from './bgrules.js';
+import { HEALS, DROP, zoneAt, planeAt, itemLabel, emptyInv, ARMOR_NAME, AMMO, AMMO_OF, ATTS, SLOTS, CAP, BOOSTS, BAG_NAME, ammoTotal, VEHICLES, THROWS, THROW_ORDER, inWater } from './bgrules.js';
+import { buildWater, makeRedZone, makeCrate, makeFire, updateFire, vaultTarget, WATER_Y } from './bgextra.js';
 import { buildVehicle, drive, poseVehicle, dressGear, extraLoot } from './bgparts.js';
 import { weapon, KNIFE, NADE, SMOKE } from '../../jelly-attack/js/weapons.js';
 import { buildMap } from '../../jelly-attack/js/world.js';
@@ -17,6 +18,7 @@ import { sfx, unlock, toggleMute, sound } from '../../jelly-attack/js/sound.js';
 import { explosion, smoke, updateFx as updateBig, stepNade, NadeArc } from '../../jelly-attack/js/fx.js';
 
 const $ = (id) => document.getElementById(id);
+const wpn = (id) => weapon(id) || THROWS[id]; // 총 · 투척(화염병 · 섬광탄 · 신호탄 총)
 const PICK_KEY = 'jellybg.pick';
 let MAP = getBgMap('island');
 
@@ -29,33 +31,35 @@ const camera = new THREE.PerspectiveCamera(72, 1, 0.05, 1400);
 camera.rotation.order = 'YXZ';
 function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
-let world = buildMap(scene, MAP);
+let world = buildMap(scene, MAP), water = buildWater(scene, MAP);
 // 맵 바꾸기 (판마다 · 처음 화면 미리보기)
-function loadBgMap(id) { const m = getBgMap(id); if (m === MAP) return; world.dispose(); MAP = m; world = buildMap(scene, MAP); }
+function loadBgMap(id) { const m = getBgMap(id); if (m === MAP) return; world.dispose(); water.dispose(); MAP = m; world = buildMap(scene, MAP); water = buildWater(scene, MAP); }
 
 const me = new Player();
 let vm = new ViewModel('#8a5634');
 const pick0 = (() => { try { return JSON.parse(store.get(PICK_KEY) || '{}'); } catch { return {}; } })();
 const game = window.bg = {
   me, mode: 'title', myId: 0, others: new Map(), loot: new Map(), inv: emptyInv(), zones: null, plane: null, t0: 0, alive: 0, total: 0, kills: 0, place: 0,
-  pick: { fill: pick0.fill ?? 24, map: pick0.map || 'random' }, watch: null, color: '#8a5634', fall: null,
+  pick: { fill: pick0.fill ?? 24, map: pick0.map || 'random', squad: pick0.squad || 1 }, watch: null, color: '#8a5634', fall: null,
+  // 몸: 엎드리기 · 기울이기 · 넘기 · 헤엄 · 기절 / 분대 · 레드존 · 보급상자 · 불
+  prone: false, lean: 0, vault: null, swim: false, knocked: false, free: null, single: {}, squad: 1, sq: {}, sqInfo: [], squads: 0, red: null, drops: new Map(), fires: [], reviving: null, revBar: null, refuel: null,
 };
 const sec = () => (performance.now() - game.t0) / 1000;
 
 // ---------- 무기 칸: 1 · 2 주무기 · 3 권총 · 4 나이프 · 5 수류탄 ----------
 let cur = 3, ammo = {}, nextFire = 0, reloadEnd = 0, fireLatch = false, kickBack = 0, throwK = 'nade';
 // 5번 칸: 수류탄 · 연막탄 (5를 한 번 더 누르면 바꾼다)
-const throwId = () => { const i = game.inv; if (i[throwK] > 0) return throwK; const o = throwK === 'nade' ? 'smoke' : 'nade'; return i[o] > 0 ? o : null; };
+const throwId = () => { const i = game.inv; if (i[throwK] > 0) return throwK; return THROW_ORDER.find((k) => i[k] > 0) || null; };
 const slotIds = () => [game.inv.guns[0], game.inv.guns[1], game.inv.pistol, 'knife', throwId()];
-const curW = () => weapon(slotIds()[cur]) || KNIFE;
+const curW = () => wpn(slotIds()[cur]) || KNIFE;
 const attOf = (i) => (i === 0 || i === 1 ? game.inv.att?.[i] : i === 2 ? game.inv.patt : null) || {};
 const curAtt = () => attOf(cur);
 const magOf = (w, att) => Math.max(1, Math.round(w.mag * (ATTS[att?.mag]?.mag || 1)));
 // 바닥에서 주운 총은 빈 탄창 (배그처럼) · 장전하면 가방의 탄을 쓴다
-function ensureAmmo() { for (const id of slotIds()) { const w = id && weapon(id); if (w?.mag && !ammo[id]) ammo[id] = { mag: 0 }; } }
+function ensureAmmo() { for (const id of slotIds()) { const w = id && wpn(id); if (w?.mag && !ammo[id]) ammo[id] = { mag: 0 }; } }
 function switchTo(i) {
   const ids = slotIds();
-  if (i === 4 && cur === 4 && game.inv.nade > 0 && game.inv.smoke > 0) { throwK = throwK === 'nade' ? 'smoke' : 'nade'; vm.setWeapon(curW(), game.color); renderSlots(); sfx('switch'); return; }
+  if (i === 4 && cur === 4) { const have = THROW_ORDER.filter((k) => game.inv[k] > 0); if (have.length > 1) { throwK = have[(have.indexOf(throwId()) + 1) % have.length]; vm.setWeapon(curW(), game.color); renderSlots(); sfx('switch'); } return; }
   if (!ids[i] || (i === cur && vm.gun)) return;
   cur = i; reloadEnd = 0; cancelHeal(); vm.setWeapon(curW(), game.color); sfx('switch');
   shell.send({ t: 'wpn', w: ids[i] }); renderSlots();
@@ -79,7 +83,7 @@ function finishReload() {
 const keys = new Set(); let mouseL = false, mouseR = false, bigMap = false;
 const locked = () => !!game.testLock || document.pointerLockElement === $('c');
 // 키보드 잠금: 전체화면이면 Ctrl+W(앉아서 앞으로) 같은 브라우저 단축키도 게임이 받는다
-const GAME_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyC', 'KeyR', 'KeyQ', 'KeyE', 'KeyG', 'KeyF', 'Space', 'Tab', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight'];
+const GAME_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyC', 'KeyR', 'KeyQ', 'KeyE', 'KeyG', 'KeyF', 'KeyZ', 'KeyB', 'KeyX', 'Space', 'Tab', 'AltLeft', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight'];
 $('fs-btn').onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch { /* 무시 */ } lock(); };
 const invOpen = () => !$('inv').classList.contains('hidden');
 // 마우스 잠금: 실패하면(브라우저가 막으면) '클릭해서 계속' 창을 띄운다
@@ -94,6 +98,8 @@ document.addEventListener('mousemove', (e) => {
   if (!locked() || game.mode === 'title' || game.mode === 'over') return;
   const z = game.mode === 'ground' && mouseR ? zoomNow() : 1;
   const s = 0.0022 * sensOf('bg') * (z > 1.05 ? 0.75 / Math.pow(z, 0.85) : 1);
+  // Alt 를 누르고 있으면 몸(조준)은 그대로 · 고개만 돌려 둘러보기
+  if (game.free) { game.free.yaw = Math.max(-2, Math.min(2, game.free.yaw - e.movementX * s)); game.free.pitch = Math.max(-1, Math.min(1, game.free.pitch - e.movementY * s)); return; }
   me.yaw -= e.movementX * s; me.pitch = Math.max(-1.45, Math.min(1.45, me.pitch - e.movementY * s));
 });
 document.addEventListener('mousedown', (e) => { if (!locked()) return; if (e.button === 0) mouseL = true; if (e.button === 2) mouseR = true; });
@@ -103,29 +109,35 @@ document.addEventListener('wheel', (e) => { if (game.mode === 'ground' && locked
 addEventListener('keydown', (e) => {
   if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
   if (game.mode === 'title' || game.mode === 'over') return;
-  if (['Space', 'Tab'].includes(e.code)) e.preventDefault();
+  if (['Space', 'Tab', 'AltLeft', 'AltRight'].includes(e.code)) e.preventDefault();
   if (e.repeat) return;
   keys.add(e.code);
+  if ((e.code === 'AltLeft' || e.code === 'AltRight') && (game.mode === 'ground' || game.mode === 'drive' || game.mode === 'fall')) game.free = { yaw: 0, pitch: 0 };
   if (e.code === 'KeyM') { bigMap = !bigMap; $('bigmap').classList.toggle('hidden', !bigMap); }
   if (e.code === 'Tab' && (game.mode === 'ground' || game.mode === 'drive')) return toggleInv();
   if (e.code === 'KeyF' && game.mode === 'drive') return exitVehicle();
-  if (e.code === 'KeyF' && game.mode === 'ground') { const v = nearVehicle(); if (v) return shell.send({ t: 'enter', id: v.id }); }
+  if (e.code === 'KeyR' && game.mode === 'drive') return startRefuel();
+  // F: 기절한 동료 살리기 (누르고 있기) → 줍기 → 차 타기 (배그처럼)
+  if (e.code === 'KeyF' && game.mode === 'ground' && !game.knocked) { const mate = reviveTarget(); if (mate) return startRevive(mate); if (nearestLoot()) return pickUp(); const v = nearVehicle(); if (v) return shell.send({ t: 'enter', id: v.id }); }
   if (game.mode === 'plane' && (e.code === 'KeyF' || e.code === 'Space')) return jump();
   if (game.mode === 'dead' && e.code === 'Space') return cycleWatch();
-  if (game.mode !== 'ground') return;
+  if (game.mode !== 'ground' || game.knocked) return;
   if (e.code === 'KeyR') reload();
   if (/^Digit[1-5]$/.test(e.code)) switchTo(+e.code.slice(5) - 1);
-  if (e.code === 'KeyQ') switchTo(cur === 0 ? 1 : 0);
-  if (e.code === 'KeyE') pickUp();
   if (e.code === 'KeyX') dropCurrent();
+  if (e.code === 'KeyZ' && !game.swim) { game.prone = !game.prone; sfx('step'); }
+  if ((e.code === 'KeyC' || e.code === 'ControlLeft') && game.prone) game.prone = false;
+  if (e.code === 'Space') { if (game.prone) game.prone = false; else tryVault(); }
+  if (e.code === 'KeyB') { const w = curW(); if (w?.auto) { game.single[w.id] = !game.single[w.id]; shell.toast(game.single[w.id] ? '☝️ 단발' : '🔁 연사', 700); sfx('switch'); } else if (w?.mag) shell.toast('이 총은 단발만 돼요', 700); }
+  if (e.code === 'Digit6') startHeal('adren');
   if (e.code === 'Digit7') startHeal('band');
   if (e.code === 'Digit8') startHeal('med');
   if (e.code === 'Digit9') startHeal('drink');
   if (e.code === 'Digit0') startHeal('pill');
   if (e.code === 'KeyG' && throwId()) throwNade(throwId());
 });
-addEventListener('keyup', (e) => keys.delete(e.code));
-addEventListener('blur', () => { keys.clear(); mouseL = mouseR = false; });
+addEventListener('keyup', (e) => { keys.delete(e.code); if (e.code === 'KeyF' && game.reviving) stopRevive(); if (e.code === 'AltLeft' || e.code === 'AltRight') game.free = null; });
+addEventListener('blur', () => { keys.clear(); mouseL = mouseR = false; game.free = null; if (game.reviving) stopRevive(); });
 function muteBtn() { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; shell.syncSound(); }
 $('b-mute').onclick = muteBtn; $('b-mute').textContent = sound.muted ? '🔇' : '🔊';
 $('b-quit').onclick = () => { if (game.mode !== 'dead' && !confirm('젤리배그에서 나갈까요?')) return; quit(); };
@@ -148,12 +160,16 @@ class Other {
     const r = this.bear = new Roach({ own: true, seed: m.name, color: m.color || '#8a5634', age: 25, look: m.look, accessories: m.acc || [] });
     r.root.scale.setScalar(0.85); scene.add(r.root);
     this.chute = makeChute(m.color); scene.add(this.chute);
-    this.tag = tag(m.name); scene.add(this.tag);
+    this.mate = game.squad > 1 && game.sq[m.id] === game.sq[game.myId];
+    this.tag = tag(m.name, this.mate ? '#4cc3ff' : null); scene.add(this.tag);
     this.pos = new THREE.Vector3(); this.tgt = new THREE.Vector3(); this.yaw = 0; this.pitch = 0; this.flags = 8; this.alive = true; this.lastPos = new THREE.Vector3(); this.firedT = 0;
     this.setGun('knife');
   }
-  setGun(id) { this.gun = id; this.bear.setHeld(heldOf(weapon(id) || KNIFE)); }
-  set(st) { const [x, y, z, yaw, pitch, f, veh] = st; this.tgt.set(x, y, z); this.tyaw = yaw; this.pitch = pitch; this.flags = f; this.veh = f & 16 ? veh : 0; if (this.pos.distanceTo(this.tgt) > 20) this.pos.copy(this.tgt); }
+  setGun(id) { this.gun = id; this.bear.setHeld(heldOf(wpn(id) || KNIFE)); }
+  set(st) { const [x, y, z, yaw, pitch, f, veh, lean] = st; this.tgt.set(x, y, z); this.tyaw = yaw; this.pitch = pitch; this.flags = f; this.veh = f & 16 ? veh : 0; this.lean = f & 16 ? 0 : lean || 0; if (this.pos.distanceTo(this.tgt) > 20) this.pos.copy(this.tgt); }
+  // 32 엎드림 · 64 기절 · 128 헤엄
+  get down() { return !!(this.flags & 96) || this.knocked; }
+  get swim() { return !!(this.flags & 128); }
   get inAir() { return (this.flags & 12) !== 0; }
   update(dt) {
     const k = Math.min(1, dt * 12);
@@ -161,7 +177,7 @@ class Other {
     let d = (this.tyaw ?? this.yaw) - this.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); this.yaw += d * k;
     const sp = this.pos.distanceTo(this.lastPos) / Math.max(dt, 1e-3); this.lastPos.copy(this.pos);
     const b = this.bear, vis = this.alive && this.jumped;
-    b.root.visible = vis; this.tag.visible = vis && !this.inAir;
+    b.root.visible = vis; this.tag.visible = vis && !this.inAir && (game.squad === 1 || this.mate);
     b.root.position.copy(this.pos); b.root.rotation.y = this.yaw + Math.PI;
     this.speed = sp;
     // 운전 중: 차는 이 사람 위치 · 방향 그대로, 곰돌이는 운전석에 앉는다
@@ -174,12 +190,25 @@ class Other {
     else { b.arms[1].rotation.x = -1.45 - this.pitch; b.arms[0].rotation.x = -1.3 - this.pitch; b.arms[0].rotation.z = b.arms[0].userData.baseZ * 0.2 + 0.5; }
     this.chute.visible = vis && (this.flags & 4) !== 0; this.chute.position.copy(this.pos);
     const crouch = this.flags & 1; b.root.scale.y = 0.85 * (crouch ? 0.75 : 1);
-    this.tag.position.set(this.pos.x, this.pos.y + (car ? 3.2 : crouch ? 1.75 : 2.2), this.pos.z);
+    // 엎드림 · 기절: 바닥에 납작 (기절은 빨갛게 깜빡) · 헤엄: 물에 잠김 · 기울이기: 옆으로 기울임
+    b.root.rotation.x = this.down && !car ? -1.35 : 0; if (this.down && !car) b.root.position.y += 0.35;
+    if (this.swim && !car) b.root.position.y -= 0.95 - Math.sin(performance.now() / 300 + this.id) * 0.05;
+    b.root.rotation.z = car ? 0 : -(this.lean || 0) * 0.35;
+    if (this.knocked && this.mate) this.tagKnock = true;
+    this.tag.position.set(this.pos.x, this.pos.y + (car ? 3.2 : this.down ? 1.2 : crouch ? 1.75 : 2.2), this.pos.z);
     this.firedT -= dt;
   }
   remove() { scene.remove(this.bear.root, this.tag, this.chute); }
   hit(o, d) {
     if (!this.jumped || this.inAir || this.veh) return null; // 차 안은 차를 맞힌다
+    if (this.down || this.swim) {
+      // 엎드림 · 기절: 낮은 몸통 공 + 앞쪽 머리 · 헤엄: 물 위 머리만
+      const p = this.pos, fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
+      const parts = this.swim ? [[p.x, p.y + 0.6, p.z, 0.36, 'head']] : [[p.x + fx * 0.7, p.y + 0.35, p.z + fz * 0.7, 0.3, 'head'], [p.x, p.y + 0.32, p.z, 0.55, 'body'], [p.x - fx * 0.6, p.y + 0.25, p.z - fz * 0.6, 0.4, 'body']];
+      let best = null;
+      for (const [cx, cy, cz, r, part] of parts) { const oc = new THREE.Vector3(o.x - cx, o.y - cy, o.z - cz), bq = oc.dot(d), disc = bq * bq - (oc.lengthSq() - r * r); if (disc < 0) continue; const t = -bq - Math.sqrt(disc); if (t > 0 && (!best || t < best.t)) best = { t, part }; }
+      return best;
+    }
     const crouch = this.flags & 1, p = this.pos, hy = p.y + (crouch ? 1.2 : 1.62);
     let best = null;
     const oc = new THREE.Vector3(o.x - p.x, o.y - hy, o.z - p.z), bq = oc.dot(d), cq = oc.lengthSq() - 0.34 * 0.34, disc = bq * bq - cq;
@@ -189,11 +218,11 @@ class Other {
     return best;
   }
 }
-function tag(name) {
+function tag(name, color) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 64;
   const x = c.getContext('2d'); x.font = 'bold 28px Jua, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
   const w = Math.min(250, x.measureText(name).width + 28);
-  x.fillStyle = 'rgba(20,10,40,.6)'; x.beginPath(); x.roundRect(128 - w / 2, 10, w, 44, 22); x.fill(); x.fillStyle = '#fff'; x.fillText(name, 128, 33);
+  x.fillStyle = 'rgba(20,10,40,.6)'; x.beginPath(); x.roundRect(128 - w / 2, 10, w, 44, 22); x.fill(); if (color) { x.strokeStyle = color; x.lineWidth = 5; x.stroke(); } x.fillStyle = '#fff'; x.fillText(name, 128, 33);
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthWrite: false, transparent: true })); s.scale.set(2.2, 0.55, 1); return s;
 }
 // 내 곰돌이 (하늘에서 보이는 모습)
@@ -221,6 +250,8 @@ zoneWall.visible = false; scene.add(zoneWall);
 const zoneEdge = new THREE.Mesh(new THREE.TorusGeometry(1, 0.004, 6, 128), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.8 }));
 zoneEdge.rotation.x = Math.PI / 2; zoneEdge.visible = false; scene.add(zoneEdge);
 
+const red = makeRedZone(scene);
+
 // ---------- 바닥의 아이템 ----------
 const LV_COL = ['#cccccc', '#9be7a7', '#7cd8ff', '#c39bff'];
 let _glow = null;
@@ -228,7 +259,7 @@ function glowTex() { if (_glow) return _glow; const c = document.createElement('
 function lootMesh(it) {
   const g = new THREE.Group(), spin = new THREE.Group(); g.add(spin);
   let col = '#ffd84d';
-  if (it.k === 'gun' || it.k === 'pistol') { const w = weapon(it.w); const gm = gunModel(w?.cls || 'rifle', '#ff8fc4'); gm.group.scale.setScalar(1.6); gm.group.rotation.y = Math.PI / 2; spin.add(gm.group); col = w?.cls === 'sniper' || w?.id === 'm249' || w?.id === 'barrett' ? '#c39bff' : '#ffd84d'; }
+  if (it.k === 'gun' || it.k === 'pistol') { const w = wpn(it.w); const gm = gunModel(w?.cls || 'rifle', '#ff8fc4'); gm.group.scale.setScalar(1.6); gm.group.rotation.y = Math.PI / 2; spin.add(gm.group); col = w?.cls === 'sniper' || w?.id === 'm249' || w?.id === 'barrett' ? '#c39bff' : '#ffd84d'; }
   else if (it.k === 'armor') { col = LV_COL[it.lv]; const v = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.6, 0.25), new THREE.MeshToonMaterial({ color: col })); spin.add(v); const s = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.12, 0.28), new THREE.MeshToonMaterial({ color: '#3a3d46' })); s.position.y = -0.1; spin.add(s); }
   else if (it.k === 'helmet') { col = LV_COL[it.lv]; const h = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshToonMaterial({ color: col })); spin.add(h); }
   else if (it.k === 'band') { col = '#ffffff'; const b = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.14, 0.3), new THREE.MeshToonMaterial({ color: '#fff3f6' })); spin.add(b); const c = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 0.04), new THREE.MeshToonMaterial({ color: '#ff5c8a' })); c.position.z = 0.15; spin.add(c); }
@@ -248,11 +279,28 @@ function nearestLoot() {
   return best;
 }
 function pickUp() { const it = nearestLoot(); if (!it) return; shell.send({ t: 'pick', id: it.id, slot: cur === 1 ? 1 : 0 }); sfx('switch'); }
+// ---------- 몸: 기울이기 · 넘기 ----------
+// 기울인 만큼 눈(쏘는 자리)이 옆으로
+function leanEye() { const e = me.eye(); if (game.lean) e.add(new THREE.Vector3(Math.cos(me.yaw), 0, -Math.sin(me.yaw)).multiplyScalar(game.lean * 0.5)); if (game.lean) e.y -= Math.abs(game.lean) * 0.12; return e; }
+function tryVault() {
+  if (!me.onGround || game.swim || game.vault || healing) return false;
+  const v = vaultTarget(MAP, me.pos, me.yaw); if (!v) return false;
+  game.vault = { from: me.pos.clone(), to: v.to, up: v.up, t: 0, dur: 0.42 }; sfx('jump'); return true;
+}
+// ---------- 기절한 동료 살리기 (F 누르고 있기 · 8초) ----------
+function reviveTarget() { if (game.squad < 2) return null; let best = null, bd = 2.6; for (const o of game.others.values()) { if (!o.alive || !o.knocked || !o.mate) continue; const d = o.pos.distanceTo(me.pos); if (d < bd) { bd = d; best = o; } } return best; }
+function startRevive(o) { game.reviving = { id: o.id, at: me.pos.clone() }; shell.send({ t: 'revive', id: o.id }); cancelHeal(); }
+function stopRevive() { if (!game.reviving) return; game.reviving = null; shell.send({ t: 'revive-stop' }); game.revBar = null; }
+// ---------- 기름 넣기 (차 안 · R · 4초) ----------
+function startRefuel() { const v = game.drv?.v; if (!v) return; if (!game.inv.gas) { shell.toast('⛽ 기름통이 없어요', 900); return; } if ((v.fuel ?? 100) >= 99) { shell.toast('⛽ 이미 가득', 800); return; } game.refuel = { end: performance.now() + 4000 }; $('heal-bar').classList.remove('hidden'); $('heal-txt').textContent = '⛽ 기름 넣는 중…'; }
+// 신호탄: 빨간 불빛이 하늘로
+function flareFx(p) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: '#ff3a2a', transparent: true, depthWrite: false })); s.scale.setScalar(2.4); s.position.copy(p).setY(p.y + 2); scene.add(s); fx.push({ o: s, t: 4, life: 4, v: new THREE.Vector3(0, 22, 0) }); }
+
 
 // ---------- 회복 (붕대 3초 · 구급상자 6초, 움직이면 천천히) ----------
 let healing = null;
 function startHeal(k) {
-  const H = HEALS[k] || BOOSTS[k]; if (!H || game.inv[k] <= 0 || healing || game.mode !== 'ground') return;
+  const H = HEALS[k] || BOOSTS[k]; if (!H || game.inv[k] <= 0 || healing || game.mode !== 'ground' || game.knocked || game.swim) return;
   if (HEALS[k] && me.hp >= H.cap) { shell.toast(k === 'band' ? `🩹 붕대로는 ${H.cap}까지만 회복돼요` : '❤️ 이미 가득 찼어요', 1200); return; }
   healing = { k, end: performance.now() + H.sec * 1000, dur: H.sec * 1000 };
   $('heal-bar').classList.remove('hidden'); $('heal-txt').textContent = `${H.emoji} ${H.name} 쓰는 중…`;
@@ -272,16 +320,16 @@ const muzzleWorld = () => new THREE.Vector3(0.2, -0.16, -0.8).applyMatrix4(camer
 // ---------- 쏘기 ----------
 function shoot(now) {
   const w = curW();
-  if (!w || game.mode !== 'ground') return;
+  if (!w || game.mode !== 'ground' || game.swim || game.knocked || game.vault) return;
   if (w.cls === 'nade') { if (!fireLatch) { fireLatch = true; throwNade(w.id); } return; }
   if (w.cls === 'knife') { if (now < nextFire || fireLatch) return; fireLatch = true; nextFire = now + w.rate * 1000; return knife(); }
-  if (reloadEnd || now < nextFire || (!w.auto && fireLatch)) return;
+  if (reloadEnd || now < nextFire || ((!w.auto || game.single[w.id]) && fireLatch)) return;
   ensureAmmo(); const a = ammo[w.id]; if (!a) return;
   if (a.mag <= 0) { if (!fireLatch) sfx('dry'); fireLatch = true; reload(); return; }
   const AT = curAtt(), spreadK = ATTS[AT.grip]?.spread || 1, recoilK = (ATTS[AT.muzzle]?.recoil || 1) * (ATTS[AT.grip]?.recoil || 1);
   cancelHeal();
   fireLatch = true; nextFire = now + w.rate * 1000; a.mag--;
-  const eye = me.eye(), fwd = me.forward();
+  const eye = leanEye(), fwd = me.forward();
   const moving = Math.hypot(me.vel.x, me.vel.z) > 1.5;
   let spread = (w.cls === 'sniper' ? (mouseR ? w.spread : 0.07) : w.spread * (mouseR ? 0.45 : 1)) * spreadK;
   spread += (moving ? w.move : 0) + (me.onGround ? 0 : 0.06) - (me.crouch > 0.5 ? spread * 0.3 : 0);
@@ -321,19 +369,25 @@ function knife() {
 }
 const nades = [], arc = new NadeArc(scene);
 function throwNade(kind = throwId()) {
-  if (!kind || game.inv[kind] <= 0) return;
+  if (!kind || game.inv[kind] <= 0 || game.swim || game.knocked) return;
+  // 신호탄 총: 하늘로 쏘면 그 자리에 보급상자가 떨어진다
+  if (kind === 'flare') { shell.send({ t: 'flare', p: [me.pos.x, me.pos.y, me.pos.z] }); game.inv.flare--; renderSlots(); if (!slotIds()[cur]) switchTo(3); sfx('gun', 'pistol'); flareFx(me.pos.clone()); banner('🎆 신호탄! 보급상자가 와요'); return; }
   vm.swing(); sfx('throw');
-  const m = new THREE.Mesh(kind === 'smoke' ? new THREE.CylinderGeometry(0.1, 0.1, 0.3, 10) : new THREE.SphereGeometry(0.13, 12, 8), new THREE.MeshToonMaterial({ color: kind === 'smoke' ? '#7a9a6a' : game.color }));
-  const p = me.eye().addScaledVector(me.forward(), 0.5); m.position.copy(p); scene.add(m);
-  nades.push({ m, kind, v: me.forward().multiplyScalar(NADE.speed).add(new THREE.Vector3(0, NADE.up, 0)), t: kind === 'smoke' ? SMOKE.fuse : NADE.fuse });
+  const col = { smoke: '#7a9a6a', molotov: '#8fd88f', flash: '#3a3d46' }[kind] || game.color;
+  const m = new THREE.Mesh(kind === 'smoke' || kind === 'flash' ? new THREE.CylinderGeometry(0.1, 0.1, 0.3, 10) : new THREE.SphereGeometry(0.13, 12, 8), new THREE.MeshToonMaterial({ color: col }));
+  const p = leanEye().addScaledVector(me.forward(), 0.5); m.position.copy(p); scene.add(m);
+  nades.push({ m, kind, v: me.forward().multiplyScalar(NADE.speed).add(new THREE.Vector3(0, NADE.up, 0)), t: kind === 'smoke' ? SMOKE.fuse : THROWS[kind] ? THROWS[kind].fuse : NADE.fuse });
   game.inv[kind]--; renderSlots(); if (!slotIds()[cur]) switchTo(3);
 }
 function updateNades(dt) {
   for (let i = nades.length - 1; i >= 0; i--) {
-    const n = nades[i], p = n.m.position;
+    const n = nades[i], p = n.m.position, vy0 = n.v.y, vx0 = n.v.x;
     stepNade(p, n.v, dt, MAP);
     n.t -= dt;
-    if (n.t <= 0) { shell.send({ t: n.kind === 'smoke' ? 'smoke' : 'nade', p: [p.x, p.y, p.z] }); scene.remove(n.m); nades.splice(i, 1); }
+    // 화염병은 처음 닿는 곳에서 깨진다
+    if (n.kind === 'molotov' && ((vy0 < -1 && n.v.y >= 0) || Math.sign(vx0) !== Math.sign(n.v.x))) n.t = 0;
+    if (n.kind === 'molotov' && inWater(MAP, p.x, p.z)) { scene.remove(n.m); nades.splice(i, 1); continue; }
+    if (n.t <= 0) { shell.send({ t: n.kind, p: [p.x, p.y, p.z] }); scene.remove(n.m); nades.splice(i, 1); }
   }
 }
 
@@ -343,12 +397,12 @@ game.veh = new Map();
 const VCOL = ['#ff8fc4', '#7cd8ff', '#ffd84d', '#9be7a7', '#c39bff', '#ffb36b'];
 function setVehicles(list) {
   for (const a of list) {
-    const [id, kind, x, y, z, yaw, hp, driver, dead] = Array.isArray(a) ? a : [a.id, a.kind, a.x, a.y, a.z, a.yaw, a.hp, a.driver, a.dead ? 1 : 0];
+    const [id, kind, x, y, z, yaw, hp, driver, dead, fuel] = Array.isArray(a) ? a : [a.id, a.kind, a.x, a.y, a.z, a.yaw, a.hp, a.driver, a.dead ? 1 : 0, a.fuel];
     let v = game.veh.get(id);
     if (!v) { v = { id, kind, x, y, z, yaw, speed: 0, mesh: buildVehicle(kind, VCOL[id % VCOL.length]) }; scene.add(v.mesh); game.veh.set(id, v); }
     const mine = game.drv && game.drv.v === v;
     if (!mine && !driver) Object.assign(v, { x, y, z, yaw });
-    v.hp = hp; v.driver = driver; v.max = VEHICLES[kind].hp;
+    v.hp = hp; v.driver = driver; v.max = VEHICLES[kind].hp; if (!mine && fuel != null) v.fuel = fuel;
     if (dead && !v.dead) { v.dead = true; v.mesh.traverse((o) => { if (o.material?.color) { o.material = o.material.clone(); o.material.color.multiplyScalar(0.25); } }); }
     if (driver === game.myId && !game.drv && game.mode === 'ground') enterVehicle(v);
     if (mine && driver !== game.myId) exitVehicle(true);
@@ -359,7 +413,7 @@ function enterVehicle(v) {
   cancelHeal(); reloadEnd = 0;
   game.mode = 'drive'; game.drv = { v, runAt: new Map() }; v.speed = 0;
   myBear.root.visible = true; myBear.setSeated(true); myChute.visible = false;
-  sfx('switch'); banner(`🚙 ${VEHICLES[v.kind].name} · F 내리기`); tip(null);
+  game.prone = false; game.lean = 0; game.swim = false; game.vault = null; sfx('switch'); banner(`${v.kind === 'boat' ? '🚤' : '🚙'} ${VEHICLES[v.kind].name} · F 내리기${game.inv.gas ? ' · R 기름 넣기' : ''}`); tip(null);
 }
 function exitVehicle(forced) {
   const D = game.drv; if (!D) return;
@@ -427,12 +481,12 @@ function dropCurrent() {
   reloadEnd = 0; cancelHeal();
   if (cur === 4) shell.send({ t: 'drop', k: id });
   else shell.send({ t: 'drop', k: cur === 2 ? 'pistol' : 'gun', g: cur });
-  sfx('switch'); shell.toast(`🫳 ${weapon(id)?.emoji || ''} ${weapon(id)?.name || ''} 버림`, 900);
+  sfx('switch'); shell.toast(`🫳 ${wpn(id)?.emoji || ''} ${wpn(id)?.name || ''} 버림`, 900);
 }
 function renderInv() {
   const I = game.inv, el = $('inv'); if (el.classList.contains('hidden')) return;
   const gunRow = (id, att, g, label) => {
-    const w = id && weapon(id);
+    const w = id && wpn(id);
     if (!w) return `<div class="ig empty">${label} · 비어 있음</div>`;
     const a = ammo[id]?.mag ?? 0, t = AMMO_OF[id];
     return `<div class="ig"><div class="ig-top"><b>${w.emoji} ${esc(w.name)}</b><span>${a}/${magOf(w, att)} · ${AMMO[t]?.emoji || ''}${AMMO[t]?.name || ''}</span><button data-drop="${g === 2 ? 'pistol' : 'gun'}" data-g="${g}">버리기</button></div>
@@ -470,6 +524,8 @@ function start(m) {
   toggleInv(false);
   for (const o of game.others.values()) o.remove(); game.others.clear();
   for (const it of game.loot.values()) scene.remove(it.mesh); game.loot.clear();
+  game.squad = m.squad || 1; game.sq = m.sq || {}; game.squads = m.squads || 0; game.sqInfo = []; game.knocked = false; game.prone = false; game.lean = 0; game.vault = null; game.swim = false; game.reviving = null; game.revBar = null; game.refuel = null; game.free = null;
+  for (const D of game.drops.values()) scene.remove(D.c.g); game.drops.clear(); for (const f of game.fires) scene.remove(f.g); game.fires = []; game.red = null; red.set(null);
   for (const mem of m.members) if (mem.id !== game.myId) game.others.set(mem.id, new Other(mem));
   addLoot(m.loot);
   setVehicles(m.veh || []);
@@ -480,7 +536,8 @@ function start(m) {
   tip('🪂 F · Space 로 뛰어내려요', '젤리 비행선이 섬을 가로질러요. 끝까지 가면 자동으로 뛰어내려요');
   if (!locked()) $('lockmsg').classList.remove('hidden');
   renderSlots(); renderGear();
-  banner(`${MAP.emoji} ${MAP.name} · ${m.total}명`);
+  banner(`${MAP.emoji} ${MAP.name} · ${m.total}명${game.squad > 1 ? ` · ${game.squad === 2 ? '듀오' : '스쿼드'} ${game.squads}팀` : ''}`);
+  $('squad').classList.toggle('hidden', game.squad < 2);
 }
 function tip(a, b) { const t = $('phase-tip'); if (!a) { t.classList.add('hidden'); return; } t.innerHTML = `${a}${b ? `<small>${b}</small>` : ''}`; t.classList.remove('hidden'); }
 function jump() {
@@ -494,7 +551,7 @@ function jump() {
 function land() {
   game.mode = 'ground'; me.vel.set(0, 0, 0); me.onGround = true;
   myBear.root.visible = false; myChute.visible = false; sfx('land'); tip(null);
-  banner('🍬 착지! E 로 줍기'); setTimeout(() => { if (game.mode === 'ground' && !game.inv.guns[0]) tip('🔎 집 안에 무기 · 탄약 · 방어구 · 부착물이 있어요', 'E 줍기 · R 장전 · 1~5 무기 · 7~0 회복/부스트 · G 던지기 · Tab 가방 · F 차 · M 지도'); }, 1600);
+  banner('🍬 착지! F 로 줍기'); setTimeout(() => { if (game.mode === 'ground' && !game.inv.guns[0]) tip('🔎 집 안에 무기 · 탄약 · 방어구 · 부착물이 있어요', 'F 줍기 · 차 타기 · 동료 살리기 · R 장전 · 1~5 무기 · 6~0 회복/부스트 · G 던지기 · Z 엎드리기 · Q/E 기울이기 · Tab 가방 · M 지도'); }, 1600);
 }
 function onLoot(m) { removeLoot(m.rm || []); addLoot(m.add || []); }
 function onInv(m) {
@@ -507,7 +564,8 @@ function onInv(m) {
   if (ids[0] || ids[1]) tip(null);
 }
 function cycleWatch() {
-  const L = [...game.others.values()].filter((o) => o.alive && o.jumped);
+  const all = [...game.others.values()].filter((o) => o.alive && o.jumped), mates = all.filter((o) => o.mate);
+  const L = mates.length ? mates : all;
   if (!L.length) return;
   game.watch = L[(L.indexOf(game.watch) + 1) % L.length]; sfx('switch');
 }
@@ -515,7 +573,8 @@ function die(byName) {
   arc.show(false);
   if (game.drv) { game.drv = null; myBear.setSeated(false); myBear.root.visible = false; }
   $('inv').classList.add('hidden');
-  game.mode = 'dead'; me.alive = false; cancelHeal(); document.exitPointerLock?.();
+  game.mode = 'dead'; me.alive = false; game.knocked = false; game.reviving = null; game.revBar = null; cancelHeal(); document.exitPointerLock?.();
+  $('knock').classList.add('hidden');
   $('spec').classList.remove('hidden'); $('lockmsg').classList.add('hidden');
   $('spec-place').textContent = `#${game.place}등 · ${game.kills}킬`;
   banner(byName ? `💥 ${byName}에게 당했어요` : '🌀 젤리 자기장에 녹았어요');
@@ -527,8 +586,11 @@ function results(m) {
   const mine = m.rank.find((e) => e.id === game.myId), won = mine?.rank === 1;
   const out = !won && game.alive > 1; // 연습에서 내가 떨어지면 남은 봇끼리는 끝까지 안 겨룬다
   $('ov-title').innerHTML = won ? '🍬 이겼젤! 오늘 간식은 젤리다!' : out ? `💥 #${mine?.rank || game.place}등으로 탈락!` : `🏆 ${esc(m.rank[0]?.name || '')} 우승!`;
-  $('ov-me').textContent = mine ? `나는 #${mine.rank}등 / ${m.rank.length}명 · ${mine.k}킬 · 피해 ${mine.dmg}` : '';
-  $('ov-rank').innerHTML = m.rank.slice(0, 30).map((e) => `<div class="brow${e.id === game.myId ? ' me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : '#' + e.rank}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${e.bot ? '🤖 ' : ''}${esc(e.name)}</span><span class="sc">${e.k}<small>킬 · ${e.dmg}</small></span></div>`).join('');
+  const teams = new Set(m.rank.map((e) => e.sq)).size;
+  $('ov-me').textContent = mine ? `${game.squad > 1 ? `우리 팀 #${mine.rank}등 / ${teams}팀` : `나는 #${mine.rank}등 / ${m.rank.length}명`} · ${mine.k}킬 · 피해 ${mine.dmg}` : '';
+  if (won && game.squad > 1) $('ov-title').innerHTML = '🍬 이겼젤! 우리 팀 오늘 간식은 젤리다!';
+  const mySq = mine?.sq;
+  $('ov-rank').innerHTML = m.rank.slice(0, 30).map((e) => `<div class="brow${e.id === game.myId ? ' me' : ''}${game.squad > 1 && e.sq === mySq ? ' mysq' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : '#' + e.rank}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${e.bot ? '🤖 ' : ''}${esc(e.name)}</span><span class="sc">${e.k}<small>킬 · ${e.dmg}</small></span></div>`).join('');
   game.lastPractice = !!m.practice;
   $('again-btn').textContent = m.practice ? '🔁 한 판 더' : '🔁 방으로 돌아가기';
   if (won) { confetti(); sfx('win'); } else sfx('lose');
@@ -540,13 +602,14 @@ function results(m) {
 function renderSlots() {
   const ids = slotIds(), I = game.inv;
   $('bg-slots').innerHTML = ids.map((id, i) => {
-    const w = id && weapon(id);
+    const w = id && wpn(id);
     const att = attOf(i), icons = w && i < 3 ? SLOTS.map((sl) => (att[sl] ? ATTS[att[sl]].emoji : '')).join('') : '';
-    const label = w ? `${w.emoji} ${w.name}${i === 4 ? ` ×${I[id]}${I.nade && I.smoke ? ' (5: 바꾸기)' : ''}` : ''}` : ['빈 주무기', '빈 주무기', '빈 권총', '', '투척 무기 없음'][i];
+    const nThrow = THROW_ORDER.filter((k) => I[k] > 0).length;
+    const label = w ? `${w.emoji} ${w.name}${i === 4 ? ` ×${I[id]}${nThrow > 1 ? ' (5: 바꾸기)' : ''}` : ''}${i < 2 && w.auto ? (game.single[id] ? ' ☝️' : ' 🔁') : ''}` : ['빈 주무기', '빈 주무기', '빈 권총', '', '투척 무기 없음'][i];
     const am = w && i < 3 ? ` <small>${ammo[id]?.mag ?? 0}/${I.ammo?.[AMMO_OF[id]] || 0}</small>` : '';
     return `<span class="${i === cur ? 'on' : ''}${w ? '' : ' empty'}">${i + 1} · ${esc(label)}${am}${icons ? ` <i>${icons}</i>` : ''}</span>`;
   }).join('');
-  $('heals').innerHTML = [['band', '7', '🩹'], ['med', '8', '🧰'], ['drink', '9', '🥤'], ['pill', '0', '💊']].map(([k, key, e]) => `<span class="${I[k] ? '' : 'none'}">${key} ${e} ×${I[k] || 0}</span>`).join('') + '<span class="tabk">Tab 🎒 가방 · X 버리기</span>';
+  $('heals').innerHTML = [['adren', '6', '💉'], ['band', '7', '🩹'], ['med', '8', '🧰'], ['drink', '9', '🥤'], ['pill', '0', '💊']].filter(([k]) => k !== 'adren' || I.adren).map(([k, key, e]) => `<span class="${I[k] ? '' : 'none'}">${key} ${e} ×${I[k] || 0}</span>`).join('') + `${I.gas ? `<span>⛽ ×${I.gas}</span>` : ''}<span class="tabk">Tab 🎒 가방 · X 버리기</span>`;
   renderInv();
 }
 function renderGear() {
@@ -558,10 +621,16 @@ function renderGear() {
 function hud(now) {
   const w = curW(), a = ammo[w?.id];
   $('hp-n').textContent = Math.max(0, Math.round(me.hp)); $('hp-bar').firstElementChild.style.width = `${Math.max(0, me.hp)}%`;
-  $('w-name').textContent = `${w?.emoji || ''} ${w?.name || ''}${reloadEnd ? ' · 장전 중…' : ''}`;
+  $('w-name').textContent = `${w?.emoji || ''} ${w?.name || ''}${w?.auto ? (game.single[w.id] ? ' · 단발 (B)' : ' · 연사 (B)') : ''}${reloadEnd ? ' · 장전 중…' : ''}`;
   $('ammo-n').textContent = a ? a.mag : w?.cls === 'nade' ? game.inv[w.id] : ''; $('ammo-r').textContent = a ? `/ ${game.inv.ammo?.[AMMO_OF[w.id]] || 0}` : '';
   $('boost').style.width = `${game.boost || 0}%`; $('boost').parentElement.classList.toggle('hidden', !(game.boost > 0));
-  $('alive').textContent = `🪂 생존 ${game.alive}`; $('kills').textContent = `🎯 ${game.kills}킬`;
+  $('alive').textContent = `🪂 생존 ${game.alive}${game.squad > 1 ? ` · 팀 ${game.squads}` : ''}`; $('kills').textContent = `🎯 ${game.kills}킬`;
+  // 몸 상태 표시
+  $('stance').textContent = game.mode !== 'ground' ? '' : game.knocked ? '💫 기절' : game.swim ? '🏊 헤엄' : game.vault ? '🧗 넘는 중' : me.prone > 0.5 ? '🛌 엎드림 (Z)' : me.crouch > 0.5 ? '🧎 앉음' : '';
+  $('stance').classList.toggle('hidden', !$('stance').textContent);
+  $('knock').classList.toggle('hidden', !game.knocked); if (game.knocked) $('knock-bar').style.width = `${Math.max(0, me.hp)}%`;
+  if (game.revBar) { const k = Math.min(1, 1 - (game.revBar.end - now) / game.revBar.ms); $('rev').classList.remove('hidden'); $('rev-txt').textContent = game.revBar.label; $('rev-bar').style.width = `${k * 100}%`; } else $('rev').classList.add('hidden');
+  renderSquad();
   const Z = zoneAt(game.zones, sec()), mm = Math.floor(Z.until / 60), ss = String(Math.floor(Z.until % 60)).padStart(2, '0');
   const zt = $('zone-txt');
   zt.textContent = sec() < 0 ? '곧 출발!' : Z.next ? (Z.shrinking ? `🌀 자기장이 줄어드는 중 ${mm}:${ss}` : `⏳ ${mm}:${ss} 뒤 자기장이 줄어요`) : '🌀 마지막 자기장';
@@ -569,11 +638,12 @@ function hud(now) {
   const out = game.mode !== 'dead' && Math.hypot(me.pos.x - Z.x, me.pos.z - Z.z) > Z.r && game.mode !== 'plane';
   $('zone-tint').style.opacity = out ? '1' : '0';
   // 줍기 안내
-  const it = game.mode === 'ground' ? nearestLoot() : null, car = game.mode === 'ground' && !it ? nearVehicle() : null;
-  if (it) { const swap = (it.k === 'gun' && game.inv.guns[0] && game.inv.guns[1]) || (it.k === 'pistol' && game.inv.pistol); $('prompt').innerHTML = `<kbd>E</kbd>${esc(itemLabel(it, weapon))}${swap ? ' (바꾸기)' : ''}`; }
-  else if (car) $('prompt').innerHTML = `<kbd>F</kbd>🚙 ${VEHICLES[car.kind].name} 타기 <small>${Math.round((car.hp / car.max) * 100)}%</small>`;
-  else if (game.mode === 'drive') { const v = game.drv.v; $('prompt').innerHTML = `🚙 ${Math.round(Math.abs(v.speed) * 3.6)}km/h · 차 ${Math.max(0, Math.round((v.hp / v.max) * 100))}% · <kbd>F</kbd>내리기`; }
-  $('prompt').classList.toggle('hidden', !it && !car && game.mode !== 'drive');
+  const mate = game.mode === 'ground' && !game.knocked ? reviveTarget() : null, it = game.mode === 'ground' && !game.knocked && !mate ? nearestLoot() : null, car = game.mode === 'ground' && !game.knocked && !it && !mate ? nearVehicle() : null;
+  if (mate) $('prompt').innerHTML = `<kbd>F</kbd>누르고 있기: 💫 ${esc(mate.name)} 살리기`;
+  else if (it) { const swap = (it.k === 'gun' && game.inv.guns[0] && game.inv.guns[1]) || (it.k === 'pistol' && game.inv.pistol); $('prompt').innerHTML = `<kbd>F</kbd>${esc(itemLabel(it, wpn))}${swap ? ' (바꾸기)' : ''}`; }
+  else if (car) $('prompt').innerHTML = `<kbd>F</kbd>${car.kind === 'boat' ? '🚤' : '🚙'} ${VEHICLES[car.kind].name} 타기 <small>${Math.round((car.hp / car.max) * 100)}% · ⛽ ${Math.round(car.fuel ?? 100)}%</small>`;
+  else if (game.mode === 'drive') { const v = game.drv.v, fu = Math.round(v.fuel ?? 100); $('prompt').innerHTML = `${v.kind === 'boat' ? '🚤' : '🚙'} ${Math.round(Math.abs(v.speed) * 3.6)}km/h · 차 ${Math.max(0, Math.round((v.hp / v.max) * 100))}% · <span class="${fu < 20 ? 'low' : ''}">⛽ ${fu}%</span>${game.inv.gas && fu < 100 ? ' · <kbd>R</kbd>기름 넣기' : ''} · <kbd>F</kbd>내리기`; }
+  $('prompt').classList.toggle('hidden', !mate && !it && !car && game.mode !== 'drive');
   const moving = Math.hypot(me.vel.x, me.vel.z) > 1.5;
   const gap = 6 + (mouseR ? 0 : 6) + (moving ? 10 : 0) + (me.onGround ? 0 : 12) + vm.kickT * 14;
   const c = $('cross'); c.classList.toggle('ads', mouseR && w?.cls !== 'knife');
@@ -581,13 +651,18 @@ function hud(now) {
   // 조준: 4배율 이상 · 저격총은 원형 스코프, 레드닷 · 2배율은 빨간 점
   const z = zoomNow(), sc = curAtt().scope, ads = mouseR && game.mode === 'ground' && w?.cls !== 'knife' && w?.cls !== 'nade';
   const bigScope = ads && (z >= 3.5 || (w?.scope && !sc));
-  c.classList.toggle('hidden', game.mode !== 'ground' || bigScope || (ads && !!sc));
+  c.classList.toggle('hidden', game.mode !== 'ground' || bigScope || (ads && !!sc) || game.swim || game.knocked);
   $('scope').classList.toggle('hidden', !bigScope);
   $('scope').dataset.z = bigScope ? `${Math.round(z)}x` : '';
   $('reddot').classList.toggle('hidden', !(ads && !bigScope && sc));
   if (healing) $('heal-bar').querySelector('i').style.width = `${Math.min(100, (1 - (healing.end - now) / healing.dur) * 100)}%`;
   drawMap($('mini'), 220, true, Z);
   if (bigMap) drawMap($('big'), 720, false, Z);
+}
+function renderSquad() {
+  if (game.squad < 2) return;
+  const key = JSON.stringify(game.sqInfo.map((q) => q.slice(0, 4))); if (key === game.sqKey) return; game.sqKey = key;
+  $('squad').innerHTML = game.sqInfo.map(([id, hp, kn, al]) => { const o = id === game.myId ? { name: '나' } : game.others.get(id); const col = !al ? '#666' : kn ? '#ff5a5a' : hp > 60 ? '#7be04a' : hp > 30 ? '#ffd23b' : '#ff7a5a'; return `<div class="sm${al ? '' : ' dead'}${id === game.myId ? ' me' : ''}"><b>${!al ? '💀' : kn ? '💫' : '🐻'}</b><span>${esc(o?.name || '?')}</span><i><u style="width:${al ? hp : 0}%;background:${col}"></u></i></div>`; }).join('');
 }
 function drawMap(cv, S, mini, Z) {
   const x = cv.getContext('2d'), k = S / (mini ? 120 : BG_SIZE + 20);
@@ -607,6 +682,10 @@ function drawMap(cv, S, mini, Z) {
     x.strokeStyle = '#4c8dff'; x.lineWidth = 2; x.beginPath(); x.arc(zx, zz, Z.r * k, 0, Math.PI * 2); x.stroke();
     if (Z.next) { const [nx, nz] = P(Z.next.x, Z.next.z); x.strokeStyle = '#ffffff'; x.setLineDash([6, 4]); x.beginPath(); x.arc(nx, nz, Z.next.r * k, 0, Math.PI * 2); x.stroke(); x.setLineDash([]); }
   }
+  // 레드존 (빨강) · 보급상자 (빨간 네모) · 분대 동료 (하늘색 점)
+  if (game.red) { const [rx, rz] = P(game.red.x, game.red.z); x.fillStyle = 'rgba(255,50,50,.35)'; x.beginPath(); x.arc(rx, rz, game.red.r * k, 0, Math.PI * 2); x.fill(); x.strokeStyle = '#ff3b3b'; x.lineWidth = 2; x.stroke(); }
+  for (const D of game.drops.values()) { const [a, b] = P(D.x, D.z); x.fillStyle = '#ff3b3b'; x.strokeStyle = '#fff'; x.lineWidth = 2; x.beginPath(); x.rect(a - 4, b - 4, 8, 8); x.fill(); x.stroke(); }
+  for (const [id, , kn, al, px, pz] of game.sqInfo) { if (id === game.myId || !al) continue; const [a, b] = P(px, pz); x.fillStyle = kn ? '#ff5a5a' : '#4cc3ff'; x.strokeStyle = '#fff'; x.lineWidth = 2; x.beginPath(); x.arc(a, b, 5, 0, Math.PI * 2); x.fill(); x.stroke(); }
   // 비행선 길
   if (game.mode === 'plane' || game.mode === 'fall') { const [a, b] = P(game.plane.a[0], game.plane.a[1]), [c, d] = P(game.plane.b[0], game.plane.b[1]); x.strokeStyle = 'rgba(255,143,196,.9)'; x.lineWidth = 2; x.setLineDash([8, 6]); x.beginPath(); x.moveTo(a, b); x.lineTo(c, d); x.stroke(); x.setLineDash([]); }
   // 차 (분홍 네모)
@@ -656,25 +735,43 @@ function frame() {
       if (me.pos.y <= fl + 0.05) { me.pos.y = fl; land(); }
     } else if (game.mode === 'ground') {
       if (reloadEnd && now >= reloadEnd) finishReload();
-      const inp = { f: kf('KeyW') - kf('KeyS'), s: kf('KeyD') - kf('KeyA'), jump: keys.has('Space') && !typing, crouch: !typing && (keys.has('KeyC') || keys.has('ControlLeft') || keys.has('ControlRight')), sprint: !typing && (keys.has('ShiftLeft') || keys.has('ShiftRight')) && !mouseL && !healing, ads: mouseR };
-      if (healing) { inp.f *= 0.4; inp.s *= 0.4; }
-      inp.speedMul = game.boost >= 60 ? 1.06 : 1; // 부스트가 높으면 조금 빨라진다
-      for (const e of me.update(dt, inp, MAP)) sfx(e, null, e === 'step' ? 0.6 : 1);
+      // 헤엄: 물 칸 안 · 땅 높이 · 기절: 엎드려 기어가기만
+      game.swim = inWater(MAP, me.pos.x, me.pos.z, 0.3) && me.pos.y < 0.3;
+      if (game.swim) game.prone = false;
+      const inp = { f: kf('KeyW') - kf('KeyS'), s: kf('KeyD') - kf('KeyA'), jump: keys.has('Space') && !typing && !game.vault && !game.swim && !game.knocked, crouch: !typing && !game.swim && (keys.has('KeyC') || keys.has('ControlLeft') || keys.has('ControlRight')), prone: (game.prone || game.knocked) && !game.swim, sprint: !typing && !game.swim && !game.knocked && (keys.has('ShiftLeft') || keys.has('ShiftRight')) && !mouseL && !healing, ads: mouseR && !game.swim && !game.knocked };
+      if (healing || game.reviving || game.revBar?.me) { inp.f *= game.reviving ? 0 : 0.4; inp.s *= game.reviving ? 0 : 0.4; }
+      inp.speedMul = (game.boost >= 60 ? 1.06 : 1) * (game.swim ? 0.55 : 1) * (game.knocked ? 1.6 : 1); // 부스트가 높으면 조금 빨라진다 · 헤엄은 느리게
+      // 기울이기 (Q · E 누르고 있기)
+      const lt = typing || game.swim || game.knocked || !me.onGround ? 0 : (keys.has('KeyE') ? 1 : 0) - (keys.has('KeyQ') ? 1 : 0);
+      game.lean += (lt - game.lean) * Math.min(1, dt * 10);
+      if (game.vault) {
+        // 넘기: 위로 올랐다가 앞으로
+        const V = game.vault; V.t += dt / V.dur; const k = Math.min(1, V.t);
+        me.pos.lerpVectors(V.from, V.to, k); me.pos.y = k < 0.5 ? V.from.y + (V.up - V.from.y) * (k * 2) : V.up + (V.to.y - V.up) * ((k - 0.5) * 2);
+        me.vel.set(0, 0, 0); if (k >= 1) { game.vault = null; me.onGround = true; }
+      } else for (const e of me.update(dt, inp, MAP)) sfx(e, null, e === 'step' ? 0.6 : 1);
+      if (game.reviving) { const o = game.others.get(game.reviving.id); if (!o || !o.knocked || o.pos.distanceTo(me.pos) > 3 || !keys.has('KeyF')) stopRevive(); }
       pushFromVehicles();
       if (mouseL && locked()) shoot(now);
       { const tw = curW(), on = tw?.cls === 'nade'; arc.show(on); if (on) { const k = tw.id === 'smoke'; arc.update(me.eye().addScaledVector(me.forward(), 0.5), me.forward().multiplyScalar(NADE.speed).add(new THREE.Vector3(0, NADE.up, 0)), MAP, k ? SMOKE.fuse : NADE.fuse, k ? SMOKE.r : NADE.r); } }
       if (kickBack > 0) { const r = Math.min(kickBack, dt * 1.2); me.pitch -= r; kickBack -= r; }
       if (healing && now >= healing.end) { shell.send({ t: 'heal', k: healing.k }); cancelHeal(); }
-      camera.position.copy(me.viewEye()); camera.rotation.set(me.pitch, me.yaw, 0);
+      camera.position.copy(me.viewEye());
+      if (game.lean) { camera.position.addScaledVector(new THREE.Vector3(Math.cos(me.yaw), 0, -Math.sin(me.yaw)), game.lean * 0.5); camera.position.y -= Math.abs(game.lean) * 0.12; }
+      if (game.swim) camera.position.y = me.pos.y + WATER_Y + 0.2 + Math.sin(t * 2.4) * 0.04;
+      camera.rotation.set(me.pitch + (game.free?.pitch || 0), me.yaw + (game.free?.yaw || 0), -game.lean * 0.2);
       if (game.shake > 0) { game.shake = Math.max(0, game.shake - dt * 1.6); const k = game.shake * game.shake * 0.35; camera.position.x += (Math.random() - 0.5) * k; camera.position.y += (Math.random() - 0.5) * k; camera.rotation.z += (Math.random() - 0.5) * k * 0.3; }
       const zoom = mouseR ? zoomNow() : 1;
       const fov = (me.sprinting ? 80 : 72) / zoom;
       if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 14); camera.updateProjectionMatrix(); }
       vm.update(dt, camera.aspect, Math.hypot(me.vel.x, me.vel.z) > 1.5 && me.onGround, mouseR, t);
+      vm.rig.visible = vm.rig.visible && !game.swim && !game.knocked && !game.vault && !game.free;
     } else if (game.mode === 'drive') {
       arc.show(false);
       driveStep(dt, kf, typing);
       if (healing && now >= healing.end) { shell.send({ t: 'heal', k: healing.k }); cancelHeal(); }
+      if (game.refuel) { $('heal-bar').querySelector('i').style.width = `${Math.min(100, (1 - (game.refuel.end - now) / 4000) * 100)}%`; if (now >= game.refuel.end) { game.refuel = null; $('heal-bar').classList.add('hidden'); shell.send({ t: 'refuel', id: game.drv.v.id }); game.drv.v.fuel = Math.min(100, (game.drv.v.fuel ?? 0) + 60); sfx('reload'); } }
+      if (game.free) camera.rotation.y += game.free.yaw * 0.6;
       if (camera.fov !== 72) { camera.fov = 72; camera.updateProjectionMatrix(); }
     } else if (game.mode === 'dead') {
       const o = game.watch && game.watch.alive ? game.watch : null;
@@ -689,6 +786,16 @@ function frame() {
     zoneEdge.position.set(Z.x, 0.3, Z.z); zoneEdge.scale.setScalar(Math.max(0.1, Z.r));
     zoneWall.material.opacity = 0.16 + Math.sin(t * 2) * 0.04;
     updateNades(dt);
+    water.update(t);
+    red.update(t, game.red, now); if (game.red && now > game.red.end) { game.red = null; red.set(null); }
+    for (const D of game.drops.values()) {
+      const k = Math.min(1, 1 - (D.land - now) / D.ms), y = D.landed ? D.gy : 90 - (90 - D.gy) * k;
+      D.c.g.position.y = y; D.c.chute.visible = !D.landed; D.c.light.material.opacity = 0.5 + Math.sin(t * 6) * 0.4;
+      if (D.landed && (D.c.smokeT -= dt) <= 0) { D.c.smokeT = 0.12; puff(new THREE.Vector3(D.x, D.gy + 1.4, D.z), '#ff5a4a', 1, 1.6, 0.6); fx[fx.length - 1].v.y = 3.5; fx[fx.length - 1].t = fx[fx.length - 1].life = 3; }
+      // 상자 안 아이템을 다 가져가면 상자도 사라진다
+      if (D.landed && now - D.landAt > 3000 && ![...game.loot.values()].some((it) => it.crate === D.id)) { scene.remove(D.c.g); game.drops.delete(D.id); }
+    }
+    for (let i = game.fires.length - 1; i >= 0; i--) { const f = game.fires[i]; updateFire(f, t); if (now > f.end) { scene.remove(f.g); game.fires.splice(i, 1); } }
     for (const o of game.others.values()) o.update(dt);
     updateVehicles(dt);
     // 아이템 빙글빙글 (가까운 것만)
@@ -697,8 +804,8 @@ function frame() {
     sendT -= dt;
     if (sendT <= 0 && game.mode !== 'dead') {
       sendT = 0.066;
-      if (game.mode === 'drive') { const v = game.drv.v; shell.send({ t: 'st', p: [v.x, v.y, v.z, v.yaw, 0, 16, v.id] }); } // 운전 중: 차 위치 · 방향
-      else { const f = game.mode === 'plane' ? 8 : game.mode === 'fall' ? (game.fall.chute ? 4 : 8) : (me.crouch > 0.5 ? 1 : 0) | (mouseR ? 2 : 0); shell.send({ t: 'st', p: [me.pos.x, me.pos.y, me.pos.z, me.yaw, me.pitch, f] }); }
+      if (game.mode === 'drive') { const v = game.drv.v; shell.send({ t: 'st', p: [v.x, v.y, v.z, v.yaw, 0, 16, v.id, Math.round(v.fuel ?? 100)] }); } // 운전 중: 차 위치 · 방향 · 기름
+      else { const f = game.mode === 'plane' ? 8 : game.mode === 'fall' ? (game.fall.chute ? 4 : 8) : (me.crouch > 0.5 ? 1 : 0) | (mouseR ? 2 : 0) | (me.prone > 0.5 && !game.knocked ? 32 : 0) | (game.knocked ? 64 : 0) | (game.swim ? 128 : 0); shell.send({ t: 'st', p: [me.pos.x, me.pos.y, me.pos.z, me.yaw, me.pitch, f, 0, Math.round(game.lean * 100) / 100] }); }
     }
     hud(now);
   } else {
@@ -709,7 +816,7 @@ function frame() {
   }
   updateFx(dt); updateBig(dt);
   renderer.clear(); renderer.render(scene, camera);
-  if (game.mode === 'ground') vm.render(renderer);
+  if (game.mode === 'ground' && vm.rig.visible) vm.render(renderer);
 }
 
 // ---------- 공용 틀 ----------
@@ -717,11 +824,11 @@ const shell = new Shell({
   sound: { muted: () => sound.muted, toggle: () => { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; } },
   key: 'jellybg', title: '🪂 젤리배그', subtitle: '젤리 비행선에서 뛰어내려 무기를 줍고<br>줄어드는 젤리 자기장 속 마지막 곰돌이가 되어요!', wsPath: '/bg-ws', max: 30,
   multiLabel: '👥 같이 하기', roomIcon: '🪂', startLabel: '🪂 비행선 출발!',
-  keysHelp: 'F/Space 뛰어내리기 · WASD 이동 · 마우스 조준 · 클릭 사격 · 우클릭 조준(스코프 배율) · E 줍기 · R 장전 · 1~5 무기(5 두 번: 수류탄/연막) · 7 붕대 · 8 구급상자 · 9 음료 · 0 진통제 · G 던지기 · X 든 것 버리기 · Tab 가방 · F 차 타기/내리기 · Shift 달리기 · C/Ctrl 앉기 · M 지도',
+  keysHelp: 'F/Space 뛰어내리기 · WASD 이동 · 마우스 조준 · 클릭 사격 · 우클릭 조준(스코프 배율) · F 줍기 · 차 타기 · 동료 살리기(누르고 있기) · R 장전(차 안: 기름) · 1~5 무기(5 여러 번: 투척 고르기) · 6 아드레날린 · 7 붕대 · 8 구급상자 · 9 음료 · 0 진통제 · G 던지기 · X 버리기 · B 단발/연사 · Z 엎드리기 · Q/E 기울이기 · Space 점프 · 넘기 · Alt 둘러보기 · Tab 가방 · Shift 달리기 · C/Ctrl 앉기 · M 지도',
   buttons: [{ id: 'practice-btn', label: '🪂 바로 하기 <small>젤리봇과 배틀로얄</small>', onClick: () => practice() }],
   extraRow: [{ label: '🖱️ 마우스 감도', onClick: () => openSens('bg') }],
   screens: ['over'],
-  describe: (o = {}) => { const m = BG_MAPS.find((x) => x.id === o.map); return `${m ? `${m.emoji} ${m.name}` : '🎲 무작위 맵'} · 🪂 ${o.fill || 24}명`; },
+  describe: (o = {}) => { const m = BG_MAPS.find((x) => x.id === o.map); return `${m ? `${m.emoji} ${m.name}` : '🎲 무작위 맵'} · ${['', '솔로', '듀오', '', '스쿼드'][o.squad || 1]} · 🪂 ${o.fill || 24}명`; },
   options: { room: (el, o, host) => optsUI(el, o, host, (n) => shell.send({ t: 'opts', opts: n })) },
   onProfile: (p) => { game.color = p.color; },
   onStart: (m) => start(m),
@@ -730,7 +837,8 @@ const shell = new Shell({
   onEscape: () => { if (bigMap) { bigMap = false; $('bigmap').classList.add('hidden'); return true; } if (invOpen()) { toggleInv(false); return true; } return false; },
   onDisconnect: () => { if (game.mode !== 'title') toTitle(); },
 });
-shell.pickOpts = () => ({ fill: game.pick.fill, map: game.pick.map });
+game.shell = shell; // 점검용
+shell.pickOpts = () => ({ fill: game.pick.fill, map: game.pick.map, squad: game.pick.squad });
 shell.on('snap', (m) => { for (const [id, ...st] of m.p) { if (id === game.myId) continue; const o = game.others.get(id); if (o) o.set(st); } });
 shell.on('jumped', (m) => { const o = game.others.get(m.id); if (o) { o.jumped = true; o.pos.copy(o.tgt); } });
 shell.on('loot', (m) => onLoot(m));
@@ -744,8 +852,9 @@ shell.on('full', (m) => shell.toast(m.text, 1300));
 shell.on('broke', (m) => { shell.toast(m.k === 'helmet' ? '⛑️ 헬멧이 부서졌어요!' : '🦺 조끼가 부서졌어요!', 1600); sfx('hurt'); });
 shell.on('wpn', (m) => { game.others.get(m.id)?.setGun(m.w); });
 shell.on('fire', (m) => {
+  if (m.ms) { game.fires.push(makeFire(scene, new THREE.Vector3(...m.p), m.r || 3.6, m.ms)); sfx('boom', null, Math.max(0.1, 0.5 - new THREE.Vector3(...m.p).distanceTo(camera.position) / 120)); return; }
   const o = game.others.get(m.by); if (!o || !Array.isArray(m.o)) return;
-  const w = weapon(m.w); o.firedT = 0.8;
+  const w = wpn(m.w); o.firedT = 0.8;
   const eye = new THREE.Vector3(...m.o), d = new THREE.Vector3(...m.d).normalize();
   const tt = rayBoxes(MAP, eye, d, 300), st = eye.clone().addScaledVector(d, 0.7); st.y -= 0.25;
   const dist = eye.distanceTo(camera.position);
@@ -765,9 +874,10 @@ shell.on('dmg', (m) => {
   if (m.by === game.myId && m.to !== game.myId) { sfx(m.head ? 'head' : 'hit'); const h = $('hitmark'); h.classList.toggle('head', !!m.head); h.classList.remove('hidden'); clearTimeout(game.hitT); game.hitT = setTimeout(() => h.classList.add('hidden'), 140); }
 });
 shell.on('kill', (m) => {
-  game.alive = m.alive;
+  game.alive = m.alive; if (m.squads != null) game.squads = m.squads;
+  { const ok = game.others.get(m.to); if (ok) ok.knocked = false; }
   const K = m.by === game.myId ? { name: '나' } : game.others.get(m.by), V = m.to === game.myId ? { name: '나' } : game.others.get(m.to);
-  const w = weapon(m.w);
+  const w = wpn(m.w);
   const row = document.createElement('div'); row.className = m.by === game.myId || m.to === game.myId ? 'me' : '';
   row.innerHTML = m.w === 'car' ? `${esc(K?.name || '?')} 🚙 ${esc(V?.name || '?')}` : m.w === 'zone' ? `🌀 ${esc(V?.name || '?')} 자기장에 녹음` : m.w === 'leave' ? `🚪 ${esc(V?.name || '?')} 나감` : `${esc(K?.name || '?')} ${w?.emoji || '💥'}${m.head ? '🎯' : ''} ${esc(V?.name || '?')}`;
   $('feed').prepend(row); setTimeout(() => row.remove(), 5000);
@@ -786,16 +896,65 @@ shell.on('boom', (m) => {
   if (d < 12) { const f = document.getElementById('nade-flash') || Object.assign(document.body.appendChild(document.createElement('div')), { id: 'nade-flash' }); f.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:4;background:#fff8e8;transition:opacity .6s;opacity:' + (0.85 * (1 - d / 12)).toFixed(2); requestAnimationFrame(() => requestAnimationFrame(() => { f.style.opacity = '0'; })); }
 });
 shell.on('gone', (m) => { game.others.get(m.id)?.remove(); game.others.delete(m.id); });
+// 기절 · 살리기
+shell.on('knock', (m) => {
+  const V = m.id === game.myId ? { name: '나' } : game.others.get(m.id), K = m.by === game.myId ? { name: '나' } : game.others.get(m.by);
+  const row = document.createElement('div'); row.className = m.by === game.myId || m.id === game.myId ? 'me' : '';
+  row.innerHTML = `${esc(K?.name || '?')} 💫 ${esc(V?.name || '?')} 기절`; $('feed').prepend(row); setTimeout(() => row.remove(), 5000);
+  const o = game.others.get(m.id); if (o) { o.knocked = true; puff(o.pos.clone().setY(o.pos.y + 0.6), '#ffd84d', 8, 0.25, 2); }
+  if (m.id === game.myId) {
+    game.knocked = true; game.prone = true; game.lean = 0; game.vault = null; cancelHeal(); if (game.reviving) stopRevive(); sfx('hurt');
+    if (game.drv) { const v = game.drv.v; game.drv = null; game.mode = 'ground'; me.pos.set(v.x + 2, v.y, v.z); myBear.root.visible = false; myBear.setSeated(false); }
+    banner('💫 기절! 동료가 살려 줄 수 있어요');
+  }
+  if (m.by === game.myId && m.id !== game.myId) { sfx('kill'); banner('💫 기절시켰어요!'); }
+});
+shell.on('reviving', (m) => {
+  if (m.to === game.myId) game.revBar = { end: performance.now() + m.ms, ms: m.ms, label: `💚 ${game.others.get(m.by)?.name || '동료'}이(가) 살리는 중…`, me: true };
+  if (m.by === game.myId) game.revBar = { end: performance.now() + m.ms, ms: m.ms, label: `💚 ${game.others.get(m.to)?.name || '동료'} 살리는 중… (F 계속)` };
+});
+shell.on('revive-stop', (m) => { if (m.to === game.myId || m.by === game.myId) { game.revBar = null; if (m.by === game.myId) game.reviving = null; } });
+shell.on('revived', (m) => {
+  const o = game.others.get(m.id); if (o) { o.knocked = false; puff(o.pos.clone().setY(o.pos.y + 1), '#9be7a7', 14, 0.3, 3); }
+  if (m.id === game.myId) { game.knocked = false; game.prone = false; me.hp = 20; banner('💚 살아났어요!'); sfx('spawn'); }
+  if (m.by === game.myId) { game.reviving = null; banner('💚 동료를 살렸어요!'); sfx('spawn'); }
+  if (m.id === game.myId || m.by === game.myId) game.revBar = null;
+});
+shell.on('sq', (m) => { game.sqInfo = m.m; for (const [id, , kn, al] of m.m) { const o = game.others.get(id); if (o) o.knocked = !!kn && !!al; } });
+// 레드존 · 보급상자 · 화염병 · 섬광탄
+shell.on('red', (m) => { const now = performance.now(); game.red = { x: m.x, z: m.z, r: m.r, start: now + m.in, end: now + m.in + m.dur }; red.set(game.red); banner('🔴 레드존! 건물 안으로 피해요'); sfx('whizz'); });
+shell.on('drop', (m) => {
+  const gy = Math.max(0, floorAt(MAP, m.x, m.z, 30));
+  const D = { id: m.id, x: m.x, z: m.z, ms: m.ms, land: performance.now() + m.ms, gy, landed: false, c: makeCrate(scene, m.x, m.z) };
+  game.drops.set(m.id, D);
+  shell.toast(m.flare === game.myId ? '🎆 내가 부른 보급상자가 떨어지는 중!' : '📦 보급상자가 떨어지는 중! (지도에 빨간 네모)', 2200);
+});
+shell.on('landed', (m) => { const D = game.drops.get(m.id); if (D) { D.landed = true; D.landAt = performance.now(); sfx('land'); } });
+shell.on('flash', (m) => {
+  const p = new THREE.Vector3(...m.p), e = camera.position.clone(), d = p.distanceTo(e);
+  puff(p, '#ffffff', 12, 1.2, 4); sfx('boom', null, Math.max(0.1, 0.8 - d / 60));
+  if (game.mode === 'dead' || d > 24) return;
+  const dir = p.clone().sub(e).normalize(), look = new THREE.Vector3(); camera.getWorldDirection(look);
+  const seen = rayBoxes(MAP, e, dir, d) >= d - 0.3;
+  const k = (seen ? Math.max(0.3, (look.dot(dir) + 1) / 2) : 0.15) * Math.max(0, 1 - d / 24);
+  if (k < 0.05) return;
+  const f = $('flashw'); f.style.transition = 'none'; f.style.opacity = String(Math.min(1, k * 1.6)); void f.offsetWidth;
+  f.style.transition = `opacity ${1.5 + k * 3}s ease-in`; f.style.opacity = '0';
+  game.shake = Math.max(game.shake || 0, k * 0.4);
+});
 function optsUI(el, o, editable, set) {
   const mp = o.map || 'random';
   el.innerHTML = `<div class="map-pick bgmaps">${[{ id: 'random', name: '무작위', emoji: '🎲', desc: '판마다 다른 맵' }, ...BG_MAPS].map((m) => `<button data-m="${m.id}" class="${m.id === mp ? 'on' : ''}" ${editable ? '' : 'disabled'} title="${esc(m.desc)}"><b>${m.emoji}</b>${esc(m.name)}</button>`).join('')}</div>
     <div class="note">${esc(([{ id: 'random', desc: '🎲 젤리 섬 · 눈꽃 섬 · 캔디 사막 중 하나' }, ...BG_MAPS].find((m) => m.id === mp) || {}).desc || '')}</div>
+    <div class="seg sqseg">${[[1, '🧍 솔로'], [2, '👯 듀오'], [4, '👨‍👩‍👧‍👦 스쿼드']].map(([n, l]) => `<button data-sq="${n}" class="${(o.squad || 1) === n ? 'on' : ''}" ${editable ? '' : 'disabled'}>${l}</button>`).join('')}</div>
+    <div class="note">${(o.squad || 1) > 1 ? '같은 방 친구끼리 먼저 한 팀 · 빈자리는 젤리봇 · 쓰러지면 기절 → 동료가 F 로 살려요' : '혼자서 끝까지 살아남기'}</div>
     <div class="bots-row">🪂 판 인원 (젤리봇으로 채우기) ${editable ? '<button data-b="-2">−</button>' : ''}<b>${o.fill ?? 24}</b>${editable ? '<button data-b="2">＋</button>' : ''}</div>`;
   el.querySelectorAll('[data-b]').forEach((b) => { b.onclick = () => set({ fill: Math.max(2, Math.min(30, (o.fill ?? 24) + +b.dataset.b)) }); });
   el.querySelectorAll('[data-m]').forEach((b) => { b.onclick = () => set({ map: b.dataset.m }); });
+  el.querySelectorAll('[data-sq]').forEach((b) => { b.onclick = () => set({ squad: +b.dataset.sq }); });
 }
 function renderTitleOpts() { optsUI($('title-opts'), game.pick, true, (n) => { Object.assign(game.pick, n); store.set(PICK_KEY, JSON.stringify(game.pick)); renderTitleOpts(); if (game.mode === 'title') loadBgMap(game.pick.map === 'random' ? 'island' : game.pick.map); }); }
-function practice() { shell.sendAfterHello({ t: 'practice', opts: { fill: game.pick.fill, map: game.pick.map } }); }
+function practice() { shell.sendAfterHello({ t: 'practice', opts: { fill: game.pick.fill, map: game.pick.map, squad: game.pick.squad } }); }
 $('again-btn').onclick = () => { if (game.lastPractice) return practice(); game.mode = 'room'; shell.backToRoom(); };
 $('home-btn').onclick = () => quit();
 function quit() { shell.send({ t: 'leave' }); shell.room = null; toTitle(); }

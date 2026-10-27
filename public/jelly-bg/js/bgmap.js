@@ -26,7 +26,7 @@ export function getBgMap(id) { const k = BG_MAPS.some((m) => m.id === id) ? id :
 // 맵을 짓는 도구 (상자 · 꾸밈 · 아이템 자리)
 function tools(R) {
   const rnd = (a, b) => a + R() * (b - a);
-  const boxes = [], deco = [], loot = [], roads = [];
+  const boxes = [], deco = [], loot = [], roads = [], water = [], boats = [];
   const T = 0.4; // 벽 두께
   // 문이 있는 벽 한 면: 축(axis 'x' 면 x 방향으로 뻗은 벽), 가운데에 폭 1.6 문 (door=false 면 막힌 벽 + 창문 구멍)
   function wallX(cx, z, len, h, y, k, door, win) {
@@ -95,8 +95,11 @@ function tools(R) {
   boxes.push(B(0, -S / 2 - 0.5, S + 2, 1, 12, 'outer', 0, { hide: true }), B(0, S / 2 + 0.5, S + 2, 1, 12, 'outer', 0, { hide: true }), B(-S / 2 - 0.5, 0, 1, S, 12, 'outer', 0, { hide: true }), B(S / 2 + 0.5, 0, 1, S, 12, 'outer', 0, { hide: true }));
   const roadSet = (main, side) => roads.push({ x: 0, z: 0, w: 200, d: 7, c: main, line: true }, { x: 0, z: 0, w: 7, d: 200, c: main, line: true }, { x: -62, z: -20, w: 6, d: 56, c: side }, { x: 62, z: 20, w: 6, d: 70, c: side });
   // 들판: 마을에서 떨어진 곳에 흩뿌리기 (f 가 하나씩 만든다)
-  const field = (places, n, f) => { for (let i = 0; i < n; i++) { const x = rnd(-112, 112), z = rnd(-112, 112); if (places.some((p) => Math.hypot(p.x - x, p.z - z) < 30) || Math.abs(x) < 6 || Math.abs(z) < 6) continue; f(x, z, i); } };
-  return { rnd, boxes, deco, loot, roads, wallX, wallZ, house, tree, rock, crate, car, tower, roadSet, field };
+  const wet = (x, z, pad = 2) => water.some((w) => Math.abs(x - w.x) < w.w / 2 + pad && Math.abs(z - w.z) < w.d / 2 + pad);
+  const field = (places, n, f) => { for (let i = 0; i < n; i++) { const x = rnd(-112, 112), z = rnd(-112, 112); if (places.some((p) => Math.hypot(p.x - x, p.z - z) < 30) || Math.abs(x) < 6 || Math.abs(z) < 6 || wet(x, z)) continue; f(x, z, i); } };
+  // 호수 (헤엄치기 · 보트) + 물가 보트
+  const lake = (x, z, w, d, boatList = []) => { water.push({ x, z, w, d }); for (const b of boatList) boats.push(b); };
+  return { rnd, boxes, deco, loot, roads, water, boats, wet, lake, wallX, wallZ, house, tree, rock, crate, car, tower, roadSet, field };
 }
 
 export function makeBgMap(id = 'island') {
@@ -108,6 +111,7 @@ export function makeBgMap(id = 'island') {
 }
 // 아이템 자리가 상자(탁자 · 컨베이어 · 기둥) 속이면: 낮으면 그 위로 올리고, 높으면 옆 빈자리로
 function fixLoot(map) {
+  map.loot = map.loot.filter(([x, , z]) => !(map.water || []).some((w) => Math.abs(x - w.x) < w.w / 2 + 0.5 && Math.abs(z - w.z) < w.d / 2 + 0.5));
   const at = (x, y, z) => map.boxes.find((b) => !b.k.startsWith('outer') && x > b.x - b.w / 2 - 0.15 && x < b.x + b.w / 2 + 0.15 && z > b.z - b.d / 2 - 0.15 && z < b.z + b.d / 2 + 0.15 && y + 0.1 > b.y && y + 0.1 < b.y + b.h);
   for (const L of map.loot) {
     const b = at(L[0], L[1], L[2]); if (!b) continue;
@@ -123,6 +127,7 @@ function islandMap(K, R) {
   const { rnd, boxes, deco, loot, roads, wallX, wallZ, house, tree, rock, crate, car } = K;
   const S = BG_SIZE;
   K.roadSet('#7a7480', '#8a8070');
+  K.lake(30, 95, 40, 26, [[22, 92, 0], [40, 98, Math.PI / 2]]); K.lake(113.5, -2, 11, 76, [[113, -24, 0], [113, 22, Math.PI]]); // 민트 호수 · 소다 항구 앞바다
 
   // 1) 젤리 마을: 집 8채 (몇 채는 2층)
   const V = PLACES[0];
@@ -188,7 +193,7 @@ function islandMap(K, R) {
   // 들판: 흩어진 나무 · 바위 · 덤불 · 젤리 웅덩이 · 길가 차
   for (let i = 0; i < 70; i++) {
     const x = rnd(-112, 112), z = rnd(-112, 112);
-    if (PLACES.some((p) => Math.hypot(p.x - x, p.z - z) < 30) || Math.abs(x) < 6 || Math.abs(z) < 6) continue;
+    if (PLACES.some((p) => Math.hypot(p.x - x, p.z - z) < 30) || Math.abs(x) < 6 || Math.abs(z) < 6 || K.wet(x, z)) continue;
     const k = R();
     if (k < 0.55) tree(x, z, R() < 0.3 ? 'pine' : 'tree');
     else if (k < 0.75) rock(x, z, rnd(0.8, 1.8));
@@ -203,7 +208,7 @@ function islandMap(K, R) {
     id: 'island', name: '젤리 섬', emoji: '🏝️', W: S, D: S, places: PLACES, land: '#8fc979',
     sky: ['#68b7ff', '#e6f5ff', '#bfe3f0'], fog: [90, 330], floor: '#8fc979', floor2: '#7db96a', sea: '#3fa0d8', clouds: 14,
     colors: { outer: '#888', home: '#f1dcc0', house: '#e8d4f0', house2: '#d9e9c8', school: '#f5e3b5', ware: '#d7c3a5', roofslab: '#a07a6a', floor: '#b89a7a', step: '#a89480', wall: '#c9b99a', brick: '#b5694f', low: '#9e9686', crate: '#b8864b', tank: '#ff8fb8', tank2: '#7cd8ff', belt: '#3c3a4c', cont1: '#e8574f', cont2: '#3f7cb5', cont3: '#5fae6e', dock: '#8a6a4a', trunk: '#7a5232', rock: '#9a9a9e', furn: '#a8784f', shelf: '#8f6a4a' },
-    boxes, deco, roads, loot,
+    boxes, deco, roads, loot, water: K.water, boats: K.boats,
     spawns: { red: [[0, 0]], blue: [[0, 0]] },
   };
 }
@@ -222,6 +227,7 @@ function snowMap(K, R) {
   const { rnd, boxes, deco, loot, wallX, wallZ, house, tree, rock, crate, car, tower, field } = K;
   const P = SNOW_PLACES, S = BG_SIZE;
   K.roadSet('#9aa6b8', '#b3bccb');
+  K.lake(30, 95, 40, 26, [[24, 92, 0]]); // 눈 녹은 호수
   const pine = (x, z) => tree(x, z, 'pine', { snow: true });
   // 1) 통나무 마을: 통나무집 8채 (2층 몇 채) · 장작 더미 · 가로등
   const V = P[0];
@@ -286,7 +292,7 @@ function snowMap(K, R) {
     id: 'snow', name: '눈꽃 섬', emoji: '❄️', W: S, D: S, places: P, land: '#eef3f9',
     sky: ['#8ab8e8', '#eef6ff', '#d8e4f0'], fog: [70, 280], floor: '#f2f6fb', floor2: '#dde6f0', sea: '#4f8fc0', clouds: 18,
     colors: { outer: '#888', cabin: '#b07a52', cabin2: '#9a6a48', lodge: '#c48a5a', hall: '#e8eef6', shop: '#f2d7e2', steel: '#9aa6b5', roofslab: '#e9f1f8', floor: '#a88a6a', step: '#9a8470', wall: '#c9d1dc', brick: '#9aa6b5', low: '#b8c2cf', crate: '#a8784f', tank2: '#7cd8ff', cont1: '#e8574f', cont2: '#3f7cb5', cont3: '#5fae6e', trunk: '#6b4a2c', rock: '#cfd6e2', ice: '#bfe8ff', pole: '#5a6070', furn: '#8a5c3a', shelf: '#7a5234' },
-    boxes, deco, roads: K.roads, loot,
+    boxes, deco, roads: K.roads, loot, water: K.water, boats: K.boats,
     spawns: { red: [[0, 0]], blue: [[0, 0]] },
   };
 }
@@ -305,12 +311,12 @@ function desertMap(K, R) {
   const { rnd, boxes, deco, loot, wallX, wallZ, house, rock, crate, car, tower, field } = K;
   const P = DESERT_PLACES, S = BG_SIZE;
   K.roadSet('#c9a875', '#d6b98a');
+  K.lake(30, 95, 40, 26, [[22, 92, 0], [40, 98, Math.PI / 2]]); K.lake(-60, -48, 9, 8); // 푸른 호수 · 오아시스
   const cactus = (x, z, s = 1) => { boxes.push(B(x, z, 0.7, 0.7, 2.4 * s, 'trunk', 0, { hide: true })); deco.push({ t: 'cactus', x, z, s }); };
   const palm = (x, z) => { boxes.push(B(x, z, 0.6, 0.6, 3, 'trunk', 0, { hide: true })); deco.push({ t: 'palm', x, z, s: rnd(0.9, 1.2) }); };
   // 1) 오아시스 마을: 흙벽돌 집(평평한 지붕 · 옥상 난간) · 오아시스 연못 · 야자수
   const V = P[0];
   [[-14, -10, 'S', 2], [0, -13, 'S', 1], [14, -10, 'S', 1], [-14, 11, 'N', 1], [2, 13, 'N', 2], [16, 10, 'N', 1], [-28, 0, 'E', 1], [28, -2, 'W', 2]].forEach(([dx, dz, door, fl], i) => house(V.x + dx, V.z + dz, i % 3 ? 8 : 9, 7, i % 2 ? 'adobe' : 'adobe2', fl, door, 3, 'flat'));
-  deco.push({ t: 'puddle', x: V.x + 2, z: V.z, c: '#46c2d8', s: 4 });
   for (const [dx, dz] of [[-6, -3], [9, 3], [-3, 4], [10, -4]]) palm(V.x + dx, V.z + dz);
   deco.push({ t: 'umbrella', x: V.x - 20, z: V.z + 2, c: '#ff8fb8' }, { t: 'sign', x: V.x - 34, z: V.z + 4, text: '오아시스 마을', c: '#c0784a', r: Math.PI / 2 });
   car(V.x + 22, V.z + 2, 0, '#ffd27a');
@@ -379,7 +385,7 @@ function desertMap(K, R) {
     id: 'desert', name: '캔디 사막', emoji: '🏜️', W: S, D: S, places: P, land: '#e8cf98',
     sky: ['#6cb2ff', '#fff0d2', '#f2d6a0'], fog: [90, 330], floor: '#ebd39e', floor2: '#dfc28a', sea: '#3fb6c8', clouds: 6,
     colors: { outer: '#888', adobe: '#e2b48a', adobe2: '#d79a72', ware: '#d7c3a5', roofslab: '#c99a72', floor: '#b89a7a', step: '#c4a07a', wall: '#d9b88a', low: '#c9a87a', crate: '#b8864b', tank: '#ff8fb8', tank2: '#ffd27a', cont1: '#e8574f', cont2: '#3f7cb5', cont3: '#5fae6e', trunk: '#6b8a3a', rock: '#d29a6a', temple: '#e8c27a', tstep: '#d9ae66', gold: '#ffcf4a', pillar: '#f2dfb4', cliff: '#c86a4a', sandbag: '#c9b083', stall: '#a8784f', sand: '#e4c890', pipe: '#9aa0ab', pole: '#6a6a78', furn: '#a8784f', shelf: '#8f6a4a' },
-    boxes, deco, roads: K.roads, loot,
+    boxes, deco, roads: K.roads, loot, water: K.water, boats: K.boats,
     spawns: { red: [[0, 0]], blue: [[0, 0]] },
   };
 }

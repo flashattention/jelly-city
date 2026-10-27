@@ -66,3 +66,19 @@ body #chat { bottom: 120px; }
 #inv .ii.none { opacity: .4; }
 #inv .none { opacity: .5; }
 @media (max-width: 760px) { #inv .inv-body { grid-template-columns: 1fr; } }
+
+/* 몸 상태 · 기절 · 살리기 · 분대 · 섬광 */
+#stance { position: absolute; left: 50%; bottom: 60px; transform: translateX(-50%); padding: 3px 12px; border-radius: 999px; background: rgba(20,8,50,.55); font-size: 14px; }
+#knock { position: fixed; inset: 0; z-index: 3; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: radial-gradient(ellipse at center, rgba(120,0,20,.15) 30%, rgba(160,0,30,.6) 100%); font-family: 'Jua', sans-serif; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.7); }
+#knock b { font-size: 42px; } #knock span { font-size: 17px; }
+#knock .kb { width: 260px; height: 12px; border-radius: 999px; background: rgba(255,255,255,.2); overflow: hidden; } #knock .kb i { display: block; height: 100%; background: linear-gradient(90deg, #ff3b5c, #ffb36b); transition: width .3s; }
+#rev { position: absolute; left: 50%; top: 52%; transform: translateX(-50%); text-align: center; font-size: 18px; }
+#rev .pbar2 i { background: linear-gradient(90deg, #7cf0c8, #9be7a7); }
+#squad { position: absolute; left: 14px; top: 14px; display: flex; flex-direction: column; gap: 4px; width: 190px; }
+#squad .sm { display: grid; grid-template-columns: 22px 1fr; gap: 0 6px; align-items: center; padding: 4px 8px; border-radius: 10px; background: rgba(20,8,50,.6); font-size: 13px; }
+#squad .sm b { grid-row: span 2; font-weight: normal; } #squad .sm.me { outline: 2px solid #4cc3ff; } #squad .sm.dead { opacity: .45; }
+#squad .sm i { display: block; height: 6px; border-radius: 3px; background: rgba(255,255,255,.15); overflow: hidden; } #squad .sm u { display: block; height: 100%; text-decoration: none; transition: width .3s; }
+#flashw { position: fixed; inset: 0; z-index: 5; pointer-events: none; background: #fffef6; opacity: 0; }
+#prompt .low { color: #ff7a5a; }
+.sqseg { margin-top: 8px; }
+#ov-rank .brow.mysq { background: rgba(76,195,255,.18); }
