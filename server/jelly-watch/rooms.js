@@ -8,8 +8,8 @@ import { clearLine, floorAt } from '../../public/jelly-attack/js/maps.js';
 
 const EYE = 1.55;
 const SELECT_MS = 25000, SETUP_ASSAULT = 20000, SETUP_CONTROL = 12000;
-const ASSAULT_SEC = Number(process.env.WATCH_SEC) || 4 * 60, BONUS_SEC = 150, CONTROL_LIMIT = 8 * 60;
-const CAP_SOLO = 13, CTRL_CAP = 9, CTRL_WIN = 85; // 점령 시간(초) · 쟁탈전 100% 까지 초
+const ASSAULT_SEC = Number(process.env.WATCH_SEC) || 4 * 60, BONUS_SEC = 120, CONTROL_LIMIT = 8 * 60;
+const CAP_SOLO = Number(process.env.WATCH_CAP) || 21, CTRL_CAP = 9, CTRL_WIN = 85; // 점령 시간(초) · 쟁탈전 100% 까지 초
 const CAP_MUL = [0, 1, 1.5, 1.85, 2.1, 2.3, 2.45];
 const ULT_X = Number(process.env.WATCH_ULTX) || 1; // 점검용: 궁극기 빨리 채우기
 const BOT_NAMES = ['젤리봇 딸기', '젤리봇 소다', '젤리봇 푸딩', '젤리봇 망고', '젤리봇 민트', '젤리봇 라임', '젤리봇 자두', '젤리봇 복숭아', '젤리봇 포도', '젤리봇 레몬', '젤리봇 체리', '젤리봇 키위'];
@@ -128,18 +128,18 @@ export class WatchRooms extends BaseRooms {
   // ---------- 부활 ----------
   spawnPts(r, team) {
     const g = r.g, sp = g.map.spawns;
-    if (g.mode === 'assault') return team === g.atk ? (g.pi >= 1 ? sp.atk2 : sp.atk) : sp.def;
+    if (g.mode === 'assault') return team === g.atk ? (g.pi >= 1 ? sp.atk2 : sp.atk) : (g.pi === 0 && sp.def1 ? sp.def1 : sp.def);
     return sp[team];
   }
   roomOf(r, team) {
     const g = r.g, rm = g.map.rooms;
-    if (g.mode === 'assault') return team === g.atk ? (g.pi >= 1 ? rm.atk2 : rm.atk) : rm.def;
+    if (g.mode === 'assault') return team === g.atk ? (g.pi >= 1 ? rm.atk2 : rm.atk) : (g.pi === 0 && rm.def1 ? rm.def1 : rm.def);
     return rm[team];
   }
   objPt(r) { const g = r.g; return g.map.points[Math.min(g.pi, g.map.points.length - 1)]; }
   spawn(r, p, now, at) {
     const pts = this.spawnPts(r, p.team), s = at || pts[Math.floor(Math.random() * pts.length)];
-    const x = s[0] + (at ? 0 : rnd(-0.8, 0.8)), z = s[1] + (at ? 0 : rnd(-0.8, 0.8)), y = at ? s[2] : floorAt(r.g.map, x, z, 3);
+    const x = s[0] + (at ? 0 : rnd(-0.8, 0.8)), z = s[1] + (at ? 0 : rnd(-0.8, 0.8)), y = at ? s[2] : floorAt(r.g.map, x, z, 0.6); // 1층 바닥에 (2층 집 안에서 태어나도)
     const o = this.objPt(r), yaw = Math.atan2(-(o.x - x), -(o.z - z));
     Object.assign(p, { alive: true, hp: this.maxHp(p), over: 0, prim: 0, bub: 0, fx: {}, respawnAt: 0, shieldOn: false, mtxOn: false, hist: [] });
     if (p.hero === 'dva' && p.pilot) { p.pilot = false; p.hp = this.maxHp(p); }
@@ -335,7 +335,7 @@ export class WatchRooms extends BaseRooms {
         if (ally) continue;
         if (blockBy(r.g.ents, a, chest(t), c.team)) continue;
         let dmg = (spec.dps || 0) * dt;
-        if (spec.energy) dmg *= 1 + c.energy / 100;
+        if (spec.energy) dmg *= 1 + c.energy / 140; // 에너지 100 이면 1.7배
         this.damage(r, t, dmg, c, now, { a: key === 's' ? 's' : 'p', beam: true });
         if (spec.selfHeal) this.heal(r, c, spec.selfHeal * dt, c, now);
       }
@@ -403,7 +403,7 @@ export class WatchRooms extends BaseRooms {
     if (id === 'rein') { if (slot === 'shift') { c.chargeAt = now; c.pinned = false; c.fx.charge = now + 2600; } if (slot === 'e') { c.fireAt = now; c.fireHits = 0; tok('fire'); } }
     if (id === 'winston') { if (slot === 'shift') { c.leapAt = now; c.landed = false; } if (slot === 'e') this.addEnt(r, { k: 'dome', team: c.team, owner: c, x: c.pos.x, y: c.pos.y, z: c.pos.z, hp: 700, max: 700, until: now + 8000 }); }
     if (id === 'dva') { if (slot === 'shift') c.boostAt = now; if (slot === 'e' && !c.pilot) tok('mini', 18); }
-    if (id === 'hog') { if (slot === 'shift') tok('hook'); if (slot === 'e') { c.fx.breath = now + 1800; c.hot = { until: now + 1800, rate: 350 / 1.8 }; } }
+    if (id === 'hog') { if (slot === 'shift') tok('hook'); if (slot === 'e') { c.fx.breath = now + 1800; c.hot = { until: now + 1800, rate: 300 / 1.8 }; } }
     if (id === 'zarya') {
       if (slot === 'shift') this.bubble(c, c, now);
       if (slot === 'e') { const t = r.players.find((p) => p.id === +m.to && p.team === c.team && p.alive); this.bubble(t && d3(t.pos, c.pos) < 32 ? t : c, c, now); }
@@ -510,7 +510,7 @@ export class WatchRooms extends BaseRooms {
     if (t.fx.breath > now) amt *= 0.5;
     const dealt = amt;
     // 보호막 순서: 입자 방벽 → 원시의 분노 → 소리 방벽 → 체력
-    if (t.bub > 0 && t.fx.bub > now) { const a = Math.min(t.bub, amt); t.bub -= a; amt -= a; const z = t.bubBy; if (z?.hero === 'zarya') z.energy = Math.min(100, z.energy + a * 0.45); }
+    if (t.bub > 0 && t.fx.bub > now) { const a = Math.min(t.bub, amt); t.bub -= a; amt -= a; const z = t.bubBy; if (z?.hero === 'zarya') z.energy = Math.min(100, z.energy + a * 0.35); }
     if (t.prim > 0 && amt > 0) { const a = Math.min(t.prim, amt); t.prim -= a; amt -= a; }
     if (t.over > 0 && amt > 0) { const a = Math.min(t.over, amt); t.over -= a; amt -= a; }
     t.hp -= amt;
@@ -563,7 +563,10 @@ export class WatchRooms extends BaseRooms {
     for (const p of r.players) if (!p.alive && p.hero && p.respawnAt && now >= p.respawnAt) this.spawn(r, p, now);
     this.statusTick(r, now, dt);
     this.entTick(r, now, dt);
-    for (const b of r.players) if (b.bot && b.alive && b.hero) this.botThink(r, b, dt, now);
+    // 봇 차례는 매번 섞는다 (늘 같은 팀이 먼저 쏘지 않게)
+    const bots = r.players.filter((b) => b.bot && b.alive && b.hero);
+    for (let i = bots.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bots[i], bots[j]] = [bots[j], bots[i]]; }
+    for (const b of bots) this.botThink(r, b, dt, now);
     if (g.phase === 'play') this.objTick(r, now, dt);
     this.sendState(r, now, dt);
   }
@@ -583,7 +586,7 @@ export class WatchRooms extends BaseRooms {
       if (p.over > 0) p.over = Math.max(0, p.over - 85 * dt);
       if (p.prim > 0 && !(p.fx.primal > now)) p.prim = 0;
       if (p.bub > 0 && !(p.fx.bub > now)) p.bub = 0;
-      if (p.hero === 'zarya' && now - (p.lastEnergy || 0) > 0) p.energy = Math.max(0, p.energy - 1.6 * dt);
+      if (p.hero === 'zarya' && now - (p.lastEnergy || 0) > 0) p.energy = Math.max(0, p.energy - 3 * dt);
       if (p.hero === 'rein') { if (p.shieldOn) { const e = g.ents.find((x) => x.k === 'shield' && x.owner === p); if (e) { e.x = p.pos.x; e.y = p.pos.y; e.z = p.pos.z; e.yaw = p.yaw; } } else if (now - (p.shieldBroke || 0) > 5000) p.shp = Math.min(1200, p.shp + 150 * dt); }
       if (p.hero === 'dva') { if (p.mtxOn) { p.mtx -= dt; if (p.mtx <= 0) { p.mtx = 0; p.mtxOn = false; } p.mtxUsed = now; } else if (now - (p.mtxUsed || 0) > 1000) p.mtx = Math.min(3, p.mtx + dt * 0.5); }
       if (p.hero === 'moira' && now - (p.sprayAt || 0) > 400) p.res = Math.min(100, p.res + 14 * dt);
@@ -613,7 +616,7 @@ export class WatchRooms extends BaseRooms {
         const amp = p.fx.amp > now;
         for (const t of r.players) {
           if (!t.alive || t.team !== p.team || d3(t.pos, p.pos) > 12) continue;
-          if (p.song === 'heal') this.heal(r, t, (amp ? 52 : 16) * dt * (t === p ? 0.7 : 1), p, now); else { t.fx.spd = now + 400; t.spdK = amp ? 1.6 : 1.28; }
+          if (p.song === 'heal') this.heal(r, t, (amp ? 48 : 13) * dt * (t === p ? 0.7 : 1), p, now); else { t.fx.spd = now + 400; t.spdK = amp ? 1.6 : 1.28; }
         }
       }
       if (p.fx.valk > now && p.hero === 'mercy') p.ult = 0;
@@ -683,7 +686,7 @@ export class WatchRooms extends BaseRooms {
       for (const p of on) p.obj += dt;
       g.atkN = atkN; g.defN = defN; g.contested = atkN > 0 && defN > 0;
       if (atkN > 0) g.lastAtk = now;
-      if (atkN > 0 && defN === 0) g.prog = Math.min(100, g.prog + dt * (100 / CAP_SOLO) * CAP_MUL[Math.min(6, atkN)]);
+      if (atkN > 0 && defN === 0) g.prog = Math.min(100, g.prog + dt * (100 / (pt.cap || CAP_SOLO)) * CAP_MUL[Math.min(6, atkN)]); // 맵마다 거점 점령 시간이 다를 수 있다
       else if (atkN === 0 && now - g.lastAtk > 3000) { const floor = Math.floor(g.prog / 33.34) * 33.34; g.prog = Math.max(floor, g.prog - dt * 6); }
       if (g.prog >= 100) {
         if (g.pi === 0) {
@@ -744,7 +747,9 @@ export class WatchRooms extends BaseRooms {
       for (const f of cands) if (!here.some((b) => b.y < f + 1.8 && b.y + b.h > f + 0.05)) return f;
       return null;
     };
-    for (let x = -map.W / 2 + 1.5; x <= map.W / 2 - 1.5; x += S) for (let z = -map.D / 2 + 1.5; z <= map.D / 2 - 1.5; z += S) {
+    // 격자는 가운데(0)를 기준으로 대칭 (양 팀 길이가 같게)
+    const X = Math.floor((map.W / 2 - 1.5) / S) * S, Z = Math.floor((map.D / 2 - 1.5) / S) * S;
+    for (let x = -X; x <= X; x += S) for (let z = -Z; z <= Z; z += S) {
       const f = floorOf(x, z); if (f == null) continue;
       idx.set(`${x},${z}`, nodes.length); nodes.push({ x, z, f, n: [] });
     }
@@ -762,11 +767,19 @@ export class WatchRooms extends BaseRooms {
     this.navs.set(map.id, nav);
     return nav;
   }
+  // A*: 실제 거리로 (대각선을 직선과 같게 세면 한쪽 팀 봇만 지그재그로 돌아가는 일이 생긴다)
   pathTo(nav, from, to) {
-    const prev = new Map([[from, -1]]), q = [from];
-    for (let qi = 0; qi < q.length; qi++) { const c = q[qi]; if (c === to) break; for (const n of nav.nodes[c].n) if (!prev.has(n)) { prev.set(n, c); q.push(n); } }
+    const N = nav.nodes, T = N[to], g = new Map([[from, 0]]), prev = new Map([[from, -1]]), done = new Set();
+    const h = (i) => Math.hypot(N[i].x - T.x, N[i].z - T.z);
+    const heap = [[h(from), from]];
+    const push = (e) => { heap.push(e); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = i * 2 + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
+    while (heap.length) {
+      const [, c] = pop(); if (done.has(c)) continue; done.add(c); if (c === to) break;
+      for (const n of N[c].n) { const ng = g.get(c) + Math.hypot(N[n].x - N[c].x, N[n].z - N[c].z, (N[n].f - N[c].f) * 2); if (ng < (g.get(n) ?? Infinity)) { g.set(n, ng); prev.set(n, c); push([ng + h(n), n]); } }
+    }
     if (!prev.has(to)) return null;
-    const out = []; for (let c = to; c !== -1; c = prev.get(c)) out.unshift(nav.nodes[c]);
+    const out = []; for (let c = to; c !== -1; c = prev.get(c)) out.unshift(N[c]);
     return out;
   }
   // 봇이 갈 곳: 거점 (공격팀은 거점 위 · 수비팀은 거점 근처) / 준비 시간엔 출발 방 앞
@@ -794,6 +807,8 @@ export class WatchRooms extends BaseRooms {
     if (sup) { let worst = 0.97; for (const p of r.players) { if (p === b || p.team !== b.team || !p.alive) continue; const k = p.hp / this.maxHp(p), d = d3(b.pos, p.pos); if (k < worst && d < 22 && this.canSee(r, eye, p)) { worst = k; ally = p; } } }
     if (tgt !== b.target) { b.target = tgt; b.react = 0.3 + Math.random() * 0.45 * (1.3 - b.skill); }
     this.botAbil(r, b, h, tgt, td, ally, now);
+    // 젤리하르트: 멀리 있는 적에겐 방패를 들고 다가가고, 가까우면 내리고 휘두른다
+    if (b.hero === 'rein') { const want = !!tgt && td > 6.5 && b.shp > 150 && now - (b.shieldBroke || 0) > 5000 && !(b.fx.charge > now); if (want !== !!b.shieldOn) { b.shieldOn = want; this.syncShield(r, b); } }
     let moving = false, look = null;
     const range = spec.type === 'melee' ? 3.5 : spec.type === 'beam' ? spec.range - 1 : spec.near ? Math.max(6, spec.near * 0.8) : 18;
     // 공격 · 치유
@@ -871,7 +886,7 @@ export class WatchRooms extends BaseRooms {
       if (td > spec.range) return;
       b.beamTo = tgt.id;
       if (blocked) { this.hurtEnt(r, blocked.e, (spec.dps || 60) * dt, b); return; }
-      let dmg = (spec.dps || 60) * dt * (0.6 + b.skill * 0.4); if (spec.energy) dmg *= 1 + b.energy / 100;
+      let dmg = (spec.dps || 60) * dt * (0.6 + b.skill * 0.4); if (spec.energy) dmg *= 1 + b.energy / 140;
       this.damage(r, tgt, dmg, b, now, { a: 'p', beam: true });
       return;
     }
@@ -949,7 +964,14 @@ export class WatchRooms extends BaseRooms {
       }
     }
     // 방어 · 이동기
-    if (b.hero === 'hog' && lowHp < 0.45 && cdOk('e')) { use('e'); b.fx.breath = now + 1800; b.hot = { until: now + 1800, rate: 350 / 1.8 }; return; }
+    if (b.hero === 'mercy' && cdOk('e')) { const dead = r.players.find((p) => p.team === b.team && !p.alive && p.deathPos && now - p.deadAt < 10000 && d3(p.deathPos, b.pos) < 7); if (dead && this.rez(r, b, now)) { b.cd.e = now + 30000; return; } }
+    if (b.hero === 'tracer' && b.blinks > 0 && tgt && lowHp < 0.8 && Math.random() < 0.5) {
+      // 점멸: 옆으로 휙 (벽이면 안 간다)
+      const side = Math.random() < 0.5 ? 1 : -1, rx = Math.cos(b.yaw) * side, rz = -Math.sin(b.yaw) * side, nx = b.pos.x + rx * 6, nz = b.pos.z + rz * 6;
+      if (clearLine(r.g.map, { x: b.pos.x, y: b.pos.y + 1, z: b.pos.z }, { x: nx, y: b.pos.y + 1, z: nz }) && Math.abs(floorAt(r.g.map, nx, nz, b.pos.y + 1) - b.pos.y) < 1) { b.pos.x = nx; b.pos.z = nz; b.blinks--; this.toRoom(r, { t: 'fx', k: 'abil', by: b.id, h: 'tracer', s: 'shift', p: [b.pos.x, b.pos.y, b.pos.z], yaw: b.yaw }); b.path = null; return; }
+    }
+    if (b.hero === 'widow' && cdOk('e') && tgt && td < 30) { use('e'); for (const e of r.g.ents.filter((e) => e.k === 'mine' && e.owner === b)) this.removeEnt(r, e); this.addEnt(r, { k: 'mine', team: b.team, owner: b, x: b.pos.x, y: b.pos.y + 0.05, z: b.pos.z, until: now + 90000 }); return; }
+    if (b.hero === 'hog' && lowHp < 0.45 && cdOk('e')) { use('e'); b.fx.breath = now + 1800; b.hot = { until: now + 1800, rate: 300 / 1.8 }; return; }
     if (b.hero === 'winston' && cdOk('e') && near >= 1 && lowHp < 0.75) { use('e'); this.addEnt(r, { k: 'dome', team: b.team, owner: b, x: b.pos.x, y: b.pos.y, z: b.pos.z, hp: 700, max: 700, until: now + 8000 }); return; }
     if (b.hero === 'soldier' && cdOk('e') && lowHp < 0.55) { use('e'); this.addEnt(r, { k: 'field', team: b.team, owner: b, x: b.pos.x, y: b.pos.y, z: b.pos.z, until: now + 5000, r: 5 }); return; }
     if (b.hero === 'zarya' && cdOk('shift') && lowHp < 0.8 && near) { use('shift'); this.bubble(b, b, now); return; }

@@ -289,7 +289,7 @@ function boomFx(k, p) {
   if (P.make === 'mine') puff(scene, p, '#c47bff', 6, 0.3, 1);
 }
 function send(m) { shell.send(m); }
-game.send = send; // 점검용
+game.send = send; game.scene = scene; game.camera = camera; // 점검용
 function shake(k) { game.shake = Math.max(game.shake || 0, k); }
 function flash(col) { const f = $('flash'); f.style.background = col; f.style.transition = 'none'; f.style.opacity = '0.45'; requestAnimationFrame(() => requestAnimationFrame(() => { f.style.transition = 'opacity .35s'; f.style.opacity = '0'; })); }
 const h = () => game.h;
@@ -461,7 +461,7 @@ function openSwap() {
 }
 function closeSwap() { $('select').classList.add('hidden'); $('select').classList.remove('swap'); if (game.mode === 'play') lock(); }
 $('sel-close').onclick = closeSwap;
-function roomOf(team) { const rm = game.map.rooms; if (game.mmode === 'assault') return team === game.atk ? (game.obj?.pi >= 1 ? rm.atk2 : rm.atk) : rm.def; return rm[team]; }
+function roomOf(team) { const rm = game.map.rooms; if (game.mmode === 'assault') return team === game.atk ? (game.obj?.pi >= 1 ? rm.atk2 : rm.atk) : (!(game.obj?.pi >= 1) && rm.def1 ? rm.def1 : rm.def); return rm[team]; }
 function openDex() {
   game.dexSel = game.dexSel || 'rein';
   const draw = () => { $('dex-grid').innerHTML = ['tank', 'dps', 'sup'].map((ro) => `<div class="role"><div class="rh" style="color:${ROLES[ro].color}">${ROLES[ro].icon} ${ROLES[ro].name}</div><div class="rg">${HEROES.filter((x) => x.role === ro).map((x) => heroCard(x, null, x.id === game.dexSel)).join('')}</div></div>`).join(''); $('dex-kit').innerHTML = kitHTML(heroById(game.dexSel)); $('dex-grid').querySelectorAll('[data-h]').forEach((b) => { b.onclick = () => { game.dexSel = b.dataset.h; sfx('pick'); draw(); }; }); };
@@ -704,7 +704,7 @@ function hud(now) {
     } else {
       const us = o.pct[game.team] || 0, them = o.pct[game.team === 'red' ? 'blue' : 'red'] || 0;
       const ownCol = o.owner ? (o.owner === game.team ? '#7cd8ff' : '#ff6a8a') : '#ffffff';
-      $('obj').innerHTML = `<div class="ob-row"><div class="pc us">${us}%</div><div class="pt act${o.ct ? ' ct' : ''}" style="--k:${o.cap?.v || 0};--c:${o.cap?.team === game.team ? '#7cd8ff' : '#ff6a8a'};border-color:${ownCol}"><b>${o.ph === 'setup' ? '🔒' : 'C'}</b></div><div class="pc them">${them}%</div></div><div class="ob-s">${o.ph === 'setup' ? `거점 열림까지 ${tt}` : o.ot ? '⏱️ 연장전!' : o.ct ? '⚔️ 경합 중!' : o.owner ? (o.owner === game.team ? '🔵 우리 팀 거점' : '🔴 적 팀 거점') : '거점을 차지하세요'} · ${tt}</div>`;
+      $('obj').innerHTML = `<div class="ob-row"><div class="pc us">${us}%</div><div class="pt act${o.ct ? ' ct' : ''}" style="--k:${o.cap?.v || 0};--c:${o.cap?.team === game.team ? '#7cd8ff' : '#ff6a8a'};border-color:${ownCol}"><b>${o.ph === 'setup' ? '🔒' : 'C'}</b></div><div class="pc them">${them}%</div></div><div class="ob-s">${o.ph === 'setup' ? `거점 열림까지 ${tt}` : o.ot ? '⏱️ 연장전!' : o.ct ? '⚔️ 경합 중!' : o.owner ? (o.owner === game.team ? '🔵 우리 팀 거점' : '🔴 적 팀 거점') : '거점을 차지하세요'}${o.ph === 'setup' ? '' : ` · ${tt}`}</div>`;
     }
   }
   // 위쪽 영웅 목록 (우리 팀 왼쪽 · 적 팀 오른쪽)
@@ -872,7 +872,7 @@ function frame() {
   } else if (game.cut) {
     for (const o of game.others.values()) o.update(dt, t);
     updateCut(dt);
-  } else if (game.map) {
+  } else if (game.map && game.mode !== 'look') {
     const a = t * 0.05, R = Math.max(game.map.W, game.map.D) * 0.5;
     camera.position.set(Math.cos(a) * R, 30, Math.sin(a) * R); camera.lookAt(0, 0, 0);
     if (camera.fov !== 60) { camera.fov = 60; camera.updateProjectionMatrix(); }
