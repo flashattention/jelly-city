@@ -7,7 +7,7 @@ import { Shell, esc } from '../../shared/js/shell.js';
 import { Roach } from '../../shared/js/roach.js';
 import { confetti } from '../../shared/js/party.js';
 import { rayBoxes, floorAt } from '../../jelly-attack/js/maps.js';
-import { makeBgMap, PLACES, BG_SIZE } from './bgmap.js';
+import { getBgMap, BG_MAPS, BG_SIZE } from './bgmap.js';
 import { HEALS, DROP, zoneAt, planeAt, itemLabel, emptyInv, ARMOR_NAME, AMMO, AMMO_OF, ATTS, SLOTS, CAP, BOOSTS, BAG_NAME, ammoTotal, VEHICLES } from './bgrules.js';
 import { buildVehicle, drive, poseVehicle, dressGear, extraLoot } from './bgparts.js';
 import { weapon, KNIFE, NADE, SMOKE } from '../../jelly-attack/js/weapons.js';
@@ -18,7 +18,7 @@ import { explosion, smoke, updateFx as updateBig, stepNade, NadeArc } from '../.
 
 const $ = (id) => document.getElementById(id);
 const PICK_KEY = 'jellybg.pick';
-const MAP = makeBgMap();
+let MAP = getBgMap('island');
 
 // ---------- 3D ----------
 const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, powerPreference: 'high-performance' });
@@ -29,14 +29,16 @@ const camera = new THREE.PerspectiveCamera(72, 1, 0.05, 1400);
 camera.rotation.order = 'YXZ';
 function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
-const world = buildMap(scene, MAP);
+let world = buildMap(scene, MAP);
+// 맵 바꾸기 (판마다 · 처음 화면 미리보기)
+function loadBgMap(id) { const m = getBgMap(id); if (m === MAP) return; world.dispose(); MAP = m; world = buildMap(scene, MAP); }
 
 const me = new Player();
 let vm = new ViewModel('#8a5634');
 const pick0 = (() => { try { return JSON.parse(store.get(PICK_KEY) || '{}'); } catch { return {}; } })();
 const game = window.bg = {
   me, mode: 'title', myId: 0, others: new Map(), loot: new Map(), inv: emptyInv(), zones: null, plane: null, t0: 0, alive: 0, total: 0, kills: 0, place: 0,
-  pick: { fill: pick0.fill ?? 24 }, watch: null, color: '#8a5634', fall: null,
+  pick: { fill: pick0.fill ?? 24, map: pick0.map || 'random' }, watch: null, color: '#8a5634', fall: null,
 };
 const sec = () => (performance.now() - game.t0) / 1000;
 
@@ -79,12 +81,14 @@ const locked = () => !!game.testLock || document.pointerLockElement === $('c');
 // 키보드 잠금: 전체화면이면 Ctrl+W(앉아서 앞으로) 같은 브라우저 단축키도 게임이 받는다
 const GAME_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyC', 'KeyR', 'KeyQ', 'KeyE', 'KeyG', 'KeyF', 'Space', 'Tab', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight'];
 $('fs-btn').onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch { /* 무시 */ } lock(); };
-function lock() { unlock(); $('c').requestPointerLock?.(); navigator.keyboard?.lock?.(GAME_KEYS).catch?.(() => {}); }
+const invOpen = () => !$('inv').classList.contains('hidden');
+// 마우스 잠금: 실패하면(브라우저가 막으면) '클릭해서 계속' 창을 띄운다
+function lock() { unlock(); try { const r = $('c').requestPointerLock?.(); r?.catch?.(() => { if (game.mode === 'ground' || game.mode === 'drive' || game.mode === 'plane' || game.mode === 'fall') $('lockmsg').classList.remove('hidden'); }); } catch { /* 무시 */ } navigator.keyboard?.lock?.(GAME_KEYS).catch?.(() => {}); }
 // 게임 중 Ctrl(앉기) + 글자: 북마크(Ctrl+D) · 저장(Ctrl+S) 같은 브라우저 단축키가 끼어들지 않게
 window.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && !(MODE_OFF()) && /^(Key|Digit|Space)/.test(e.code) && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) e.preventDefault(); }, true);
 const MODE_OFF = () => game.mode === 'title' || game.mode === 'over';
-document.addEventListener('pointerlockchange', () => { if (game.mode !== 'title' && game.mode !== 'over') $('lockmsg').classList.toggle('hidden', locked() || game.mode === 'dead'); });
-$('c').addEventListener('click', () => { if (game.mode === 'dead') return cycleWatch(); if (game.mode !== 'title' && game.mode !== 'over' && !locked()) lock(); });
+document.addEventListener('pointerlockchange', () => { if (game.mode !== 'title' && game.mode !== 'over') $('lockmsg').classList.toggle('hidden', locked() || game.mode === 'dead' || invOpen()); });
+$('c').addEventListener('click', () => { if (game.mode === 'dead') return cycleWatch(); if (invOpen()) return toggleInv(false); if (game.mode !== 'title' && game.mode !== 'over' && !locked()) lock(); });
 $('lock-btn').onclick = lock; $('sens-btn').onclick = () => openSens('bg'); $('quit-btn').onclick = () => quit();
 document.addEventListener('mousemove', (e) => {
   if (!locked() || game.mode === 'title' || game.mode === 'over') return;
@@ -113,6 +117,7 @@ addEventListener('keydown', (e) => {
   if (/^Digit[1-5]$/.test(e.code)) switchTo(+e.code.slice(5) - 1);
   if (e.code === 'KeyQ') switchTo(cur === 0 ? 1 : 0);
   if (e.code === 'KeyE') pickUp();
+  if (e.code === 'KeyX') dropCurrent();
   if (e.code === 'Digit7') startHeal('band');
   if (e.code === 'Digit8') startHeal('med');
   if (e.code === 'Digit9') startHeal('drink');
@@ -410,8 +415,19 @@ function pushFromVehicles() {
 // ---------- 가방 (Tab) ----------
 function toggleInv(force) {
   const el = $('inv'), open = force ?? el.classList.contains('hidden');
+  if (open === invOpen()) return;
   el.classList.toggle('hidden', !open);
-  if (open) { document.exitPointerLock?.(); renderInv(); } else if (game.mode === 'ground' || game.mode === 'drive') lock();
+  // 열면 마우스를 풀어 단추를 누르게 (걷기는 계속) · 닫으면 바로 다시 조준
+  if (open) { $('lockmsg').classList.add('hidden'); document.exitPointerLock?.(); renderInv(); } else if (game.mode === 'ground' || game.mode === 'drive') lock();
+}
+// X: 가방을 열지 않고 지금 든 것 버리기 (주무기 · 권총 · 투척 1개)
+function dropCurrent() {
+  const ids = slotIds(), id = ids[cur];
+  if (cur === 3 || !id) { shell.toast('🔪 나이프는 버릴 수 없어요', 1000); return; }
+  reloadEnd = 0; cancelHeal();
+  if (cur === 4) shell.send({ t: 'drop', k: id });
+  else shell.send({ t: 'drop', k: cur === 2 ? 'pistol' : 'gun', g: cur });
+  sfx('switch'); shell.toast(`🫳 ${weapon(id)?.emoji || ''} ${weapon(id)?.name || ''} 버림`, 900);
 }
 function renderInv() {
   const I = game.inv, el = $('inv'); if (el.classList.contains('hidden')) return;
@@ -446,6 +462,7 @@ function zoomNow() {
 
 // ---------- 흐름 ----------
 function start(m) {
+  loadBgMap(m.map);
   game.mode = 'plane'; game.myId = shell.myId; game.zones = m.zones; game.plane = m.plane; game.t0 = performance.now() + m.in;
   game.total = m.total; game.alive = m.total; game.kills = 0; game.place = 0; game.inv = emptyInv(); game.watch = null;
   ammo = {}; cur = 3; reloadEnd = 0; healing = null; me.hp = 100; me.alive = true; me.vel.set(0, 0, 0); me.pitch = -0.25; game.boost = 0; game.drv = null; throwK = 'nade';
@@ -463,7 +480,7 @@ function start(m) {
   tip('🪂 F · Space 로 뛰어내려요', '젤리 비행선이 섬을 가로질러요. 끝까지 가면 자동으로 뛰어내려요');
   if (!locked()) $('lockmsg').classList.remove('hidden');
   renderSlots(); renderGear();
-  banner(`🏝️ 젤리 섬 · ${m.total}명`);
+  banner(`${MAP.emoji} ${MAP.name} · ${m.total}명`);
 }
 function tip(a, b) { const t = $('phase-tip'); if (!a) { t.classList.add('hidden'); return; } t.innerHTML = `${a}${b ? `<small>${b}</small>` : ''}`; t.classList.remove('hidden'); }
 function jump() {
@@ -529,7 +546,7 @@ function renderSlots() {
     const am = w && i < 3 ? ` <small>${ammo[id]?.mag ?? 0}/${I.ammo?.[AMMO_OF[id]] || 0}</small>` : '';
     return `<span class="${i === cur ? 'on' : ''}${w ? '' : ' empty'}">${i + 1} · ${esc(label)}${am}${icons ? ` <i>${icons}</i>` : ''}</span>`;
   }).join('');
-  $('heals').innerHTML = [['band', '7', '🩹'], ['med', '8', '🧰'], ['drink', '9', '🥤'], ['pill', '0', '💊']].map(([k, key, e]) => `<span class="${I[k] ? '' : 'none'}">${key} ${e} ×${I[k] || 0}</span>`).join('') + '<span class="tabk">Tab 🎒 가방</span>';
+  $('heals').innerHTML = [['band', '7', '🩹'], ['med', '8', '🧰'], ['drink', '9', '🥤'], ['pill', '0', '💊']].map(([k, key, e]) => `<span class="${I[k] ? '' : 'none'}">${key} ${e} ×${I[k] || 0}</span>`).join('') + '<span class="tabk">Tab 🎒 가방 · X 버리기</span>';
   renderInv();
 }
 function renderGear() {
@@ -577,12 +594,12 @@ function drawMap(cv, S, mini, Z) {
   const cx = mini ? me.pos.x : 0, cz = mini ? me.pos.z : 0; // 작은 지도는 나를 가운데
   const P = (wx, wz) => [S / 2 + (wx - cx) * k, S / 2 + (wz - cz) * k];
   x.clearRect(0, 0, S, S);
-  x.fillStyle = '#3fa0d8'; x.fillRect(0, 0, S, S);
-  const [ix, iz] = P(-BG_SIZE / 2, -BG_SIZE / 2); x.fillStyle = '#8fc979'; x.beginPath(); x.roundRect(ix, iz, BG_SIZE * k, BG_SIZE * k, 12 * k); x.fill();
+  x.fillStyle = MAP.sea || '#3fa0d8'; x.fillRect(0, 0, S, S);
+  const [ix, iz] = P(-BG_SIZE / 2, -BG_SIZE / 2); x.fillStyle = MAP.land || '#8fc979'; x.beginPath(); x.roundRect(ix, iz, BG_SIZE * k, BG_SIZE * k, 12 * k); x.fill();
   x.fillStyle = 'rgba(110,100,120,.8)'; for (const r of MAP.roads) { const [a, b] = P(r.x - r.w / 2, r.z - r.d / 2); x.fillRect(a, b, r.w * k, r.d * k); }
   x.fillStyle = 'rgba(80,60,60,.55)'; for (const b of MAP.boxes) { if (b.hide || b.h < 1.5 || b.y > 0.5) continue; const [a, c] = P(b.x - b.w / 2, b.z - b.d / 2); x.fillRect(a, c, Math.max(1, b.w * k), Math.max(1, b.d * k)); }
   x.font = `${mini ? 11 : 15}px Jua`; x.textAlign = 'center'; x.fillStyle = '#fff';
-  for (const p of PLACES) { const [a, b] = P(p.x, p.z); if (a > 0 && a < S && b > 0 && b < S) { x.lineWidth = 3; x.strokeStyle = 'rgba(20,10,40,.7)'; x.strokeText(p.name, a, b); x.fillText(p.name, a, b); } }
+  for (const p of MAP.places || []) { const [a, b] = P(p.x, p.z); if (a > 0 && a < S && b > 0 && b < S) { x.lineWidth = 3; x.strokeStyle = 'rgba(20,10,40,.7)'; x.strokeText(p.name, a, b); x.fillText(p.name, a, b); } }
   // 자기장: 지금(파랑) · 다음(흰 줄)
   if (Z) {
     const [zx, zz] = P(Z.x, Z.z);
@@ -610,7 +627,7 @@ function frame() {
   const dt = Math.min(0.05, clock.getDelta()), now = performance.now();
   t += dt;
   if (game.mode !== 'title' && game.mode !== 'over' && game.zones) {
-    const s = sec(), typing = !locked();
+    const s = sec(), typing = !locked() && !invOpen();
     const kf = (c) => (typing ? 0 : keys.has(c) ? 1 : 0);
     // 비행선
     const P = planeAt(game.plane, Math.max(0, s));
@@ -700,20 +717,20 @@ const shell = new Shell({
   sound: { muted: () => sound.muted, toggle: () => { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; } },
   key: 'jellybg', title: '🪂 젤리배그', subtitle: '젤리 비행선에서 뛰어내려 무기를 줍고<br>줄어드는 젤리 자기장 속 마지막 곰돌이가 되어요!', wsPath: '/bg-ws', max: 30,
   multiLabel: '👥 같이 하기', roomIcon: '🪂', startLabel: '🪂 비행선 출발!',
-  keysHelp: 'F/Space 뛰어내리기 · WASD 이동 · 마우스 조준 · 클릭 사격 · 우클릭 조준(스코프 배율) · E 줍기 · R 장전 · 1~5 무기(5 두 번: 수류탄/연막) · 7 붕대 · 8 구급상자 · 9 음료 · 0 진통제 · G 던지기 · Tab 가방 · F 차 타기/내리기 · Shift 달리기 · C/Ctrl 앉기 · M 지도',
+  keysHelp: 'F/Space 뛰어내리기 · WASD 이동 · 마우스 조준 · 클릭 사격 · 우클릭 조준(스코프 배율) · E 줍기 · R 장전 · 1~5 무기(5 두 번: 수류탄/연막) · 7 붕대 · 8 구급상자 · 9 음료 · 0 진통제 · G 던지기 · X 든 것 버리기 · Tab 가방 · F 차 타기/내리기 · Shift 달리기 · C/Ctrl 앉기 · M 지도',
   buttons: [{ id: 'practice-btn', label: '🪂 바로 하기 <small>젤리봇과 배틀로얄</small>', onClick: () => practice() }],
   extraRow: [{ label: '🖱️ 마우스 감도', onClick: () => openSens('bg') }],
   screens: ['over'],
-  describe: (o = {}) => `🪂 ${o.fill || 24}명 (젤리봇으로 채우기)`,
+  describe: (o = {}) => { const m = BG_MAPS.find((x) => x.id === o.map); return `${m ? `${m.emoji} ${m.name}` : '🎲 무작위 맵'} · 🪂 ${o.fill || 24}명`; },
   options: { room: (el, o, host) => optsUI(el, o, host, (n) => shell.send({ t: 'opts', opts: n })) },
   onProfile: (p) => { game.color = p.color; },
   onStart: (m) => start(m),
   onFinish: (m) => results(m),
   onChatClose: () => { if (game.mode !== 'title' && game.mode !== 'over' && game.mode !== 'dead') lock(); },
-  onEscape: () => { if (bigMap) { bigMap = false; $('bigmap').classList.add('hidden'); return true; } return false; },
+  onEscape: () => { if (bigMap) { bigMap = false; $('bigmap').classList.add('hidden'); return true; } if (invOpen()) { toggleInv(false); return true; } return false; },
   onDisconnect: () => { if (game.mode !== 'title') toTitle(); },
 });
-shell.pickOpts = () => ({ fill: game.pick.fill });
+shell.pickOpts = () => ({ fill: game.pick.fill, map: game.pick.map });
 shell.on('snap', (m) => { for (const [id, ...st] of m.p) { if (id === game.myId) continue; const o = game.others.get(id); if (o) o.set(st); } });
 shell.on('jumped', (m) => { const o = game.others.get(m.id); if (o) { o.jumped = true; o.pos.copy(o.tgt); } });
 shell.on('loot', (m) => onLoot(m));
@@ -770,11 +787,15 @@ shell.on('boom', (m) => {
 });
 shell.on('gone', (m) => { game.others.get(m.id)?.remove(); game.others.delete(m.id); });
 function optsUI(el, o, editable, set) {
-  el.innerHTML = `<div class="bots-row">🪂 판 인원 (젤리봇으로 채우기) ${editable ? '<button data-b="-2">−</button>' : ''}<b>${o.fill ?? 24}</b>${editable ? '<button data-b="2">＋</button>' : ''}</div>`;
+  const mp = o.map || 'random';
+  el.innerHTML = `<div class="map-pick bgmaps">${[{ id: 'random', name: '무작위', emoji: '🎲', desc: '판마다 다른 맵' }, ...BG_MAPS].map((m) => `<button data-m="${m.id}" class="${m.id === mp ? 'on' : ''}" ${editable ? '' : 'disabled'} title="${esc(m.desc)}"><b>${m.emoji}</b>${esc(m.name)}</button>`).join('')}</div>
+    <div class="note">${esc(([{ id: 'random', desc: '🎲 젤리 섬 · 눈꽃 섬 · 캔디 사막 중 하나' }, ...BG_MAPS].find((m) => m.id === mp) || {}).desc || '')}</div>
+    <div class="bots-row">🪂 판 인원 (젤리봇으로 채우기) ${editable ? '<button data-b="-2">−</button>' : ''}<b>${o.fill ?? 24}</b>${editable ? '<button data-b="2">＋</button>' : ''}</div>`;
   el.querySelectorAll('[data-b]').forEach((b) => { b.onclick = () => set({ fill: Math.max(2, Math.min(30, (o.fill ?? 24) + +b.dataset.b)) }); });
+  el.querySelectorAll('[data-m]').forEach((b) => { b.onclick = () => set({ map: b.dataset.m }); });
 }
-function renderTitleOpts() { optsUI($('title-opts'), game.pick, true, (n) => { Object.assign(game.pick, n); store.set(PICK_KEY, JSON.stringify(game.pick)); renderTitleOpts(); }); }
-function practice() { shell.sendAfterHello({ t: 'practice', opts: { fill: game.pick.fill } }); }
+function renderTitleOpts() { optsUI($('title-opts'), game.pick, true, (n) => { Object.assign(game.pick, n); store.set(PICK_KEY, JSON.stringify(game.pick)); renderTitleOpts(); if (game.mode === 'title') loadBgMap(game.pick.map === 'random' ? 'island' : game.pick.map); }); }
+function practice() { shell.sendAfterHello({ t: 'practice', opts: { fill: game.pick.fill, map: game.pick.map } }); }
 $('again-btn').onclick = () => { if (game.lastPractice) return practice(); game.mode = 'room'; shell.backToRoom(); };
 $('home-btn').onclick = () => quit();
 function quit() { shell.send({ t: 'leave' }); shell.room = null; toTitle(); }
@@ -788,7 +809,6 @@ function toTitle() {
   $('zone-tint').style.opacity = '0';
   shell.show('title'); renderTitleOpts();
 }
-void world;
-renderTitleOpts();
+renderTitleOpts(); loadBgMap(game.pick.map === 'random' ? 'island' : game.pick.map);
 shell.boot();
 frame();

@@ -1,13 +1,12 @@
 // 젤리배그 방: 최대 30명(사람 + 젤리봇으로 채우기) · 젤리 비행선에서 뛰어내려 · 줍고 · 싸우고 · 줄어드는 젤리 자기장 · 마지막 한 명
 //   아이템 · 가방 · 피해(방어구) · 회복 · 자기장 피해 · 순위는 서버가 정한다. 움직임은 각자 화면이 보내고, 맞힘은 서버가 벽 · 거리 · 연사로 확인
 import { BaseRooms } from '../shared/rooms.js';
-import { makeBgMap, BG_SIZE } from '../../public/jelly-bg/js/bgmap.js';
+import { getBgMap, BG_MAPS, BG_SIZE } from '../../public/jelly-bg/js/bgmap.js';
 import { clearLine } from '../../public/jelly-attack/js/maps.js';
 import { weapon, NADE, nadeDmg, KNIFE, falloff } from '../../public/jelly-attack/js/weapons.js';
 import { ARMOR_CUT, HEALS, DROP, makeLoot, makeZones, zoneAt, makePlane, planeAt, emptyInv, rollItem, AMMO, AMMO_OF, ATTS, fits, CAP, BOOSTS, ammoTotal, makeVehicles, VEHICLES } from '../../public/jelly-bg/js/bgrules.js';
 import { rng } from '../../public/jelly-apple/js/board.js';
 
-const MAP = makeBgMap();
 const EYE = 1.55, MAX = 30;
 const BOT_NAMES = ['딸기', '소다', '푸딩', '망고', '민트', '라임', '자두', '복숭아', '포도', '레몬', '체리', '키위', '바닐라', '초코', '멜론', '유자', '코코넛', '블루베리', '귤', '수박', '자몽', '카라멜', '마카롱', '솜사탕', '모찌', '쿠키', '와플', '팝콘', '젤리빈'];
 const BOT_COLORS = ['#ff8fb1', '#7cd8ff', '#ffd27a', '#ffb36b', '#9be7a7', '#c39bff', '#ff7a7a', '#ffc2d1', '#b39ddb', '#fff176', '#ef5350', '#aed581'];
@@ -16,10 +15,10 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
 export class BgRooms extends BaseRooms {
   constructor(userOf) {
-    super(userOf, { max: MAX, hz: 15, countdown: 3000, defaults: { fill: 24 } });
-    this.nav = null;
+    super(userOf, { max: MAX, hz: 15, countdown: 3000, defaults: { fill: 24, map: 'random' } });
+    this.navs = new Map();
   }
-  allow(cur, n) { return { fill: Number.isFinite(Number(n.fill)) ? Math.max(2, Math.min(MAX, Math.round(Number(n.fill)))) : cur.fill }; }
+  allow(cur, n) { return { fill: Number.isFinite(Number(n.fill)) ? Math.max(2, Math.min(MAX, Math.round(Number(n.fill)))) : cur.fill, map: n.map === 'random' || BG_MAPS.some((m) => m.id === n.map) ? n.map : cur.map || 'random' }; }
   list() { return [...this.rooms.values()].filter((r) => !r.private).map((r) => this.roomInfo(r)); }
   handle(c, m) {
     if (m.t === 'practice') {
@@ -34,7 +33,10 @@ export class BgRooms extends BaseRooms {
   // ---------- 시작 ----------
   onStart(r) {
     const seed = r.seed;
-    r.loot = new Map(makeLoot(MAP, seed).map((it) => [it.id, it]));
+    // 맵: 고른 맵 (무작위면 씨앗으로)
+    const mid = r.opts.map && r.opts.map !== 'random' ? r.opts.map : BG_MAPS[seed % BG_MAPS.length].id;
+    r.map = getBgMap(mid);
+    r.loot = new Map(makeLoot(r.map, seed).map((it) => [it.id, it]));
     r.nextLoot = 100000;
     r.zones = makeZones(seed); r.plane = makePlane(seed);
     r.veh = makeVehicles(seed); r.smokes = []; r.vehAt = 0;
@@ -51,11 +53,11 @@ export class BgRooms extends BaseRooms {
       if (p.bot) { p.path = null; p.target = null; p.react = 0; p.fireT = 0; p.lootT = 0; p.goal = null; p.scanT = 0; }
     }
     r.alive = r.players.length;
-    return { map: 'island', zones: r.zones, plane: r.plane, loot: [...r.loot.values()], total: r.players.length, veh: r.veh };
+    return { map: r.map.id, zones: r.zones, plane: r.plane, loot: [...r.loot.values()], total: r.players.length, veh: r.veh };
   }
   // 봇의 눈: 벽 · 연막에 가리면 못 본다
   see(r, a, b) {
-    if (!clearLine(MAP, a, b)) return false;
+    if (!clearLine(r.map, a, b)) return false;
     for (const s of r.smokes) { const dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((s.x - a.x) * dx + (s.z - a.z) * dz) / L2)); if ((a.x + dx * t - s.x) ** 2 + (a.z + dz * t - s.z) ** 2 < 5.5 * 5.5) return false; }
     return true;
   }
@@ -123,7 +125,7 @@ export class BgRooms extends BaseRooms {
       const a = { x: c.st[0], y: c.st[1] + EYE, z: c.st[2] }, b = { x: tgt.pos.x, y: tgt.pos.y + 1.1, z: tgt.pos.z };
       const d = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
       if (d > (w.cls === 'knife' ? 3.5 : w.range * 2.2 + 8)) return;
-      if (![1.6, 1.1, 0.5].some((h) => clearLine(MAP, a, { ...b, y: tgt.pos.y + h }))) return;
+      if (![1.6, 1.1, 0.5].some((h) => clearLine(r.map, a, { ...b, y: tgt.pos.y + h }))) return;
       const n = Math.max(1, Math.min(w.pellets || 1, Number(m.n) || 1)), head = m.part === 'head';
       const dmg = w.cls === 'knife' ? (m.back ? w.back : w.dmg) : w.dmg * n * (head ? w.head : 1) * falloff(w, d);
       this.damage(r, tgt, dmg, c, w.id, head);
@@ -138,7 +140,7 @@ export class BgRooms extends BaseRooms {
       for (const t of r.players) {
         if (!t.alive || !t.pos) continue;
         const q = { x: t.pos.x, y: t.pos.y + 1, z: t.pos.z }, dd = Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z);
-        if (dd > NADE.r || !clearLine(MAP, p, q)) continue;
+        if (dd > NADE.r || !clearLine(r.map, p, q)) continue;
         this.damage(r, t, nadeDmg(dd) * (t === c ? 0.5 : 1), c, 'nade', false);
       }
     }
@@ -282,8 +284,8 @@ export class BgRooms extends BaseRooms {
     for (const b of r.players) if (b.bot && b.alive) this.botThink(r, b, dt, now, sec);
   }
   // ---------- 젤리봇 ----------
-  navOf() {
-    if (this.nav) return this.nav;
+  navOf(MAP) {
+    if (this.navs.has(MAP.id)) return this.navs.get(MAP.id);
     const S = 4, nodes = [], idx = new Map(), H = BG_SIZE / 2 - 4;
     for (let x = -H; x <= H; x += S) for (let z = -H; z <= H; z += S) {
       if (MAP.boxes.some((b) => b.y < 1.8 && !b.k.startsWith('outer') && x > b.x - b.w / 2 - 0.6 && x < b.x + b.w / 2 + 0.6 && z > b.z - b.d / 2 - 0.6 && z < b.z + b.d / 2 + 0.6)) continue;
@@ -291,7 +293,7 @@ export class BgRooms extends BaseRooms {
     }
     for (let i = 0; i < nodes.length; i++) { const a = nodes[i]; for (const [dx, dz] of [[S, 0], [0, S], [S, S], [S, -S]]) { const j = idx.get(`${a.x + dx},${a.z + dz}`); if (j == null) continue; const b = nodes[j]; if (!clearLine(MAP, { x: a.x, y: 0.5, z: a.z }, { x: b.x, y: 0.5, z: b.z })) continue; a.n.push(j); b.n.push(i); } }
     const near = (p) => { let best = 0, bd = Infinity; for (let i = 0; i < nodes.length; i++) { const n = nodes[i], d = (n.x - p.x) ** 2 + (n.z - p.z) ** 2; if (d < bd) { bd = d; best = i; } } return best; };
-    return (this.nav = { nodes, near });
+    const nav = { nodes, near }; this.navs.set(MAP.id, nav); return nav;
   }
   pathTo(nav, from, to) {
     const prev = new Map([[from, -1]]), q = [from];
@@ -312,7 +314,7 @@ export class BgRooms extends BaseRooms {
       b.pos.y -= vy * dt;
       const d = dist(b.pos, b.fallTo); if (d > 0.5) { b.pos.x += ((b.fallTo.x - b.pos.x) / d) * DROP.glide * dt; b.pos.z += ((b.fallTo.z - b.pos.z) / d) * DROP.glide * dt; }
       b.pos.x = Math.max(-BG_SIZE / 2 + 3, Math.min(BG_SIZE / 2 - 3, b.pos.x)); b.pos.z = Math.max(-BG_SIZE / 2 + 3, Math.min(BG_SIZE / 2 - 3, b.pos.z));
-      if (b.pos.y <= 0) { b.pos.y = 0; b.landed = true; b.lootT = 3 + Math.random() * 7; }
+      if (b.pos.y <= 0) { b.pos.y = 0; b.landed = true; b.lootT = 3 + Math.random() * 7; const nav = this.navOf(r.map), n = nav.nodes[nav.near(b.pos)]; if (n) { b.pos.x = n.x; b.pos.z = n.z; } } // 건물 · 바위 속에 내리지 않게 가까운 길로
       b.st = [b.pos.x, b.pos.y, b.pos.z, b.yaw || 0, 0, b.pos.y > DROP.openAt ? 8 : 4]; return;
     }
     // 2) 줍는 시간이 지나면 무기 · 방어구를 챙긴 것으로
@@ -355,7 +357,7 @@ export class BgRooms extends BaseRooms {
       const outside = Math.hypot(b.pos.x - goalZ.x, b.pos.z - goalZ.z) > goalZ.r * 0.85;
       if (!b.path || !b.path.length || (b.repath = (b.repath || 0) - dt) <= 0 || (outside && !b.goingIn)) {
         b.repath = 8 + Math.random() * 6; b.goingIn = outside;
-        const nav = this.navOf();
+        const nav = this.navOf(r.map);
         const a = Math.random() * Math.PI * 2, rr = Math.random() * goalZ.r * 0.6;
         const goal = outside || Math.random() < 0.6 ? { x: goalZ.x + Math.cos(a) * rr, z: goalZ.z + Math.sin(a) * rr } : { x: b.pos.x + (Math.random() - 0.5) * 40, z: b.pos.z + (Math.random() - 0.5) * 40 };
         b.path = this.pathTo(nav, nav.near(b.pos), nav.near(goal)) || [];

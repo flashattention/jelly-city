@@ -18,8 +18,8 @@ function kindTex(kind, col) {
     x.fillStyle = a; x.fillRect(0, 0, n, n);
     if (kind === 'crate') { x.strokeStyle = d; x.lineWidth = 10; x.strokeRect(5, 5, n - 10, n - 10); x.beginPath(); x.moveTo(8, 8); x.lineTo(n - 8, n - 8); x.moveTo(n - 8, 8); x.lineTo(8, n - 8); x.stroke(); x.fillStyle = b; for (let i = 1; i < 4; i++) x.fillRect(0, (i * n) / 4, n, 2); }
     else if (kind.startsWith('cont')) { for (let i = 0; i < 12; i++) { x.fillStyle = i % 2 ? b : a; x.fillRect((i * n) / 12, 0, n / 12, n); } x.fillStyle = d; x.fillRect(0, 0, n, 6); x.fillRect(0, n - 6, n, 6); x.fillStyle = 'rgba(255,255,255,.25)'; x.fillRect(n * 0.1, n * 0.12, n * 0.3, 6); }
-    else if (kind === 'wall' || kind === 'outer' || kind === 'low' || kind === 'brick') { x.fillStyle = b; for (let r = 0; r < 8; r++) for (let i = 0; i < 4; i++) { const o = r % 2 ? n / 8 : 0; x.fillRect(i * n / 4 + o + 2, r * n / 8 + 2, n / 4 - 4, n / 8 - 4); } x.fillStyle = 'rgba(0,0,0,.06)'; for (let i = 0; i < 20; i++) x.fillRect(R() * n, R() * n, 6, 6); }
-    else if (kind.startsWith('house') || kind === 'ware' || kind === 'home' || kind === 'shop' || kind === 'school') {
+    else if (kind === 'wall' || kind === 'outer' || kind === 'low' || kind === 'brick' || kind === 'sandbag' || kind === 'steel') { x.fillStyle = b; for (let r = 0; r < 8; r++) for (let i = 0; i < 4; i++) { const o = r % 2 ? n / 8 : 0; x.fillRect(i * n / 4 + o + 2, r * n / 8 + 2, n / 4 - 4, n / 8 - 4); } x.fillStyle = 'rgba(0,0,0,.06)'; for (let i = 0; i < 20; i++) x.fillRect(R() * n, R() * n, 6, 6); }
+    else if (kind.startsWith('house') || kind === 'ware' || kind === 'home' || kind === 'shop' || kind === 'school' || kind.startsWith('cabin') || kind === 'lodge' || kind === 'hall' || kind.startsWith('adobe')) {
       // 벽 칠 + 창문(창틀 · 유리 반사 · 화분) — 3m 마다 반복
       x.fillStyle = b; for (let i = 0; i < 40; i++) { x.globalAlpha = 0.22; x.fillRect(R() * n, R() * n, 4 + R() * 12, 3); } x.globalAlpha = 1;
       x.fillStyle = shade(col, 0.55); x.fillRect(n * 0.2 - 3, n * 0.22 - 3, n * 0.6 + 6, n * 0.34 + 6);
@@ -32,7 +32,7 @@ function kindTex(kind, col) {
     }
     else if (kind.startsWith('tank')) { const g = x.createLinearGradient(0, 0, n, 0); g.addColorStop(0, d); g.addColorStop(0.5, shade(col, 1.2)); g.addColorStop(1, d); x.fillStyle = g; x.fillRect(0, 0, n, n); x.fillStyle = 'rgba(255,255,255,.35)'; x.fillRect(0, n * 0.2, n, 4); x.fillRect(0, n * 0.7, n, 4); }
     else if (kind === 'belt') { x.fillStyle = '#222'; x.fillRect(0, 0, n, n); x.fillStyle = '#555'; for (let i = 0; i < 8; i++) x.fillRect(i * n / 8, 0, 4, n); }
-    else if (kind === 'rock') { for (let i = 0; i < 30; i++) { x.fillStyle = R() < 0.5 ? b : shade(col, 1.12); x.globalAlpha = 0.6; x.beginPath(); x.arc(R() * n, R() * n, 4 + R() * 14, 0, 7); x.fill(); } x.globalAlpha = 1; }
+    else if (kind === 'rock' || kind === 'cliff') { for (let i = 0; i < 30; i++) { x.fillStyle = R() < 0.5 ? b : shade(col, 1.12); x.globalAlpha = 0.6; x.beginPath(); x.arc(R() * n, R() * n, 4 + R() * 14, 0, 7); x.fill(); } x.globalAlpha = 1; }
     else if (kind === 'trunk') { x.fillStyle = b; for (let i = 0; i < 10; i++) x.fillRect(R() * n, 0, 3, n); }
     else if (kind === 'roofslab' || kind === 'floor') { x.fillStyle = b; for (let i = 0; i < 8; i++) x.fillRect(0, i * n / 8, n, 2); }
     else { x.fillStyle = b; x.fillRect(0, n - 8, n, 8); x.fillRect(n - 8, 0, 8, n); }
@@ -69,11 +69,15 @@ function deco(parent, d, lights) {
       for (const [ox, oy, oz, r] of [[0, 3.2, 0, 1.5], [0.7, 2.7, 0.3, 1.0], [-0.7, 2.8, -0.2, 1.05], [0.1, 3.9, -0.2, 0.9]]) m(parent, SPH(), tm(c), x + ox * s, y + oy * s, z + oz * s, r * s, r * s * 0.9, r * s);
       break;
     }
-    case 'pine': m(parent, CYL(), tm('#6b4a2c'), x, y + 0.8 * s, z, 0.18 * s, 1.6 * s, 0.18 * s); for (let i = 0; i < 3; i++) m(parent, CONE(), tm('#3f8f5a'), x, y + (1.6 + i * 1.0) * s, z, (1.5 - i * 0.35) * s, 1.6 * s, (1.5 - i * 0.35) * s); break;
+    case 'pine': m(parent, CYL(), tm('#6b4a2c'), x, y + 0.8 * s, z, 0.18 * s, 1.6 * s, 0.18 * s); for (let i = 0; i < 3; i++) { m(parent, CONE(), tm(d.snow ? '#2f6f4a' : '#3f8f5a'), x, y + (1.6 + i * 1.0) * s, z, (1.5 - i * 0.35) * s, 1.6 * s, (1.5 - i * 0.35) * s); if (d.snow) m(parent, CONE(), tm('#f4f8fc'), x, y + (1.95 + i * 1.0) * s, z, (1.05 - i * 0.25) * s, 0.9 * s, (1.05 - i * 0.25) * s); } break;
+    case 'snowman': { const w = tm('#f7fbff'); m(parent, SPH(), w, x, y + 0.55 * s, z, 0.6 * s, 0.55 * s, 0.6 * s); m(parent, SPH(), w, x, y + 1.3 * s, z, 0.42 * s, 0.4 * s, 0.42 * s); m(parent, SPH(), w, x, y + 1.85 * s, z, 0.3 * s, 0.3 * s, 0.3 * s); m(parent, CONE(), tm('#ff8a3d'), x, y + 1.85 * s, z + 0.35 * s, 0.06 * s, 0.3 * s, 0.06 * s).rotation.x = Math.PI / 2; for (const sx of [-0.1, 0.1]) m(parent, SPH(), tm('#222'), x + sx * s, y + 1.95 * s, z + 0.26 * s, 0.04 * s, 0.04 * s, 0.04 * s); m(parent, CYL(), tm('#ff5c8a'), x, y + 1.62 * s, z, 0.33 * s, 0.1 * s, 0.33 * s); m(parent, CYL(), tm('#3a3a44'), x, y + 2.2 * s, z, 0.2 * s, 0.3 * s, 0.2 * s); break; }
+    case 'cactus': { const c = tm('#5fa65a'); m(parent, CYL(), c, x, y + 1.2 * s, z, 0.3 * s, 2.4 * s, 0.3 * s); m(parent, SPH(), c, x, y + 2.4 * s, z, 0.3 * s, 0.3 * s, 0.3 * s); for (const sd of [-1, 1]) { const h = (sd > 0 ? 1.3 : 0.9) * s; m(parent, CYL(), c, x + sd * 0.55 * s, y + h, z, 0.2 * s, 0.25 * s, 0.2 * s, Math.PI / 2).rotation.z = Math.PI / 2; m(parent, CYL(), c, x + sd * 0.7 * s, y + h + 0.4 * s, z, 0.2 * s, 0.8 * s, 0.2 * s); } m(parent, SPH(), tm('#ff8fb8'), x, y + 2.7 * s, z, 0.14 * s, 0.1 * s, 0.14 * s); break; }
+    case 'igloo': { const g = new THREE.Mesh(new THREE.SphereGeometry(2.4, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), tm('#eef6ff')); g.position.set(x, y, z); parent.add(g); m(parent, BOX(), tm('#dfeaf6'), x, y + 0.75, z + 2.3, 1.4, 1.5, 0.8); m(parent, BOX(), tm('#3a4a5a'), x, y + 0.7, z + 2.72, 1.0, 1.3, 0.05); break; }
+    case 'tent': { const c = d.c || '#e8b84a', g = new THREE.Mesh(new THREE.ConeGeometry(1.8 * s, 2.2 * s, 4), tm(c)); g.position.set(x, y + 1.1 * s, z); g.rotation.y = Math.PI / 4; parent.add(g); m(parent, CYL(), tm('#7a5232'), x, y + 1.3 * s, z, 0.05, 2.6 * s, 0.05); break; }
     case 'palm': { for (let i = 0; i < 5; i++) m(parent, CYL(), tm(i % 2 ? '#a07a4a' : '#8a6a3c'), x + i * 0.08 * s, y + (0.5 + i) * s, z, 0.2 * s, 1 * s, 0.2 * s); for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2, l = m(parent, SPH(), tm('#4caf6a'), x + 0.4 * s + Math.cos(a) * 1.3 * s, y + 5.1 * s, z + Math.sin(a) * 1.3 * s, 1.4 * s, 0.12 * s, 0.4 * s, -a); void l; } break; }
     case 'bush': for (const [ox, oz, r] of [[0, 0, 0.8], [0.6, 0.3, 0.6], [-0.5, 0.2, 0.55]]) m(parent, SPH(), tm(d.c || '#6cbf63'), x + ox * s, y + r * 0.6 * s, z + oz * s, r * s, r * 0.8 * s, r * s); break;
     case 'flowers': for (let i = 0; i < 7; i++) { const a = i * 2.4, r = 0.3 + (i % 3) * 0.3; m(parent, SPH(), tm(['#ff8fb8', '#ffd84d', '#ffffff', '#b388ff'][i % 4]), x + Math.cos(a) * r * s, y + 0.25, z + Math.sin(a) * r * s, 0.14, 0.12, 0.14); } break;
-    case 'rock': m(parent, gc('rockg', () => new THREE.DodecahedronGeometry(1, 0)), tm('#9a9a9e'), x, y + 0.5 * s, z, 1.1 * s, 0.75 * s, 0.95 * s, x * 3); break;
+    case 'rock': m(parent, gc('rockg', () => new THREE.DodecahedronGeometry(1, 0)), tm(d.c || '#9a9a9e'), x, y + 0.5 * s, z, 1.1 * s, 0.75 * s, 0.95 * s, x * 3); break;
     case 'lamp': {
       m(parent, CYL(), tm('#4a4a58'), x, y + 2.2, z, 0.09, 4.4, 0.09);
       m(parent, BOX(), tm('#4a4a58'), x + 0.45, y + 4.35, z, 0.9, 0.1, 0.12);
@@ -161,7 +165,7 @@ export function buildMap(scene, map) {
     mesh.position.set(b.x, b.y + b.h / 2, b.z);
     parts.add(mesh);
     if (b.roof === 'pitch') pitchedRoof(parts, b, ROOFS[Math.abs(Math.round(b.x * 3 + b.z)) % ROOFS.length]);
-    else if (b.h >= 5 && b.k !== 'outer' && !b.k.startsWith('tank') && b.roof !== 'none') { const roof = new THREE.Mesh(new THREE.BoxGeometry(b.w + 0.4, 0.4, b.d + 0.4), mat('roof|' + col, () => new THREE.MeshToonMaterial({ color: map.colors.roof || shade(col, 0.6) }))); roof.position.set(b.x, b.y + b.h + 0.2, b.z); parts.add(roof); }
+    else if (b.h >= 5 && b.k !== 'outer' && !b.k.startsWith('tank') && b.roof !== 'none' && !['cliff', 'pole', 'pillar', 'gold', 'ice'].includes(b.k)) { const roof = new THREE.Mesh(new THREE.BoxGeometry(b.w + 0.4, 0.4, b.d + 0.4), mat('roof|' + col, () => new THREE.MeshToonMaterial({ color: map.colors.roof || shade(col, 0.6) }))); roof.position.set(b.x, b.y + b.h + 0.2, b.z); parts.add(roof); }
   }
   const lights = [];
   for (const d of map.deco || []) deco(parts, d, lights);
