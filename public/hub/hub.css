@@ -173,7 +173,7 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .ding .dcards i:nth-child(1) { transform: rotate(-12deg) translateY(4px); } .ding .dcards i:nth-child(3) { transform: rotate(12deg) translateY(4px); }
 .ding .dbell { position: absolute; right: 12%; top: 22%; width: 56px; height: 46px; border-radius: 50% 50% 14% 14% / 70% 70% 14% 14%; background: radial-gradient(ellipse at 35% 28%, #fffbe0, #ffe066 30%, #f2b705 75%, #b77f00); color: #8a4b00; font-family: 'Jua', sans-serif; font-size: 22px; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 12px rgba(0,0,0,.35); animation: dding 2.2s ease-in-out infinite; }
 @keyframes dding { 0%, 70%, 100% { transform: rotate(0); } 75% { transform: rotate(-14deg); } 82% { transform: rotate(10deg); } 89% { transform: rotate(-5deg); } }
-.merge .new, .bang .new, .ding .new, .guys .new { position: absolute; right: 14px; top: 12px; padding: 4px 12px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-family: 'Jua', sans-serif; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+.slide .new, .merge .new, .bang .new, .ding .new, .guys .new { position: absolute; right: 14px; top: 12px; padding: 4px 12px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-family: 'Jua', sans-serif; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
 
 /* 젤리 가이즈 */
 .card.guys .art { background: linear-gradient(180deg, #5ec8ff 0%, #c9efff 70%, #ff8fc4 70%, #ff6fae 100%); }
@@ -186,3 +186,12 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .guys .beans i:nth-child(2) { animation-delay: .15s; } .guys .beans i:nth-child(3) { animation-delay: .3s; } .guys .beans i:nth-child(4) { animation-delay: .45s; }
 @keyframes ghop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-14px) rotate(-6deg); } }
 .guys .gcrown { position: absolute; left: 14%; top: 6%; font-size: 28px; animation: wob 2s ease-in-out infinite; filter: drop-shadow(0 3px 3px rgba(0,0,0,.3)); }
+
+/* 젤리 슬라이드 */
+.card.slide .art { background: linear-gradient(160deg, #b388ff 0%, #ff9ed1 100%); }
+.slide .sgrid { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); display: grid; grid-template-columns: repeat(3, 34px); gap: 6px; padding: 8px; border-radius: 16px; background: rgba(40,20,80,.35); }
+.slide .sgrid i { width: 34px; height: 34px; border-radius: 50% 50% 45% 45%; background: rgba(255,255,255,.12); box-shadow: inset 0 -4px 6px rgba(0,0,0,.15), inset 3px 3px 5px rgba(255,255,255,.45); }
+.slide .sgrid i.sugar { border-radius: 8px; background: #f4f0fb; }
+.slide .sgrid i:nth-child(1) { animation: sglide 2.2s ease-in-out infinite; }
+@keyframes sglide { 0%, 30% { transform: translateX(0); } 50%, 80% { transform: translateX(40px); } 100% { transform: translateX(0); } }
+.slide .sarrow { position: absolute; right: 16%; top: 40px; font-size: 28px; color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,.2); animation: wob 1.6s ease-in-out infinite; }
