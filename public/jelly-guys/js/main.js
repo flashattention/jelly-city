@@ -125,7 +125,7 @@ function readInput() {
   if (stick.id != null) { f = -stick.dy; s = stick.dx; }
   // 카메라가 보는 쪽이 앞
   const fx = Math.sin(game.camYaw), fz = Math.cos(game.camYaw), rx = -fz, rz = fx;
-  const inp = { mx: fx * f - rx * s, mz: fz * f - rz * s, jump: jumpEdge, dive: diveEdge };
+  const inp = { mx: fx * f + rx * s, mz: fz * f + rz * s, jump: jumpEdge, dive: diveEdge }; // (rx, rz) = 화면 오른쪽
   jumpEdge = diveEdge = false;
   return inp;
 }
