@@ -9,12 +9,14 @@ const BOT_COLORS = ['#ff6b8b', '#9b6bff', '#ffd84d', '#5fe0b0', '#ffab91', '#6ec
 export const MERGE_TIMES = [120, 180, 300];
 
 export class MergeRooms extends BaseRooms {
-  constructor(userOf) { super(userOf, { max: 8, hz: 10, countdown: 3500, defaults: { time: 180, bots: 0, cont: 'box' } }); }
+  constructor(userOf) { super(userOf, { max: 8, hz: 10, countdown: 3500, defaults: { time: 180, bots: 0, cont: 'box', bomb: true, star: true } }); }
   allow(cur, n) {
     return {
       time: MERGE_TIMES.includes(Number(n.time)) ? Number(n.time) : cur.time,
       bots: Number.isFinite(Number(n.bots)) ? Math.max(0, Math.min(7, Math.round(Number(n.bots)))) : cur.bots,
       cont: CONTAINERS[n.cont] ? n.cont : cur.cont || 'box',
+      bomb: n.bomb == null ? cur.bomb !== false : !!n.bomb,
+      star: n.star == null ? cur.star !== false : !!n.star,
     };
   }
   list() { return [...this.rooms.values()].filter((r) => !r.practice).map((r) => this.roomInfo(r)); }
@@ -40,9 +42,9 @@ export class MergeRooms extends BaseRooms {
     r.over = false; r.lastT = r.startAt; r.multi = r.players.length > 1;
     for (const p of r.players) {
       p.score = 0; p.out = false; p.outAt = 0; p.sent = 0; p.atkAt = 0; p.bdAt = 0; p.best = 0;
-      if (p.bot) { p.jar = new Jar(r.seed, r.opts.cont); p.nextAt = r.startAt + 600 + Math.random() * 900; p.aimX = null; }
+      if (p.bot) { p.jar = new Jar(r.seed, r.opts.cont, r.opts); p.nextAt = r.startAt + 600 + Math.random() * 900; p.aimX = null; }
     }
-    return { time: r.opts.time, endAt: r.endAt - Date.now(), cont: r.opts.cont };
+    return { time: r.opts.time, endAt: r.endAt - Date.now(), cont: r.opts.cont, sp: { bomb: r.opts.bomb, star: r.opts.star } };
   }
   alive(r) { return r.players.filter((p) => !p.out); }
   // 공격: 살아 있는 다른 곰돌이 중 하나에게 (점수가 높은 쪽을 조금 더 자주)

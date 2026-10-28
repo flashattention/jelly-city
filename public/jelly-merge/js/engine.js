@@ -45,7 +45,9 @@ function walls(kind) {
 const G = 1500, SUB = 1 / 120, ITER = 5, VMAX = 1100;
 let NID = 1;
 export class Jar {
-  constructor(seed, kind = 'box') {
+  // sp = { bomb, star }: 특별 젤리를 켜고 끈다 (같은 방은 모두 같은 설정이라 순서도 같다)
+  constructor(seed, kind = 'box', sp = {}) {
+    this.sp = { bomb: sp.bomb !== false, star: sp.star !== false };
     this.kind = CONTAINERS[kind] ? kind : 'box';
     this.walls = walls(this.kind);
     this.q = rng(seed); this.r2 = rng(seed ^ 0x9e3779b9);
@@ -60,7 +62,11 @@ export class Jar {
   // 다음 젤리: 작은 것(1~5)만 · 가끔 특별 젤리 (같은 씨앗이면 모두 같은 순서)
   pull() {
     this.drops++;
-    if (this.drops >= this.special) { this.special = this.drops + 15 + Math.floor(this.q() * 8); return this.q() < 0.5 ? RAINBOW : BOMB; }
+    if (this.drops >= this.special && (this.sp.bomb || this.sp.star)) {
+      this.special = this.drops + 15 + Math.floor(this.q() * 8);
+      const k = this.q();
+      return this.sp.bomb && this.sp.star ? (k < 0.5 ? RAINBOW : BOMB) : this.sp.star ? RAINBOW : BOMB;
+    }
     const x = this.q();
     return x < 0.3 ? 1 : x < 0.56 ? 2 : x < 0.78 ? 3 : x < 0.93 ? 4 : 5;
   }

@@ -59,3 +59,8 @@
 }
 .seg.cont-seg button { white-space: nowrap; }
 @media (max-width: 480px) { .seg.cont-seg button { padding: 6px 8px; font-size: 14px; } .seg.cont-seg button small { white-space: normal; font-size: 10px; } }
+
+.tog-seg { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 10px; }
+.tog-seg button { border-radius: 14px; line-height: 1.15; }
+.tog-seg button:not(.on) { opacity: .6; text-decoration: line-through; }
+.tog-seg button small { text-decoration: none; }
