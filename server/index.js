@@ -28,6 +28,10 @@ import { WordRooms } from './jelly-word/rooms.js';
 import { Dict } from './jelly-word/dict.js';
 import { DrawRooms } from './jelly-draw/rooms.js';
 import { TypeRooms } from './jelly-type/rooms.js';
+import { GuysRooms } from './jelly-guys/rooms.js';
+import { MergeRooms } from './jelly-merge/rooms.js';
+import { BangRooms } from './jelly-bang/rooms.js';
+import { DingRooms } from './jelly-ding/rooms.js';
 import { normWord } from '../public/jelly-draw/js/prompts.js';
 import { complete } from './jelly-city/llm.js';
 import { Records } from './shared/records.js';
@@ -75,6 +79,10 @@ const sketchRooms = new SketchRooms((sid) => world.userOf(sid)); // 젤리 스�
 const guessHits = new Map();
 // 젤리 타자연습: 경주 방 · 짧은 글 최고 타수(정확도 90% 이상) · 젤리비 최고 점수
 const typeRooms = new TypeRooms((sid) => world.userOf(sid));
+const guysRooms = new GuysRooms((sid) => world.userOf(sid)); // 젤리 가이즈 (파티 장애물 레이스 · 봇은 서버가)
+const mergeRooms = new MergeRooms((sid) => world.userOf(sid)); // 젤리 머지
+const bangRooms = new BangRooms((sid) => world.userOf(sid)); // 젤리뱅 (숨은 역할 카드 결투)
+const dingRooms = new DingRooms((sid) => world.userOf(sid)); // 젤리 땡 (종 치기)
 const typeRecords = new Records(DATA_DIR, 'jelly-type', {
   boards: ['kpm', 'rain'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.value)),
   check: (b) => { const v = Number(b.value); return Number.isFinite(v) && v >= 0 && v <= (b.b === 'kpm' ? 1600 : 5000000) ? null : '기록이 이상해요'; },
@@ -257,6 +265,7 @@ const watchWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, pe
 watchWss.on('connection', (ws) => watchRooms.connect(ws));
 const partyWss = (rooms) => { const w = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false }); w.on('connection', (ws) => rooms.connect(ws)); return w; };
 const appleWss = partyWss(appleRooms), wordWss = partyWss(wordRooms), typeWss = partyWss(typeRooms);
+const guysWss = partyWss(guysRooms), mergeWss = partyWss(mergeRooms), bangWss = partyWss(bangRooms), dingWss = partyWss(dingRooms);
 const drawWss = new WebSocketServer({ noServer: true, maxPayload: 160 * 1024, perMessageDeflate: { threshold: 2048 } }); // 그림은 커서 더 크게 · 압축
 drawWss.on('connection', (ws) => drawRooms.connect(ws));
 const survWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: { threshold: 512 } }); // 충치균이 많아서 압축
@@ -266,7 +275,7 @@ sketchWss.on('connection', (ws) => sketchRooms.connect(ws));
 // 주소로 나눠 받는다: /ws = 젤리시티 · /dream-ws = 드림 러너
 server.on('upgrade', (req, socket, head) => {
   const p = new URL(req.url, 'http://x').pathname;
-  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/rider-ws' ? riderWss : p === '/attack-ws' ? attackWss : p === '/bg-ws' ? bgWss : p === '/watch-ws' ? watchWss : p === '/apple-ws' ? appleWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : p === '/type-ws' ? typeWss : p === '/surv-ws' ? survWss : p === '/sketch-ws' ? sketchWss : null;
+  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/rider-ws' ? riderWss : p === '/attack-ws' ? attackWss : p === '/bg-ws' ? bgWss : p === '/watch-ws' ? watchWss : p === '/apple-ws' ? appleWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : p === '/type-ws' ? typeWss : p === '/surv-ws' ? survWss : p === '/sketch-ws' ? sketchWss : p === '/guys-ws' ? guysWss : p === '/merge-ws' ? mergeWss : p === '/bang-ws' ? bangWss : p === '/ding-ws' ? dingWss : null;
   if (!target) { socket.destroy(); return; }
   target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
 });

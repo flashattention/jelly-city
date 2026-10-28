@@ -70,15 +70,22 @@ class Other {
     if (game.cut) { this.pos.copy(this.cutPos || this.pos); this.yaw = this.cutYaw ?? this.yaw; }
     else { if (this.pos.distanceTo(this.tgt) > 8) this.pos.copy(this.tgt); else this.pos.lerp(this.tgt, k); let d = (this.tyaw ?? this.yaw) - this.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); this.yaw += d * k; }
     const sp = this.pos.distanceTo(this.lastPos) / Math.max(dt, 1e-3); this.lastPos.copy(this.pos);
-    const b = this.bear, mech = this.mech && !this.pilot, ghost = this.flags & F.ghost, show = (this.alive || game.cut) && !(ghost && Math.sin(t * 30) > -0.6);
+    // 쓰러짐: 죽으면(체력 0 이어도) 뒤로 넘어졌다가 2초쯤 뒤 바닥으로 스르르 사라진다 · 수면총에 맞으면 옆으로 누워 잔다
+    const alive = this.alive && !(this.hp <= 0 && this.max > 0);
+    if (alive || game.cut) this.deadT = -1; else if (this.deadT < 0 || this.deadT == null) this.deadT = 0; else this.deadT += dt;
+    const fallen = !alive && !game.cut && this.deadT < 2.4, sleep = alive && !game.cut && !!(this.flags & F.sleep);
+    this.lie = (this.lie || 0) + ((fallen || sleep ? 1 : 0) - (this.lie || 0)) * Math.min(1, dt * (fallen ? 9 : 6));
+    const b = this.bear, mech = this.mech && !this.pilot && alive, ghost = this.flags & F.ghost, show = ((alive || game.cut) && !(ghost && Math.sin(t * 30) > -0.6)) || fallen;
     if (this.mech) { this.mech.visible = mech && show; this.mech.position.copy(this.pos); this.mech.rotation.y = this.yaw + Math.PI; }
     b.root.visible = show;
     b.root.position.copy(this.pos); if (mech) b.root.position.y += 1.35;
-    b.root.rotation.y = this.yaw + Math.PI;
+    b.root.rotation.order = 'YXZ';
+    b.root.rotation.set(fallen ? -this.lie * Math.PI / 2 : 0, this.yaw + Math.PI, sleep ? this.lie * Math.PI / 2 : 0);
+    if (this.lie > 0.01) b.root.position.y += this.lie * 0.35 * this.size - (fallen ? Math.max(0, this.deadT - 1.6) * 1.4 : 0); // 넘어진 몸이 바닥에 묻히지 않게 · 사라질 땐 가라앉기
     b.root.scale.setScalar(0.85 * (mech ? 0.55 : this.size) * (this.flags & F.primal ? 1.35 : 1));
     b.setSeated?.(!!mech);
-    b.update(dt, mech ? 0 : Math.min(9, sp), { noCrawl: true });
-    if (!game.cut && !b.emote) {
+    b.update(dt, mech || this.lie > 0.05 ? 0 : Math.min(9, sp), { noCrawl: true });
+    if (!game.cut && !b.emote && this.lie < 0.05) {
       if (b.heldPose !== 'melee') { b.arms[1].rotation.x = -1.45 - this.pitch; b.arms[1].rotation.z = b.arms[1].userData.baseZ * 0.3; b.arms[0].rotation.x = -1.3 - this.pitch; b.arms[0].rotation.z = b.arms[0].userData.baseZ * 0.2 + 0.5; }
       if (this.flags & (F.blossom | F.hogult)) b.root.rotation.y += this.flags & F.blossom ? t * 14 : 0;
     }
@@ -575,7 +582,7 @@ shell.on('spawn', (m) => {
   const st = game.stats.get(m.id); if (st) st.hero = m.h;
   if (m.id === game.myId) return spawnMe(m.p, m.h);
   const o = game.others.get(m.id); if (!o) return;
-  o.setHero(m.h); o.alive = true; o.set(m.p, true);
+  o.setHero(m.h); o.alive = true; o.lie = 0; o.deadT = -1; o.set(m.p, true);
 });
 shell.on('snap', (m) => { for (const [id, ...st] of m.p) { if (id === game.myId) continue; game.others.get(id)?.set(st); } });
 shell.on('ps', (m) => {
@@ -967,7 +974,9 @@ function frame() {
     ents.update(dt);
     updatePoints(t);
     // 카메라: 살아 있으면 눈 · 죽으면 쓰러진 자리 위에서 천천히
-    if (me.alive) { camera.position.copy(me.viewEye()); camera.rotation.set(me.pitch, me.yaw, 0); }
+    // 잠들면 내 눈도 바닥으로 · 옆으로 기울어진다
+    game.zz = (game.zz || 0) + ((me.alive && has('sleep') ? 1 : 0) - (game.zz || 0)) * Math.min(1, dt * 5);
+    if (me.alive) { camera.position.copy(me.viewEye()); camera.position.y -= game.zz * 1.15; camera.rotation.set(me.pitch * (1 - game.zz), me.yaw, game.zz * 1.25); }
     else { const a = t * 0.25, c = me.pos; camera.position.set(c.x + Math.cos(a) * 7, c.y + 5, c.z + Math.sin(a) * 7); camera.lookAt(c.x, c.y + 1, c.z); }
     if (game.shake > 0) { game.shake = Math.max(0, game.shake - dt * 1.8); const k = game.shake * game.shake * 0.3; camera.position.x += (Math.random() - 0.5) * k; camera.position.y += (Math.random() - 0.5) * k; camera.rotation.z += (Math.random() - 0.5) * k * 0.3; }
     const fov = 78 / scopeZoom();

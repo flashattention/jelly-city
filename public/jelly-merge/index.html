@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>젤리 머지</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/css/shell.css" />
+  <link rel="stylesheet" href="../shared/css/party.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <div class="bubbles" aria-hidden="true"></div>
+  <!-- 게임 중 -->
+  <div id="game" class="hidden">
+    <div id="side-l">
+      <div class="panel sc-box"><div class="lbl">점수</div><b id="score">0</b><div id="best" class="lbl"></div></div>
+      <div class="panel nx-box"><div class="lbl">다음</div><canvas id="next" width="80" height="80"></canvas></div>
+      <div class="panel lad-box"><div class="lbl">젤리 사다리</div><div id="ladder"></div></div>
+      <button id="restart-btn" class="btn ghost hidden">🔄 다시</button>
+    </div>
+    <div id="jar-wrap"><canvas id="jar"></canvas><div id="timebar" class="hidden"><i></i></div><div id="combo" class="hidden"></div><div id="outmsg" class="hidden"></div></div>
+    <div id="side-r" class="panel hidden"><div class="ptitle">🍬 라이벌</div><div id="rivals"></div></div>
+    <div class="hud-r"><button id="b-mute" title="소리 (M)">🔊</button><button id="b-quit" title="그만하기">✕</button></div>
+    <div id="feed"></div>
+  </div>
+  <div id="count" class="overlay hidden"><div class="count-big" id="count-n">3</div></div>
+  <!-- 결과 -->
+  <div id="over" class="screen hidden"><div class="card wide">
+    <h2 id="ov-title">끝!</h2>
+    <div id="ov-me" class="sub"></div>
+    <div id="ov-rank" class="res-list"></div>
+    <div class="row2"><button id="again-btn" class="btn big">🔁 한 판 더</button><button id="home-btn" class="btn ghost">처음으로</button></div>
+  </div></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
