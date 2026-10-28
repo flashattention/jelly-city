@@ -102,7 +102,7 @@ export const HEROES = [
     q: { name: '용검', icon: '🐉', desc: '6초 동안 용검을 뽑아 적을 베어요' } },
   { id: 'widow', name: '젤리메이커', role: 'dps', emoji: '🕷️', color: '#9466e0', hp: 200, speed: 1, ult: 1700, held: 'sniper', acc: ['vr', 'tuxedo'],
     motto: '한 발, 한 명.', desc: '우클릭으로 조준경을 모아 한 방! 갈고리로 높은 곳에',
-    p: { type: 'hit', name: '죽음의 입맞춤', dmg: 14, rate: 0.09, mag: 30, reload: 1.5, spread: 0.03, near: 20, far: 40, head: 2, auto: true, scoped: { min: 15, max: 120, charge: 1, head: 2.5, rate: 0.6 } },
+    p: { type: 'hit', name: '죽음의 입맞춤', dmg: 11, rate: 0.09, mag: 30, reload: 1.5, spread: 0.03, near: 20, far: 40, head: 2, auto: true, scoped: { min: 12, max: 100, charge: 1.3, head: 2, rate: 0.9 } }, // 너프: 완충 머리 300 → 200 · 충전 1 → 1.3초
     s: { type: 'scope', name: '조준경', icon: '🔭', zoom: 2.8 },
     shift: { name: '갈고리', icon: '🪝', cd: 10, desc: '조준한 벽으로 쭉 날아가요' },
     e: { name: '맹독 지뢰', icon: '☠️', cd: 12, desc: '밟은 적에게 독 피해' },

@@ -3,7 +3,7 @@
 import { store } from '../../shared/js/account.js';
 import { Shell, esc } from '../../shared/js/shell.js';
 import { faceHtml, makeSound, confetti, rankIcon } from '../../shared/js/party.js';
-import { Jar, W, H, DL, DROP_Y, RAD, FLAVORS, SUGAR, RAINBOW, BOMB, KING, CONTAINERS, landAt } from './engine.js';
+import { Jar, W, H, DL, DROP_Y, RAD, FLAVORS, SUGAR, RAINBOW, BOMB, KING, CONTAINERS } from './engine.js';
 
 const TIMES = [120, 180, 300];
 const $ = (id) => document.getElementById(id);
@@ -13,7 +13,7 @@ const pick0 = (() => { try { return JSON.parse(store.get(PICK_KEY) || '{}'); } c
 const bestOf = (() => { try { return JSON.parse(store.get(BEST_KEY) || '{}'); } catch { return {}; } })();
 const game = window.merge = {
   mode: 'title', kind: 'solo', jar: null, players: new Map(), myId: 0, time: 180, startAt: 0, endAt: 0, out: false,
-  pick: { cont: CONTAINERS[pick0.cont] ? pick0.cont : 'box', time: TIMES.includes(pick0.time) ? pick0.time : 180, bots: pick0.bots ?? 3, guide: pick0.guide !== false, bomb: pick0.bomb !== false, star: pick0.star !== false },
+  pick: { cont: CONTAINERS[pick0.cont] ? pick0.cont : 'box', time: TIMES.includes(pick0.time) ? pick0.time : 180, bots: pick0.bots ?? 3, bomb: pick0.bomb !== false, star: pick0.star !== false },
 };
 
 for (let i = 0; i < 14; i++) { const b = document.createElement('i'); const s = 30 + Math.random() * 90; b.style.cssText = `left:${Math.random() * 100}%;width:${s}px;height:${s}px;animation-duration:${12 + Math.random() * 16}s;animation-delay:${-Math.random() * 20}s`; document.querySelector('.bubbles').appendChild(b); }
@@ -162,15 +162,7 @@ function draw(t) {
   g.lineWidth = dz ? 4 : 2; g.setLineDash([12, 10]); g.lineDashOffset = -t / 40;
   g.beginPath(); g.moveTo(0, DL); g.lineTo(W, DL); g.stroke(); g.setLineDash([]);
   if (dz) { g.fillStyle = `rgba(255,60,90,${0.12 + dz * 0.2})`; g.fillRect(0, -20, W, DL + 20); }
-  // 떨어뜨릴 자리 안내선
   const canAim = game.mode === 'play' && !game.out && performance.now() >= game.startAt;
-  if (canAim && game.pick.guide) {
-    const r = RAD[J.cur], ax = J.clampAim(aimX), land = landAt(J, ax, r);
-    g.strokeStyle = 'rgba(255,255,255,.4)'; g.lineWidth = 2; g.setLineDash([3, 8]);
-    g.beginPath(); g.moveTo(ax, DROP_Y + r); g.lineTo(ax, land.y + r); g.stroke(); g.setLineDash([]);
-    g.fillStyle = 'rgba(255,255,255,.18)'; g.beginPath(); g.ellipse(ax, land.y + r - 2, r * 0.7, r * 0.18, 0, 0, 7); g.fill();
-    if (land.hit && land.hit.lv === J.cur && J.cur <= KING) { g.strokeStyle = 'rgba(124,240,200,.9)'; g.lineWidth = 3; g.beginPath(); g.arc(land.hit.x, land.hit.y, land.hit.r + 5 + Math.sin(t / 90) * 2, 0, 7); g.stroke(); }
-  }
   for (const b of J.bodies) drawBody(b, t);
   g.restore();
   // 병 테두리 (유리)
@@ -389,7 +381,6 @@ function optsUI(el, o, editable, set, multi) {
     ${multi ? `<div class="seg time-seg">${TIMES.map((t) => `<button data-t="${t}" class="${t === o.time ? 'on' : ''}" ${editable ? '' : 'disabled'}>⏱️ ${t / 60}분</button>`).join('')}</div>
     <div class="opt-row">🤖 젤리봇 ${editable ? '<button class="pm" data-b="-1">−</button>' : ''}<b>${o.bots || 0}</b>${editable ? '<button class="pm" data-b="1">＋</button>' : ''}</div>` : ''}
     <div class="seg mode-seg tog-seg">
-      <button data-g class="${game.pick.guide ? 'on' : ''}" title="떨어질 자리를 점선 · 동그라미로 보여 줘요 (나만 적용)">🎯 떨어질 자리<small>${game.pick.guide ? '켜짐' : '꺼짐'} · 나만</small></button>
       <button data-s="bomb" class="${o.bomb !== false ? 'on' : ''}" ${editable ? '' : 'disabled'} title="닿고 잠시 뒤 펑! 작은 젤리 · 설탕을 없애요">💥 폭탄 젤리<small>${o.bomb !== false ? '켜짐' : '꺼짐'}</small></button>
       <button data-s="star" class="${o.star !== false ? 'on' : ''}" ${editable ? '' : 'disabled'} title="어떤 젤리와도 합쳐져 한 단계 올려요">🌈 무지개 젤리<small>${o.star !== false ? '켜짐' : '꺼짐'}</small></button>
     </div>`;
@@ -397,7 +388,6 @@ function optsUI(el, o, editable, set, multi) {
   el.querySelectorAll('[data-t]').forEach((b) => { b.onclick = () => set({ time: +b.dataset.t }); });
   el.querySelectorAll('[data-b]').forEach((b) => { b.onclick = () => set({ bots: Math.max(0, Math.min(7, (o.bots || 0) + +b.dataset.b)) }); });
   el.querySelectorAll('[data-s]').forEach((b) => { b.onclick = () => set({ [b.dataset.s]: o[b.dataset.s] === false }); });
-  el.querySelector('[data-g]').onclick = () => { game.pick.guide = !game.pick.guide; store.set(PICK_KEY, JSON.stringify(game.pick)); optsUI(el, o, editable, set, multi); };
 }
 function renderTitleOpts() { optsUI($('title-opts'), game.pick, true, (n) => { Object.assign(game.pick, n); store.set(PICK_KEY, JSON.stringify(game.pick)); renderTitleOpts(); }, true); }
 

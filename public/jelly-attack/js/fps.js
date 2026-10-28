@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { floorAt, boxesIn } from './maps.js';
 
-const R = 0.35, H_STAND = 1.72, H_CROUCH = 1.18, EYE_STAND = 1.55, EYE_CROUCH = 1.05;
+const R = 0.35, R_FOOT = 0.29, H_STAND = 1.72, H_CROUCH = 1.18, EYE_STAND = 1.55, EYE_CROUCH = 1.05;
 export class Player {
   constructor() { this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3(); this.yaw = 0; this.pitch = 0; this.onGround = true; this.crouch = 0; this.prone = 0; this.alive = false; this.hp = 100; this.stepT = 0; this.snapDY = 0; }
   // prone: 엎드리기 (젤리배그) · 눈 0.45m · 키 0.6m
@@ -29,17 +29,24 @@ export class Player {
     if (!inp.keepVel) { this.vel.x += (wx * speed - this.vel.x) * k; this.vel.z += (wz * speed - this.vel.z) * k; }
     if (inp.jump && this.onGround && !inp.prone) { this.vel.y = inp.jumpV || 7; this.onGround = false; ev.push('jump'); }
     if (!inp.noGrav) this.vel.y -= 21 * dt;
-    // 옆으로: x 축 · z 축 따로 움직이고 벽에서 밀어낸다
-    this.pos.x += this.vel.x * dt; this.push(map, 'x');
-    this.pos.z += this.vel.z * dt; this.push(map, 'z');
-    // 위아래
+    // 빠르게 움직일 때(돌진 · 갈고리 · 점프 추진기)는 잘게 나눠서 — 한 번에 1m 넘게 가면 얇은 벽 · 지붕을 뚫는다
     const wasGround = this.onGround;
-    this.pos.y += this.vel.y * dt;
+    const n = Math.min(10, Math.max(1, Math.ceil(Math.max(Math.abs(this.vel.x), Math.abs(this.vel.y), Math.abs(this.vel.z)) * dt / 0.25)));
+    const sdt = dt / n;
+    for (let i = 0; i < n; i++) {
+      // 옆으로: x 축 · z 축 따로 움직이고 벽에서 밀어낸다
+      this.pos.x += this.vel.x * sdt; this.push(map, 'x');
+      this.pos.z += this.vel.z * sdt; this.push(map, 'z');
+      // 위아래
+      const py = this.pos.y;
+      this.pos.y += this.vel.y * sdt;
+      if (this.vel.y > 0) for (const b of boxesIn(map, this.pos.x - 1, this.pos.z - 1, this.pos.x + 1, this.pos.z + 1)) if (this.inXZ(b, R_FOOT) && b.y > py && b.y < this.pos.y + this.height) { this.pos.y = b.y - this.height; this.vel.y = 0; }
+      // 바닥: 몸 가운데가 상자 위에 있어야 선다 (벽에 붙어서 점프하면 벽 위로 올라가던 것 막기)
+      const fl = floorAt(map, this.pos.x, this.pos.z, Math.max(this.pos.y, py), R_FOOT);
+      if (this.pos.y <= fl) { if (!wasGround && this.vel.y < -6) ev.push('land'); if (fl - this.pos.y > 0.03) this.snapDY += fl - this.pos.y; this.pos.y = fl; this.vel.y = 0; this.onGround = true; }
+      else if (this.pos.y > fl + 0.05) this.onGround = false;
+    }
     this.snapDY = Math.min(this.snapDY, 0.6);
-    if (this.vel.y > 0) for (const b of boxesIn(map, this.pos.x - 1, this.pos.z - 1, this.pos.x + 1, this.pos.z + 1)) if (this.inXZ(b) && b.y > this.pos.y && b.y < this.pos.y + this.height) { this.pos.y = b.y - this.height; this.vel.y = 0; }
-    const fl = floorAt(map, this.pos.x, this.pos.z, Math.max(this.pos.y, this.pos.y - this.vel.y * dt), R);
-    if (this.pos.y <= fl) { if (!wasGround && this.vel.y < -6) ev.push('land'); if (fl - this.pos.y > 0.03) this.snapDY += fl - this.pos.y; this.pos.y = fl; this.vel.y = 0; this.onGround = true; }
-    else if (this.pos.y > fl + 0.05) this.onGround = false;
     // 발소리
     const sp = Math.hypot(this.vel.x, this.vel.z);
     if (this.onGround && sp > 2 && !inp.crouch) { this.stepT -= dt * sp; if (this.stepT <= 0) { this.stepT = 2.2; ev.push('step'); } }
@@ -49,12 +56,12 @@ export class Player {
   push(map, axis) {
     for (const b of boxesIn(map, this.pos.x - 1, this.pos.z - 1, this.pos.x + 1, this.pos.z + 1)) {
       const top = b.y + b.h;
-      if (top <= this.pos.y + 0.55 || b.y >= this.pos.y + this.height || !this.inXZ(b)) continue; // 계단처럼 낮은 건 올라선다
+      if (top <= this.pos.y + (this.onGround ? 0.55 : 0.25) || b.y >= this.pos.y + this.height || !this.inXZ(b)) continue; // 계단처럼 낮은 건 올라선다 (공중에선 아주 낮은 턱만)
       if (axis === 'x') { const l = b.x - b.w / 2 - R, r = b.x + b.w / 2 + R; this.pos.x = this.pos.x - l < r - this.pos.x ? l : r; this.vel.x = 0; }
       else { const l = b.z - b.d / 2 - R, r = b.z + b.d / 2 + R; this.pos.z = this.pos.z - l < r - this.pos.z ? l : r; this.vel.z = 0; }
     }
     // 낮은 턱은 올라선다
-    const fl = floorAt(map, this.pos.x, this.pos.z, this.pos.y, R);
+    const fl = floorAt(map, this.pos.x, this.pos.z, this.pos.y, R_FOOT);
     if (fl > this.pos.y && fl - this.pos.y <= 0.55 && this.onGround) { this.snapDY += fl - this.pos.y; this.pos.y = fl; }
   }
 }

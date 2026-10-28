@@ -220,7 +220,8 @@ export class WatchRooms extends BaseRooms {
     const head = m.part === 'head' && spec.type !== 'melee';
     if (ally) return this.heal(r, t, spec.heal * n, c, now);
     let dmg;
-    if (scoped) { const k = Math.max(0, Math.min(1, +m.charge || 0)); dmg = (spec.scoped.min + (spec.scoped.max - spec.scoped.min) * k) * (head ? spec.scoped.head : 1); }
+    // 조준경 충전은 서버도 센다: 지난 저격 뒤로 지난 시간보다 더 모일 수 없다
+    if (scoped) { const k = Math.max(0, Math.min(1, +m.charge || 0, (now - (c.snipeAt || 0)) / (spec.scoped.charge * 1000))); c.snipeAt = now; dmg = (spec.scoped.min + (spec.scoped.max - spec.scoped.min) * k) * (head ? spec.scoped.head : 1); }
     else dmg = spec.dmg * n * (head ? spec.head || 2 : 1) * falloff(spec, d);
     this.damage(r, t, dmg, c, now, { a: m.a === 'p' ? 'p' : m.a, head, steal: spec.steal, melee: spec.type === 'melee', kb: spec.kb });
   }
@@ -852,8 +853,8 @@ export class WatchRooms extends BaseRooms {
         }
       }
     }
-    // 높이: 계단 · 단 위로
-    const fy = floorAt(map, b.pos.x, b.pos.z, b.pos.y + 1.3);
+    // 높이: 계단 · 단 위로 (몸 가운데가 그 위에 있을 때만 · 벽 옆을 걷다가 벽 위로 올라가던 것 막기)
+    const fy = floorAt(map, b.pos.x, b.pos.z, b.pos.y + 0.8, 0.15);
     if (fy > b.pos.y) b.pos.y = Math.min(fy, b.pos.y + dt * 9); else if (fy < b.pos.y) { b.vy = (b.vy || 0) - 21 * dt; b.pos.y = Math.max(fy, b.pos.y + b.vy * dt); if (b.pos.y === fy) b.vy = 0; }
     b.st = [b.pos.x, b.pos.y, b.pos.z, b.yaw, b.pitch || 0, (moving ? 1 : 0) | (b.beamTo ? 2 : 0)];
     b.beamAtSend = b.beamTo;
@@ -869,7 +870,7 @@ export class WatchRooms extends BaseRooms {
     const fx = -Math.sin(b.yaw), fz = -Math.cos(b.yaw), rx = Math.cos(b.yaw), rz = -Math.sin(b.yaw);
     let vx = fx * f + rx * s, vz = fz * f + rz * s; const L = Math.hypot(vx, vz); if (L < 0.05) return; vx /= Math.max(1, L); vz /= Math.max(1, L);
     const nx = b.pos.x + vx * speed * dt, nz = b.pos.z + vz * speed * dt;
-    if (clearLine(r.g.map, { x: b.pos.x, y: b.pos.y + 0.6, z: b.pos.z }, { x: nx + vx * 0.6, y: b.pos.y + 0.6, z: nz + vz * 0.6 }) && Math.abs(floorAt(r.g.map, nx, nz, b.pos.y + 1.3) - b.pos.y) < 1.4) { b.pos.x = nx; b.pos.z = nz; }
+    if (clearLine(r.g.map, { x: b.pos.x, y: b.pos.y + 0.6, z: b.pos.z }, { x: nx + vx * 0.6, y: b.pos.y + 0.6, z: nz + vz * 0.6 }) && Math.abs(floorAt(r.g.map, nx, nz, b.pos.y + 0.8, 0.15) - b.pos.y) < 0.8) { b.pos.x = nx; b.pos.z = nz; }
     b.path = null;
   }
   botAttack(r, b, h, spec, tgt, td, dt, now) {

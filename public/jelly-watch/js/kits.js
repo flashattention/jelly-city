@@ -79,7 +79,7 @@ export function makeKit(h, G) {
     if (sp.type === 'hit') {
       if (now < st.next || (!sp.auto && st.latch)) return;
       st.latch = true;
-      if (sp.scoped && G.mouseR) { if (!edge) return; const charge = Math.min(1, (now - st.scopeAt) / 1000); fireHit(sp, 'p', now, { charge, rate: sp.scoped.rate, snd: 'sniper', spread: 0 }); st.scopeAt = now + sp.scoped.rate * 1000; return; }
+      if (sp.scoped && G.mouseR) { if (!edge) return; const charge = Math.min(1, (now - st.scopeAt) / (sp.scoped.charge * 1000)); fireHit(sp, 'p', now, { charge, rate: sp.scoped.rate, snd: 'sniper', spread: 0 }); st.scopeAt = now + sp.scoped.rate * 1000; return; }
       return fireHit(sp, 'p', now);
     }
     if (sp.type === 'proj') { if (now < st.next || (!sp.auto && st.latch)) return; st.latch = true; return fireProjSpec(sp, 'p', now); }
@@ -334,7 +334,7 @@ export function makeKit(h, G) {
   K.extra = () => {
     if (h.id === 'pharah') return { bar: st.fuel, label: '연료' };
     if (h.id === 'tracer') return { pips: st.blinks, label: '점멸' };
-    if (h.id === 'widow' && G.mouseR) return { bar: Math.min(1, (performance.now() - st.scopeAt) / 1000), label: '충전' };
+    if (h.id === 'widow' && G.mouseR) return { bar: Math.min(1, (performance.now() - st.scopeAt) / (h.p.scoped.charge * 1000)), label: '충전' };
     if (h.id === 'lucio') return { label: G.has('songheal') ? '🎵 치유 곡' : '🎵 속도 곡' };
     return null;
   };
