@@ -174,3 +174,15 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .ding .dbell { position: absolute; right: 12%; top: 22%; width: 56px; height: 46px; border-radius: 50% 50% 14% 14% / 70% 70% 14% 14%; background: radial-gradient(ellipse at 35% 28%, #fffbe0, #ffe066 30%, #f2b705 75%, #b77f00); color: #8a4b00; font-family: 'Jua', sans-serif; font-size: 22px; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 12px rgba(0,0,0,.35); animation: dding 2.2s ease-in-out infinite; }
 @keyframes dding { 0%, 70%, 100% { transform: rotate(0); } 75% { transform: rotate(-14deg); } 82% { transform: rotate(10deg); } 89% { transform: rotate(-5deg); } }
 .merge .new, .bang .new, .ding .new, .guys .new { position: absolute; right: 14px; top: 12px; padding: 4px 12px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-family: 'Jua', sans-serif; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+
+/* 젤리 가이즈 */
+.card.guys .art { background: linear-gradient(180deg, #5ec8ff 0%, #c9efff 70%, #ff8fc4 70%, #ff6fae 100%); }
+.guys .bar { position: absolute; left: 8%; right: 8%; top: 36%; height: 12px; border-radius: 999px; background: repeating-linear-gradient(-45deg, #ffffff 0 10px, #ff4f9a 10px 20px); box-shadow: 0 3px 0 rgba(0,0,0,.15); animation: gsweep 2.4s ease-in-out infinite; transform-origin: 50% 50%; }
+@keyframes gsweep { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+.guys .beans { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); display: flex; gap: 14px; }
+.guys .beans i { position: relative; width: 30px; height: 38px; border-radius: 50% 50% 45% 45%; box-shadow: inset 0 -5px 8px rgba(0,0,0,.18), inset 4px 4px 6px rgba(255,255,255,.55); animation: ghop 1s ease-in-out infinite; }
+.guys .beans i::before, .guys .beans i::after { content: ''; position: absolute; top: -5px; width: 11px; height: 11px; border-radius: 50%; background: inherit; }
+.guys .beans i::before { left: 1px; } .guys .beans i::after { right: 1px; }
+.guys .beans i:nth-child(2) { animation-delay: .15s; } .guys .beans i:nth-child(3) { animation-delay: .3s; } .guys .beans i:nth-child(4) { animation-delay: .45s; }
+@keyframes ghop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-14px) rotate(-6deg); } }
+.guys .gcrown { position: absolute; left: 14%; top: 6%; font-size: 28px; animation: wob 2s ease-in-out infinite; filter: drop-shadow(0 3px 3px rgba(0,0,0,.3)); }

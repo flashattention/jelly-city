@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>젤리 가이즈</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/css/shell.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="flash"></div>
+  <!-- 경기 중 -->
+  <div id="hud" class="hidden">
+    <div id="h-top"><div id="h-round"></div><div id="h-count"></div></div>
+    <div id="h-time"></div>
+    <div class="hud-r"><button id="b-mute" title="소리 (M)">🔊</button><button id="b-quit" title="그만하기">✕</button></div>
+    <div id="h-keys"><kbd>WASD</kbd> 이동 · <kbd>Space</kbd> 점프 · <kbd>Shift</kbd> 다이브 · 화면 클릭 = 마우스 카메라</div>
+    <div id="t-btns"><button id="t-dive">🤸</button><button id="t-jump">⬆️</button></div>
+  </div>
+  <div id="stick" class="hidden"><i></i></div>
+  <div id="card" class="hidden"></div>
+  <div id="count" class="hidden"></div>
+  <div id="banner" class="hidden"></div>
+  <div id="spec" class="hidden"></div>
+  <!-- 결과 -->
+  <div id="over" class="screen hidden"><div class="card wide">
+    <h2 id="ov-title"></h2>
+    <div id="ov-me" class="sub"></div>
+    <div id="ov-rank" class="ranks"></div>
+    <div class="row2"><button id="again-btn" class="btn big">🔁 한 판 더</button><button id="home-btn" class="btn ghost">처음으로</button></div>
+  </div></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

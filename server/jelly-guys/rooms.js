@@ -20,7 +20,7 @@ export class GuysRooms extends BaseRooms {
     // 혼자 하기: 나만의 방 + 젤리봇 → 바로 시작
     if (m.t === 'practice') {
       this.leave(c);
-      const r = { id: this.newCode(), name: `${c.name}의 연습`, players: [], host: c, state: 'wait', startAt: 0, opts: this.allow({ ...this.o.defaults }, m.opts || {}), practice: true };
+      const r = { id: this.newCode(), name: `${c.name}의 연습`, players: [], host: c, state: 'wait', startAt: 0, opts: this.allow({ ...this.o.defaults }, m.opts || {}), practice: true, only: ROUNDS[m.opts?.round] ? m.opts.round : null };
       this.rooms.set(r.id, r);
       r.players.push(c); c.room = r; c.team = null;
       this.send(c, { t: 'joined', room: this.roomInfo(r), members: this.members(r), practice: true });
@@ -35,10 +35,12 @@ export class GuysRooms extends BaseRooms {
       const k = (i + (r.seed % 7)) % BOT_NAMES.length;
       r.players.push({ id: this.nextPid++, bot: true, name: BOT_NAMES[k], color: BOT_COLORS[k], look: { hat: 1 + ((r.seed >> i) % 9), outfit: (r.seed >> (i + 3)) % 7 }, acc: [], team: null, st: null });
     }
-    r.ep = { plan: planEpisode(r.players.length, r.seed), ri: -1, alive: new Set(r.players.map((p) => p.id)), place: new Map(), elimOrder: [] };
+    r.ep = { plan: r.only ? [r.only] : planEpisode(r.players.length, r.seed), single: !!r.only, ri: -1, alive: new Set(r.players.map((p) => p.id)), place: new Map(), elimOrder: [] };
     r.phase = 'wait'; r.phaseAt = r.startAt;
     return { plan: r.ep.plan };
   }
+  // 젤리봇 인사는 세 마리만 (스무 마리가 다 말하면 채팅이 가득 찬다)
+  botsGreet(r) { const all = r.players; r.players = all.filter((p) => !p.bot).concat(all.filter((p) => p.bot).slice(0, 3)); super.botsGreet(r); r.players = all; }
   onLeave(r, c) { if (r.ep?.alive.has(c.id)) this.eliminate(r, c, true); }
 
   // ---------- 판 시작 ----------
@@ -47,7 +49,7 @@ export class GuysRooms extends BaseRooms {
     const id = ep.plan[Math.min(ep.ri, ep.plan.length - 1)];
     const alive = r.players.filter((p) => ep.alive.has(p.id));
     // 마지막 판이 아닌데 너무 적게 남았으면 바로 결승
-    const final = ep.ri >= ep.plan.length - 1 || alive.length <= 3;
+    const final = !ep.single && (ep.ri >= ep.plan.length - 1 || alive.length <= 3);
     const rid = final && ROUNDS[id].kind !== 'final' ? ep.plan[ep.plan.length - 1] : id;
     const seed = (r.seed * 31 + ep.ri * 977) >>> 0;
     const L = buildRound(rid, seed);
@@ -186,7 +188,7 @@ export class GuysRooms extends BaseRooms {
   nextOrEnd(r, now) {
     const ep = r.ep;
     const humansAlive = r.players.some((p) => !p.bot && ep.alive.has(p.id));
-    if (ep.winners || ep.alive.size <= 1 || !humansAlive) return this.finishEpisode(r);
+    if (ep.winners || ep.single || ep.alive.size <= 1 || !humansAlive) return this.finishEpisode(r);
     this.startRound(r, now);
   }
   finishEpisode(r) {

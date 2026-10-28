@@ -1,0 +1,77 @@
+/* 젤리 가이즈 */
+html, body { margin: 0; height: 100%; overflow: hidden; background: #8ad3ff; font-family: 'Gowun Dodum', sans-serif; touch-action: none; }
+#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.hidden { display: none !important; }
+#flash { position: fixed; inset: 0; background: #7fd3ff; opacity: 0; pointer-events: none; z-index: 30; }
+#flash.on { animation: flash .6s ease-out; }
+@keyframes flash { 0% { opacity: .7; } 100% { opacity: 0; } }
+
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; font-family: 'Jua', sans-serif; color: #fff; }
+#h-top { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; }
+#h-round { background: rgba(60, 30, 90, .55); padding: 6px 18px; border-radius: 999px; font-size: 18px; text-shadow: 0 2px 0 rgba(0,0,0,.3); }
+#h-round small { opacity: .75; margin-left: 6px; }
+#h-count { background: #fff; color: #5a2a7a; padding: 6px 20px; border-radius: 999px; font-size: 22px; box-shadow: 0 5px 0 #c9a6e8, 0 8px 18px rgba(0,0,0,.25); }
+#h-count b { color: #ff4f9a; font-size: 28px; }
+#h-time { position: absolute; top: 14px; left: 16px; font-size: 34px; text-shadow: 0 3px 0 rgba(70,30,100,.5); }
+#h-time.low { color: #ff6b8b; animation: pulse .5s infinite alternate; }
+@keyframes pulse { to { transform: scale(1.12); } }
+.hud-r { position: absolute; top: 12px; right: 12px; display: flex; gap: 8px; pointer-events: auto; }
+.hud-r button { width: 42px; height: 42px; border-radius: 50%; border: 0; background: rgba(60,30,90,.55); color: #fff; font-size: 18px; cursor: pointer; }
+#h-keys { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); font-family: 'Gowun Dodum', sans-serif; font-size: 13px; background: rgba(40,20,60,.45); padding: 6px 14px; border-radius: 999px; white-space: nowrap; }
+#h-keys kbd { background: #fff; color: #5a2a7a; border-radius: 6px; padding: 1px 6px; font-family: 'Jua', sans-serif; }
+
+/* 판 소개 카드 */
+#card { position: fixed; left: 50%; top: 44%; transform: translate(-50%, -50%); z-index: 20; min-width: min(520px, 88vw); padding: 26px 34px; border-radius: 28px; text-align: center; color: #fff; font-family: 'Jua', sans-serif; background: linear-gradient(160deg, #ff7eb6, #9b6bff); box-shadow: 0 10px 0 rgba(80,30,120,.35), 0 20px 50px rgba(0,0,0,.35); animation: cardIn .5s cubic-bezier(.2,1.6,.4,1); }
+#card.survive { background: linear-gradient(160deg, #ffb347, #ff5f6d); }
+#card.final { background: linear-gradient(160deg, #ffd84d, #ff8a3d); color: #4a2400; }
+#card.start { background: linear-gradient(160deg, #5ec8ff, #9b6bff); }
+#card .em { font-size: 64px; line-height: 1; animation: wob 1s ease-in-out infinite alternate; }
+#card .nm { font-size: 38px; margin: 8px 0 6px; text-shadow: 0 3px 0 rgba(0,0,0,.18); }
+#card .ds { font-family: 'Gowun Dodum', sans-serif; font-size: 17px; opacity: .95; }
+#card .sb { margin-top: 12px; display: inline-block; padding: 5px 14px; border-radius: 999px; background: rgba(255,255,255,.25); font-size: 15px; }
+@keyframes cardIn { from { transform: translate(-50%, -50%) scale(.3) rotate(-8deg); opacity: 0; } }
+@keyframes wob { from { transform: rotate(-8deg) scale(1); } to { transform: rotate(8deg) scale(1.08); } }
+
+#count { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 21; font-family: 'Jua', sans-serif; font-size: 140px; color: #fff; text-shadow: 0 8px 0 #9b6bff, 0 14px 30px rgba(0,0,0,.3); animation: pop .9s ease-out; pointer-events: none; }
+#count.go { color: #ffe066; text-shadow: 0 8px 0 #ff5fa2, 0 14px 30px rgba(0,0,0,.3); }
+@keyframes pop { 0% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; } 30% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { opacity: .9; } }
+
+#banner { position: fixed; left: 50%; top: 30%; transform: translate(-50%, -50%); z-index: 22; font-family: 'Jua', sans-serif; font-size: 52px; color: #fff; padding: 14px 40px; border-radius: 26px; background: rgba(90,40,130,.75); text-shadow: 0 4px 0 rgba(0,0,0,.25); animation: cardIn .45s cubic-bezier(.2,1.6,.4,1); pointer-events: none; white-space: nowrap; }
+#banner.good { background: linear-gradient(160deg, #6fe08a, #2fbf8f); }
+#banner.bad { background: linear-gradient(160deg, #6aa8ff, #5a6fd8); }
+#spec { position: fixed; bottom: 54px; left: 50%; transform: translateX(-50%); z-index: 12; background: rgba(40,20,60,.6); color: #fff; padding: 8px 18px; border-radius: 999px; font-size: 15px; }
+
+.confetti { position: fixed; inset: 0; pointer-events: none; z-index: 25; overflow: hidden; }
+.confetti i { position: absolute; top: -20px; width: 10px; height: 16px; border-radius: 3px; animation: fall linear forwards; }
+@keyframes fall { to { transform: translateY(110vh) rotate(720deg); } }
+
+/* 처음 화면 옵션 */
+.seg { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; margin: 8px 0; }
+.seg .lbl { font-size: 14px; opacity: .85; margin-right: 4px; }
+.seg button { border: 0; border-radius: 999px; padding: 6px 14px; background: rgba(255,255,255,.18); color: inherit; font-family: 'Jua', sans-serif; font-size: 15px; cursor: pointer; }
+.seg button.on { background: #ffd84d; color: #4a2400; }
+.seg button:disabled { opacity: .5; cursor: default; }
+.round-list { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; margin: 6px 0 2px; }
+.round-list .lbl { width: 100%; text-align: center; font-size: 13px; opacity: .8; }
+.round-list .rk { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.14); border: 0; color: inherit; font-family: inherit; cursor: pointer; }
+.round-list .rk:hover { background: rgba(255,255,255,.3); }
+.round-list .rk.survive { background: rgba(255,140,90,.28); }
+.round-list .rk.final { background: rgba(255,216,77,.3); }
+
+/* 결과 */
+.ranks { max-height: 46vh; overflow: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 12px 0; }
+.ranks .row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 12px; background: rgba(255,255,255,.1); }
+.ranks .row.me { background: rgba(255,216,77,.3); }
+.ranks .row b { min-width: 26px; text-align: center; font-family: 'Jua', sans-serif; }
+.ranks .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.ranks .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 휴대폰 */
+#t-btns { display: none; }
+#stick { position: fixed; width: 110px; height: 110px; margin: -55px 0 0 -55px; border-radius: 50%; background: rgba(255,255,255,.18); border: 3px solid rgba(255,255,255,.5); z-index: 15; pointer-events: none; }
+#stick i { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: rgba(255,255,255,.85); }
+body.touch #t-btns { display: flex; position: absolute; right: 18px; bottom: 26px; gap: 14px; pointer-events: auto; }
+body.touch #t-btns button { width: 74px; height: 74px; border-radius: 50%; border: 0; font-size: 30px; background: rgba(255,255,255,.85); box-shadow: 0 5px 0 rgba(90,40,130,.4); }
+body.touch #t-btns #t-jump { width: 92px; height: 92px; background: #ffd84d; }
+body.touch #h-keys { display: none; }
+@media (max-width: 640px) { #card .nm { font-size: 28px; } #banner { font-size: 34px; } #count { font-size: 100px; } .ranks { grid-template-columns: 1fr; } #h-count { font-size: 18px; } }
