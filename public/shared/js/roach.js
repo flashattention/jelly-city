@@ -129,6 +129,7 @@ export class Roach {
     this.bodyM = bodyM;
     const darkM = gummy ? jelly(shade(color, 0.86)) : toon(shade(color, 0.72));
     const bellyM = gummy ? jelly(look.belly && look.belly !== 'auto' ? look.belly : shade(color, 1.2), 0.7) : toon(look.belly && look.belly !== 'auto' ? look.belly : shade(color, 1.45));
+    this.bellyM = bellyM; // 젤리 숨바꼭질: 배도 칠할 수 있게
     const wingM = toon(shade(color, 0.85));
     const white = toon('#ffffff');
     const black = toon('#1d1410');

@@ -75,21 +75,21 @@ const HAT = (() => { const g = new THREE.Group(); const red = new THREE.MeshLamb
 class Mate {
   constructor(m) {
     this.id = m.id; this.name = m.name; this.bot = !!m.bot;
-    this.bear = new Bear(m.id === game.myId ? '#ff9ec4' : lighten(m.color || '#8a5634'));
+    this.bear = new Bear(m.id === game.myId ? (shell.profile?.color || '#ff9ec4') : (m.color || '#8a5634'), m.id === game.myId ? shell.profile?.look : m.look);
     this.tag = nameTag(m.id === game.myId ? '나' : (m.bot ? '🤖 ' : '') + m.name, m.id === game.myId ? '#ffe066' : '#ffffff');
     scene.add(this.bear.root, this.tag);
     this.pos = new THREE.Vector3(); this.tp = new THREE.Vector3(); this.yaw = 0; this.tyaw = 0; this.flags = 0; this.at = 0; this.sp = 0;
   }
   snap(x, y, z, yaw, f) { this.tp.set(x, y, z); this.tyaw = yaw; this.flags = f; if (!this.at) { this.pos.copy(this.tp); this.yaw = yaw; } this.at = performance.now(); }
   place(x, z, yaw) { this.pos.set(x, 0, z); this.tp.copy(this.pos); this.yaw = this.tyaw = yaw; this.at = performance.now(); }
-  setSeeker(on) { if (on) { const h = HAT.clone(); h.position.y = 1.32; this.bear.inner.add(h); this.hat = h; } else if (this.hat) { this.bear.inner.remove(this.hat); this.hat = null; } }
-  setFound(on) { this.found = on; this.bear.mat.transparent = on; this.bear.mat.opacity = on ? 0.35 : 1; this.bear.mat.needsUpdate = true; }
+  setSeeker(on) { if (on) { const h = HAT.clone(); h.position.y = this.bear.topY / 0.86 - 0.12; this.bear.inner.add(h); this.hat = h; } else if (this.hat) { this.bear.inner.remove(this.hat); this.hat = null; } }
+  setFound(on) { this.found = on; this.bear.setGhost(on); }
   update(dt, local) {
     if (!local) { if (this.pos.distanceTo(this.tp) > 5) this.pos.copy(this.tp); else this.pos.lerp(this.tp, Math.min(1, dt * 12)); let d = this.tyaw - this.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); this.yaw += d * Math.min(1, dt * 10); }
     const pose = this.flags & 3; if (pose !== this.bear.pose) this.bear.setPose(pose);
     const b = this.bear.root; b.position.copy(this.pos); b.rotation.y = this.yaw;
     this.bear.animate(dt, !!(this.flags & 4));
-    this.tag.position.set(this.pos.x, this.pos.y + (pose === 2 ? 1.0 : 1.75), this.pos.z);
+    this.tag.position.set(this.pos.x, this.pos.y + (pose === 2 ? 1.0 : this.bear.topY + 0.3), this.pos.z);
     // 찾는 동안 움직이면 반짝이 흔적
     if (game.phase === 'seek' && this.flags & 4 && !this.found && this.id !== game.seeker) { this.sp -= dt; if (this.sp <= 0) { this.sp = 0.12; sparkle(this.pos); } }
   }
@@ -141,10 +141,9 @@ function rayFrom(cx, cy) { ndc.set((cx / innerWidth) * 2 - 1, -(cy / innerHeight
 canvas.addEventListener('pointerdown', (e) => {
   if (game.mode !== 'play') return;
   S.unlock?.();
-  if (amSeeker() && game.phase === 'seek' && !game.found.has(game.myId)) {
-    if (!touch && document.pointerLockElement !== canvas) { canvas.requestPointerLock?.(); return; }
-    if (!touch) { gun.firing = true; fire(); return; }
-  }
+  if (!touch && !game.painting && document.pointerLockElement !== canvas) { canvas.requestPointerLock?.(); return; } // 원작처럼: 클릭 한 번이면 마우스로 바로 둘러보기
+  if (amSeeker() && game.phase === 'seek' && !game.found.has(game.myId) && !touch) { gun.firing = true; fire(); return; }
+  if (!touch && !game.painting) return;
   drag = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, paint: false, t: performance.now(), id: e.pointerId };
   if (game.painting) {
     const h = rayFrom(e.clientX, e.clientY).intersectObjects(me().bear.meshes(), false)[0];
@@ -154,7 +153,12 @@ canvas.addEventListener('pointerdown', (e) => {
   try { canvas.setPointerCapture?.(e.pointerId); } catch { /* 무시 */ }
 });
 canvas.addEventListener('pointermove', (e) => {
-  if (document.pointerLockElement === canvas) { game.camYaw -= e.movementX * 0.0026; game.camPitch = Math.max(-1.3, Math.min(1.3, game.camPitch - e.movementY * 0.0024)); return; }
+  if (document.pointerLockElement === canvas) {
+    const fp = amSeeker() && game.phase === 'seek';
+    game.camYaw -= e.movementX * 0.0026;
+    game.camPitch = fp ? Math.max(-1.3, Math.min(1.3, game.camPitch - e.movementY * 0.0024)) : Math.max(-0.25, Math.min(1.25, game.camPitch + e.movementY * 0.0026));
+    return;
+  }
   if (!drag || drag.id !== e.pointerId) return;
   if (drag.paint) { const h = rayFrom(e.clientX, e.clientY).intersectObjects(me().bear.meshes(), false)[0]; if (h) paintHit(h, false); return; }
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
@@ -304,7 +308,7 @@ function paintHit(h, first) {
   const b = me().bear, part = h.object.userData.part;
   if (first) b.snapshot();
   if (game.tool === 'fill' || game.tool === 'stamp') { if (first) { game.tool === 'stamp' ? b.stamp(part, curSpec()) : b.fill(part, game.c1); S.sfx('pop', 2); } return; }
-  b.dab(h.uv, part, game.c1, game.size, game.tool === 'erase');
+  b.dab(h.uv, h.object, game.c1, game.size, game.tool === 'erase');
   if (Math.random() < 0.3) S.sfx('pen');
 }
 // 스포이드: 화면에 비친 색이 아니라 그 겉면 무늬의 실제 색 (+ 무늬도 기억)
@@ -326,6 +330,7 @@ function sendPaint() { if (!game.paintDirty) return; game.paintDirty = false; co
 function togglePaint(on = !game.painting) {
   if (on && (amSeeker() || game.phase !== 'hide' || game.found.has(game.myId))) return;
   game.painting = on; $('paint').classList.toggle('hidden', !on); $('paint-btn').classList.toggle('on', on);
+  if (on) document.exitPointerLock?.();
   if (on) { game.camDist0 = game.camDist; game.camDist = 2.6; game.camPitch = 0.25; game.camYaw = game.myYaw; buildPaintUI(); S.sfx('page'); }
   else { game.camDist = game.camDist0 || 5; sendPaint(); }
   hudRole();
@@ -342,6 +347,12 @@ function feed(t, big) { const d = document.createElement('div'); d.textContent =
 let introT = 0;
 function intro(html, cls, ms) { const c = $('intro'); c.className = cls || ''; c.innerHTML = html; clearTimeout(introT); if (ms) introT = setTimeout(() => c.classList.add('hidden'), ms); }
 const nameOf = (id) => (id === game.myId ? '나' : game.members?.get(id)?.name || '?');
+function lockHint() {
+  const el = $('lockhint'); if (!el) return;
+  const show = !touch && game.mode === 'play' && !game.painting && document.pointerLockElement !== canvas && (game.phase === 'hide' || game.phase === 'seek' || game.phase === 'ready') && !(amSeeker() && game.phase !== 'seek');
+  el.classList.toggle('hidden', !show);
+}
+document.addEventListener('pointerlockchange', () => lockHint());
 function hudRole() {
   const found = game.found.has(game.myId), seeker = amSeeker();
   $('h-role').textContent = seeker ? (game.phase === 'seek' ? '🔍 술래 · 수상한 곳에 물감총! 물감통은 조금씩 다시 차요' : '🔍 이번 판 술래') : found ? '😵 들켰어요 · 술래를 따라 구경해요' : game.phase === 'seek' ? '🫥 들키지 마세요 · 움직이면 반짝이가 남아요' : `🫥 숨는 젤리 · 술래는 ${nameOf(game.seeker)}`;
@@ -354,6 +365,7 @@ function hudRole() {
   $('cross').classList.toggle('hidden', !(seeker && game.phase === 'seek'));
   $('t-tag').classList.toggle('hidden', !(seeker && game.phase === 'seek'));
   $('touch').classList.toggle('hidden', !touch || game.painting);
+  lockHint();
 }
 
 // ---------- 공용 틀 ----------
@@ -375,7 +387,7 @@ const shell = new Shell({
   sound: { muted: () => S.sound.muted, toggle: () => { S.toggleMute(); $('b-mute').textContent = S.sound.muted ? '🔇' : '🔊'; } },
   key: 'jellyhide', title: '🫥 젤리 숨바꼭질', subtitle: '몸에 색을 칠해 방 · 가게 · 정원과 똑같아지기!<br>술래는 물감총으로 수상한 곳을 쏴서 찾아요', wsPath: '/hide-ws', max: 10,
   multiLabel: '👥 같이 하기', roomIcon: '🫥', startLabel: '🫥 숨바꼭질 시작!',
-  keysHelp: 'WASD 이동 · 마우스 끌기 카메라 · F 칠하기 · 💧 스포이드로 겉면 색 찍기 · 1~4 자세 · Q/E 돌기 · 술래는 클릭 · 꾹 누르기로 물감총 발사',
+  keysHelp: 'WASD 이동 · 화면 클릭 후 마우스로 둘러보기(Esc 커서) · F 칠하기 · 💧 스포이드로 겉면 색 찍기 · 1~4 자세 · Q/E 돌기 · 술래는 클릭 · 꾹 누르기로 물감총 발사',
   buttons: [{ id: 'hide-btn', label: '🫥 숨기 연습 <small>젤리봇 술래에게서 숨어요</small>', onClick: () => practice('hide') }, { id: 'seek-btn', label: '🔍 술래 연습 <small>숨은 젤리봇을 찾아요</small>', cls: 'ghost', onClick: () => practice('seek') }],
   screens: ['over'],
   describe: (o = {}) => `${o.map === 'random' ? '🎲 돌아가며' : MAPS.find((m) => m.id === o.map)?.name || ''} · ${o.rounds ? `${o.rounds}판` : '모두 한 번씩'} · 🤖 ${o.bots || 0}`,

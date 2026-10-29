@@ -78,12 +78,46 @@ function garden() {
   return { id: 'garden', name: '꽃 정원', emoji: '🌷', desc: '꽃밭 · 산울타리 · 돗자리 · 나무 그늘', W, D, H: 2.4, floor: S('#7cc96a', 'grass', '#5fae4e', 1.1), sky: ['#9fdcff', '#e8f8ff'], indoor: false, boxes };
 }
 
+
+// ---------- 맵 넓히기: 배치는 그대로 펼치고(1.75배) 빈자리는 그 맵의 색 · 무늬로 소품을 더 채운다 ----------
+//   서버 · 화면이 같은 씨앗으로 만들어서 모두 같은 맵 (봇 길찾기도 새 맵으로)
+function widen(m, k) {
+  const R = rng(m.id.length * 7919 + 3), walls = m.boxes.filter((b) => b.wall), rest = m.boxes.filter((b) => !b.wall);
+  const W = Math.round(m.W * k), D = Math.round(m.D * k), H = m.indoor ? m.H + 1 : m.H;
+  const out = room(W, D, H, [walls[0].s, walls[1].s, walls[2].s, walls[3].s]);
+  for (const b of rest) { const g = b.rug ? k : 1.15; out.push({ ...b, x: b.x * k, z: b.z * k, w: b.w * g, d: b.d * g }); }
+  // 소품 재료: 이 맵의 소품 무늬들
+  const specs = rest.filter((b) => !b.rug && b.h > 0.4).map((b) => b.s);
+  const pick = () => specs[Math.floor(R() * specs.length)];
+  const clear = (x, z, r) => Math.abs(x) < W / 2 - r - 0.6 && Math.abs(z) < D / 2 - r - 0.6 && !out.some((b) => !b.rug && !b.wall && Math.abs(b.x - x) < b.w / 2 + r + 0.9 && Math.abs(b.z - z) < b.d / 2 + r + 0.9);
+  const want = Math.round(W * D * 0.011);
+  for (let t = 0, n = 0; t < 600 && n < want; t++) {
+    const x = (R() - 0.5) * (W - 4), z = (R() - 0.5) * (D - 4), kind = R();
+    if (kind < 0.4) { // 블록 더미 (1~3층)
+      const sz = 1.1 + R() * 0.8; if (!clear(x, z, sz)) continue;
+      const lv = 1 + Math.floor(R() * 3); for (let i = 0; i < lv; i++) out.push(B(x + (R() - 0.5) * 0.3, z + (R() - 0.5) * 0.3, sz * (1 - i * 0.12), sz * (1 - i * 0.12), sz * 0.9, pick(), i * sz * 0.9));
+    } else if (kind < 0.65) { // 탁자 · 낮은 상자 (밑에 숨을 수 있게 다리 넷)
+      const w = 2.2 + R() * 1.6, d = 1.4 + R() * 1, h = 0.9 + R() * 0.3; if (!clear(x, z, Math.max(w, d) / 2)) continue;
+      const top = pick(); out.push(B(x, z, w, d, 0.18, top, h));
+      for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) out.push(B(x + sx * (w / 2 - 0.15), z + sz * (d / 2 - 0.15), 0.22, 0.22, h, top));
+    } else if (kind < 0.85) { // 길쭉한 상자 (벽처럼 숨기 좋은 면)
+      const long = R() < 0.5, w = long ? 3 + R() * 2 : 0.9, d = long ? 0.9 : 3 + R() * 2; if (!clear(x, z, Math.max(w, d) / 2)) continue;
+      out.push(B(x, z, w, d, 1.2 + R() * 0.8, pick()));
+    } else { // 바닥 깔개
+      const w = 3 + R() * 3, d = 3 + R() * 3; if (out.some((b) => b.rug && Math.abs(b.x - x) < (b.w + w) / 2 && Math.abs(b.z - z) < (b.d + d) / 2) || !clear(x, z, 0.5)) continue;
+      out.push({ ...B(x, z, w, d, 0.05, pick()), rug: 1 });
+    }
+    n++;
+  }
+  return { ...m, W, D, H, boxes: out };
+}
+
 const MAKERS = { toy, candy, garden };
 export const MAPS = [{ id: 'toy', name: '장난감 방', emoji: '🧸' }, { id: 'candy', name: '사탕 가게', emoji: '🍭' }, { id: 'garden', name: '꽃 정원', emoji: '🌷' }];
 const cache = new Map();
 export function getMap(id) {
   if (!MAKERS[id]) id = 'toy';
-  if (!cache.has(id)) { const m = MAKERS[id](); m.spawns = spawns(m); m.spots = spots(m); m.nav = makeNav(m); cache.set(id, m); }
+  if (!cache.has(id)) { const m = widen(MAKERS[id](), 1.75); m.spawns = spawns(m); m.spots = spots(m); m.nav = makeNav(m); cache.set(id, m); }
   return cache.get(id);
 }
 
