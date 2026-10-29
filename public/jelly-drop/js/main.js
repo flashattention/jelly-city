@@ -19,7 +19,7 @@ import { sfx, unlock, toggleMute, sound } from '../../jelly-tactical/js/sound.js
 import { explosion, smoke, updateFx as updateBig, stepNade, NadeArc } from '../../jelly-tactical/js/fx.js';
 
 const $ = (id) => document.getElementById(id);
-const wpn = (id) => weapon(id) || THROWS[id]; // 총 · 투척(화염병 · 섬광탄 · 신호탄 총)
+const wpn = (id) => weapon(id) || THROWS[id]; // 총 · 투척(화염병 · 섬광탄 · 선물 신호탄)
 const PICK_KEY = 'jellydrop.pick';
 let MAP = getBgMap('island');
 
@@ -42,7 +42,7 @@ const pick0 = (() => { try { return JSON.parse(store.get(PICK_KEY) || '{}'); } c
 const game = window.bg = {
   me, mode: 'title', myId: 0, others: new Map(), loot: new Map(), inv: emptyInv(), zones: null, plane: null, t0: 0, alive: 0, total: 0, kills: 0, place: 0,
   pick: { fill: pick0.fill ?? 24, map: pick0.map || 'random', squad: pick0.squad || 1 }, watch: null, color: '#8a5634', fall: null,
-  // 몸: 엎드리기 · 기울이기 · 넘기 · 헤엄 · 기절 / 분대 · 레드존 · 보급상자 · 불
+  // 몸: 엎드리기 · 기울이기 · 넘기 · 헤엄 · 기절 / 분대 · 사탕 폭격 구역 · 선물 낙하산 · 불
   prone: false, lean: 0, vault: null, swim: false, knocked: false, free: null, single: {}, squad: 1, sq: {}, sqInfo: [], squads: 0, red: null, drops: new Map(), fires: [], reviving: null, revBar: null, refuel: null,
 };
 const sec = () => (performance.now() - game.t0) / 1000;
@@ -371,8 +371,8 @@ function knife() {
 const nades = [], arc = new NadeArc(scene);
 function throwNade(kind = throwId()) {
   if (!kind || game.inv[kind] <= 0 || game.swim || game.knocked) return;
-  // 신호탄 총: 하늘로 쏘면 그 자리에 보급상자가 떨어진다
-  if (kind === 'flare') { shell.send({ t: 'flare', p: [me.pos.x, me.pos.y, me.pos.z] }); game.inv.flare--; renderSlots(); if (!slotIds()[cur]) switchTo(3); sfx('gun', 'pistol'); flareFx(me.pos.clone()); banner('🎆 신호탄! 보급상자가 와요'); return; }
+  // 선물 신호탄: 하늘로 쏘면 그 자리에 선물 낙하산이 떨어진다
+  if (kind === 'flare') { shell.send({ t: 'flare', p: [me.pos.x, me.pos.y, me.pos.z] }); game.inv.flare--; renderSlots(); if (!slotIds()[cur]) switchTo(3); sfx('gun', 'pistol'); flareFx(me.pos.clone()); banner('🎆 신호탄! 선물 낙하산이 와요'); return; }
   vm.swing(); sfx('throw');
   const col = { smoke: '#7a9a6a', molotov: '#8fd88f', flash: '#3a3d46' }[kind] || game.color;
   const m = new THREE.Mesh(kind === 'smoke' || kind === 'flash' ? new THREE.CylinderGeometry(0.1, 0.1, 0.3, 10) : new THREE.SphereGeometry(0.13, 12, 8), new THREE.MeshToonMaterial({ color: col }));
@@ -501,7 +501,7 @@ function renderInv() {
     <div class="inv-col"><h3>🎒 ${BAG_NAME[I.bag]} <small>탄약 ${used}/${cap}</small></h3>
       ${Object.keys(AMMO).map((a) => `<div class="ii${I.ammo[a] ? '' : ' none'}"><span>${AMMO[a].emoji} ${AMMO[a].name}</span><b>${I.ammo[a] || 0}</b>${I.ammo[a] ? `<button data-drop="ammo" data-a="${a}">버리기</button>` : ''}</div>`).join('')}
       <h3>❤️ 회복 · 부스트 · 투척</h3>
-      ${cnt('band', '젤리 붕대 (7)', '🩹', CAP.band[I.bag])}${cnt('med', '젤리 구급상자 (8)', '🧰', CAP.med[I.bag])}${cnt('drink', '에너지 젤리 음료 (9)', '🥤')}${cnt('pill', '진통 젤리 (0)', '💊')}${cnt('nade', '젤리 수류탄', '💣')}${cnt('smoke', '연막탄', '💨')}
+      ${cnt('band', '꿀 붕대 (7)', '🩹', CAP.band[I.bag])}${cnt('med', '젤리 구급상자 (8)', '🧰', CAP.med[I.bag])}${cnt('drink', '탄산 젤리 음료 (9)', '🥤')}${cnt('pill', '진통 젤리 (0)', '💊')}${cnt('nade', '젤리 수류탄', '💣')}${cnt('smoke', '연막탄', '💨')}
       <h3>🛡️ 장비</h3><div class="ii"><span>⛑️ 헬멧</span><b>${I.helmet ? `${ARMOR_NAME[I.helmet]} · ${Math.max(0, Math.round(I.helmetD))}%` : '없음'}</b></div><div class="ii"><span>🦺 조끼</span><b>${I.armor ? `${ARMOR_NAME[I.armor]} · ${Math.max(0, Math.round(I.armorD))}%` : '없음'}</b></div></div>`;
   el.querySelectorAll('[data-drop]').forEach((b) => { b.onclick = () => { shell.send({ t: 'drop', k: b.dataset.drop, a: b.dataset.a, g: +b.dataset.g }); sfx('switch'); }; });
   el.querySelectorAll('[data-detach]').forEach((b) => { b.onclick = () => { shell.send({ t: 'drop', k: 'detach', slot: b.dataset.detach, g: +b.dataset.g }); sfx('switch'); }; });
@@ -683,7 +683,7 @@ function drawMap(cv, S, mini, Z) {
     x.strokeStyle = '#4c8dff'; x.lineWidth = 2; x.beginPath(); x.arc(zx, zz, Z.r * k, 0, Math.PI * 2); x.stroke();
     if (Z.next) { const [nx, nz] = P(Z.next.x, Z.next.z); x.strokeStyle = '#ffffff'; x.setLineDash([6, 4]); x.beginPath(); x.arc(nx, nz, Z.next.r * k, 0, Math.PI * 2); x.stroke(); x.setLineDash([]); }
   }
-  // 레드존 (빨강) · 보급상자 (빨간 네모) · 분대 동료 (하늘색 점)
+  // 사탕 폭격 구역 (빨강) · 선물 낙하산 (빨간 네모) · 분대 동료 (하늘색 점)
   if (game.red) { const [rx, rz] = P(game.red.x, game.red.z); x.fillStyle = 'rgba(255,50,50,.35)'; x.beginPath(); x.arc(rx, rz, game.red.r * k, 0, Math.PI * 2); x.fill(); x.strokeStyle = '#ff3b3b'; x.lineWidth = 2; x.stroke(); }
   for (const D of game.drops.values()) { const [a, b] = P(D.x, D.z); x.fillStyle = '#ff3b3b'; x.strokeStyle = '#fff'; x.lineWidth = 2; x.beginPath(); x.rect(a - 4, b - 4, 8, 8); x.fill(); x.stroke(); }
   for (const [id, , kn, al, px, pz] of game.sqInfo) { if (id === game.myId || !al) continue; const [a, b] = P(px, pz); x.fillStyle = kn ? '#ff5a5a' : '#4cc3ff'; x.strokeStyle = '#fff'; x.lineWidth = 2; x.beginPath(); x.arc(a, b, 5, 0, Math.PI * 2); x.fill(); x.stroke(); }
@@ -825,7 +825,7 @@ const shell = new Shell({
   sound: { muted: () => sound.muted, toggle: () => { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; } },
   key: 'jellydrop', title: '🪂 젤리드롭', subtitle: '젤리 비행선에서 뛰어내려 무기를 줍고<br>줄어드는 젤리 자기장 속 마지막 곰돌이가 되어요!', wsPath: '/drop-ws', max: 30,
   multiLabel: '👥 같이 하기', roomIcon: '🪂', startLabel: '🪂 비행선 출발!',
-  keysHelp: 'F/Space 뛰어내리기 · WASD 이동 · 마우스 조준 · 클릭 사격 · 우클릭 조준(스코프 배율) · F 줍기 · 차 타기 · 동료 살리기(누르고 있기) · R 장전(차 안: 기름) · 1~5 무기(5 여러 번: 투척 고르기) · 6 아드레날린 · 7 붕대 · 8 구급상자 · 9 음료 · 0 진통제 · G 던지기 · X 버리기 · B 단발/연사 · Z 엎드리기 · Q/E 기울이기 · Space 점프 · 넘기 · Alt 둘러보기 · Tab 가방 · Shift 달리기 · C/Ctrl 앉기 · M 지도',
+  keysHelp: 'F/Space 뛰어내리기 · WASD 이동 · 마우스 조준 · 클릭 사격 · 우클릭 조준(스코프 배율) · F 줍기 · 차 타기 · 동료 살리기(누르고 있기) · R 장전(차 안: 기름) · 1~5 무기(5 여러 번: 투척 고르기) · 6 슈가 러시 · 7 붕대 · 8 구급상자 · 9 음료 · 0 진통제 · G 던지기 · X 버리기 · B 단발/연사 · Z 엎드리기 · Q/E 기울이기 · Space 점프 · 넘기 · Alt 둘러보기 · Tab 가방 · Shift 달리기 · C/Ctrl 앉기 · M 지도',
   buttons: [{ id: 'practice-btn', label: '🪂 바로 하기 <small>젤리봇과 배틀로얄</small>', onClick: () => practice() }],
   extraRow: [{ label: '🖱️ 마우스 감도', onClick: () => openSens('bg') }],
   screens: ['over'],
@@ -922,13 +922,13 @@ shell.on('revived', (m) => {
   if (m.id === game.myId || m.by === game.myId) game.revBar = null;
 });
 shell.on('sq', (m) => { game.sqInfo = m.m; for (const [id, , kn, al] of m.m) { const o = game.others.get(id); if (o) o.knocked = !!kn && !!al; } });
-// 레드존 · 보급상자 · 화염병 · 섬광탄
-shell.on('red', (m) => { const now = performance.now(); game.red = { x: m.x, z: m.z, r: m.r, start: now + m.in, end: now + m.in + m.dur }; red.set(game.red); banner('🔴 레드존! 건물 안으로 피해요'); sfx('whizz'); });
+// 사탕 폭격 구역 · 선물 낙하산 · 화염병 · 섬광탄
+shell.on('red', (m) => { const now = performance.now(); game.red = { x: m.x, z: m.z, r: m.r, start: now + m.in, end: now + m.in + m.dur }; red.set(game.red); banner('🔴 사탕 폭격 구역! 건물 안으로 피해요'); sfx('whizz'); });
 shell.on('drop', (m) => {
   const gy = Math.max(0, floorAt(MAP, m.x, m.z, 30));
   const D = { id: m.id, x: m.x, z: m.z, ms: m.ms, land: performance.now() + m.ms, gy, landed: false, c: makeCrate(scene, m.x, m.z) };
   game.drops.set(m.id, D);
-  shell.toast(m.flare === game.myId ? '🎆 내가 부른 보급상자가 떨어지는 중!' : '📦 보급상자가 떨어지는 중! (지도에 빨간 네모)', 2200);
+  shell.toast(m.flare === game.myId ? '🎆 내가 부른 선물 낙하산이 떨어지는 중!' : '📦 선물 낙하산이 떨어지는 중! (지도에 빨간 네모)', 2200);
 });
 shell.on('landed', (m) => { const D = game.drops.get(m.id); if (D) { D.landed = true; D.landAt = performance.now(); sfx('land'); } });
 shell.on('flash', (m) => {

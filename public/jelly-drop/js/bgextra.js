@@ -1,4 +1,4 @@
-// 젤리드롭 더하기: 물(호수 · 바다) · 레드존 · 보급상자(낙하산 · 빨간 연기) · 화염병 불 · 섬광탄 · 넘기(파쿠르)
+// 젤리드롭 더하기: 물(호수 · 바다) · 사탕 폭격 구역 · 선물 낙하산(낙하산 · 빨간 연기) · 화염병 불 · 섬광탄 · 넘기(파쿠르)
 import * as THREE from 'three';
 import { boxesIn, floorAt } from '../../jelly-tactical/js/maps.js';
 
@@ -22,7 +22,7 @@ export function buildWater(scene, map) {
   return { group: g, update(t) { for (const m of g.userData.tops || []) m.material.opacity = 0.68 + Math.sin(t * 1.3) * 0.04; }, dispose() { scene.remove(g); } };
 }
 
-// ---------- 레드존 ----------
+// ---------- 사탕 폭격 구역 ----------
 export function makeRedZone(scene) {
   const wall = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 64, 1, true), new THREE.MeshBasicMaterial({ color: '#ff3b3b', transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false }));
   const floor = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshBasicMaterial({ color: '#ff3b3b', transparent: true, opacity: 0.16, depthWrite: false }));
@@ -33,7 +33,7 @@ export function makeRedZone(scene) {
   };
 }
 
-// ---------- 보급상자 ----------
+// ---------- 선물 낙하산 ----------
 export function makeCrate(scene, x, z) {
   const g = new THREE.Group();
   const box = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.1, 1.4), toon('#d8423a')); box.position.y = 0.55; g.add(box);

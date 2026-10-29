@@ -30,10 +30,10 @@ const EXTRA = {
 };
 // 젤리드롭 전용 총 (이름 · 위력 · 연사 · 사거리 · 반동)
 const BG_DEF = {
-  kar98: { name: 'Kar98k', emoji: '🎯', dmg: 82, rate: 1.7, range: 150, held: 'sniper', tracer: '#ffffff', recoil: [0.06, 0.01, 0.3], zoom: 1.6 },
-  mini14: { name: 'Mini14', emoji: '🔫', dmg: 34, rate: 0.22, range: 120, held: 'sniper', recoil: [0.03, 0.01, 0.12], zoom: 1.6 },
-  vector: { name: 'Vector', emoji: '🔫', dmg: 10, rate: 0.055, range: 40, held: 'rifle', auto: true, recoil: [0.012, 0.012, 0.05] },
-  s1897: { name: 'S1897 펌프 샷건', emoji: '💥', dmg: 10, pellets: 8, spread: 0.08, rate: 1.0, range: 24, held: 'shotgun', tracer: '#ffcc80', recoil: [0.12, 0.03, 0.35] },
+  kar98: { name: '볼트액션 저격총', emoji: '🎯', dmg: 82, rate: 1.7, range: 150, held: 'sniper', tracer: '#ffffff', recoil: [0.06, 0.01, 0.3], zoom: 1.6 },
+  mini14: { name: '반자동 소총', emoji: '🔫', dmg: 34, rate: 0.22, range: 120, held: 'sniper', recoil: [0.03, 0.01, 0.12], zoom: 1.6 },
+  vector: { name: '소형 기관단총', emoji: '🔫', dmg: 10, rate: 0.055, range: 40, held: 'rifle', auto: true, recoil: [0.012, 0.012, 0.05] },
+  s1897: { name: '펌프 산탄총', emoji: '💥', dmg: 10, pellets: 8, spread: 0.08, rate: 1.0, range: 24, held: 'shotgun', tracer: '#ffcc80', recoil: [0.12, 0.03, 0.35] },
   crossbow: { name: '석궁', emoji: '🏹', dmg: 95, rate: 2.8, range: 90, held: 'crossbow', tracer: '#c8a46a', recoil: [0.02, 0, 0.1], zoom: 1.6 },
 };
 export const PRIMARY = ['m4', 'ak47', 'rifle', 'scar', 'mp5', 'uzi', 'plasma_smg', 'sniper', 'hunting_rifle', 'barrett', 'shotgun', 'double_barrel', 'm249'];

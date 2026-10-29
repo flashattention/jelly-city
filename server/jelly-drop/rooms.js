@@ -184,7 +184,7 @@ export class DropRooms extends BaseRooms {
     else if (it.k === 'med') { if (inv.med >= CAP.med[bag]) return full('🎒 구급상자를 더 못 넣어요'); inv.med++; }
     else if (it.k === 'drink' || it.k === 'pill' || it.k === 'adren') { if (inv.drink + inv.pill + inv.adren >= CAP.boost[bag]) return full('🎒 부스트 아이템을 더 못 넣어요'); inv[it.k]++; }
     else if (['nade', 'smoke', 'molotov', 'flash'].includes(it.k)) { if (throwCount(inv) >= CAP.throw[bag]) return full('🎒 투척 무기를 더 못 넣어요'); inv[it.k]++; }
-    else if (it.k === 'flare') { if (inv.flare >= 2) return full('🎆 신호탄 총은 2개까지'); inv.flare++; }
+    else if (it.k === 'flare') { if (inv.flare >= 2) return full('🎆 선물 신호탄은 2개까지'); inv.flare++; }
     else if (it.k === 'gas') { if (inv.gas >= CAP.gas[bag]) return full('🎒 기름통을 더 못 넣어요'); inv.gas++; }
     r.loot.delete(id);
     const add = [];
@@ -356,7 +356,7 @@ export class DropRooms extends BaseRooms {
     }
     if (k === 'flare') { this.dropCrate(r, c.pos.x, c.pos.z, 13000, c); return; }
   }
-  // 보급상자: 하늘에서 낙하산으로 → 땅에 닿으면 좋은 아이템
+  // 선물 낙하산: 하늘에서 낙하산으로 → 땅에 닿으면 좋은 아이템
   dropCrate(r, x, z, ms, by) {
     const lim = BG_SIZE / 2 - 6, id = r.dropId++;
     x = Math.max(-lim, Math.min(lim, x)); z = Math.max(-lim, Math.min(lim, z));
@@ -386,7 +386,7 @@ export class DropRooms extends BaseRooms {
       r.fireT = 0;
       for (const f of r.fires) for (const t of r.players) if (t.alive && t.pos && dist(t.pos, f) < THROWS.molotov.r && Math.abs(t.pos.y - f.y) < 2 && !t.veh) this.damage(r, t, THROWS.molotov.dps / 4, f.by === t ? null : f.by, 'molotov', false);
     }
-    // 레드존: 자기장 안 아무 곳에 경고 → 폭격 (지붕 밑은 안전)
+    // 사탕 폭격 구역: 자기장 안 아무 곳에 경고 → 폭격 (지붕 밑은 안전)
     const Z = zoneAt(r.zones, sec);
     if (!r.red && sec >= r.redNext && Z.phase < 4) {
       const a = Math.random() * Math.PI * 2, d = Math.random() * Math.max(0, Z.r * 0.7 - RED_R * 0.5);
@@ -407,7 +407,7 @@ export class DropRooms extends BaseRooms {
         }
       }
     }
-    // 보급상자 시간
+    // 선물 낙하산 시간
     if (r.dropNext.length && sec >= r.dropNext[0]) { r.dropNext.shift(); const N = Z.next || Z, a = Math.random() * Math.PI * 2, d = Math.random() * N.r * 0.6; this.dropCrate(r, N.x + Math.cos(a) * d, N.z + Math.sin(a) * d, 20000); }
     for (const d of r.drops) if (!d.landed && now >= d.at) {
       d.landed = true;
@@ -474,7 +474,7 @@ export class DropRooms extends BaseRooms {
       else if (!b.reviving) this.startRevive(r, b, down.id, now);
       b.st = [b.pos.x, 0, b.pos.z, b.yaw || 0, 0, b.reviving ? 1 : 0]; return;
     }
-    // 레드존 폭격 중이면 밖으로 (지붕 밑이면 버틴다)
+    // 사탕 폭격 구역 폭격 중이면 밖으로 (지붕 밑이면 버틴다)
     if (r.red && Date.now() > r.red.start - 3000 && dist(b.pos, r.red) < r.red.r + 2 && !this.underRoof(r, b.pos)) {
       const d = dist(b.pos, r.red) || 1; b.pos.x += ((b.pos.x - r.red.x) / d) * 6.5 * dt; b.pos.z += ((b.pos.z - r.red.z) / d) * 6.5 * dt; b.path = null;
     }

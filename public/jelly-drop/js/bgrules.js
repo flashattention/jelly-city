@@ -3,7 +3,7 @@ import { rng } from '../../jelly-ten/js/board.js';
 import { BG_SIZE } from './bgmap.js';
 
 export const ARMOR_CUT = [0, 0.3, 0.4, 0.55];   // 조끼(몸) · 헬멧(머리) 단계별 피해 줄임
-export const HEALS = { band: { name: '젤리 붕대', emoji: '🩹', hp: 15, cap: 75, sec: 3 }, med: { name: '젤리 구급상자', emoji: '🧰', hp: 100, cap: 100, sec: 6 } };
+export const HEALS = { band: { name: '꿀 붕대', emoji: '🩹', hp: 15, cap: 75, sec: 3 }, med: { name: '젤리 구급상자', emoji: '🧰', hp: 100, cap: 100, sec: 6 } };
 export const PLANE = { h: 95, speed: 11 };
 export const DROP = { free: 28, chute: 6, openAt: 42, glide: 9 };  // 떨어지는 빠르기 · 낙하산 펴는 높이 · 옆으로 미끄러지는 빠르기
 
@@ -38,18 +38,18 @@ export function fits(a, w) {
   return true;
 }
 // 가방: 단계마다 담을 수 있는 양 (0 = 가방 없음)
-export const BAG_NAME = ['없음', '1단계 가방', '2단계 가방', '3단계 가방'];
+export const BAG_NAME = ['없음', '말랑 가방', '쫀득 가방', '단단 가방'];
 export const CAP = { ammo: [90, 180, 270, 360], band: [5, 10, 15, 20], med: [1, 2, 3, 4], boost: [2, 4, 6, 8], throw: [2, 3, 4, 5], gas: [1, 1, 2, 2] };
-export const BOOSTS = { drink: { name: '에너지 젤리 음료', emoji: '🥤', sec: 4, add: 40 }, pill: { name: '진통 젤리', emoji: '💊', sec: 6, add: 60 }, adren: { name: '젤리 아드레날린', emoji: '💉', sec: 8, add: 100 } };
-// 투척 (5번 칸에서 차례로): 수류탄 · 연막 · 화염병 · 섬광탄 · 신호탄 총
+export const BOOSTS = { drink: { name: '탄산 젤리 음료', emoji: '🥤', sec: 4, add: 40 }, pill: { name: '진통 젤리', emoji: '💊', sec: 6, add: 60 }, adren: { name: '젤리 슈가 러시', emoji: '💉', sec: 8, add: 100 } };
+// 투척 (5번 칸에서 차례로): 수류탄 · 연막 · 화염병 · 섬광탄 · 선물 신호탄
 export const THROWS = {
   molotov: { id: 'molotov', name: '젤리 화염병', emoji: '🔥', cls: 'nade', fuse: 1.3, r: 3.6, dps: 12, sec: 7, impact: true },
   flash: { id: 'flash', name: '섬광탄', emoji: '⚡', cls: 'nade', fuse: 1.8, r: 24 },
-  flare: { id: 'flare', name: '신호탄 총', emoji: '🎆', cls: 'nade', fuse: 0, r: 0, flare: true },
+  flare: { id: 'flare', name: '선물 신호탄', emoji: '🎆', cls: 'nade', fuse: 0, r: 0, flare: true },
 };
 export const THROW_ORDER = ['nade', 'smoke', 'molotov', 'flash', 'flare'];
 export const throwCount = (inv) => (inv.nade || 0) + (inv.smoke || 0) + (inv.molotov || 0) + (inv.flash || 0);
-// 보급상자 안: 좋은 것만
+// 선물 낙하산 안: 좋은 것만
 export function rollCrate(r) {
   const pick = (list) => list[Math.floor(r() * list.length)];
   const gun = pick(['barrett', 'm249', 'kar98', 'scar', 'vector']), AM = { barrett: '300', m249: '556', kar98: '762', scar: '762', vector: '9mm' };
@@ -83,13 +83,13 @@ export function makeLoot(map, seed) {
   }
   return out;
 }
-export const ARMOR_NAME = ['', '1단계', '2단계', '3단계'];
+export const ARMOR_NAME = ['', '말랑', '쫀득', '단단']; // 장비 단계 이름 (1 · 2 · 3)
 export function itemLabel(it, weapon) {
   if (it.k === 'gun' || it.k === 'pistol') { const w = weapon(it.w); return `${w?.emoji || '🔫'} ${w?.name || it.w}`; }
   if (it.k === 'ammo') return `${AMMO[it.a]?.emoji || ''} ${AMMO[it.a]?.name || it.a} ×${it.n}`;
   if (it.k === 'att') return `${ATTS[it.a]?.emoji || ''} ${ATTS[it.a]?.name || it.a}`;
-  if (it.k === 'armor') return `🦺 젤리 조끼 ${ARMOR_NAME[it.lv]}`;
-  if (it.k === 'helmet') return `⛑️ 젤리 헬멧 ${ARMOR_NAME[it.lv]}`;
+  if (it.k === 'armor') return `🦺 ${ARMOR_NAME[it.lv]} 젤리 조끼`;
+  if (it.k === 'helmet') return `⛑️ ${ARMOR_NAME[it.lv]} 젤리 헬멧`;
   if (it.k === 'bag') return `🎒 ${BAG_NAME[it.lv]}`;
   if (it.k === 'band') return `${HEALS.band.emoji} ${HEALS.band.name} ×${it.n || 1}`;
   if (it.k === 'med') return `${HEALS.med.emoji} ${HEALS.med.name}`;
@@ -97,7 +97,7 @@ export function itemLabel(it, weapon) {
   if (it.k === 'nade') return '💣 젤리 수류탄';
   if (it.k === 'smoke') return '💨 연막탄';
   if (THROWS[it.k]) return `${THROWS[it.k].emoji} ${THROWS[it.k].name}`;
-  if (it.k === 'adren') return '💉 젤리 아드레날린';
+  if (it.k === 'adren') return '💉 슈가 러시';
   if (it.k === 'gas') return '⛽ 젤리 기름통';
   return '❔';
 }
