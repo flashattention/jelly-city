@@ -45,6 +45,7 @@ jobs:
           curl -sf localhost:8123/jelly-court/ > /dev/null
           curl -sf localhost:8123/jelly-ding/ > /dev/null
           curl -sf localhost:8123/jelly-slide/ > /dev/null
+          curl -sf localhost:8123/jelly-hide/ > /dev/null
           curl -sf 'localhost:8123/api/surv/board?b=normal' > /dev/null
           curl -sf 'localhost:8123/api/ten/board?b=t120' > /dev/null
           # 이름이 바뀐 게임: 옛 주소가 새 주소로 넘어가는지

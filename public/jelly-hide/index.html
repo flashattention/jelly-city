@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>젤리 숨바꼭질</title>
+  <meta name="description" content="몸에 색을 칠해 장난감 방 · 사탕 가게 · 꽃 정원에 숨는 젤리 곰돌이 숨바꼭질" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/css/shell.css" />
+  <link rel="stylesheet" href="../shared/css/party.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="blind" class="hidden"><div class="eye">🙈</div><b>젤리들이 숨는 중…</b><div class="sub">눈을 꼭 감고 기다려요 · <span id="blind-t"></span></div><div class="dots"><i></i><i></i><i></i></div></div>
+  <!-- 게임 중 -->
+  <div id="hud" class="hidden">
+    <div id="h-top">
+      <div id="h-round"></div>
+      <div id="h-phase"><span id="h-label"></span><b id="h-time">0:00</b></div>
+      <div id="h-found"></div>
+    </div>
+    <div id="h-role"></div>
+    <div class="hud-r"><button id="b-help" title="도움말">❔</button><button id="b-mute" title="소리 (M)">🔊</button><button id="b-quit" title="그만하기">✕</button></div>
+    <div id="camo" class="hidden"><div class="lbl">🫥 위장도</div><div class="bar"><i></i></div><b id="camo-n">0%</b><small id="camo-w"></small></div>
+    <div id="cross" class="hidden"><i></i></div>
+    <div id="penalty" class="hidden">−3초</div>
+    <div id="poses" class="hidden">
+      <button data-pose="0" title="서기 (1)">🧍<small>서기</small></button><button data-pose="1" title="쪼그리기 (2)">🙇<small>쪼그리기</small></button><button data-pose="2" title="납작 엎드리기 (3)">🫠<small>납작</small></button><button data-pose="3" title="동글이 (4)">🟣<small>동글이</small></button>
+      <button data-rot="-1" title="왼쪽으로 돌기 (Q)">↺</button><button data-rot="1" title="오른쪽으로 돌기 (E)">↻</button>
+      <button id="paint-btn" class="big" title="몸 칠하기 (F)">🎨<small>칠하기</small></button>
+    </div>
+    <div id="paint" class="hidden">
+      <div class="ptitle">🎨 몸 칠하기 <small>곰돌이를 끌어서 칠해요 · 빈 곳을 끌면 빙글</small></div>
+      <div class="tools" id="tools"></div>
+      <div class="row-s" id="sizes"></div>
+      <div class="pair"><button id="c1" title="주 색"></button><button id="swap" title="두 색 바꾸기">⇄</button><button id="c2" title="두 번째 색 (무늬 색)"></button><span id="pick-hint">💧 스포이드로 벽 · 바닥 색을 콕!</span></div>
+      <div class="palette" id="palette"></div>
+      <div class="pats" id="pats"></div>
+      <div class="parts" id="parts"></div>
+      <div class="row-s"><button id="undo">↩ 되돌리기</button><button id="reset">🧼 처음으로</button><button id="done" class="ok">✅ 다 칠했어요</button></div>
+    </div>
+    <div id="feed"></div>
+    <div id="touch" class="hidden"><div id="stick"><i></i></div><div class="tb"><button id="t-jump">⤒</button><button id="t-tag" class="hidden">🔍</button></div></div>
+  </div>
+  <div id="intro" class="hidden"></div>
+  <div id="help" class="hidden"><div class="card wide">
+    <h2>🫥 젤리 숨바꼭질 하는 법</h2>
+    <div class="howto">
+      <div><b>🫥 숨는 젤리</b><p>술래가 눈을 가린 동안 숨을 곳을 고르고, <b>🎨 칠하기(F)</b>로 몸에 색을 칠해 벽 · 바닥 · 물건과 똑같이 만들어요. <b>💧 스포이드</b>로 겉면 색을 그대로 찍고, <b>무늬 도장</b>으로 줄무늬 · 땡땡이까지 따라 해요. 얼굴도 칠하면 눈이 사라져요!</p><p>자세(1~4)로 몸 모양을 바꾸고 Q · E 로 돌아요. 찾는 동안에도 살금살금 움직일 수 있지만 <b>반짝이 흔적</b>이 남아요.</p></div>
+      <div><b>🔍 술래</b><p>숨는 시간이 끝나면 1인칭으로 찾아요. 수상한 곳을 <b>클릭</b>하면 7.5m 안의 젤리를 찾아요. 아무것도 없는 곳을 누르면 <b>시간 −3초</b>!</p><p>점수: 젤리는 버틴 시간 + 끝까지 살아남으면 보너스 · 술래는 찾은 수 + 남은 시간 보너스. 판마다 술래가 바뀌어요.</p></div>
+    </div>
+    <div class="keys">WASD 이동 · 마우스 끌기 카메라 · Space 점프 · F 칠하기 · 1~4 자세 · Q/E 돌기 · Ctrl+Z 되돌리기 · 술래: 클릭 찾기</div>
+    <div class="row2"><button id="help-close" class="btn big">알겠어요!</button></div>
+  </div></div>
+  <!-- 결과 -->
+  <div id="over" class="screen hidden"><div class="card wide">
+    <h2 id="ov-title">끝!</h2>
+    <div id="ov-me" class="sub"></div>
+    <div id="ov-rank" class="res-list"></div>
+    <div class="row2"><button id="again-btn" class="btn big">🔁 한 판 더</button><button id="home-btn" class="btn ghost">처음으로</button></div>
+  </div></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

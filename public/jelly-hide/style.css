@@ -1,0 +1,92 @@
+/* 젤리 숨바꼭질 */
+html, body { margin: 0; height: 100%; overflow: hidden; background: #2a1748; }
+#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.hidden { display: none !important; }
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; font-family: 'Jua', sans-serif; color: #fff; }
+#hud button { pointer-events: auto; }
+#h-top { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; }
+#h-round, #h-found { background: rgba(40,20,70,.6); padding: 6px 14px; border-radius: 999px; font-size: 15px; white-space: nowrap; }
+#h-phase { background: #fff; color: #4a2a6a; padding: 6px 18px; border-radius: 999px; display: flex; align-items: center; gap: 10px; box-shadow: 0 5px 0 rgba(120,80,170,.45), 0 8px 18px rgba(0,0,0,.25); }
+#h-phase #h-label { font-size: 15px; }
+#h-phase b { font-size: 26px; min-width: 60px; text-align: center; }
+#h-phase.hurry b { color: #ff3b6b; animation: pulse .5s infinite alternate; }
+@keyframes pulse { to { transform: scale(1.15); } }
+#h-role { position: absolute; top: 62px; left: 50%; transform: translateX(-50%); font-size: 14px; background: rgba(40,20,70,.55); padding: 4px 14px; border-radius: 999px; white-space: nowrap; }
+.hud-r { position: absolute; top: 12px; right: 12px; display: flex; gap: 8px; }
+.hud-r button { width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(40,20,70,.6); color: #fff; font-size: 17px; cursor: pointer; }
+#camo { position: absolute; left: 16px; top: 14px; width: 190px; background: rgba(40,20,70,.62); border-radius: 18px; padding: 8px 12px; }
+#camo .lbl { font-size: 13px; opacity: .85; }
+#camo .bar { height: 12px; border-radius: 999px; background: rgba(255,255,255,.18); overflow: hidden; margin: 5px 0 3px; }
+#camo .bar i { display: block; height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, #ff5c7a, #ffd23f 50%, #62cf7a); transition: width .4s; }
+#camo b { font-size: 24px; } #camo small { font-family: 'Gowun Dodum', sans-serif; font-size: 12px; margin-left: 6px; opacity: .9; }
+#cross { position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px; border: 3px solid rgba(255,255,255,.9); border-radius: 50%; box-shadow: 0 0 0 2px rgba(60,20,90,.4); }
+#cross i { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: #ff5c9a; }
+#cross.hot { border-color: #ffd23f; transform: scale(1.15); }
+#penalty { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); font-size: 48px; color: #ff5c7a; text-shadow: 0 4px 0 rgba(60,10,30,.5); animation: pen 0.9s ease-out forwards; }
+@keyframes pen { from { transform: translate(-50%, 10px) scale(1.4); opacity: 0; } 20% { opacity: 1; transform: translate(-50%, 0) scale(1); } to { opacity: 0; transform: translate(-50%, -30px); } }
+#poses { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 6px; background: rgba(40,20,70,.55); padding: 6px; border-radius: 20px; }
+#poses button { border: 0; border-radius: 14px; background: rgba(255,255,255,.14); color: #fff; font-size: 22px; width: 58px; height: 54px; cursor: pointer; font-family: 'Jua'; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
+#poses button small { font-size: 10px; opacity: .85; }
+#poses button.on { background: #ffd84d; color: #4a2a00; }
+#poses button.big { width: 70px; background: linear-gradient(135deg, #ff7eb6, #9b6bff); }
+#poses button:disabled { opacity: .35; }
+/* 칠하기 판 */
+#paint { position: fixed; z-index: 60; right: 12px; top: 64px; bottom: 12px; width: 300px; overflow-y: auto; pointer-events: auto; background: rgba(30,14,58,.82); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,.18); border-radius: 22px; padding: 12px; font-family: 'Gowun Dodum', sans-serif; display: flex; flex-direction: column; gap: 9px; }
+#paint .ptitle { font-family: 'Jua'; font-size: 19px; } #paint .ptitle small { display: block; font-family: 'Gowun Dodum'; font-size: 11.5px; opacity: .8; }
+#paint button { border: 0; border-radius: 12px; background: rgba(255,255,255,.13); color: #fff; cursor: pointer; font-family: 'Jua'; font-size: 14px; padding: 7px 8px; }
+#paint button.on { background: #ffd84d; color: #4a2a00; }
+#paint .tools { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+#paint .tools button { display: flex; flex-direction: column; align-items: center; font-size: 20px; padding: 6px 2px; } #paint .tools button small { font-size: 10.5px; }
+#paint .row-s { display: flex; gap: 5px; flex-wrap: wrap; } #paint .row-s button { flex: 1; }
+#paint .pair { display: flex; align-items: center; gap: 6px; }
+#paint .pair #c1, #paint .pair #c2 { width: 38px; height: 38px; border-radius: 12px; border: 3px solid #fff; padding: 0; }
+#paint .pair #c2 { width: 30px; height: 30px; border-width: 2px; }
+#paint .pair span { font-size: 11px; opacity: .85; line-height: 1.3; }
+#paint .palette { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; }
+#paint .palette button { aspect-ratio: 1; padding: 0; border-radius: 8px; border: 2px solid rgba(255,255,255,.25); }
+#paint .pats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+#paint .pats button { height: 40px; padding: 0; border: 2px solid rgba(255,255,255,.3); background-size: 22px 22px; font-size: 10px; display: flex; align-items: flex-end; justify-content: center; }
+#paint .pats button span { background: rgba(30,14,58,.75); border-radius: 6px; padding: 0 4px; font-family: 'Gowun Dodum'; }
+#paint .pats button.on { outline: 3px solid #ffd84d; }
+#paint .parts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+#paint .ok { background: linear-gradient(135deg, #62cf7a, #3fb6a8) !important; }
+#feed { position: absolute; left: 50%; bottom: 90px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 4px; align-items: center; }
+#feed div { background: rgba(40,20,70,.75); border-radius: 999px; padding: 4px 14px; font-size: 15px; animation: feed 3.2s ease-out forwards; white-space: nowrap; }
+#feed div.big { background: linear-gradient(135deg, #ff7eb6, #9b6bff); font-size: 19px; }
+@keyframes feed { 0% { opacity: 0; transform: translateY(8px); } 10%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+/* 눈 가림 */
+#blind { position: fixed; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: radial-gradient(ellipse at center, #3a1f66, #120826); color: #fff; font-family: 'Jua', sans-serif; text-align: center; }
+#blind .eye { font-size: 84px; animation: bob 1.6s ease-in-out infinite; } #blind b { font-size: 34px; } #blind .sub { font-family: 'Gowun Dodum'; opacity: .85; }
+#blind .dots i { display: inline-block; width: 12px; height: 12px; margin: 0 5px; border-radius: 50%; background: #ff8fc4; animation: bob 1s ease-in-out infinite; } #blind .dots i:nth-child(2) { animation-delay: .15s; } #blind .dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes bob { 50% { transform: translateY(-10px); } }
+/* 판 소개 · 판 결과 */
+#intro { position: fixed; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 8; width: min(560px, 92vw); padding: 24px 26px; border-radius: 28px; text-align: center; color: #fff; font-family: 'Jua', sans-serif; background: linear-gradient(160deg, #ff7eb6, #9b6bff); box-shadow: 0 10px 0 rgba(80,30,120,.35), 0 22px 50px rgba(0,0,0,.4); animation: cardIn .5s cubic-bezier(.2,1.6,.4,1); }
+#intro.seek { background: linear-gradient(160deg, #ffb347, #ff5f6d); }
+#intro .em { font-size: 60px; line-height: 1.05; } #intro .nm { font-size: 34px; margin: 6px 0; } #intro .ds { font-family: 'Gowun Dodum'; font-size: 16px; opacity: .95; }
+#intro .sb { margin-top: 10px; display: inline-block; padding: 5px 14px; border-radius: 999px; background: rgba(255,255,255,.22); font-size: 15px; }
+#intro .res { margin-top: 12px; display: flex; flex-direction: column; gap: 5px; text-align: left; font-size: 16px; }
+#intro .res div { display: flex; gap: 8px; align-items: center; background: rgba(255,255,255,.16); border-radius: 12px; padding: 5px 10px; }
+#intro .res div.me { background: rgba(255,230,120,.4); } #intro .res span.p { margin-left: auto; }
+@keyframes cardIn { from { transform: translate(-50%, -50%) scale(.3); opacity: 0; } }
+#help .howto { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; text-align: left; font-size: 14px; margin: 10px 0; }
+#help .howto div { background: rgba(255,255,255,.08); border-radius: 16px; padding: 10px 12px; } #help .howto b { font-family: 'Jua'; font-size: 17px; } #help p { margin: 6px 0 0; line-height: 1.5; }
+.mode-seg button small { display: block; font-size: 11px; opacity: .8; }
+.opt-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.opt-grid .seg { margin: 0 auto; }
+/* 휴대폰 */
+#touch { position: absolute; inset: 0; }
+#stick { position: absolute; left: 22px; bottom: 90px; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,.15); border: 3px solid rgba(255,255,255,.4); pointer-events: auto; touch-action: none; }
+#stick i { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; background: rgba(255,255,255,.85); }
+#touch .tb { position: absolute; right: 18px; bottom: 96px; display: flex; flex-direction: column; gap: 10px; }
+#touch .tb button { width: 66px; height: 66px; border-radius: 50%; border: 0; background: rgba(255,255,255,.85); font-size: 26px; pointer-events: auto; }
+#touch #t-tag { width: 82px; height: 82px; background: #ffd84d; font-size: 34px; }
+@media (max-width: 700px) {
+  #paint { left: 8px; right: 8px; width: auto; top: auto; bottom: 8px; max-height: 46vh; }
+  #poses { bottom: auto; top: 96px; transform: translateX(-50%) scale(.82); }
+  #camo { top: 172px; left: 10px; width: 132px; padding: 6px 10px; } #camo b { font-size: 18px; }
+  #h-top { left: 10px; transform: none; } #h-phase b { font-size: 21px; min-width: 50px; } #h-role { top: 58px; left: 10px; transform: none; font-size: 12px; }
+  #h-round, #h-found { display: none; }
+  #help .howto { grid-template-columns: 1fr; }
+}
+.opt-grid .seg { display: flex; flex-wrap: wrap; justify-content: center; width: fit-content; max-width: 100%; }
+.opt-grid .seg button { white-space: nowrap; padding: 6px 11px; font-size: 14px; }

@@ -33,6 +33,7 @@ import { MergeRooms } from './jelly-merge/rooms.js';
 import { CourtRooms } from './jelly-court/rooms.js';
 import { DingRooms } from './jelly-ding/rooms.js';
 import { SlideRooms } from './jelly-slide/rooms.js';
+import { HideRooms } from './jelly-hide/rooms.js';
 import { normWord } from '../public/jelly-draw/js/prompts.js';
 import { complete } from './jelly-city/llm.js';
 import { Records } from './shared/records.js';
@@ -96,6 +97,7 @@ const mergeRooms = new MergeRooms((sid) => world.userOf(sid)); // 젤리 머지
 const courtRooms = new CourtRooms((sid) => world.userOf(sid)); // 젤리궁정 (숨은 역할 카드 결투)
 const dingRooms = new DingRooms((sid) => world.userOf(sid)); // 젤리 땡 (종 치기)
 const slideRooms = new SlideRooms((sid) => world.userOf(sid)); // 젤리 슬라이드 (밀어서 합치기)
+const hideRooms = new HideRooms((sid) => world.userOf(sid)); // 젤리 숨바꼭질 (몸에 색칠해 숨기)
 const typeRecords = new Records(DATA_DIR, 'jelly-type', {
   boards: ['kpm', 'rain'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.value)),
   check: (b) => { const v = Number(b.value); return Number.isFinite(v) && v >= 0 && v <= (b.b === 'kpm' ? 1600 : 5000000) ? null : '기록이 이상해요'; },
@@ -297,12 +299,15 @@ const drawWss = new WebSocketServer({ noServer: true, maxPayload: 160 * 1024, pe
 drawWss.on('connection', (ws) => drawRooms.connect(ws));
 const survWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: { threshold: 512 } }); // 충치균이 많아서 압축
 survWss.on('connection', (ws) => survRooms.connect(ws));
+// 숨바꼭질: 칠한 몸 그림(작은 JPEG)을 주고받아서 크게 · 압축
+const hideWss = new WebSocketServer({ noServer: true, maxPayload: 128 * 1024, perMessageDeflate: { threshold: 1024 } });
+hideWss.on('connection', (ws) => hideRooms.connect(ws));
 const sketchWss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024, perMessageDeflate: { threshold: 1024 } }); // 그리는 획을 실시간으로
 sketchWss.on('connection', (ws) => sketchRooms.connect(ws));
 // 주소로 나눠 받는다: /ws = 젤리시티 · /dream-ws = 드림 러너
 server.on('upgrade', (req, socket, head) => {
   const p0 = new URL(req.url, 'http://x').pathname, p = OLD_WS[p0] || p0;
-  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/drift-ws' ? driftWss : p === '/tactical-ws' ? tacticalWss : p === '/drop-ws' ? dropWss : p === '/guard-ws' ? guardWss : p === '/ten-ws' ? tenWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : p === '/type-ws' ? typeWss : p === '/surv-ws' ? survWss : p === '/sketch-ws' ? sketchWss : p === '/rumble-ws' ? rumbleWss : p === '/merge-ws' ? mergeWss : p === '/court-ws' ? courtWss : p === '/ding-ws' ? dingWss : p === '/slide-ws' ? slideWss : null;
+  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/drift-ws' ? driftWss : p === '/tactical-ws' ? tacticalWss : p === '/drop-ws' ? dropWss : p === '/guard-ws' ? guardWss : p === '/ten-ws' ? tenWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : p === '/type-ws' ? typeWss : p === '/surv-ws' ? survWss : p === '/sketch-ws' ? sketchWss : p === '/rumble-ws' ? rumbleWss : p === '/merge-ws' ? mergeWss : p === '/court-ws' ? courtWss : p === '/ding-ws' ? dingWss : p === '/slide-ws' ? slideWss : p === '/hide-ws' ? hideWss : null;
   if (!target) { socket.destroy(); return; }
   target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
 });
