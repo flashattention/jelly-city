@@ -2,6 +2,8 @@
 //   서버는 방 관리 · 시작 신호 · 서로의 위치 중계 · 밀치기 중계만 한다 (각자 자기 달리기는 자기 브라우저가 계산)
 //   방마다 6자리 초대 코드. 방 만들기 · 빠른 참가는 로그인(구글 · 체험판)한 사람만, 초대 코드(링크)로는 비로그인도 들어온다
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { BaseRooms } from '../shared/rooms.js';
 
 const MAX = 12;
@@ -9,18 +11,23 @@ const SNAP_HZ = 15;
 const COUNTDOWN = 3500; // ms
 const TEAM_DUR = Number(process.env.DREAM_TEAM_SEC) || 180; // 팀전 제한 시간 (초, 시험할 땐 줄일 수 있다)
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 헷갈리는 0 O 1 I 는 뺐다
+const PAUSE_FILE = 'dream-pause.json'; // 서버 점검(배포) 동안 달리던 방을 잠깐 적어 두는 곳
+const PAUSE_MAX = 5 * 60 * 1000;  // 점검이 이보다 길면 이어 달리지 않는다
+const REJOIN_WAIT = 10000;        // 첫 사람이 돌아온 뒤 나머지를 기다리는 시간
 const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n);
 
 export class DreamRooms {
-  constructor(userOf) {
+  constructor(userOf, dataDir) {
     this.userOf = userOf;
+    this.dataDir = dataDir;
     this.rooms = new Map();   // id → room
     this.clients = new Set();
     this.nextPid = 1;
+    this.restore();
     setInterval(() => this.tick(), 1000 / SNAP_HZ).unref();
   }
   connect(ws) {
-    const c = { ws, id: this.nextPid++, room: null, name: '곰돌이', color: '#8a5634', look: null, acc: [], who: null, st: null, dead: false, result: null, lastShove: 0 };
+    const c = { ws, id: this.nextPid++, tok: crypto.randomBytes(9).toString('hex'), room: null, name: '곰돌이', color: '#8a5634', look: null, acc: [], who: null, st: null, dead: false, result: null, lastShove: 0 };
     this.clients.add(c);
     ws.on('message', (raw) => {
       let m; try { m = JSON.parse(raw); } catch { return; }
@@ -31,7 +38,7 @@ export class DreamRooms {
   }
   send(c, m) { if (c.ws.readyState === 1) c.ws.send(JSON.stringify(m)); }
   toRoom(room, m, except) { const s = JSON.stringify(m); for (const p of room.players) if (p !== except && p.ws.readyState === 1) p.ws.send(s); }
-  roomInfo(r) { return { id: r.id, name: r.name, n: r.players.length, max: MAX, state: r.state, host: r.host?.name || '', mode: r.mode, team: !!r.team }; }
+  roomInfo(r) { return { id: r.id, name: r.name, n: r.players.length, max: MAX, state: r.state === 'pause' ? 'run' : r.state, host: r.host?.name || '', mode: r.mode, team: !!r.team }; }
   list() { return [...this.rooms.values()].map((r) => this.roomInfo(r)); }
   members(r) { return r.players.map((p) => ({ id: p.id, name: p.name, color: p.color, look: p.look, acc: p.acc, host: p === r.host, dead: p.dead, result: p.result, team: p.team })); }
   roomUpdate(r) { this.toRoom(r, { t: 'room', room: this.roomInfo(r), you: null, members: this.members(r) }); }
@@ -47,7 +54,8 @@ export class DreamRooms {
         const lj = m.look && typeof m.look === 'object' ? JSON.stringify(m.look) : '';
         c.look = lj && lj.length < 600 ? JSON.parse(lj) : null;
         c.acc = Array.isArray(m.acc) ? m.acc.slice(0, 6).map((x) => String(x).slice(0, 40)) : [];
-        return this.send(c, { t: 'hello', id: c.id, rooms: this.list(), anon: !c.who });
+        if (m.resume && this.rejoin(c, m.resume)) return; // 서버 점검 뒤 달리던 자리로 돌아오기
+        return this.send(c, { t: 'hello', id: c.id, tok: c.tok, rooms: this.list(), anon: !c.who, resumeFail: !!m.resume });
       }
       case 'list': return this.send(c, { t: 'rooms', rooms: this.list() });
       case 'create': {
@@ -173,7 +181,7 @@ export class DreamRooms {
     if (c.room === r) return;
     this.leave(c);
     if (r.players.length >= MAX) return this.send(c, { t: 'error', text: '방이 꽉 찼어요 (최대 12명)' });
-    if (r.state === 'run') return this.send(c, { t: 'error', text: '이미 달리는 중인 방이에요. 끝나면 들어갈 수 있어요' });
+    if (r.state !== 'wait') return this.send(c, { t: 'error', text: '이미 달리는 중인 방이에요. 끝나면 들어갈 수 있어요' });
     r.players.push(c); c.room = r; c.dead = false; c.st = null; c.result = null;
     c.team = this.smaller(r, c);
     this.send(c, { t: 'joined', room: this.roomInfo(r), members: this.members(r), chat: r.chat || [] });
@@ -187,7 +195,7 @@ export class DreamRooms {
     r.players = r.players.filter((p) => p !== c);
     c.room = null;
     if (tell) this.send(c, { t: 'left' }); // 혼자 있던 방이어도 꼭 알려 준다 (안 알려서 못 나가던 문제)
-    if (!r.players.length) { this.rooms.delete(r.id); this.broadcastList(); return; }
+    if (!r.players.length) { if (!r.slots?.size || r.state !== 'pause') this.rooms.delete(r.id); this.broadcastList(); return; }
     if (r.host === c) r.host = r.players[0];
     this.sysChat(r, `🚪 ${c.name} 님이 나갔어요`);
     if (r.state === 'run') { this.toRoom(r, { t: 'dead', id: c.id, result: null, left: true }); if (r.players.every((p) => p.dead)) this.finish(r); }
@@ -207,8 +215,67 @@ export class DreamRooms {
     const s = JSON.stringify({ t: 'rooms', rooms: this.list() });
     for (const c of this.clients) if (!c.room && c.hi && c.ws.readyState === 1) c.ws.send(s);
   }
+  // ---------- 서버 점검: 달리던 방을 멈춰 적어 두고, 다시 켜지면 같은 자리에서 이어 달린다 ----------
+  //   점검 시작(SIGTERM) → 달리는 방에 'maint' (브라우저는 그 자리에서 멈추고 다시 접속을 기다린다) → 파일에 적기
+  //   다시 켜짐 → 파일을 읽어 'pause' 방으로 → 사람들이 hello{resume}로 자리를 되찾으면 다 같이 3·2·1 뒤 'resume'
+  maint() {
+    const now = Date.now(), rooms = [];
+    for (const r of this.rooms.values()) {
+      if (r.state !== 'run' && r.state !== 'pause') continue;
+      this.toRoom(r, { t: 'maint' });
+      const players = r.state === 'pause' ? [...r.players.map((p) => this.slotOf(p)), ...r.slots.values()] : r.players.map((p) => this.slotOf(p));
+      rooms.push({ id: r.id, name: r.name, mode: r.mode, team: r.team, seed: r.seed, elapsed: r.state === 'pause' ? r.elapsed : now - r.startAt, host: r.host?.tok, chat: r.chat || [], players });
+    }
+    if (!rooms.length || !this.dataDir) return 0;
+    try { fs.writeFileSync(path.join(this.dataDir, PAUSE_FILE), JSON.stringify({ at: now, rooms })); } catch (e) { console.error('드림 러너 방 저장 실패', e.message); }
+    return rooms.length;
+  }
+  slotOf(p) { return { id: p.id, tok: p.tok, name: p.name, color: p.color, look: p.look, acc: p.acc, team: p.team, st: p.st, dead: p.dead, result: p.result }; }
+  restore() {
+    if (!this.dataDir) return;
+    const f = path.join(this.dataDir, PAUSE_FILE);
+    let d; try { d = JSON.parse(fs.readFileSync(f, 'utf8')); fs.unlinkSync(f); } catch { return; }
+    if (!d?.rooms || Date.now() - d.at > PAUSE_MAX) return;
+    for (const x of d.rooms) {
+      if (this.rooms.has(x.id) || !Array.isArray(x.players)) continue;
+      const r = { id: x.id, name: x.name, players: [], host: null, hostTok: x.host, state: 'pause', seed: x.seed, startAt: 0, elapsed: x.elapsed, mode: x.mode, team: !!x.team, chat: x.chat || [], slots: new Map(), deadline: Date.now() + PAUSE_MAX, firstBack: 0 };
+      for (const p of x.players) { r.slots.set(p.tok, p); this.nextPid = Math.max(this.nextPid, p.id + 1); }
+      this.rooms.set(r.id, r);
+    }
+    if (this.rooms.size) console.log(`🌙 드림 러너: 점검 전에 달리던 방 ${this.rooms.size}개를 기다리는 중`);
+  }
+  rejoin(c, q) {
+    const r = this.rooms.get(String(q.room || '')), p = r?.state === 'pause' && r.slots.get(String(q.tok || ''));
+    if (!p) return false;
+    r.slots.delete(p.tok);
+    this.leave(c);
+    Object.assign(c, { id: p.id, tok: p.tok, team: p.team, st: p.st, dead: p.dead, result: p.result, room: r });
+    r.players.push(c);
+    if (p.tok === r.hostTok || !r.host) r.host = c;
+    r.firstBack ||= Date.now();
+    this.send(c, { t: 'resumed', id: c.id, tok: c.tok, room: this.roomInfo(r), members: this.members(r), chat: r.chat });
+    this.roomUpdate(r);
+    return true;
+  }
+  // 모두 돌아왔거나 첫 사람이 돌아온 지 10초: 못 돌아온 사람은 나간 걸로 치고 다시 출발
+  resume(r) {
+    r.state = 'run';
+    r.startAt = Date.now() + COUNTDOWN - r.elapsed;
+    const gone = [...r.slots.values()].map((p) => p.id);
+    r.slots.clear();
+    if (!r.players.some((p) => p === r.host)) r.host = r.players[0];
+    this.toRoom(r, { t: 'resume', in: COUNTDOWN, members: this.members(r), gone, left: TEAM_DUR * 1000 - r.elapsed });
+    if (!r.team && r.players.every((p) => p.dead)) this.finish(r);
+    this.broadcastList();
+  }
   tick() {
     for (const r of this.rooms.values()) {
+      if (r.state === 'pause') {
+        const now = Date.now();
+        if (r.players.length && (!r.slots.size || now - r.firstBack > REJOIN_WAIT)) this.resume(r);
+        else if (!r.players.length && now > r.deadline) this.rooms.delete(r.id);
+        continue;
+      }
       if (r.state !== 'run') continue;
       if (r.team && Date.now() > r.startAt + TEAM_DUR * 1000 + 800) { this.finishTeam(r); continue; }
       const p = [];

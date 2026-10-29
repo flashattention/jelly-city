@@ -61,7 +61,7 @@ try {
 } catch (e) { console.error('복원 실패', e); }
 const world = new World({ dataDir: DATA_DIR });
 const dreamBoard = new DreamBoard(DATA_DIR); // 드림 러너 리더보드
-const dreamRooms = new DreamRooms((sid) => world.userOf(sid)); // 드림 러너 같이 달리기 방
+const dreamRooms = new DreamRooms((sid) => world.userOf(sid), DATA_DIR); // 드림 러너 같이 달리기 방
 // 젤리드리프트: 방 · 트랙별 최고 기록 (짧을수록 좋다)
 const RIDER_TRACKS = ['candy', 'cloud', 'neon', 'lava', 'sakura', 'synth', 'snow', 'deep', 'hairpin', 'choco', 'crystal', 'steam', 'park', 'rainbow', 'moon', 'chess'];
 const driftRooms = new DriftRooms((sid) => world.userOf(sid));
@@ -361,6 +361,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
     if (stopping) return;
     stopping = true;
     world.broadcast({ t: 'sys', text: '🔧 서버가 업데이트돼요! 잠시 후 자동으로 다시 접속해요' });
+    try { const n = dreamRooms.maint(); if (n) console.log(`🌙 드림 러너: 달리던 방 ${n}개를 멈춰 적어 뒀어요`); } catch (e) { console.error('드림 러너 멈추기 실패', e); }
     try { world.save(); console.log('💾 세계를 저장했어요'); } catch (e) { console.error('저장 실패', e); }
     dreamBoard.save(); driftRecords.save(); tenRecords.save(); survRecords.save(); wordDict.save(); typeRecords.save(); mergeRecords.save(); slideRecords.save();
     setTimeout(() => process.exit(0), 500);

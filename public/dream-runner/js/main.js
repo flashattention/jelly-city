@@ -299,7 +299,15 @@ async function died(why) {
   if (game.multi) net.send({ t: 'dead', dist: rec.dist, stars: rec.stars, why });
   game.rec = rec;
   if (!logged()) { game.submitted = { anonPending: true }; return; } // 비로그인: 탈락 화면에서 임시 닉네임을 정해 남긴다
-  try { game.submitted = await account.api('/api/dream/score', { method: 'POST', body: rec }); } catch (e) { game.submitted = { error: e.message }; }
+  try { game.submitted = await postScore(rec, () => { if (game.submitted === null) game.submitted = { waiting: true }; }); } catch (e) { game.submitted = { error: e.message }; }
+  if (game.mode === 'over' && !game.multi && game.rec === rec) showOver(); // 점검이 끝나 늦게 올라갔으면 결과 화면을 고친다
+}
+// 기록 올리기: 서버 점검(배포) 중이면 다시 켜질 때까지 3초마다 다시 시도한다 (최대 5분)
+async function postScore(body, onWait) {
+  for (let i = 0; ; i++) {
+    try { return await account.api('/api/dream/score', { method: 'POST', body }); }
+    catch (e) { if ((e.status && e.status < 500) || i >= 100) throw e; onWait?.(); await new Promise((ok) => setTimeout(ok, 3000)); }
+  }
 }
 async function showOver() {
   game.mode = 'over';
@@ -311,7 +319,7 @@ async function showOver() {
   const r = game.submitted;
   $('ov-save').classList.toggle('hidden', !r?.anonPending);
   if (r?.anonPending) { $('ov-nick').value = store.get(NICK_KEY) || game.profile.name; $('ov-save-btn').disabled = false; }
-  $('ov-best').textContent = r?.error ? `기록을 올리지 못했어요 (${r.error})` : r?.newBest ? `🎉 내 최고 기록! 전체 ${r.me?.rank}위` : r?.me ? `내 최고 ${r.me.score.toLocaleString()}점 · 전체 ${r.me.rank}위` : '';
+  $('ov-best').textContent = r?.waiting ? '🔧 서버 점검 중이에요 · 끝나면 기록을 자동으로 올려요' : r?.error ? `기록을 올리지 못했어요 (${r.error})` : r?.newBest ? `🎉 내 최고 기록! 전체 ${r.me?.rank}위` : r?.me ? `내 최고 ${r.me.score.toLocaleString()}점 · 전체 ${r.me.rank}위` : '';
   if (r?.anonPending) $('ov-best').textContent = '';
   if (r?.newBest) sfx('best');
   $('again-btn').textContent = game.multi ? '👥 방으로 돌아가기' : '🔁 다시 달리기';
@@ -326,7 +334,7 @@ $('ov-save-btn').onclick = async () => {
   store.set(NICK_KEY, name);
   $('ov-save-btn').disabled = true;
   try {
-    const r = await account.api('/api/dream/score', { method: 'POST', body: { ...game.rec, name, anon: anonId() } });
+    const r = await postScore({ ...game.rec, name, anon: anonId() }, () => { $('ov-best').textContent = '🔧 서버 점검 중이에요 · 끝나면 기록을 자동으로 올려요'; });
     game.submitted = r;
     $('ov-save').classList.add('hidden');
     $('ov-best').textContent = r.newBest ? `🎉 내 최고 기록! 전체 ${r.me?.rank}위` : `내 최고 ${r.me.score.toLocaleString()}점 · 전체 ${r.me.rank}위`;
@@ -366,12 +374,52 @@ const net = {
     this.ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/dream-ws`);
     this.ws.onopen = () => { this.open = true; hello(); };
     this.ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch { return; } this.handlers[m.t]?.(m); };
-    this.ws.onclose = () => { this.open = false; chat?.show(false); if (game.multi && game.mode !== 'title') { toast('🔧 서버 업데이트 중... 20초 안에 복구돼요. 잠시 뒤 다시 들어와 주세요', 5000); setTimeout(() => { if (game.multi) toTitle(); }, 800); } };
+    this.ws.onclose = () => {
+      this.open = false;
+      if (game.paused) { pauseMsg('🔧 서버 점검 중이에요', '끝나면 지금 자리에서 그대로 이어 달려요'); setTimeout(() => { if (!game.paused) return; if (performance.now() - game.paused.at > PAUSE_MAX) return pauseGiveUp(); this.connect(); }, 2000); return; }
+      chat?.show(false); if (game.multi && game.mode !== 'title') { toast('🔧 서버 업데이트 중... 20초 안에 복구돼요. 잠시 뒤 다시 들어와 주세요', 5000); setTimeout(() => { if (game.multi) toTitle(); }, 800); } };
   },
   send(m) { if (this.ws?.readyState === 1) this.ws.send(JSON.stringify(m)); },
   on(t, f) { this.handlers[t] = f; },
 };
-function hello() { net.send({ t: 'hello', session: logged() ? account.session : null, name: game.profile.name, color: game.profile.color, look: game.profile.look, acc: game.profile.acc }); }
+function hello() { net.send({ t: 'hello', session: logged() ? account.session : null, name: game.profile.name, color: game.profile.color, look: game.profile.look, acc: game.profile.acc, resume: game.paused ? { room: game.paused.room, tok: game.paused.tok } : null }); }
+
+// ---------- 서버 점검: 그 자리에서 멈췄다가 점검이 끝나면 다 같이 3·2·1 뒤 이어 달리기 ----------
+//   maint(서버가 꺼지기 직전) → 멈춤 · 다시 접속 → resumed(자리 되찾음, 다른 사람 기다림) → resume(카운트다운 뒤 출발)
+const PAUSE_MAX = 5 * 60 * 1000;
+function pauseMsg(a, b) {
+  let el = $('maint');
+  if (!el) { el = document.createElement('div'); el.id = 'maint'; el.style.cssText = 'position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(20,8,50,.55);backdrop-filter:blur(3px);z-index:15;font-family:Jua,sans-serif;text-align:center;padding:16px;pointer-events:none'; document.body.appendChild(el); }
+  el.innerHTML = `<div style="font-size:34px">${esc(a)}</div><div style="font-size:19px;opacity:.85">${esc(b)}</div>`;
+  el.classList.remove('hidden');
+}
+function pauseGiveUp() {
+  game.paused = null; $('maint')?.classList.add('hidden');
+  toast('점검이 길어져서 이어 달리지 못했어요 😢', 4000);
+  game.room = null; toTitle();
+}
+net.on('maint', () => {
+  if (!game.multi || !game.room || game.paused || !['count', 'run', 'dead', 'teamend'].includes(game.mode)) return;
+  game.paused = { room: game.room.id, tok: net.tok, prev: game.mode, at: performance.now() };
+  pauseMsg('🔧 서버 점검 중이에요', '끝나면 지금 자리에서 그대로 이어 달려요');
+  keys.clear();
+});
+net.on('resumed', (m) => {
+  if (!game.paused) return;
+  game.myId = m.id; net.tok = m.tok; game.room = m.room; game.members = m.members;
+  chat.reset(m.chat || []); chat.show(true);
+  pauseMsg('✅ 점검이 끝났어요', '다른 친구들이 돌아오길 기다리는 중…');
+});
+net.on('resume', (m) => {
+  const p = game.paused; if (!p) return;
+  game.paused = null; $('maint')?.classList.add('hidden');
+  game.members = m.members;
+  for (const id of m.gone || []) { game.ghosts.get(id)?.remove(); game.ghosts.delete(id); }
+  if (game.team) game.endAt = performance.now() + m.in + m.left;
+  if (p.prev === 'run' || p.prev === 'count') { game.mode = 'count'; game.countT = m.in / 1000; game.countN = null; }
+  else game.mode = p.prev;
+  toast('🌙 이어 달려요!', 1500);
+});
 function openLobby() {
   game.multi = true; net.pendingJoin = null;
   show('lobby'); $('rooms').innerHTML = '<div class="empty">방 목록을 불러오는 중…</div>';
@@ -434,7 +482,8 @@ function renderRoom(rank) {
   }
 }
 net.on('hello', (m) => {
-  game.myId = m.id;
+  game.myId = m.id; net.tok = m.tok;
+  if (game.paused) { pauseGiveUp(); return; } // 점검 사이에 방이 사라졌다
   if (net.pendingJoin) { net.send({ t: 'join', id: net.pendingJoin }); net.pendingJoin = null; return; }
   renderRooms(m.rooms);
 });
@@ -578,6 +627,8 @@ function frame() {
     const a = t * 0.18;
     camera.position.set(Math.sin(a) * 7, 2.6, z + Math.cos(a) * 7);
     camera.lookAt(0, 1.1, z);
+  } else if (game.paused) {
+    hud(); // 서버 점검: 그 자리에서 멈춰 있는다
   } else {
     if (game.mode === 'count') {
       game.countT -= dt;
