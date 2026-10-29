@@ -1,13 +1,13 @@
 // 젤리 숨바꼭질 방: 술래 한 명 · 나머지는 몸에 색을 칠해 맵에 숨는다. 판마다 술래가 바뀐다
-//   흐름: 준비(역할 보기) → 숨기(술래는 눈 가림) → 찾기(술래가 클릭으로 찾기 · 헛클릭은 시간 −3초) → 판 결과 → … → 최종 순위
-//   서버가 정하는 것: 판 · 시간 · 찾기 판정(거리) · 점수 · 헛클릭 벌칙. 봇은 서버가 길찾기 · 숨기 · 찾기를 한다
+//   흐름: 준비(역할 보기) → 숨기(술래는 눈 가림) → 찾기(술래가 물감총으로 쏴서 찾기) → 판 결과 → … → 최종 순위
+//   서버가 정하는 것: 판 · 시간 · 찾기 판정(거리) · 점수 · 물감 중계(연사 제한). 봇은 서버가 길찾기 · 숨기 · 찾기를 한다
 import { BaseRooms } from '../shared/rooms.js';
 import { getMap, MAPS, camoScore, specColors, findPath, randomOpen, lineClear, rgb2hex, hex2rgb } from '../../public/jelly-hide/js/maps.js';
 
 const BOT_NAMES = ['젤리봇 딸기', '젤리봇 포도', '젤리봇 레몬', '젤리봇 민트', '젤리봇 복숭아', '젤리봇 소다', '젤리봇 코코'];
 const BOT_COLORS = ['#ff6b8b', '#9b6bff', '#ffd84d', '#5fe0b0', '#ffab91', '#6ec6ff', '#c98a5a'];
 export const HIDE_TIMES = [45, 60, 90], SEEK_TIMES = [90, 120, 180], ROUNDS = [0, 2, 3, 5];
-const READY = 4500, RESULT = 7000, TAG_RANGE = 7.5, PENALTY = 3000;
+const READY = 4500, RESULT = 7000, TAG_RANGE = 26, SHOT_V = 30, SHOT_G = 6; // 물감은 30m/s 포물선 · 맞힌 거리는 26m 까지 인정
 const FAST = Number(process.env.HIDE_FAST) || 1; // 점검용: 숨기 · 찾기 시간을 줄인다
 
 export class HideRooms extends BaseRooms {
@@ -62,7 +62,7 @@ export class HideRooms extends BaseRooms {
   startRound(r) {
     const g = r.g; g.round++;
     g.seeker = g.order[g.round - 1]; g.mapId = r.opts.map === 'random' ? g.maps[(g.round - 1) % g.maps.length] : r.opts.map;
-    g.map = getMap(g.mapId); g.found = new Map(); g.misses = 0;
+    g.map = getMap(g.mapId); g.found = new Map(); g.shots = 0; g.pend = [];
     // 출발 자리: 술래는 가운데, 나머지는 둘레에
     const sp = g.map.spawns, spawn = {};
     let k = 1;
@@ -94,7 +94,8 @@ export class HideRooms extends BaseRooms {
     if (g.phase === 'wait') { if (now >= g.until) this.startRound(r); return; }
     if (g.phase === 'ready' && now >= g.until) { for (const b of r.players) if (b.bot && b.id !== g.seeker) this.botHide(r, b); this.setPhase(r, 'hide', (r.opts.hide * 1000) / FAST); }
     else if (g.phase === 'hide' && now >= g.until) { g.seekAt = now; this.setPhase(r, 'seek', (r.opts.seek * 1000) / FAST); }
-    else if (g.phase === 'seek') { if (now >= g.until || this.hiders(r).every((p) => g.found.has(p.id))) this.endRound(r); }
+    else if (g.phase === 'seek') { if (g.pend.length) { const due = g.pend.filter((p) => now >= p.at); g.pend = g.pend.filter((p) => now < p.at); for (const p of due) { const by = r.players.find((x) => x.id === p.by); if (by) this.tag(r, by, p.id); } }
+      if (now >= g.until || this.hiders(r).every((p) => g.found.has(p.id))) this.endRound(r); }
     else if (g.phase === 'result' && now >= g.until) { if (g.round >= g.rounds) return this.finish(r); this.startRound(r); }
     if (g.phase === 'hide' || g.phase === 'seek') this.tickBots(r, dt, now);
     for (const b of r.players) if (b.bot && b.pos) b.st = [+b.pos.x.toFixed(2), 0, +b.pos.z.toFixed(2), +b.yaw.toFixed(2), b.pose | (b.moving ? 4 : 0)];
@@ -126,7 +127,12 @@ export class HideRooms extends BaseRooms {
     if (ai.chase) {
       const t = r.players.find((p) => p.id === ai.chase), tp = t && this.posOf(t);
       if (!t || g.found.has(t.id) || !tp) { ai.chase = null; b.path = null; }
-      else if (Math.hypot(tp.x - b.pos.x, tp.z - b.pos.z) < 3.2) { b.yaw = Math.atan2(tp.x - b.pos.x, tp.z - b.pos.z); this.tag(r, b, t.id); ai.chase = null; b.path = null; return; }
+      else if (Math.hypot(tp.x - b.pos.x, tp.z - b.pos.z) < 8 && lineClear(g.map, [b.pos.x, b.pos.z], [tp.x, tp.z])) {
+        // 물감총: 서서 조준해 쏜다 (실력만큼 맞힌다 · 빗나간 물감은 자국으로)
+        b.yaw = Math.atan2(tp.x - b.pos.x, tp.z - b.pos.z); b.moving = false;
+        if ((ai.gun = (ai.gun || 0) - dt) <= 0) { ai.gun = 0.45 + Math.random() * 0.3; this.botShoot(r, b, t, tp, Math.random() < 0.45 + b.skill * 0.35); }
+        return;
+      }
       else if (!b.path?.length || (ai.re = (ai.re || 0) - dt) <= 0) { ai.re = 1; b.path = findPath(g.map, [b.pos.x, b.pos.z], [tp.x, tp.z]) || []; }
     }
     if (!b.path?.length) b.path = findPath(g.map, [b.pos.x, b.pos.z], randomOpen(g.map)) || [];
@@ -143,8 +149,8 @@ export class HideRooms extends BaseRooms {
       const p = 0.3 * (1 - camo / 100) ** 1.6 * (d < 3 ? 2 : d < 6 ? 1.2 : 0.55) * (moving ? 4 : 1) * (0.6 + b.skill * 0.6);
       if (Math.random() < p) { ai.chase = h.id; b.path = null; return; }
     }
-    // 가끔은 엉뚱한 곳을 눌러 시간을 잃는다
-    if (Math.random() < 0.012) { const a = b.yaw + (Math.random() - 0.5); this.miss(r, b, [b.pos.x + Math.sin(a) * 3, 0.6, b.pos.z + Math.cos(a) * 3]); }
+    // 가끔은 수상해 보이는 곳에 그냥 쏴 본다
+    if (Math.random() < 0.02) { const a = b.yaw + (Math.random() - 0.5) * 0.8; this.botShoot(r, b, null, { x: b.pos.x + Math.sin(a) * 6, y: 0, z: b.pos.z + Math.cos(a) * 6 }, false); }
   }
   tag(r, by, id) {
     const g = r.g; if (g.phase !== 'seek' || by.id !== g.seeker || g.found.has(id) || id === g.seeker) return false;
@@ -156,10 +162,17 @@ export class HideRooms extends BaseRooms {
     this.toRoom(r, { t: 'found', id, by: by.id, sec: Math.round(sec), left: this.hiders(r).filter((p) => !g.found.has(p.id)).length });
     return true;
   }
-  miss(r, by, p) {
-    const g = r.g; if (g.phase !== 'seek') return;
-    g.until = Math.max(Date.now() + 2000, g.until - PENALTY); g.misses++;
-    this.toRoom(r, { t: 'miss', by: by.id, p, ms: g.until - Date.now() });
+  // 봇 술래의 물감 한 발: 맞힐 거면 젤리 가운데로, 아니면 옆으로 빗겨서. 맞으면 날아가는 시간 뒤에 찾았다
+  botShoot(r, b, t, tp, hit) {
+    const g = r.g, o = [b.pos.x + Math.sin(b.yaw) * 0.5, (b.pos.y || 0) + 1.0, b.pos.z + Math.cos(b.yaw) * 0.5];
+    const err = hit ? 0 : (Math.random() < 0.5 ? -1 : 1) * (0.9 + Math.random() * 1.2);
+    const px = tp.x + Math.cos(b.yaw) * err, pz = tp.z - Math.sin(b.yaw) * err, py = (tp.y || 0) + 0.55;
+    const dx = px - o[0], dz = pz - o[2], dist = Math.hypot(dx, dz) || 1, time = dist / SHOT_V;
+    const dy = py - o[1] + 0.5 * SHOT_G * time * time; // 떨어지는 만큼 조금 위로
+    const L = Math.hypot(dx, dy, dz) || 1;
+    g.shots++;
+    this.toRoom(r, { t: 'shot', by: b.id, o: o.map((v) => +v.toFixed(2)), d: [dx / L, dy / L, dz / L].map((v) => +v.toFixed(3)), c: (g.shots % 6) });
+    if (hit && t) g.pend.push({ by: b.id, id: t.id, at: Date.now() + time * 1000 });
   }
   endRound(r) {
     const g = r.g, now = Date.now(), seekSec = Math.max(1, (now - g.seekAt) / 1000), seeker = r.players.find((p) => p.id === g.seeker);
@@ -176,7 +189,7 @@ export class HideRooms extends BaseRooms {
       seeker.score += pts; seeker.finds += g.found.size;
       res.push({ id: seeker.id, pts, seeker: true, finds: g.found.size, all });
     }
-    this.setPhase(r, 'result', RESULT, { res, misses: g.misses });
+    this.setPhase(r, 'result', RESULT, { res, shots: g.shots });
   }
   onMessage(c, m, r) {
     const g = r.g; if (!g || r.state !== 'run') return;
@@ -186,7 +199,12 @@ export class HideRooms extends BaseRooms {
     } else if (m.t === 'camo' && Array.isArray(m.dom)) {
       c.dom = m.dom.slice(0, 6).map((e) => (Array.isArray(e) ? e.slice(0, 4).map((v) => Math.max(0, Math.min(255, Number(v) || 0))) : [0, 0, 0, 0]));
     } else if (m.t === 'tag') { if (!this.tag(r, c, Number(m.id))) this.send(c, { t: 'far' }); }
-    else if (m.t === 'miss' && c.id === g.seeker && Array.isArray(m.p)) { const now = Date.now(); if (now - (c.missAt || 0) < 350) return; c.missAt = now; this.miss(r, c, m.p.slice(0, 3).map(Number)); }
+    else if (m.t === 'shot' && c.id === g.seeker && g.phase === 'seek' && Array.isArray(m.o) && Array.isArray(m.d)) {
+      // 물감 한 발: 연사 제한(0.15초) 뒤 다른 사람에게 그대로 보여 준다 (맞힘은 'tag' 로 따로 · 거리는 서버가 확인)
+      const now = Date.now(); if (now - (c.shotAt || 0) < 150) return; c.shotAt = now;
+      const o = m.o.slice(0, 3).map(Number), d = m.d.slice(0, 3).map(Number); if (![...o, ...d].every(Number.isFinite)) return;
+      g.shots++; this.toRoom(r, { t: 'shot', by: c.id, o, d, c: (Number(m.c) | 0) % 6 }, c);
+    }
   }
   onLeave(r, c) {
     const g = r.g; if (!g) return;

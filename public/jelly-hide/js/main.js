@@ -1,6 +1,6 @@
-// 젤리 숨바꼭질: 술래가 눈을 가린 동안 몸에 색을 칠해 숨고, 술래는 1인칭으로 수상한 곳을 콕 찍어 찾는다
+// 젤리 숨바꼭질: 술래가 눈을 가린 동안 몸에 색을 칠해 숨고, 술래는 1인칭 물감총으로 수상한 곳을 쏴서 찾는다
 //   숨는 쪽: 3인칭 · 🎨 칠하기(붓 · 지우개 · 스포이드 · 부위 채우기 · 무늬 도장) · 자세 4가지 · 위장도 계기판
-//   술래: 1인칭 · 클릭 찾기(7.5m) · 헛클릭은 −3초 · 움직이는 젤리는 반짝이 흔적
+//   술래: 1인칭 물감총(포물선 물감 · 맞은 자리에 자국 · 물감통 12발이 조금씩 참) · 움직이는 젤리는 반짝이 흔적
 import * as THREE from 'three';
 import { store } from '../../shared/js/account.js';
 import { Shell, esc } from '../../shared/js/shell.js';
@@ -134,7 +134,7 @@ addEventListener('keydown', (e) => {
 });
 addEventListener('keyup', (e) => keys.delete(e.code));
 addEventListener('blur', () => keys.clear());
-// 마우스 · 손가락: 끌면 카메라 · 칠하기 모드에선 곰돌이를 끌면 칠한다 · 술래는 클릭으로 찾기
+// 마우스 · 손가락: 끌면 카메라 · 칠하기 모드에선 곰돌이를 끌면 칠한다 · 술래는 클릭(꾹)으로 물감총
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 let drag = null;
 function rayFrom(cx, cy) { ndc.set((cx / innerWidth) * 2 - 1, -(cy / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera); return ray; }
@@ -143,7 +143,7 @@ canvas.addEventListener('pointerdown', (e) => {
   S.unlock?.();
   if (amSeeker() && game.phase === 'seek' && !game.found.has(game.myId)) {
     if (!touch && document.pointerLockElement !== canvas) { canvas.requestPointerLock?.(); return; }
-    if (!touch) { seekClick(innerWidth / 2, innerHeight / 2); return; }
+    if (!touch) { gun.firing = true; fire(); return; }
   }
   drag = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, paint: false, t: performance.now(), id: e.pointerId };
   if (game.painting) {
@@ -161,10 +161,10 @@ canvas.addEventListener('pointermove', (e) => {
   const fp = amSeeker() && game.phase === 'seek';
   game.camYaw -= dx * (fp ? 0.005 : 0.007); game.camPitch = fp ? Math.max(-1.3, Math.min(1.3, game.camPitch - dy * 0.004)) : Math.max(-0.25, Math.min(1.25, game.camPitch + dy * 0.005));
 });
+addEventListener('pointerup', () => { if (!touch) gun.firing = false; });
 canvas.addEventListener('pointerup', (e) => {
   if (!drag || drag.id !== e.pointerId) return;
   const tap = Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 8 && performance.now() - drag.t < 350;
-  if (tap && touch && amSeeker() && game.phase === 'seek') seekClick(e.clientX, e.clientY);
   if (drag.paint) paintChanged();
   drag = null;
 });
@@ -176,23 +176,101 @@ $('stick').addEventListener('pointermove', (e) => { if (e.pointerId === stick.id
 $('stick').addEventListener('pointerup', () => { stick.id = null; stick.x = stick.y = 0; $('stick').firstElementChild.style.transform = ''; });
 function moveStick(e) { const r = $('stick').getBoundingClientRect(); let x = (e.clientX - r.left - r.width / 2) / (r.width / 2), y = (e.clientY - r.top - r.height / 2) / (r.height / 2); const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; } stick.x = x; stick.y = y; $('stick').firstElementChild.style.transform = `translate(${x * 34}px, ${y * 34}px)`; }
 $('t-jump').onclick = () => { game.jump = true; };
-$('t-tag').onclick = () => seekClick(innerWidth / 2, innerHeight / 2);
+$('t-tag').addEventListener('pointerdown', (e) => { e.preventDefault(); gun.firing = true; fire(); });
+$('t-tag').addEventListener('pointerup', () => { gun.firing = false; });
+$('t-tag').addEventListener('pointerleave', () => { gun.firing = false; });
 
-// ---------- 술래: 찾기 ----------
-game.seekAt = (x, y) => seekClick(x, y); // 점검용
-function seekClick(cx, cy) {
-  if (!amSeeker() || game.phase !== 'seek') return;
-  const r = rayFrom(cx, cy);
-  const bears = [...game.mates.values()].filter((m) => m.id !== game.myId && !m.found);
-  const hb = r.intersectObjects(bears.flatMap((m) => m.bear.meshes()), false)[0];
-  const hw = r.intersectObjects(world.meshes, false)[0];
-  if (hb && (!hw || hb.distance <= hw.distance + 0.05)) {
-    const m = hb.object.userData.bear, mate = bears.find((x) => x.bear === m);
-    if (mate) { shell.send({ t: 'tag', id: mate.id }); S.sfx('tick'); return; }
-  }
-  const p = hw ? hw.point : r.ray.at(12, new THREE.Vector3());
-  shell.send({ t: 'miss', p: [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2)] });
+// ---------- 술래: 물감총 ----------
+//   물감 덩어리가 포물선으로 날아가 맞은 자리에 자국을 남긴다 (같은 방 모두에게 보인다). 젤리를 맞히면 찾았다!
+//   물감통 12발 · 0.45초마다 1발씩 다시 참 → 아무 데나 마구 쏘기는 어렵다
+const AMMO_MAX = 12, AMMO_REGEN = 0.45, FIRE_GAP = 0.2, SHOT_V = 30, SHOT_G = 6;
+const PAINTS = ['#ff4f9a', '#4aa3ff', '#ffd23f', '#62cf7a', '#9a6bff', '#ff9334'];
+const gun = { ammo: AMMO_MAX, regen: 0, cool: 0, firing: false, ci: 0, kick: 0, model: null };
+const shots = [], splats = [];
+const splatTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'); x.fillStyle = '#fff';
+  x.beginPath(); for (let i = 0; i <= 24; i++) { const a = (i / 24) * Math.PI * 2, r = 34 + Math.random() * 14; x.lineTo(64 + Math.cos(a) * r, 64 + Math.sin(a) * r); } x.fill();
+  for (let i = 0; i < 9; i++) { const a = Math.random() * 6.28, d = 44 + Math.random() * 16, r = 4 + Math.random() * 7; x.beginPath(); x.arc(64 + Math.cos(a) * d, 64 + Math.sin(a) * d, r, 0, 7); x.fill(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+const G_BLOB = new THREE.SphereGeometry(0.11, 12, 8), G_SPLAT = new THREE.PlaneGeometry(1, 1);
+function makeGun() {
+  const g = new THREE.Group(), toon = (c, o = {}) => new THREE.MeshToonMaterial({ color: c, ...o });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.15, 0.42), toon('#ffffff')); g.add(body);
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 0.3, 14), toon('#5a4a7a')); barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0.02, -0.33); g.add(barrel);
+  const tip = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.016, 8, 16), toon('#ff4f9a')); tip.position.set(0, 0.02, -0.48); g.add(tip);
+  const tank = new THREE.Mesh(new THREE.SphereGeometry(0.11, 18, 12), new THREE.MeshToonMaterial({ color: PAINTS[0], transparent: true, opacity: 0.85 })); tank.position.set(0, 0.17, 0.02); g.add(tank);
+  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.2, 0.09), toon('#ffb3d1')); handle.position.set(0, -0.15, 0.1); handle.rotation.x = 0.25; g.add(handle);
+  g.position.set(0.3, -0.27, -0.66); g.scale.setScalar(0.62); g.userData = { tank, tip };
+  g.traverse((o) => { if (o.isMesh) { o.renderOrder = 20; o.material.depthTest = false; } }); // 벽에 붙어도 총이 묻히지 않게
+  camera.add(g); scene.add(camera); return g;
 }
+function fire() {
+  if (!amSeeker() || game.phase !== 'seek' || gun.cool > 0) return;
+  if (gun.ammo < 1) { if (!gun.dry) { gun.dry = true; S.sfx('bad'); feed('🎨 물감이 다 떨어졌어요 · 잠깐 기다리면 다시 차요'); } return; }
+  gun.ammo--; gun.cool = FIRE_GAP; gun.kick = 1; gun.dry = false;
+  const d = new THREE.Vector3(); camera.getWorldDirection(d);
+  const right = new THREE.Vector3().crossVectors(d, camera.up).normalize();
+  const o = camera.position.clone().addScaledVector(d, 0.55).addScaledVector(right, 0.2).add(new THREE.Vector3(0, -0.14, 0));
+  // 총구에서 조준점 쪽으로 (가까운 벽이면 그 점을 향해)
+  ray.setFromCamera(new THREE.Vector2(0, 0), camera); const aim = ray.intersectObjects(world.meshes, false)[0];
+  const to = aim && aim.distance < 40 ? aim.point : camera.position.clone().addScaledVector(d, 40);
+  const dir = to.clone().sub(o).normalize(); dir.y += 0.012; dir.normalize();
+  const ci = gun.ci = (gun.ci + 1) % PAINTS.length;
+  spawnShot(o, dir, ci, true);
+  shell.send({ t: 'shot', o: [o.x, o.y, o.z].map((v) => +v.toFixed(2)), d: [dir.x, dir.y, dir.z].map((v) => +v.toFixed(3)), c: ci });
+  S.sfx('pop', 1);
+}
+function spawnShot(o, d, ci, mine) {
+  const color = PAINTS[ci % PAINTS.length];
+  const m = new THREE.Mesh(G_BLOB, new THREE.MeshToonMaterial({ color, emissive: color, emissiveIntensity: 0.25 }));
+  m.position.copy(o); scene.add(m);
+  shots.push({ m, vel: d.clone().multiplyScalar(SHOT_V), color, mine, life: 2.2 });
+}
+const segRay = new THREE.Raycaster(), prevP = new THREE.Vector3(), segD = new THREE.Vector3();
+function tickShots(dt) {
+  if (gun.model) {
+    gun.cool = Math.max(0, gun.cool - dt); gun.kick = Math.max(0, gun.kick - dt * 6);
+    if (gun.ammo < AMMO_MAX && (gun.regen += dt) >= AMMO_REGEN) { gun.regen = 0; gun.ammo++; }
+    if (gun.firing && gun.cool <= 0) fire();
+    const show = amSeeker() && game.phase === 'seek' && game.mode === 'play';
+    gun.model.visible = show;
+    gun.model.position.z = -0.66 + gun.kick * 0.06; gun.model.rotation.x = gun.kick * 0.12;
+    gun.model.userData.tank.material.color.set(PAINTS[(gun.ci + 1) % PAINTS.length]); gun.model.userData.tank.scale.setScalar(0.45 + 0.55 * (gun.ammo / AMMO_MAX));
+    const el = $('ammo'); el.classList.toggle('hidden', !show);
+    if (show) el.innerHTML = `🎨 <b>${gun.ammo}</b><i style="width:${(gun.ammo / AMMO_MAX) * 100}%"></i>`;
+  }
+  for (let i = shots.length - 1; i >= 0; i--) {
+    const s = shots[i]; s.life -= dt;
+    prevP.copy(s.m.position); s.vel.y -= SHOT_G * dt; s.m.position.addScaledVector(s.vel, dt);
+    segD.copy(s.m.position).sub(prevP); const L = segD.length(); segD.normalize();
+    segRay.set(prevP, segD); segRay.far = L;
+    const bears = [...game.mates.values()].filter((x) => x.id !== game.seeker && !x.found);
+    const hb = segRay.intersectObjects(bears.flatMap((x) => x.bear.meshes()), false)[0];
+    const hw = segRay.intersectObjects(world.meshes, false)[0];
+    let done = s.life <= 0;
+    if (hb && (!hw || hb.distance <= hw.distance + 0.05)) {
+      const mate = bears.find((x) => x.bear === hb.object.userData.bear);
+      burst(hb.point, s.color);
+      if (mate && s.mine) shell.send({ t: 'tag', id: mate.id });
+      done = true;
+    } else if (hw) {
+      const n = hw.face ? hw.face.normal.clone().transformDirection(hw.object.matrixWorld) : new THREE.Vector3(0, 1, 0);
+      addSplat(hw.point, n, s.color); done = true;
+      if (s.mine) S.sfx('tick', 2);
+    }
+    if (done) { scene.remove(s.m); s.m.material.dispose(); shots.splice(i, 1); }
+  }
+}
+function addSplat(p, n, color) {
+  const m = new THREE.Mesh(G_SPLAT, new THREE.MeshBasicMaterial({ map: splatTex, color, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }));
+  m.position.copy(p).addScaledVector(n, 0.012); m.lookAt(p.clone().add(n)); m.rotateZ(Math.random() * 6.28); m.scale.setScalar(0.45 + Math.random() * 0.3);
+  scene.add(m); splats.push(m);
+  if (splats.length > 260) { const o = splats.shift(); scene.remove(o); o.material.dispose(); }
+}
+function burst(p, color) { for (let i = 0; i < 12; i++) { const q = new THREE.Sprite(new THREE.SpriteMaterial({ map: sparkTex, color, transparent: true, depthWrite: false })); q.position.copy(p); q.scale.setScalar(0.35); scene.add(q); fx.push({ o: q, life: 0.7, v: new THREE.Vector3((Math.random() - 0.5) * 5, Math.random() * 4, (Math.random() - 0.5) * 5) }); } }
+function clearPaintballs() { for (const s of shots) { scene.remove(s.m); s.m.material.dispose(); } shots.length = 0; for (const m of splats) { scene.remove(m); m.material.dispose(); } splats.length = 0; gun.ammo = AMMO_MAX; gun.firing = false; }
+game.fire = () => fire(); // 점검용
 
 // ---------- 칠하기 ----------
 const PALETTE = ['#ffffff', '#f3ece2', '#c9c2b8', '#6b6b78', '#2b2433', '#ff5c7a', '#ff9eb5', '#ff9334', '#ffd23f', '#fff1a8', '#62cf7a', '#3f9b4b', '#3fd0c0', '#4a9dff', '#bfe3ff', '#9a6bff', '#c98a4b', '#8a5a3a'];
@@ -266,7 +344,7 @@ function intro(html, cls, ms) { const c = $('intro'); c.className = cls || ''; c
 const nameOf = (id) => (id === game.myId ? '나' : game.members?.get(id)?.name || '?');
 function hudRole() {
   const found = game.found.has(game.myId), seeker = amSeeker();
-  $('h-role').textContent = seeker ? (game.phase === 'seek' ? '🔍 술래 · 수상한 곳을 클릭! 헛클릭은 −3초' : '🔍 이번 판 술래') : found ? '😵 들켰어요 · 술래를 따라 구경해요' : game.phase === 'seek' ? '🫥 들키지 마세요 · 움직이면 반짝이가 남아요' : `🫥 숨는 젤리 · 술래는 ${nameOf(game.seeker)}`;
+  $('h-role').textContent = seeker ? (game.phase === 'seek' ? '🔍 술래 · 수상한 곳에 물감총! 물감통은 조금씩 다시 차요' : '🔍 이번 판 술래') : found ? '😵 들켰어요 · 술래를 따라 구경해요' : game.phase === 'seek' ? '🫥 들키지 마세요 · 움직이면 반짝이가 남아요' : `🫥 숨는 젤리 · 술래는 ${nameOf(game.seeker)}`;
   const hid = [...game.mates.keys()].filter((id) => id !== game.seeker), left = hid.filter((id) => !game.found.has(id)).length;
   $('h-found').textContent = `🫥 남은 젤리 ${left} / ${hid.length}`;
   $('h-round').textContent = `${game.round} / ${game.rounds}판 · ${MAPS.find((m) => m.id === game.mapId)?.emoji || ''} ${MAPS.find((m) => m.id === game.mapId)?.name || ''}`;
@@ -295,9 +373,9 @@ function renderTitleOpts() { optsUI($('title-opts'), game.pick, true, (n) => { O
 function practice(role) { S.unlock?.(); game.lastRole = role; shell.sendAfterHello({ t: 'practice', opts: { ...game.pick, role } }); }
 const shell = new Shell({
   sound: { muted: () => S.sound.muted, toggle: () => { S.toggleMute(); $('b-mute').textContent = S.sound.muted ? '🔇' : '🔊'; } },
-  key: 'jellyhide', title: '🫥 젤리 숨바꼭질', subtitle: '몸에 색을 칠해 방 · 가게 · 정원과 똑같아지기!<br>술래는 수상한 곳을 콕 찍어 찾아요', wsPath: '/hide-ws', max: 10,
+  key: 'jellyhide', title: '🫥 젤리 숨바꼭질', subtitle: '몸에 색을 칠해 방 · 가게 · 정원과 똑같아지기!<br>술래는 물감총으로 수상한 곳을 쏴서 찾아요', wsPath: '/hide-ws', max: 10,
   multiLabel: '👥 같이 하기', roomIcon: '🫥', startLabel: '🫥 숨바꼭질 시작!',
-  keysHelp: 'WASD 이동 · 마우스 끌기 카메라 · F 칠하기 · 💧 스포이드로 겉면 색 찍기 · 1~4 자세 · Q/E 돌기 · 술래는 클릭으로 찾기 (헛클릭 −3초)',
+  keysHelp: 'WASD 이동 · 마우스 끌기 카메라 · F 칠하기 · 💧 스포이드로 겉면 색 찍기 · 1~4 자세 · Q/E 돌기 · 술래는 클릭 · 꾹 누르기로 물감총 발사',
   buttons: [{ id: 'hide-btn', label: '🫥 숨기 연습 <small>젤리봇 술래에게서 숨어요</small>', onClick: () => practice('hide') }, { id: 'seek-btn', label: '🔍 술래 연습 <small>숨은 젤리봇을 찾아요</small>', cls: 'ghost', onClick: () => practice('seek') }],
   screens: ['over'],
   describe: (o = {}) => `${o.map === 'random' ? '🎲 돌아가며' : MAPS.find((m) => m.id === o.map)?.name || ''} · ${o.rounds ? `${o.rounds}판` : '모두 한 번씩'} · 🤖 ${o.bots || 0}`,
@@ -325,6 +403,7 @@ shell.on('ph', (m) => {
   game.phase = m.phase; game.round = m.round; game.rounds = m.rounds; game.seeker = m.seeker; game.endAt = performance.now() + m.ms;
   game.found = new Set(m.found);
   if (m.mapId) buildWorld(m.mapId), game.mapId = m.mapId;
+  if (m.phase === 'ready' || m.phase === 'seek') clearPaintballs();
   for (const x of game.mates.values()) { x.setSeeker(x.id === game.seeker); x.setFound(game.found.has(x.id)); }
   const seeker = amSeeker();
   if (m.phase === 'ready') {
@@ -333,7 +412,7 @@ shell.on('ph', (m) => {
     game.pose = 0; me()?.bear.setPose(0); game.camPitch = 0.35; game.camDist = 5;
     const mp = MAPS.find((x) => x.id === m.mapId), md = getMap(m.mapId);
     intro(seeker
-      ? `<div class="em">🔍</div><div class="nm">이번엔 내가 술래!</div><div class="ds">젤리들이 숨는 동안 눈을 감아요. 그다음 수상한 곳을 콕 클릭!<br>아무것도 없는 곳을 누르면 시간 −3초</div><div class="sb">${mp.emoji} ${mp.name} · ${m.round} / ${m.rounds}판</div>`
+      ? `<div class="em">🔍</div><div class="nm">이번엔 내가 술래!</div><div class="ds">젤리들이 숨는 동안 눈을 감아요. 그다음 수상한 곳에 <b>물감총</b>을 쏴요!<br>물감통은 12발 · 쏘면 조금씩 다시 차요</div><div class="sb">${mp.emoji} ${mp.name} · ${m.round} / ${m.rounds}판</div>`
       : `<div class="em">🫥</div><div class="nm">숨어요!</div><div class="ds">숨을 곳을 고르고 <b>🎨 칠하기(F)</b>로 몸을 겉면과 똑같이!<br>💧 스포이드로 색을 찍고 무늬 도장으로 무늬까지</div><div class="sb">${mp.emoji} ${mp.name} — ${md.desc} · 술래 ${esc(nameOf(game.seeker))}</div>`, seeker ? 'seek' : '', 4300);
     S.sfx('turn');
   } else if (m.phase === 'hide') {
@@ -342,12 +421,12 @@ shell.on('ph', (m) => {
   } else if (m.phase === 'seek') {
     $('blind').classList.add('hidden');
     if (game.painting) togglePaint(false); else sendPaint();
-    if (seeker) { game.camPitch = 0; P.yaw = game.camYaw; feed('🔍 찾기 시작! 수상한 곳을 클릭', true); } else feed(`🔍 ${nameOf(game.seeker)} 술래가 찾기 시작했어요! 쉿…`, true);
+    if (seeker) { game.camPitch = 0; P.yaw = game.camYaw; feed('🔍 찾기 시작! 수상한 곳에 물감총 발사 (누르고 있으면 연사)', true); } else feed(`🔍 ${nameOf(game.seeker)} 술래가 찾기 시작했어요! 쉿…`, true);
     S.sfx('start');
   } else if (m.phase === 'result') {
     document.exitPointerLock?.(); if (game.painting) togglePaint(false);
     const res = (m.res || []).slice().sort((a, b) => b.pts - a.pts);
-    intro(`<div class="em">⏱️</div><div class="nm">${m.round} / ${m.rounds}판 끝!</div><div class="ds">${res.find((e) => e.seeker)?.all ? '술래가 모두 찾았어요! 🔍' : `끝까지 숨은 젤리 ${res.filter((e) => !e.seeker && !e.found).length}마리`}${m.misses ? ` · 헛클릭 ${m.misses}번` : ''}</div>
+    intro(`<div class="em">⏱️</div><div class="nm">${m.round} / ${m.rounds}판 끝!</div><div class="ds">${res.find((e) => e.seeker)?.all ? '술래가 모두 찾았어요! 🔍' : `끝까지 숨은 젤리 ${res.filter((e) => !e.seeker && !e.found).length}마리`}${m.shots ? ` · 물감 ${m.shots}발` : ''}</div>
       <div class="res">${res.map((e) => `<div class="${e.id === game.myId ? 'me' : ''}">${e.seeker ? '🔍' : e.found ? '😵' : '🫥'} ${esc(nameOf(e.id))}<small>${e.seeker ? `${e.finds}마리 찾음` : e.found ? `${e.sec}초에 들킴` : '끝까지 숨음!'}</small><span class="p">+${e.pts}</span></div>`).join('')}</div>`, '', 6800);
     const mine = res.find((e) => e.id === game.myId); if (mine && ((mine.seeker && mine.all) || (!mine.seeker && !mine.found))) { S.sfx('win'); confetti(60); } else S.sfx('page');
   }
@@ -362,8 +441,8 @@ shell.on('found', (m) => {
   if (m.by === game.myId) S.sfx('ok'); else S.sfx('pop', 3);
   hudRole();
 });
-shell.on('miss', (m) => { poof(m.p); game.endAt = performance.now() + m.ms; if (m.by === game.myId) { const p = $('penalty'); p.classList.remove('hidden'); p.style.animation = 'none'; void p.offsetWidth; p.style.animation = ''; S.sfx('bad'); } });
-shell.on('far', () => feed('🤏 너무 멀어요 · 7.5m 안으로 다가가서!'));
+shell.on('shot', (m) => { if (m.by === game.myId || !Array.isArray(m.o) || !Array.isArray(m.d)) return; spawnShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d).normalize(), m.c | 0, false); });
+shell.on('far', () => feed('🤏 너무 멀리서 맞았어요 · 조금 더 다가가요'));
 shell.on('snap', (m) => { for (const [id, x, y, z, yaw, f] of m.p) { if (id === game.myId) continue; game.mates.get(id)?.snap(x, y, z, yaw, f); } });
 shell.on('gone', (m) => { const x = game.mates.get(m.id); if (x) { x.remove(); game.mates.delete(m.id); } hudRole(); });
 
@@ -414,6 +493,7 @@ function frame() {
   const dt = Math.min(0.05, clock.getDelta()); tt += dt;
   if (game.mode === 'play') play(dt);
   else if (titleBear) { titleBear.animate(dt, false); const a = tt * 0.18; camera.position.set(Math.sin(a) * 4.5, 2.2, -10 + Math.cos(a) * 1.5); camera.lookAt(0, 1, -14.2); }
+  tickShots(dt);
   tickFx(dt);
   renderer.render(scene, camera);
 }
@@ -470,6 +550,7 @@ function play(dt) {
   }
 }
 
+gun.model = makeGun();
 buildPaintUI();
 renderTitleOpts();
 shell.boot();

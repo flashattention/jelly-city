@@ -90,3 +90,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #2a1748; }
 }
 .opt-grid .seg { display: flex; flex-wrap: wrap; justify-content: center; width: fit-content; max-width: 100%; }
 .opt-grid .seg button { white-space: nowrap; padding: 6px 11px; font-size: 14px; }
+
+#ammo { position: absolute; left: 50%; top: calc(50% + 34px); transform: translateX(-50%); min-width: 96px; padding: 3px 10px 6px; border-radius: 999px; background: rgba(40,20,60,.55); color: #fff; font-family: 'Jua', sans-serif; font-size: 13px; text-align: center; pointer-events: none; }
+#ammo b { font-size: 16px; }
+#ammo i { display: block; height: 4px; margin-top: 2px; border-radius: 4px; background: linear-gradient(90deg, #ff4f9a, #ffd23f, #4aa3ff); transition: width .15s; }
