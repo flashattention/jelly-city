@@ -59,7 +59,6 @@ function drawJelly(g, r, lv) {
     }
   };
   // 바닥 그림자
-  g.fillStyle = 'rgba(60,20,90,.18)'; g.beginPath(); g.ellipse(0, r * 0.92, r * 0.8, r * 0.16, 0, 0, 7); g.fill();
   const body = new Path2D(); body.arc(0, 0, r, 0, Math.PI * 2);
   if (ears) for (const sx of [-1, 1]) { const e = new Path2D(); e.arc(sx * r * 0.62, -r * 0.7, r * 0.33, 0, 7); g.globalAlpha = 0.95; fill(e); g.globalAlpha = 1; g.strokeStyle = shade(col, 0.65); g.globalAlpha = 0.4; g.lineWidth = Math.max(1, r * 0.06); g.stroke(e); g.globalAlpha = 1; g.fillStyle = 'rgba(255,255,255,.3)'; g.beginPath(); g.arc(sx * r * 0.62, -r * 0.7, r * 0.15, 0, 7); g.fill(); }
   g.globalAlpha = 0.96; fill(body); g.globalAlpha = 1;
@@ -156,12 +155,14 @@ function draw(t) {
   const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, 'rgba(40,20,80,.35)'); bg.addColorStop(0.5, 'rgba(120,70,150,.38)'); bg.addColorStop(1, 'rgba(255,150,205,.45)');
   g.fillStyle = bg; g.fillRect(-10, -20, W + 20, H + 30);
   g.fillStyle = 'rgba(255,255,255,.06)'; for (let i = 0; i < 6; i++) { g.beginPath(); g.arc(60 + i * 60, H - 40 - ((t / 30 + i * 90) % (H - 60)), 4 + (i % 3) * 2, 0, 7); g.fill(); }
-  // 위험선
+  // 위험선: 평소엔 안 보이고, 젤리가 넘기 시작하면 빨갛게 깜빡인다
   const dz = J.danger > 0 ? Math.min(1, J.danger / 2.6) : 0;
-  g.strokeStyle = dz ? `rgba(255,${90 - dz * 60},${110 - dz * 60},${0.6 + 0.4 * Math.abs(Math.sin(t / (120 - dz * 60)))})` : 'rgba(255,255,255,.35)';
-  g.lineWidth = dz ? 4 : 2; g.setLineDash([12, 10]); g.lineDashOffset = -t / 40;
-  g.beginPath(); g.moveTo(0, DL); g.lineTo(W, DL); g.stroke(); g.setLineDash([]);
-  if (dz) { g.fillStyle = `rgba(255,60,90,${0.12 + dz * 0.2})`; g.fillRect(0, -20, W, DL + 20); }
+  if (dz) {
+    g.strokeStyle = `rgba(255,${90 - dz * 60},${110 - dz * 60},${0.6 + 0.4 * Math.abs(Math.sin(t / (120 - dz * 60)))})`;
+    g.lineWidth = 4; g.setLineDash([12, 10]); g.lineDashOffset = -t / 40;
+    g.beginPath(); g.moveTo(0, DL); g.lineTo(W, DL); g.stroke(); g.setLineDash([]);
+    g.fillStyle = `rgba(255,60,90,${0.12 + dz * 0.2})`; g.fillRect(0, -20, W, DL + 20);
+  }
   const canAim = game.mode === 'play' && !game.out && performance.now() >= game.startAt;
   for (const b of J.bodies) drawBody(b, t);
   g.restore();
