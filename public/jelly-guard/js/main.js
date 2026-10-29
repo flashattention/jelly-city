@@ -306,7 +306,8 @@ const G = {
   get map() { return game.map; }, get ps() { return game.ps; }, get others() { return game.others; }, get mouseL() { return mouseL; }, get mouseR() { return mouseR; }, get jumpEdge() { return jumpEdge; },
   get gravAt() { return game.gravAt; }, set visor(v) { game.visor = v; }, get visor() { return game.visor; }, set jets(v) { game.jets = v; }, set grapLine(v) { game.grapLine = v; },
   toast: (t) => shell.toast(t, 1500),
-  recoil: (a) => { game.rc = (game.rc || 0) + a; me.pitch = Math.min(1.5, me.pitch + a); }, // 반동: 조준점이 위로 튀었다가 조금씩 돌아온다 enemies: () => others().filter((o) => o.alive && enemy(o)),
+  enemies: () => others().filter((o) => o.alive && enemy(o)),
+  recoil: (a) => { game.rc = (game.rc || 0) + a; me.pitch = Math.min(1.5, me.pitch + a); }, // 반동: 조준점이 위로 튀었다가 조금씩 돌아온다
   puff: (p, c, n) => puff(scene, p, c, n), ring: (p, c, r) => ring(scene, p, c, r), tracer: (p, c) => line(scene, muzzle(), p, c, 0.15, 0.04),
   wave: () => { const p = me.pos.clone().addScaledVector(new THREE.Vector3(-Math.sin(me.yaw), 0, -Math.cos(me.yaw)), 3); ring(scene, p, '#a6ff5e', 5, 0.4, 1); },
   moveDir: () => { const f2 = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0), s2 = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0); const v = new THREE.Vector3(-Math.sin(me.yaw) * f2 + Math.cos(me.yaw) * s2, 0, -Math.cos(me.yaw) * f2 - Math.sin(me.yaw) * s2); return v.lengthSq() > 0 ? v.normalize() : v; },
