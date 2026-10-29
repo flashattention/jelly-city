@@ -6,7 +6,7 @@ import { Shell, esc } from '../../shared/js/shell.js';
 import { faceHtml, makeSound, confetti, rankIcon } from '../../shared/js/party.js';
 import { COLS, ROWS, TIMES, makeBoard, sumRect, tryMove } from './board.js';
 
-const MODES = [['race', '🍎 각자 판', '같은 판을 따로따로'], ['shared', '🍏 한 판 같이', '판 하나를 다 같이 · 먼저 묶으면 임자']];
+const MODES = [['race', '🔢 각자 판', '같은 판을 따로따로'], ['shared', '🤝 한 판 같이', '판 하나를 다 같이 · 먼저 묶으면 임자']];
 
 const $ = (id) => document.getElementById(id);
 const S = makeSound('jellyten');
@@ -262,7 +262,7 @@ function startMulti(m) {
   begin('multi', m.seed, m.time || m.opts?.time || 120, m.in);
   game.endAt = performance.now() + (m.endAt ?? (m.in + game.time * 1000));
   renderLive();
-  if (game.shared) setTimeout(() => shell.toast('🍏 한 판 같이! 먼저 묶는 사람이 임자예요 · 내가 터뜨린 칸은 내 색으로 물들어요', 3200), m.in);
+  if (game.shared) setTimeout(() => shell.toast('🤝 한 판 같이! 먼저 묶는 사람이 임자예요 · 내가 터뜨린 칸은 내 색으로 물들어요', 3200), m.in);
 }
 function timeUp() {
   game.mode = 'wait'; sel = null; S.stopMusic();
@@ -278,12 +278,12 @@ function renderLive(hit) {
 const shell = new Shell({
   sound: { muted: () => S.sound.muted, toggle: () => { S.toggleMute(); $('b-mute').textContent = S.sound.muted ? '🔇' : '🔊'; } },
   key: 'jellyten', title: '🔟 젤리텐', subtitle: '숫자 곰젤리를 네모로 묶어 합이 10이 되면 팡!<br>제한 시간 안에 최대한 많이 터뜨려요', wsPath: '/ten-ws', max: 12,
-  multiLabel: '👥 같이 하기', roomIcon: '🍎', startLabel: '🍎 다 같이 시작!',
+  multiLabel: '👥 같이 하기', roomIcon: '🔟', startLabel: '🔟 다 같이 시작!',
   keysHelp: '마우스(손가락)로 드래그해서 네모로 묶기 · 합이 딱 10이면 사라져요 · 같이 하기는 모두 같은 판으로 겨뤄요',
-  buttons: [{ id: 'solo-btn', label: '🍎 혼자 하기 <small>최고 점수 도전</small>', onClick: () => startSolo() }, { id: 'bot-btn', label: '🤖 봇과 대결 <small>젤리봇과 같은 판</small>', cls: 'ghost', onClick: () => practice() }],
+  buttons: [{ id: 'solo-btn', label: '🔟 혼자 하기 <small>최고 점수 도전</small>', onClick: () => startSolo() }, { id: 'bot-btn', label: '🤖 봇과 대결 <small>젤리봇과 같은 판</small>', cls: 'ghost', onClick: () => practice() }],
   extraRow: [{ label: '🏆 순위표', onClick: () => openBoard(game.pick.time) }],
   screens: ['over', 'board-screen'],
-  describe: (o = {}) => `${o.mode === 'shared' ? '🍏 한 판 같이' : '🍎 각자 판'} · ⏱️ ${o.time || 120}초 · 🤖 봇 ${o.bots || 0}`,
+  describe: (o = {}) => `${o.mode === 'shared' ? '🤝 한 판 같이' : '🔢 각자 판'} · ⏱️ ${o.time || 120}초 · 🤖 봇 ${o.bots || 0}`,
   options: {
     room: (el, o, host) => optsUI(el, o, host, (n) => shell.send({ t: 'opts', opts: n }), true),
   },
@@ -328,7 +328,7 @@ function rowHtml(e, extra = '') { return `<div class="res-row${e.id === game.myI
 function results(m) {
   game.mode = 'over'; S.stopMusic(); $('game').classList.add('hidden');
   const mine = m.rank.find((e) => e.id === game.myId);
-  $('ov-title').textContent = m.rank[0] ? `${game.shared ? '🍏 땅따먹기 ' : ''}🏆 ${m.rank[0].name} 우승!` : '끝!';
+  $('ov-title').textContent = m.rank[0] ? `${game.shared ? '🤝 땅따먹기 ' : ''}🏆 ${m.rank[0].name} 우승!` : '끝!';
   $('ov-me').textContent = mine ? `나는 ${mine.rank}등 · 곰젤리 ${mine.score}개` : '';
   $('ov-rank').innerHTML = m.rank.map((e) => rowHtml(e)).join('');
   $('ov-save').classList.add('hidden');
