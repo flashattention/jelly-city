@@ -44,6 +44,15 @@ const has = (k) => !!(game.flags & F[k]);
 const myTeamOf = (o) => o.team === game.team;
 const enemy = (o) => o && o.team !== game.team;
 
+// ---------- 입자 방벽 구슬 (탱글): 가장자리가 밝은 분홍 구슬 ----------
+const BUB_G = new THREE.SphereGeometry(1, 32, 20);
+const BUB_M = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+  uniforms: { t: { value: 0 }, c: { value: new THREE.Color('#ff7ad9') } },
+  vertexShader: 'varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vP = position; gl_Position = projectionMatrix * mv; }',
+  fragmentShader: 'uniform float t; uniform vec3 c; varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ float f = pow(1. - abs(dot(vN, vV)), 2.2); float hex = 0.5 + 0.5 * sin(vP.y * 18. + t * 3.) * sin(vP.x * 18. - t * 2.); gl_FragColor = vec4(c * (0.35 + f * 1.4 + hex * 0.12), 0.12 + f * 0.75); }',
+});
+{ const warm = new THREE.Mesh(BUB_G, BUB_M); warm.position.set(0, -500, 0); warm.scale.setScalar(0.001); warm.frustumCulled = false; scene.add(warm); } // 처음 켤 때 멈추지 않게 미리 그려 둔다
 // ---------- 다른 영웅 ----------
 class Other {
   constructor(m) {
@@ -98,11 +107,20 @@ class Other {
     // 벽 너머로 보이기 (적외선 투시 · 맹독 지뢰)
     const xr = this.alive && enemy(this) && !this.seen && (game.obj?.infra?.[game.team] || this.flags & F.reveal);
     this.xray.visible = !!xr && !game.cut; if (xr) this.xray.position.set(this.pos.x, this.pos.y + 1, this.pos.z);
+    // 입자 방벽 구슬: 켜질 때 톡 커지고, 꺼지면 사라진다
+    const bubOn = !!(this.flags & F.bub) && show && !game.cut;
+    if (bubOn && !this.bub) { this.bub = new THREE.Mesh(BUB_G, BUB_M); this.bub.renderOrder = 8; scene.add(this.bub); this.bubK = 0; }
+    if (this.bub) {
+      this.bubK = Math.max(0, Math.min(1, this.bubK + (bubOn ? dt * 6 : -dt * 5)));
+      const r = (mech ? 1.9 : 1.15 * this.size) * (0.6 + 0.4 * Math.sin(this.bubK * Math.PI / 2)) * (1 + Math.sin(t * 6) * 0.015);
+      this.bub.position.set(this.pos.x, this.pos.y + (mech ? 1.4 : 1.0 * this.size), this.pos.z); this.bub.scale.setScalar(r); this.bub.visible = this.bubK > 0.01;
+      if (!bubOn && this.bubK <= 0) { scene.remove(this.bub); this.bub = null; }
+    }
     // 상태 보기
     this.fxT = (this.fxT || 0) - dt;
     if (this.fxT <= 0 && this.alive && !game.cut && this.pos.distanceTo(camera.position) > 3) {
       this.fxT = 0.12; const c = this.chest();
-      if (this.flags & F.bub) puff(scene, c, '#ff9fe0', 1, 1.1, 0.2, 0.2);
+      if (this.flags & F.bub && Math.random() < 0.4) puff(scene, c, '#ff9fe0', 1, 1.1, 0.2, 0.2);
       if (this.flags & F.nano) puff(scene, c, '#7cf0ff', 2, 0.5, 1.5, 0.4);
       if (this.flags & F.sleep) puff(scene, c.setY(c.y + 1.2), '#d6c2ff', 1, 0.4, 0.4, 0.8);
       if (this.flags & F.stun) puff(scene, c.setY(c.y + 1.1), '#ffe48a', 2, 0.25, 1, 0.3);
@@ -118,7 +136,7 @@ class Other {
       if (this.flags & F.primal) puff(scene, c, '#9fe8ff', 1, 0.6, 1, 0.3);
     }
   }
-  remove() { for (const o of [this.bear?.root, this.mech, this.plate.s, this.xray, this.feet]) if (o) scene.remove(o); }
+  remove() { for (const o of [this.bear?.root, this.mech, this.plate.s, this.xray, this.feet, this.bub]) if (o) scene.remove(o); }
   // 맞았나: 머리(공) · 몸(원기둥)
   hit(o, d) {
     const p = this.pos, mech = this.mech && !this.pilot, s = mech ? 1.25 : this.size * (this.flags & F.primal ? 1.3 : 1);
@@ -974,7 +992,8 @@ function frame() {
     if (game.rc > 0) { const back = Math.min(game.rc, dt * (game.rc * 6 + 0.02)); me.pitch -= back; game.rc -= back; }
     edgeL = edgeR = relR = jumpEdge = false;
     updateProjs(dt);
-    for (const o of game.others.values()) o.update(dt, t);
+    BUB_M.uniforms.t.value = t;
+  for (const o of game.others.values()) o.update(dt, t);
     ents.update(dt);
     updatePoints(t);
     // 카메라: 살아 있으면 눈 · 죽으면 쓰러진 자리 위에서 천천히

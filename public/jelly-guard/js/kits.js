@@ -110,6 +110,7 @@ export function makeKit(h, G) {
       return;
     }
     if (h.id === 'widow' || h.id === 'ana') { if (edge) st.scopeAt = now; return; }
+    if (h.id === 'tracer') { if (edge) K.abil('shift', now); return; } // 쌩쌩: 우클릭도 점멸
     if (!held) { st.latchS = false; st.tgtS = null; return; }
     if (busy() || !s) return;
     if (G.has('blade') || G.has('primal') || G.has('barrage') || G.has('deadeye')) return;
@@ -132,7 +133,7 @@ export function makeKit(h, G) {
   // 빵야 난사: 남은 총알을 빠르게
   K.fan = () => {
     if (st.mode === 'fan' || st.mag <= 0) return; st.mode = 'fan';
-    const tick = () => { if (!G.me.alive || st.mag <= 0 || G.has('stun')) { st.mode = null; if (st.mag <= 0) K.reload(); return; } st.mag--; G.hitscan({ ...h.s, near: 10, far: 20 }, { a: 's', spread: h.s.spread }); G.vm.kick(0.7); G.sfx('gun', 'pistol', 0.8); setTimeout(tick, h.s.rate * 1000); };
+    const tick = () => { if (!G.me.alive || st.mag <= 0 || G.has('stun')) { st.mode = null; if (st.mag <= 0) K.reload(); return; } st.mag--; G.hitscan({ ...h.s, near: 10, far: 20 }, { a: 's', spread: h.s.spread }); G.vm.kick(0.7); if (h.s.recoil) G.recoil(h.s.recoil); G.sfx('gun', 'pistol', 0.8); setTimeout(tick, h.s.rate * 1000); };
     tick();
   };
   // 황야의 무법자: 쏘면 모아 둔 만큼 한꺼번에

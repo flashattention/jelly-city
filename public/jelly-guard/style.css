@@ -155,7 +155,8 @@ body #chat { bottom: 120px; }
 #ov { position: fixed; inset: 0; z-index: 2; pointer-events: none; transition: box-shadow .25s, background .25s; }
 #ov.ghost { background: radial-gradient(ellipse at center, transparent 35%, rgba(30,10,40,.75) 100%); }
 #ov.tp { background: radial-gradient(ellipse at center, transparent 45%, rgba(80,30,130,.5) 100%); }
-#ov.bub { box-shadow: inset 0 0 90px rgba(255,120,200,.75); }
+#ov.bub { box-shadow: inset 0 0 90px rgba(255,120,200,.75), inset 0 0 0 6px rgba(255,170,230,.55), inset 0 0 26px 10px rgba(255,255,255,.25); background: radial-gradient(ellipse at center, transparent 62%, rgba(255,130,215,.18) 80%, rgba(255,200,240,.38) 100%); animation: bubpop .35s ease-out; }
+@keyframes bubpop { 0% { opacity: 0; transform: scale(1.08); } 60% { opacity: 1; transform: scale(.99); } 100% { transform: scale(1); } }
 #ov.nano { box-shadow: inset 0 0 90px rgba(80,220,255,.7); }
 #ov.boost { box-shadow: inset 0 0 70px rgba(255,200,60,.6); }
 #ov.blade { box-shadow: inset 0 0 110px rgba(140,255,90,.7); }
