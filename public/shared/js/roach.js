@@ -1308,7 +1308,7 @@ export class Roach {
         if (Math.floor(E.t * 2) !== E.lastHeart) { E.lastHeart = Math.floor(E.t * 2); Roach.onEmoteFx?.(this, 'heart'); }
         break;
       }
-      case 'shuffle': { // 셔플: 다리를 빠르게 차고 팔은 테크토닉처럼 휘휘
+      case 'shuffle': { // 셔플: 다리를 빠르게 차고 팔은 위아래로 휘휘
         const q = Math.sin(t * Math.PI * 4.4);
         legs(q > 0 ? q * 0.9 : 0, q < 0 ? -q * 0.9 : 0);
         this.inner.position.y = Math.abs(q) * 0.1;

@@ -1,4 +1,4 @@
-// 젤리 그림릴레이 방 (텔레스트레이션 방식): 최대 8명 · 제시어 → 그림 → 맞히기 → 그림 … 을 그림책마다 한 칸씩 돌려 가며
+// 젤리 그림릴레이 방: 최대 8명 · 제시어 → 그림 → 맞히기 → 그림 … 을 그림책마다 한 칸씩 돌려 가며
 //   모두 같은 순간에 각자 다른 그림책을 맡는다. 끝나면 그림책을 한 권씩 함께 넘겨 보고 ❤️ 를 준다
 import { BaseRooms, clean } from '../shared/rooms.js';
 import { pickPrompts, normWord } from '../../public/jelly-draw/js/prompts.js';

@@ -172,7 +172,7 @@ export function makeKit(h, G) {
       case 'pharah.e': if (!useCd('e', sp.cd)) return; abil('e'); G.fireProj('conc', { a: 'e' }); G.sfx('throw'); return;
       case 'reaper.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); st.mag = h.p.mag; G.sfx('abil'); return;
       case 'reaper.e': {
-        // 오버워치처럼: E → 착지 자리가 보이는 조준 → 클릭 · E 로 확정 / 우클릭 취소
+        // E → 착지 자리가 보이는 조준 → 클릭 · E 로 확정 / 우클릭 취소
         if (st.aim !== 'tp') { if (cdLeft('e') > 0) { G.sfx('cd'); return; } st.aim = 'tp'; G.sfx('pick'); return; }
         return K.confirmTp(now);
       }

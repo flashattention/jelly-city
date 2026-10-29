@@ -519,7 +519,7 @@ function start(m) {
   if (store.get(HERO_KEY)) setTimeout(() => send({ t: 'pick', h: store.get(HERO_KEY) }), 300);
 }
 
-// ---------- 영웅마다 다른 조준점 (오버워치처럼) ----------
+// ---------- 영웅마다 다른 조준점 ----------
 const CROSS = {
   rein: '<circle r="3" fill="none" stroke-width="1.5"/>',
   winston: '<circle r="44" fill="none" stroke-dasharray="3 9" stroke-width="2"/><circle r="2.5"/>',
@@ -818,7 +818,7 @@ function drawAims(now) {
   if (game.visor && me.alive) { let best = null, bd = 0.55; const e = eye(), f = fwd(); for (const o of game.others.values()) { if (!enemy(o) || !o.alive || !o.seen) continue; const dd = o.chest().sub(e).normalize().dot(f); if (dd > bd) { bd = dd; best = o; } } if (best) { const q = scr(best.chest()); if (q) html.push(`<div class="mk lockon" style="left:${q[0]}px;top:${q[1]}px"></div>`); } }
   $('marks').innerHTML = html.join('');
   const g = list.find((a) => a.k === 'grap'); $('grap').classList.toggle('hidden', !g); if (g) $('grap').classList.toggle('ok', g.ok);
-  // 디바 방어 매트릭스: 앞에 분홍 부채꼴 · 둥둥: 곡이 닿는 범위
+  // 뿅뿅 방어 매트릭스: 앞에 분홍 부채꼴 · 둥둥: 곡이 닿는 범위
   matrixFan.visible = me.alive && game.h?.id === 'dva' && has('matrix');
   if (matrixFan.visible) { matrixFan.position.copy(camera.position); matrixFan.quaternion.copy(camera.quaternion); matrixFan.children[0].material.opacity = 0.18 + Math.sin(now / 60) * 0.05; }
   auraRing.visible = me.alive && game.h?.id === 'lucio';

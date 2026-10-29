@@ -60,7 +60,7 @@ export function dvaMech() {
   part(g, SPH, pink, 0, 1.25, 0, 0.95, 0.75, 0.95); part(g, SPH, white, 0, 1.35, -0.45, 0.6, 0.45, 0.4);
   for (const s of [-1, 1]) { part(g, CYL, dark, s * 0.45, 0.45, 0.1, 0.16, 0.9, 0.16); part(g, BOX, pink, s * 0.45, 0.08, 0, 0.36, 0.18, 0.55); part(g, BOX, pink, s * 1.0, 1.2, -0.3, 0.32, 0.32, 0.8); part(g, CYL, dark, s * 1.0, 1.2, -0.85, 0.1, 0.4, 0.1, Math.PI / 2); part(g, SPH, glowM('#ffd0ec', 0.8), s * 0.6, 1.1, 0.95, 0.12, 0.08, 0.04); }
   part(g, BOX, toon('#7cd8ff'), 0, 1.45, -0.86, 0.5, 0.12, 0.05);
-  // 오버워치 메카처럼: 뒤 부스터 둘 · 앞 토끼 무늬 · 흰 줄 · 어깨 범퍼
+  // 메카: 뒤 부스터 둘 · 앞 토끼 무늬 · 흰 줄 · 어깨 범퍼
   for (const s of [-1, 1]) { part(g, CYL, dark, s * 0.45, 1.35, 0.85, 0.2, 0.5, 0.2, Math.PI / 2); part(g, SPH, glowM('#ffb3e6', 0.7), s * 0.45, 1.35, 1.12, 0.14, 0.14, 0.08); part(g, SPH, white, s * 0.78, 1.55, -0.1, 0.3, 0.22, 0.32); part(g, BOX, white, s * 0.55, 1.15, -0.82, 0.12, 0.5, 0.05); }
   part(g, SPH, toon('#ff5fa2'), 0, 1.0, -0.92, 0.12, 0.1, 0.04); for (const s of [-1, 1]) part(g, SPH, toon('#ff5fa2'), s * 0.07, 1.14, -0.9, 0.04, 0.1, 0.03);
   // 로봇 앞(-z)을 곰돌이 얼굴 쪽(+z)으로 돌려서 묶는다 (같은 방향을 보게)
@@ -82,7 +82,7 @@ export class Plate {
     const col = this.mine ? '#7cd8ff' : '#ff5a6e';
     x.font = 'bold 26px Jua, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
     x.lineWidth = 5; x.strokeStyle = 'rgba(0,0,0,.6)'; x.strokeText(this.name, 128, 20); x.fillStyle = this.mine ? '#e6f7ff' : '#ffe0e6'; x.fillText(this.name, 128, 20);
-    // 25 마다 한 칸 (오버워치처럼 칸 나뉜 체력)
+    // 25 마다 한 칸 (칸 나뉜 체력)
     const W = 200, X = 28, Y = 42, H = 14, segs = Math.min(26, Math.ceil(max / 25)), sw = W / segs;
     x.fillStyle = 'rgba(0,0,0,.45)'; x.fillRect(X - 3, Y - 3, W + 6, H + 6);
     const k = Math.max(0, hp / max), kt = Math.min(1 - k, temp / max);

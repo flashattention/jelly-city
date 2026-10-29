@@ -73,7 +73,7 @@ export function makeLoot(map, seed) {
   let id = 1;
   const put = (it, x, y, z) => out.push({ id: id++, ...it, x, y, z });
   for (const [x, y, z] of map.loot) {
-    // 배그처럼 한 자리에 여러 개 · 총 옆에는 그 총알
+    // 한 자리에 여러 개 · 총 옆에는 그 총알
     const n = 1 + (r() < 0.75) + (r() < 0.35);
     for (let i = 0; i < n; i++) {
       const it = rollItem(r), ox = x + (i % 2 ? 0.75 : 0) - (i === 2 ? 0.75 : 0), oz = z + (i ? 0.45 : 0);

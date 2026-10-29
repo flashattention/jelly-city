@@ -191,7 +191,7 @@ const shell = new Shell({
   sound: { muted: () => S.sound.muted, toggle: () => { S.toggleMute(); syncMute(); } },
   key: 'jellytype', title: '⌨️ 젤리 타자연습', subtitle: '짧은 글 따라 치기 · 떨어지는 젤리비 막기<br>친구들과 같은 문장으로 타자 경주까지!', wsPath: '/type-ws', max: 8,
   multiLabel: '👥 같이 경주', roomIcon: '⌨️', startLabel: '⌨️ 경주 시작!',
-  keysHelp: '화면의 글을 그대로 치고 Enter · 타수는 한글 자모 단위(한컴타자 방식) · 정확도 90% 이상이어야 순위표에 올라요',
+  keysHelp: '화면의 글을 그대로 치고 Enter · 타수는 한글 자모 단위 · 정확도 90% 이상이어야 순위표에 올라요',
   buttons: [{ id: 'solo-btn', label: '⌨️ 짧은 글 연습 <small>타수 · 정확도</small>', onClick: () => startSolo() }, { id: 'rain-btn', label: '🍬 젤리비 <small>떨어지는 낱말 막기</small>', cls: 'ghost', onClick: () => startRain() }, { id: 'bot-btn', label: '🤖 봇과 경주 <small>젤리봇과 같은 문장</small>', cls: 'ghost', onClick: () => practice() }],
   extraRow: [{ label: '🏆 순위표', onClick: () => openBoard('kpm') }],
   screens: ['over', 'board-screen'],

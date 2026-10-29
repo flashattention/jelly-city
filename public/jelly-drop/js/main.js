@@ -56,7 +56,7 @@ const curW = () => wpn(slotIds()[cur]) || KNIFE;
 const attOf = (i) => (i === 0 || i === 1 ? game.inv.att?.[i] : i === 2 ? game.inv.patt : null) || {};
 const curAtt = () => attOf(cur);
 const magOf = (w, att) => Math.max(1, Math.round(w.mag * (ATTS[att?.mag]?.mag || 1)));
-// 바닥에서 주운 총은 빈 탄창 (배그처럼) · 장전하면 가방의 탄을 쓴다
+// 바닥에서 주운 총은 빈 탄창 · 장전하면 가방의 탄을 쓴다
 function ensureAmmo() { for (const id of slotIds()) { const w = id && wpn(id); if (w?.mag && !ammo[id]) ammo[id] = { mag: 0 }; } }
 function switchTo(i) {
   const ids = slotIds();
@@ -118,7 +118,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'Tab' && (game.mode === 'ground' || game.mode === 'drive')) return toggleInv();
   if (e.code === 'KeyF' && game.mode === 'drive') return exitVehicle();
   if (e.code === 'KeyR' && game.mode === 'drive') return startRefuel();
-  // F: 기절한 동료 살리기 (누르고 있기) → 줍기 → 차 타기 (배그처럼)
+  // F: 기절한 동료 살리기 (누르고 있기) → 줍기 → 차 타기
   if (e.code === 'KeyF' && game.mode === 'ground' && !game.knocked) { const mate = reviveTarget(); if (mate) return startRevive(mate); if (nearestLoot()) return pickUp(); const v = nearVehicle(); if (v) return shell.send({ t: 'enter', id: v.id }); }
   if (game.mode === 'plane' && (e.code === 'KeyF' || e.code === 'Space')) return jump();
   if (game.mode === 'dead' && e.code === 'Space') return cycleWatch();

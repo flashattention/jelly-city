@@ -1,4 +1,4 @@
-// 젤리 그림릴레이 (텔레스트레이션 방식): 제시어 → 그림 → 맞히기 → 그림 … 그림책을 돌려 가며 · 끝나면 함께 넘겨 보기
+// 젤리 그림릴레이: 제시어 → 그림 → 맞히기 → 그림 … 그림책을 돌려 가며 · 끝나면 함께 넘겨 보기
 //   혼자서는 '혼자 그려보기': 그린 그림을 AI 젤리봇이 맞힌다
 import { account, store } from '../../shared/js/account.js';
 import { Shell, esc } from '../../shared/js/shell.js';
@@ -234,7 +234,7 @@ const shell = new Shell({
   sound: { muted: () => S.sound.muted, toggle: () => { S.toggleMute(); $('b-mute').textContent = S.sound.muted ? '🔇' : '🔊'; } },
   key: 'jellydraw', title: '🎨 젤리 그림릴레이', subtitle: '제시어 → 그림 → 맞히기 → 그림…<br>그림책이 돌고 나면 얼마나 바뀌었는지 함께 봐요!', wsPath: '/draw-ws', max: 8,
   multiLabel: '👥 같이 하기 (2~8명)', roomIcon: '🎨', startLabel: '🎨 그림릴레이 시작!',
-  keysHelp: '마우스 · 손가락으로 그리기 · Ctrl+Z 되돌리기 · 텔레스트레이션처럼 모두 동시에 각자 다른 그림책을 이어요',
+  keysHelp: '마우스 · 손가락으로 그리기 · Ctrl+Z 되돌리기 · 모두 동시에 각자 다른 그림책을 이어요',
   buttons: [{ id: 'solo-btn', label: '🎨 혼자 그려보기 <small>AI 젤리봇이 맞혀요</small>', onClick: () => soloStart() }],
   describe: (o = {}) => `🎨 그리기 ${o.draw || 80}초`,
   options: { room: (el, o, host) => optsUI(el, o, host, (n) => shell.send({ t: 'opts', opts: n })) },

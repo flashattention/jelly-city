@@ -831,7 +831,7 @@ window.addEventListener('mousemove', (e) => {
   c.pitch = clamp(c.pitch + dy * 0.0022 * sens, game.player.fp || game.player.aim > 0.5 || game.player.odmHeld ? -1.3 : -0.35, 1.25);
   game.mouseT = 1.5;
 });
-// 스코프 배율 (배그처럼 휠로 조절). 무기마다 고를 수 있는 배율과 처음 배율
+// 스코프 배율 (휠로 조절). 무기마다 고를 수 있는 배율과 처음 배율
 const SCOPES = { hunting_rifle: { steps: [2, 3, 4, 6], start: 4 }, sniper: { steps: [2, 3, 4, 6, 8], start: 6 }, barrett: { steps: [4, 6, 8, 12, 15], start: 8 } };
 game.scopeZoom = {};
 function scopeZoomOf(id) { const s = SCOPES[id]; return s ? game.scopeZoom[id] ?? s.start : null; }
@@ -2437,7 +2437,7 @@ function frame() {
   if (game.emoting) {
     const moving = input.forward || input.back || input.left || input.right || input.jumpPressed || input.dashPressed || input.moveDir;
     if (moving || !p.onGround || p.inCar || p.flying || p.mount || game.dead || game.busy || p.swimming) stopEmote();
-    else if ((game.emoting.t += dt) < 1.2 && !p.fp) p.cam.yaw = angleLerp(p.cam.yaw, p.heading, Math.min(1, dt * 4)); // 포트나이트처럼 앞모습이 보이게
+    else if ((game.emoting.t += dt) < 1.2 && !p.fp) p.cam.yaw = angleLerp(p.cam.yaw, p.heading, Math.min(1, dt * 4)); // 춤출 땐 카메라가 천천히 정면으로처럼 앞모습이 보이게
     if (game.emoting?.song && songSession?.owner === 'me' && p.roach.emote) p.roach.emote.beat = emoteSongBeat(game.emoting.song);
   }
   updateListenedSong();
