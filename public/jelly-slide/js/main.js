@@ -2,6 +2,7 @@
 //   혼자 하기(4×4 · 5×5 · 최고 점수 · 되돌리기 한 번) · 봇과 대결 · 같이 하기(최대 8명 · 큰 곰 · 콤보 = 상대 판에 설탕 덩어리)
 import { store } from '../../shared/js/account.js';
 import { Shell, esc } from '../../shared/js/shell.js';
+import { Ranking } from '../../shared/js/ranking.js';
 import { faceHtml, makeSound, confetti, rankIcon } from '../../shared/js/party.js';
 import { Board, FLAVORS, SUGAR, RAINBOW, KING, SIZES, DIRS } from './engine.js';
 
@@ -288,7 +289,9 @@ function countdown(ms) {
   };
   tickC();
 }
+function clearBoard() { const el = document.getElementById('ov-board'); if (el) el.innerHTML = ''; ranking.hideSave(); }
 function begin(kind, seed, size, ms, sp = game.pick) {
+  clearBoard();
   game.kind = kind; game.mode = 'play'; game.out = false; game.size = size; game.undoUsed = false;
   game.board = new Board(seed, size, sp); game.ladderBest = 0; lastSent = -1;
   fx.parts = []; fx.texts = []; fx.shake = 0; fx.flash = 0;
@@ -352,13 +355,15 @@ const shell = new Shell({
   multiLabel: '👥 같이 하기', roomIcon: '🧸', startLabel: '🧸 다 같이 시작!',
   keysHelp: '← → ↑ ↓ · WASD 로 밀기 · 휴대폰은 판을 손가락으로 쓱 · Z 되돌리기(혼자 하기 · 한 번) · 한 번에 여러 번 합치면 콤보 보너스',
   buttons: [{ id: 'solo-btn', label: '🧸 혼자 하기 <small>최고 점수 도전</small>', onClick: () => startSolo() }, { id: 'bot-btn', label: '🤖 봇과 대결 <small>설탕 덩어리 주고받기</small>', cls: 'ghost', onClick: () => practice() }],
-  screens: ['over'],
+  screens: ['over', 'board-screen'],
+  extraRow: [{ label: '🏆 순위표', onClick: () => ranking.open(`s${game.pick.size}`) }],
   describe: (o = {}) => `${o.size || 4}×${o.size || 4} · ⏱️ ${Math.round((o.time || 180) / 60)}분 · 🤖 봇 ${o.bots || 0}`,
   options: { room: (el, o, host) => optsUI(el, o, host, (n) => shell.send({ t: 'opts', opts: n }), true) },
   onStart: (m) => startMulti(m),
   onFinish: (m) => results(m),
   onDisconnect: () => { if (game.mode !== 'title' && game.kind !== 'solo') toTitle(); },
 });
+const ranking = new Ranking({ shell, api: '/api/slide', boards: [{ id: 's4', label: '4×4 판' }, { id: 's5', label: '5×5 판' }], title: '🏆 젤리 슬라이드 순위표', nickKey: 'jellyslide.nick' });
 shell.pickOpts = () => ({ ...game.pick });
 shell.on('sc', (m) => { const p = game.players.get(m.id); if (!p || m.id === game.myId) return; p.score = m.s; p.lv = m.lv; });
 shell.on('bd', (m) => { const p = game.players.get(m.id); if (p) p.b = m.b; });
@@ -403,6 +408,7 @@ function endSolo() {
   $('again-btn').textContent = '🔁 한 판 더';
   if (isBest && prev) { confetti(); S.sfx('win'); }
   shell.show('over');
+  ranking.submit(`s${size}`, B.score, $('ov-board'), (t, best) => { $('ov-me').textContent += ` · ${t}`; if (best) confetti(); });
 }
 $('again-btn').onclick = () => { if (game.kind === 'solo') return startSolo(); if (game.lastPractice) return practice(); game.mode = 'room'; shell.backToRoom(); };
 $('home-btn').onclick = () => quit();

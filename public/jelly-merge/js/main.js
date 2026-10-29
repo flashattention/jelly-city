@@ -2,6 +2,7 @@
 //   혼자 하기(끝없이 · 최고 점수) · 봇과 대결 · 같이 하기(최대 8명 · 크게 합치면 설탕 덩어리를 상대 병에 보낸다)
 import { store } from '../../shared/js/account.js';
 import { Shell, esc } from '../../shared/js/shell.js';
+import { Ranking } from '../../shared/js/ranking.js';
 import { faceHtml, makeSound, confetti, rankIcon } from '../../shared/js/party.js';
 import { Jar, W, H, DL, DROP_Y, RAD, FLAVORS, SUGAR, RAINBOW, BOMB, KING, CONTAINERS } from './engine.js';
 
@@ -303,7 +304,9 @@ function countdown(ms) {
   };
   tickC();
 }
+function clearBoard() { const el = document.getElementById('ov-board'); if (el) el.innerHTML = ''; ranking.hideSave(); }
 function begin(kind, seed, cont, ms, sp = game.pick) {
+  clearBoard();
   game.kind = kind; game.mode = 'play'; game.out = false; game.cont = cont;
   game.jar = new Jar(seed, cont, sp); game.ladderBest = 0; lastSent = -1;
   fx.parts = []; fx.rings = []; fx.texts = []; fx.shake = 0; fx.flash = 0; aimX = W / 2;
@@ -363,13 +366,15 @@ const shell = new Shell({
   multiLabel: '👥 같이 하기', roomIcon: '🍓', startLabel: '🍓 다 같이 시작!',
   keysHelp: '마우스로 위치를 고르고 클릭 · 휴대폰은 끌다가 떼기 · ← → 와 Space 도 돼요 · 큰 젤리 · 콤보 = 상대에게 설탕 덩어리 공격',
   buttons: [{ id: 'solo-btn', label: '🍓 혼자 하기 <small>최고 점수 도전</small>', onClick: () => startSolo() }, { id: 'bot-btn', label: '🤖 봇과 대결 <small>설탕 덩어리 주고받기</small>', cls: 'ghost', onClick: () => practice() }],
-  screens: ['over'],
+  screens: ['over', 'board-screen'],
+  extraRow: [{ label: '🏆 순위표', onClick: () => ranking.open(game.pick.cont) }],
   describe: (o = {}) => `${CONTAINERS[o.cont || 'box'].n} · ⏱️ ${Math.round((o.time || 180) / 60)}분 · 🤖 봇 ${o.bots || 0}`,
   options: { room: (el, o, host) => optsUI(el, o, host, (n) => shell.send({ t: 'opts', opts: n }), true) },
   onStart: (m) => startMulti(m),
   onFinish: (m) => results(m),
   onDisconnect: () => { if (game.mode !== 'title' && game.kind !== 'solo') toTitle(); },
 });
+const ranking = new Ranking({ shell, api: '/api/merge', boards: Object.entries(CONTAINERS).map(([id, c]) => ({ id, label: c.n })), title: '🏆 젤리 머지 순위표', nickKey: 'jellymerge.nick' });
 shell.pickOpts = () => ({ ...game.pick });
 shell.on('sc', (m) => { const p = game.players.get(m.id); if (!p || m.id === game.myId) return; p.score = m.s; p.lv = m.lv; });
 shell.on('bd', (m) => { const p = game.players.get(m.id); if (p) { p.b = m.b; p.h = m.h; } });
@@ -415,6 +420,7 @@ function endSolo() {
   $('again-btn').textContent = '🔁 한 판 더';
   if (isBest && prev) { confetti(); S.sfx('win'); }
   shell.show('over');
+  ranking.submit(cont, J.score, $('ov-board'), (t, best) => { $('ov-me').textContent += ` · ${t}`; if (best) confetti(); });
 }
 $('again-btn').onclick = () => {
   if (game.kind === 'solo') return startSolo();

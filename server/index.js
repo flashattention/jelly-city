@@ -100,6 +100,15 @@ const typeRecords = new Records(DATA_DIR, 'jelly-type', {
   boards: ['kpm', 'rain'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.value)),
   check: (b) => { const v = Number(b.value); return Number.isFinite(v) && v >= 0 && v <= (b.b === 'kpm' ? 1600 : 5000000) ? null : '기록이 이상해요'; },
 });
+// 젤리 머지 · 젤리 슬라이드: 혼자 하기 최고 점수 (통 · 판 크기마다)
+const mergeRecords = new Records(DATA_DIR, 'jelly-merge', {
+  boards: ['box', 'bowl', 'cup'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.value)),
+  check: (b) => { const v = Number(b.value); return Number.isFinite(v) && v >= 0 && v <= 500000 ? null : '기록이 이상해요'; },
+});
+const slideRecords = new Records(DATA_DIR, 'jelly-slide', {
+  boards: ['s4', 's5'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.value)),
+  check: (b) => { const v = Number(b.value); return Number.isFinite(v) && v >= 0 && v <= 5000000 ? null : '기록이 이상해요'; },
+});
 const driftRecords = new Records(DATA_DIR, 'jelly-drift', {
   boards: RIDER_TRACKS, better: (a, b) => a.value < b.value, value: (b) => Math.round(Number(b.time) * 1000) / 1000,
   check: (b) => (Number.isFinite(Number(b.time)) && Number(b.time) >= 25 && Number(b.time) <= 3600 ? null : '기록이 이상해요'),
@@ -144,6 +153,8 @@ async function api(req, res, url) {
   }
   // 드림 러너 (계정 · 로그인은 젤리시티와 같이 쓴다)
   if (url.pathname.startsWith('/api/dream/')) return dreamApi(req, res, url, world.userOf(sid), dreamBoard, json);
+  if (url.pathname.startsWith('/api/merge/')) return mergeRecords.api(req, res, url, world.userOf(sid), json, '/api/merge');
+  if (url.pathname.startsWith('/api/slide/')) return slideRecords.api(req, res, url, world.userOf(sid), json, '/api/slide');
   if (url.pathname.startsWith('/api/drift/')) return driftRecords.api(req, res, url, world.userOf(sid), json, '/api/drift');
   if (url.pathname.startsWith('/api/rider/')) return driftRecords.api(req, res, url, world.userOf(sid), json, '/api/rider'); // 옛 주소
   // 혼자 그려보기: AI 젤리봇이 그림을 보고 맞힌다 (그림은 저장하지 않는다)
@@ -346,7 +357,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
     stopping = true;
     world.broadcast({ t: 'sys', text: '🔧 서버가 업데이트돼요! 잠시 후 자동으로 다시 접속해요' });
     try { world.save(); console.log('💾 세계를 저장했어요'); } catch (e) { console.error('저장 실패', e); }
-    dreamBoard.save(); driftRecords.save(); tenRecords.save(); survRecords.save(); wordDict.save(); typeRecords.save();
+    dreamBoard.save(); driftRecords.save(); tenRecords.save(); survRecords.save(); wordDict.save(); typeRecords.save(); mergeRecords.save(); slideRecords.save();
     setTimeout(() => process.exit(0), 500);
   });
 }

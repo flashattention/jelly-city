@@ -32,7 +32,6 @@ jobs:
           curl -sf localhost:8123/dream-runner/ > /dev/null
           curl -sf localhost:8123/jelly-drift/ > /dev/null
           curl -sf localhost:8123/jelly-tactical/ > /dev/null
-          curl -sf localhost:8123/jelly-tactical/bg/ > /dev/null
           curl -sf localhost:8123/jelly-drop/ > /dev/null
           curl -sf localhost:8123/jelly-guard/ > /dev/null
           curl -sf localhost:8123/jelly-ten/ > /dev/null
@@ -48,6 +47,11 @@ jobs:
           curl -sf localhost:8123/jelly-slide/ > /dev/null
           curl -sf 'localhost:8123/api/surv/board?b=normal' > /dev/null
           curl -sf 'localhost:8123/api/ten/board?b=t120' > /dev/null
+          # 이름이 바뀐 게임: 옛 주소가 새 주소로 넘어가는지
+          for o in jelly-bg jelly-attack/bg jelly-watch jelly-rider jelly-attack jelly-guys jelly-bang jelly-apple; do curl -sfL localhost:8123/$o/ > /dev/null; done
+          curl -sf 'localhost:8123/api/merge/board?b=box' > /dev/null
+          curl -sf 'localhost:8123/api/slide/board?b=s4' > /dev/null
+          curl -sf 'localhost:8123/api/apple/board?b=t120' > /dev/null
           curl -sf localhost:8123/api/dream/board
 
   deploy:
