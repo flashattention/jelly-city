@@ -28,6 +28,7 @@ export function makeKit(h, G) {
     st.next = now + (opt.rate ?? sp.rate) * 1000;
     G.hitscan(sp, { a, ...opt });
     G.vm.kick(sp.dmg >= 60 || opt.charge != null ? 0.9 : sp.pellets > 4 ? 1 : 0.35);
+    const rc = opt.charge != null ? sp.scoped?.recoil : sp.recoil; if (rc) G.recoil(rc * (opt.charge != null ? 0.5 + opt.charge * 0.5 : 1));
     G.sfx('gun', opt.snd || GUN_SND[h.id] || 'rifle', 0.8);
     if (sp.mag && st.mag <= 0) setTimeout(K.reload, 180);
   }
@@ -224,7 +225,7 @@ export function makeKit(h, G) {
     if (G.has('coal')) inp.speedMul *= 1.25;
     if (h.id === 'moira' && st.mode === 'fade') inp.speedMul *= 2.2;
     if (h.id === 'dva' && G.mouseR && !G.has('pilot')) inp.speedMul *= 0.8;
-    if (st.mode && now > st.until) { if (st.mode === 'roll') { st.mag = h.p.mag; st.reloadEnd = 0; } if (st.mode === 'grap') me.vel.y = Math.max(me.vel.y, 5); if (st.mode === 'dash' || st.mode === 'boost') { me.vel.x *= 0.3; me.vel.z *= 0.3; } st.mode = st.mode === 'leap' && !me.onGround ? 'leap' : null; }
+    if (st.mode && now > st.until) { if (st.mode === 'roll') { st.mag = h.p.mag; st.reloadEnd = 0; } if (st.mode === 'grap') { me.vel.y = Math.max(me.vel.y, 5); st.grapJump = now + 700; } if (st.mode === 'dash' || st.mode === 'boost') { me.vel.x *= 0.3; me.vel.z *= 0.3; } st.mode = st.mode === 'leap' && !me.onGround ? 'leap' : null; }
     // 멈춤 (기절 · 수면 · 포화 · 순간이동 준비)
     if (G.has('stun') || G.has('sleep') || st.mode === 'tp') { inp.f = 0; inp.s = 0; inp.jump = false; }
     if (st.mode === 'tp' && now >= st.until - 30) { me.pos.copy(st.tpTo); me.vel.set(0, 0, 0); st.mode = null; G.flash('#4a4356'); G.sfx('blink'); }
@@ -252,7 +253,8 @@ export function makeKit(h, G) {
       }
       case 'grap': {
         const d = st.to.clone().sub(me.pos.clone().setY(me.pos.y + 1)); const L = d.length();
-        if (L < 1.6) { st.mode = null; me.vel.y = 6; break; }
+        if (L < 1.6) { st.mode = null; me.vel.y = 6; st.grapJump = now + 700; break; }
+        if (G.jumpEdge) { st.mode = null; d.normalize(); me.vel.set(d.x * 17, Math.max(8.5, d.y * 17 + 6), d.z * 17); G.sfx('jump'); G.puff(me.pos.clone(), '#9466e0', 6, 0.3, 1); break; } // 갈고리 점프: 끌려가는 힘 그대로 날아오르기
         inp.keepVel = true; inp.noGrav = true; d.normalize(); me.vel.copy(d.multiplyScalar(22)); G.grapLine = st.to;
         break;
       }
@@ -280,6 +282,7 @@ export function makeKit(h, G) {
       if (G.has('barrage')) { inp.f = 0; inp.s = 0; inp.keepVel = true; inp.noGrav = true; me.vel.set(0, 0, 0); K.barrage(now); }
       inp.airCtl = 2.4;
     }
+    if (h.id === 'widow' && st.grapJump) { if (me.onGround || now > st.grapJump) st.grapJump = 0; else if (G.jumpEdge) { st.grapJump = 0; const fw = flat.clone(); me.vel.x += fw.x * 5; me.vel.z += fw.z * 5; me.vel.y = 8.5; G.sfx('jump'); G.puff(me.pos.clone(), '#9466e0', 6, 0.3, 1); } }
     if (h.id === 'genji') {
       if (me.onGround) st.dj = true;
       else if (G.jumpEdge && st.dj) { st.dj = false; me.vel.y = 7.6; G.sfx('jump'); G.puff(me.pos.clone(), '#b6ff8a', 6, 0.3, 1); }
