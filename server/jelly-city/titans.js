@@ -1,6 +1,6 @@
 // 거대 젤리의 습격 (서버): 누가 접속해 있으면 늘 최소 TITAN_MIN 마리(작은·중간·큰 것)가 있고,
 // TITAN_EVERY 초마다 한 마리씩 늘어 TITAN_MAX 마리까지. 도시 밖에서 걸어 들어와 플레이어를 쫓아 짓밟는다.
-// 젤리병단 장비로 뒷목을 베어야만 쓰러진다 (총·마법·폭발 등은 효과 없음)
+// 하늘갈고리 장비로 뒷목을 베어야만 쓰러진다 (총·마법·폭발 등은 효과 없음)
 import { terrainH } from '../../public/jelly-city/js/terrain.js';
 import { HALF, GRID, roadC } from '../../public/jelly-city/js/config.js';
 import { RNG } from '../../public/shared/js/utils.js';
@@ -48,7 +48,7 @@ export class Titans {
       this.spawn(this.rng.range(lo, hi));
     }
     this.addT = EVERY; this.refillT = REFILL;
-    this.w.broadcast({ t: 'sys', text: `🚨 거대 젤리 ${n}마리가 도시를 습격합니다! ${EVERY}초마다 한 마리씩 늘어나요 (최대 ${MAX}마리) · 젤리병단 장비(🪝 가방·핫바에 있어요, 없으면 U 상점 → 젤리 택티컬)로 뒷목을 노리세요!` });
+    this.w.broadcast({ t: 'sys', text: `🚨 거대 젤리 ${n}마리가 도시를 습격합니다! ${EVERY}초마다 한 마리씩 늘어나요 (최대 ${MAX}마리) · 하늘갈고리 장비(🪝 가방·핫바에 있어요, 없으면 U 상점 → 젤리 택티컬)로 뒷목을 노리세요!` });
     this.w.broadcast({ t: 'titanRaid', n });
   }
   spawn(size = this.rng.range(TITAN.minS, TITAN.maxS)) {
@@ -68,7 +68,7 @@ export class Titans {
     t.napeT -= dt;
     if (STILL) return;
     t.life += dt; t.t -= dt; t.atkT -= dt; t.noEffT -= dt;
-    // 땅 가까이에 있는 가장 가까운 플레이어를 쫓는다 (200m 안). 입체기동으로 높이 떠 있는 사람은 못 쫓는다 → 그 틈에 뒷목을 노린다
+    // 땅 가까이에 있는 가장 가까운 플레이어를 쫓는다 (200m 안). 갈고리로 높이 떠 있는 사람은 못 쫓는다 → 그 틈에 뒷목을 노린다
     const H0 = titanHeight(t.s);
     let tgt = null, td = 200;
     for (const p of outside) { if (p.pos.y - t.y > H0 * 0.3) continue; const d = Math.hypot(p.pos.x - t.x, p.pos.z - t.z); if (d < td) { td = d; tgt = p; } }
@@ -167,7 +167,7 @@ export class Titans {
     }
   }
 
-  // 공격받음: 젤리병단 장비로, 뒷목 가까이에서, 뒤쪽에서 벤 것만 통한다
+  // 공격받음: 하늘갈고리 장비로, 뒷목 가까이에서, 뒤쪽에서 벤 것만 통한다
   hit(p, msg) {
     const t = this.list.find((x) => x.id === +msg.id);
     if (!t || t.dead || p.loc !== -1) return;

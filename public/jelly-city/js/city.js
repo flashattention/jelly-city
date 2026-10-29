@@ -1419,7 +1419,7 @@ const BUILDERS = {
     const ring = new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.12, 8, 30), toon('#ff1744', { emissive: '#ff1744', emissiveIntensity: 0.8 }));
     ring.position.set(0, h + 1.5, -1); ring.rotation.x = Math.PI / 2; dynamicMesh(ring); g.add(ring);
     ctx.anim.spins.push({ obj: ring, speed: 0.8, axis: 'z' });
-    // 홀로그램 광선검
+    // 홀로그램 빛 막대
     const saber = new THREE.Mesh(G.cylLow(), new THREE.MeshBasicMaterial({ color: '#40c4ff', transparent: true, opacity: 0.8 }));
     saber.scale.set(0.12, 3, 0.12); saber.position.set(b.w / 2 - 1, 2, b.d / 2 + 1); saber.rotation.z = 0.4; dynamicMesh(saber); g.add(saber);
   },

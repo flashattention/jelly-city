@@ -135,7 +135,7 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .sketch .paper svg { width: 100%; height: 100%; }
 .sketch .brush { position: absolute; right: 18%; top: 14%; font-size: 40px; }
 
-/* 젤리워치 카드: 거점 + 영웅들 */
+/* 젤리수호대 카드: 거점 + 영웅들 */
 .card.watch .art { background: radial-gradient(circle at 50% 120%, #ffb347 0%, #ff6fae 45%, #5b3cc4 100%); }
 .watch .wpt { position: absolute; left: 50%; top: 36%; transform: translate(-50%, -50%); width: 86px; height: 86px; border-radius: 50%; border: 5px solid #fff; display: flex; align-items: center; justify-content: center; background: conic-gradient(#7cd8ff 65%, rgba(20,8,50,.5) 0); box-shadow: 0 0 30px rgba(255,255,255,.6); }
 .watch .wpt b { width: 62px; height: 62px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #2a1458; color: #fff; font-family: 'Jua', sans-serif; font-size: 34px; }
@@ -143,7 +143,7 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .watch .heroes i { font-style: normal; font-size: 22px; width: 36px; height: 36px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.25); border: 2px solid rgba(255,255,255,.7); animation: horde 1.8s ease-in-out infinite alternate; }
 .watch .heroes i:nth-child(even) { animation-delay: -.9s; }
 .watch .new { position: absolute; right: 14px; top: 12px; padding: 4px 12px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-family: 'Jua', sans-serif; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
-/* 젤리배그 카드: 비행선 · 낙하산 · 자기장 */
+/* 젤리드롭 카드: 비행선 · 낙하산 · 자기장 */
 .card.bg .art { background: linear-gradient(180deg, #7fc4ff 0%, #bfe6ff 55%, #9be7a7 100%); }
 .bg .ship { position: absolute; left: 12%; top: 10%; font-size: 40px; animation: wob 3s ease-in-out infinite; }
 .bg .chutes { position: absolute; left: 0; right: 0; top: 30%; display: flex; justify-content: center; gap: 30px; }
@@ -158,7 +158,7 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .merge .jar i::before, .merge .jar i::after { content: ''; position: absolute; top: -12%; width: 34%; height: 34%; border-radius: 50%; background: inherit; z-index: -1; }
 .merge .jar i::before { left: 4%; } .merge .jar i::after { right: 4%; }
 .merge .drop { position: absolute; left: 30%; top: 14px; width: 26px; height: 26px; border-radius: 50%; background: #62cf7a; box-shadow: inset 0 -4px 6px rgba(0,0,0,.18), inset 3px 3px 5px rgba(255,255,255,.5); animation: wob 1.6s ease-in-out infinite; }
-/* 젤리뱅 */
+/* 젤리궁정 */
 .card.bang .art { background: radial-gradient(ellipse at 50% 60%, #ff9fcb 0%, #d65a99 55%, #6b2a55 100%); }
 .bang .cards { position: absolute; left: 50%; top: 34%; transform: translate(-50%, -50%); display: flex; gap: 8px; }
 .bang .cards i { width: 46px; height: 64px; border-radius: 10px; background: #fffaf3; border: 3px solid #ff4d6d; box-shadow: 0 4px 0 #b0203e; display: flex; align-items: center; justify-content: center; font-size: 26px; font-style: normal; }
@@ -175,7 +175,7 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 @keyframes dding { 0%, 70%, 100% { transform: rotate(0); } 75% { transform: rotate(-14deg); } 82% { transform: rotate(10deg); } 89% { transform: rotate(-5deg); } }
 .slide .new, .merge .new, .bang .new, .ding .new, .guys .new { position: absolute; right: 14px; top: 12px; padding: 4px 12px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-family: 'Jua', sans-serif; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
 
-/* 젤리 가이즈 */
+/* 젤리대소동 */
 .card.guys .art { background: linear-gradient(180deg, #5ec8ff 0%, #c9efff 70%, #ff8fc4 70%, #ff6fae 100%); }
 .guys .bar { position: absolute; left: 8%; right: 8%; top: 36%; height: 12px; border-radius: 999px; background: repeating-linear-gradient(-45deg, #ffffff 0 10px, #ff4f9a 10px 20px); box-shadow: 0 3px 0 rgba(0,0,0,.15); animation: gsweep 2.4s ease-in-out infinite; transform-origin: 50% 50%; }
 @keyframes gsweep { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }

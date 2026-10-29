@@ -7,9 +7,9 @@ export const CHANNELS = [
   { id: 'cartoon', name: '꼬물이 만화동산', emoji: '🎬' },
   { id: 'sports', name: '젤리 스포츠 축구 중계', emoji: '⚽' },
   { id: 'cooking', name: '요리왕 젤리', emoji: '🍳' },
-  { id: 'music', name: '뮤직뱅크 말랑', emoji: '🎵' },
+  { id: 'music', name: '말랑 뮤직쇼', emoji: '🎵' },
   { id: 'weather', name: '젤리시티 날씨', emoji: '🌦️' },
-  { id: 'animal', name: '동물의 왕국', emoji: '🐾' },
+  { id: 'animal', name: '젤리 동물 탐험', emoji: '🐾' },
 ];
 
 const W = 320, H = 180;

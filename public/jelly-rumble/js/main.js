@@ -1,5 +1,6 @@
-// 젤리 가이즈: 최대 20명(+ 젤리봇)이 여러 판의 장애물 레이스 · 버티기 · 결승을 거쳐 마지막 한 명을 가린다
+// 젤리대소동: 최대 20명(+ 젤리봇)이 여러 판의 장애물 레이스 · 버티기 · 결승을 거쳐 마지막 한 명을 가린다
 //   내 몸은 이 화면이 움직이고(phys.js), 다른 곰돌이는 서버가 보내는 위치를 부드럽게 따라간다
+import '../../shared/js/renamed.js'; // 옛 이름으로 저장된 값 옮기기 (맨 먼저)
 import * as THREE from 'three';
 import { Shell, esc } from '../../shared/js/shell.js';
 import { makeBear, poseBear } from '../../dream-runner/js/runner.js';
@@ -28,7 +29,7 @@ const game = window.guys = {
   L: null, world: null, st: { tiles: new Map(), doors: new Set() },
   me: null, body: null, bear: null, ghosts: new Map(), alive: new Set(),
   playAt: 0, round: null, myState: 'run', // run · fin · out · spec
-  camYaw: 0, camPitch: 0.32, spec: null, sendT: 0, fill: Number(localStorage.getItem('jellyguys.fill')) || 16,
+  camYaw: 0, camPitch: 0.32, spec: null, sendT: 0, fill: Number(localStorage.getItem('jellyrumble.fill')) || 16,
   quota: 0, passN: 0, outN: 0, start: 0, events: [],
 };
 
@@ -143,7 +144,7 @@ function fillSeg(el, cur, host, onPick) {
   el.appendChild(d);
 }
 const shell = new Shell({
-  key: 'jellyguys', title: '🎉 젤리 가이즈', subtitle: '젤리 곰돌이 20명이 장애물 레이스 · 버티기 · 결승을 거쳐<br>마지막 한 명의 왕관을 다퉈요!', wsPath: '/guys-ws', max: 20,
+  key: 'jellyrumble', title: '🎉 젤리대소동', subtitle: '젤리 곰돌이 20명이 장애물 레이스 · 버티기 · 결승을 거쳐<br>마지막 한 명의 왕관을 다퉈요!', wsPath: '/rumble-ws', max: 20,
   sound: { muted: () => sound.muted, toggle: () => { toggleMute(); syncMute(); } },
   multiLabel: '👥 같이 하기', roomIcon: '🎉', startLabel: '🎉 다 같이 출발!',
   keysHelp: 'W A S D 움직이기 · Space 점프 · Shift / E 다이브 · 마우스 카메라 (화면 클릭) · M 소리',
@@ -162,7 +163,7 @@ const shell = new Shell({
 shell.pickOpts = () => ({ fill: game.fill });
 function renderTitleOpts() {
   const el = $('title-opts'); el.innerHTML = '';
-  fillSeg(el, game.fill, true, (n) => { game.fill = n; localStorage.setItem('jellyguys.fill', n); renderTitleOpts(); });
+  fillSeg(el, game.fill, true, (n) => { game.fill = n; localStorage.setItem('jellyrumble.fill', n); renderTitleOpts(); });
   const box = document.createElement('div'); box.className = 'round-list';
   box.innerHTML = '<div class="lbl">🗺️ 맵 하나만 연습하기</div>' + Object.entries(ROUNDS).map(([id, r]) => `<button class="rk ${r.kind}" data-r="${id}" title="${esc(r.desc)}">${r.emoji} ${esc(r.name)}</button>`).join('');
   box.querySelectorAll('[data-r]').forEach((b) => { b.onclick = () => startSolo(b.dataset.r); });
@@ -176,7 +177,7 @@ function onEpisodeStart(m) {
   game.mode = 'play'; game.myId = shell.myId; game.members = new Map(m.members.map((x) => [x.id, x]));
   shell.hideScreens(); $('hud').classList.remove('hidden'); $('over').classList.add('hidden');
   game.plan = m.plan || [];
-  showCard('🎉', '젤리 가이즈', `${m.members.length}명이 모였어요! ${game.plan.length}판 안에 마지막 한 명이 정해져요`, 'start', 1500);
+  showCard('🎉', '젤리대소동', `${m.members.length}명이 모였어요! ${game.plan.length}판 안에 마지막 한 명이 정해져요`, 'start', 1500);
   setMusic(['major', 64, 150, 'square']);
 }
 function quit() { if (shell.room) { shell.send({ t: 'leave' }); shell.room = null; } toTitle(); }

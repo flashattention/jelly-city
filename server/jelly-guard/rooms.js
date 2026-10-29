@@ -1,10 +1,10 @@
-// 젤리워치 방: 최대 12명(6 대 6) + 봇. 영웅 고르기 → 준비 시간 → 점령전(A → B) / 쟁탈전(가운데 거점)
+// 젤리수호대 방: 최대 12명(6 대 6) + 봇. 영웅 고르기 → 준비 시간 → 점령전(A → B) / 쟁탈전(가운데 거점)
 //   맞았는지는 쏜 사람 화면이 알리고, 서버가 거리 · 벽 · 연사 · 쿨타임을 확인해서 피해 · 치유 · 상태 이상 · 궁극기 충전을 정한다
 //   봇은 서버가 움직인다 (거점으로 길찾기 → 보이면 영웅 무기로 공격 · 지원가는 아군 치유 · 궁극기도 쓴다)
 import { BaseRooms } from '../shared/rooms.js';
-import { HEROES, heroById, PROJ, falloff, blockBy, RESPAWN_MS, ULT_PASSIVE, QUICK_MELEE } from '../../public/jelly-watch/js/heroes.js';
-import { makeMap, wmapById, WMAPS, openGates, inRoom } from '../../public/jelly-watch/js/watchmaps.js';
-import { clearLine, floorAt } from '../../public/jelly-attack/js/maps.js';
+import { HEROES, heroById, PROJ, falloff, blockBy, RESPAWN_MS, ULT_PASSIVE, QUICK_MELEE } from '../../public/jelly-guard/js/heroes.js';
+import { makeMap, wmapById, WMAPS, openGates, inRoom } from '../../public/jelly-guard/js/watchmaps.js';
+import { clearLine, floorAt } from '../../public/jelly-tactical/js/maps.js';
 
 const EYE = 1.55;
 const SELECT_MS = 25000, SETUP_ASSAULT = 20000, SETUP_CONTROL = 12000;
@@ -24,7 +24,7 @@ const chest = (p) => ({ x: p.pos.x, y: p.pos.y + 1.1, z: p.pos.z });
 const eyeOf = (p) => ({ x: p.pos.x, y: p.pos.y + EYE, z: p.pos.z });
 const rnd = (a, b) => a + Math.random() * (b - a);
 
-export class WatchRooms extends BaseRooms {
+export class GuardRooms extends BaseRooms {
   teamChat() { return true; }
   constructor(userOf) {
     super(userOf, { max: 12, hz: 20, countdown: 1500, defaults: { map: 'jellymura', size: 5 } });
@@ -355,25 +355,25 @@ export class WatchRooms extends BaseRooms {
       if (c.hero === 'dva' && !c.pilot) c.mtxOn = !!m.on && c.mtx > 0.2;
       return;
     }
-    if (s === 'pin') { // 젤리하르트 돌진에 부딪힌 적
+    if (s === 'pin') { // 말랑방패 돌진에 부딪힌 적
       const t = r.players.find((p) => p.id === +m.to); if (c.hero !== 'rein' || !t || t.team === c.team || now - (c.chargeAt || 0) > 3200 || c.pinned) return;
       if (d2(t.pos, c.pos) > 4.5) return; c.pinned = true;
       this.damage(r, t, 200, c, now, { a: 'shift', melee: true }); const f = fwd(c.yaw); this.knock(r, t, [f.x * 14, 5, f.z * 14]);
       return;
     }
-    if (s === 'bump') { // 디젤바 부스터에 부딪힘
+    if (s === 'bump') { // 뿅뿅 부스터에 부딪힘
       const t = r.players.find((p) => p.id === +m.to); if (c.hero !== 'dva' || !t || t.team === c.team || now - (c.boostAt || 0) > 2500) return;
       if (d2(t.pos, c.pos) > 4 || now - (t.bumpedAt || 0) < 800) return; t.bumpedAt = now;
       this.damage(r, t, 25, c, now, { a: 'shift', melee: true }); const f = fwd(c.yaw); this.knock(r, t, [f.x * 10, 4, f.z * 10]);
       return;
     }
-    if (s === 'land') { // 젤리스턴 점프팩 착지 · 원시의 분노 착지
+    if (s === 'land') { // 통통박사 점프팩 착지 · 원시의 분노 착지
       if (c.hero !== 'winston' || now - (c.leapAt || 0) > 3500 || c.landed) return; c.landed = true;
       this.toRoom(r, { t: 'fx', k: 'land', by: c.id, p: [c.pos.x, c.pos.y, c.pos.z] });
       for (const t of r.players) if (t.alive && t.team !== c.team && d3(t.pos, c.pos) < 4.5 && this.canSee(r, eyeOf(c), t)) this.damage(r, t, 50, c, now, { a: 'shift', melee: true });
       return;
     }
-    if (s === 'blink') { // 트레이젤리 점멸 (충전 3번)
+    if (s === 'blink') { // 쌩쌩 점멸 (충전 3번)
       if (c.hero !== 'tracer' || c.blinks < 1) return; c.blinks--; c.blinkT = c.blinkT || now; return;
     }
     const slot = s === 'q' ? 'q' : s === 'shift' ? 'shift' : s === 'e' ? 'e' : s === 's' ? 's' : null; if (!slot) return;
@@ -464,7 +464,7 @@ export class WatchRooms extends BaseRooms {
     }
     return false;
   }
-  // 젤리크리 황야의 무법자: 모아 둔 피해를 한꺼번에
+  // 빵야 황야의 무법자: 모아 둔 피해를 한꺼번에
   deadeyeShot(r, c, m, now) {
     if (c.hero !== 'cassidy' || !(c.fx.deadeye > now - 400)) return;
     const el = (now - c.deadAt) / 1000;
@@ -612,7 +612,7 @@ export class WatchRooms extends BaseRooms {
           }
         }
       }
-      // 젤리우 음악: 주변 아군 치유 · 속도
+      // 둥둥 음악: 주변 아군 치유 · 속도
       if (p.hero === 'lucio') {
         const amp = p.fx.amp > now;
         for (const t of r.players) {
@@ -667,7 +667,7 @@ export class WatchRooms extends BaseRooms {
       if (e.k === 'dome' && e.owner && !e.owner.alive) { /* 주인이 죽어도 돔은 남는다 */ }
     }
   }
-  // 디젤바 자폭: 벽 뒤는 안전
+  // 뿅뿅 자폭: 벽 뒤는 안전
   bigBoom(r, e, now) {
     this.toRoom(r, { t: 'boom', k: 'nuke', p: [e.x, e.y, e.z], by: e.owner.id });
     for (const t of r.players) {
@@ -808,7 +808,7 @@ export class WatchRooms extends BaseRooms {
     if (sup) { let worst = 0.97; for (const p of r.players) { if (p === b || p.team !== b.team || !p.alive) continue; const k = p.hp / this.maxHp(p), d = d3(b.pos, p.pos); if (k < worst && d < 22 && this.canSee(r, eye, p)) { worst = k; ally = p; } } }
     if (tgt !== b.target) { b.target = tgt; b.react = 0.3 + Math.random() * 0.45 * (1.3 - b.skill); }
     this.botAbil(r, b, h, tgt, td, ally, now);
-    // 젤리하르트: 멀리 있는 적에겐 방패를 들고 다가가고, 가까우면 내리고 휘두른다
+    // 말랑방패: 멀리 있는 적에겐 방패를 들고 다가가고, 가까우면 내리고 휘두른다
     if (b.hero === 'rein') { const want = !!tgt && td > 6.5 && b.shp > 150 && now - (b.shieldBroke || 0) > 5000 && !(b.fx.charge > now); if (want !== !!b.shieldOn) { b.shieldOn = want; this.syncShield(r, b); } }
     let moving = false, look = null;
     const range = spec.type === 'melee' ? 3.5 : spec.type === 'beam' ? spec.range - 1 : spec.near ? Math.max(6, spec.near * 0.8) : 18;
@@ -891,7 +891,7 @@ export class WatchRooms extends BaseRooms {
       this.damage(r, tgt, dmg, b, now, { a: 'p', beam: true });
       return;
     }
-    if (spec.type === 'spray') { // 젤리라: 적에겐 흡수 줄기
+    if (spec.type === 'spray') { // 부글: 적에겐 흡수 줄기
       if (td > h.s.range) return; b.beamTo = tgt.id;
       if (!blocked) { this.damage(r, tgt, h.s.dps * dt * 0.8, b, now, { a: 's', beam: true }); this.heal(r, b, h.s.selfHeal * dt, b, now); }
       return;

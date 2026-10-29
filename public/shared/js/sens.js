@@ -4,8 +4,8 @@
 const KEY = 'jelly.sens';
 export const SENS_GAMES = [
   { key: 'city', name: '🐻 젤리시티' },
-  { key: 'attack', name: '🔫 젤리어택' },
-  { key: 'bg', name: '🪂 젤리배그' },
+  { key: 'attack', name: '🔫 젤리택티컬' },
+  { key: 'bg', name: '🪂 젤리드롭' },
 ];
 const MIN = 0.2, MAX = 3;
 
@@ -14,7 +14,7 @@ function load() {
   try { s = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { /* 무시 */ }
   if (!s || typeof s !== 'object') {
     s = { all: 1, own: {} };
-    // 예전 젤리어택 감도가 있으면 젤리어택 따로 값으로 옮긴다
+    // 예전 젤리택티컬 감도가 있으면 젤리택티컬 따로 값으로 옮긴다
     try { const old = Number(localStorage.getItem('jellyattack.sens')); if (old && old !== 1) s.own.attack = old; } catch { /* 무시 */ }
   }
   s.all = clampS(s.all ?? 1); s.own ||= {};

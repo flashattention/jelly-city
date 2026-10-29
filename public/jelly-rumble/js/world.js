@@ -1,4 +1,4 @@
-// 젤리 가이즈 세상 그리기: 판(L) 하나를 three.js 로 만들고, 시간 t 에 맞춰 장애물을 움직인다
+// 젤리대소동 세상 그리기: 판(L) 하나를 three.js 로 만들고, 시간 t 에 맞춰 장애물을 움직인다
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { moverAt, spinAngle, hammerAt, ballAt, ballsNow, rng } from './rounds.js';

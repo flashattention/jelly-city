@@ -58,8 +58,8 @@ export class World {
     this.photos = {}; // 사진 id → { owner, ownerName, t, posted, caption, likes, postedAt }
     this.feedback = []; // 개발자에게 건의
     this.lastAct = new Map(); // '캐릭터:종류' → 마지막 시각 (댓글·DM 도배 방지, 저장 안 함)
-    this.dms = {}; // 인스타 DM: 'a|b' (캐릭터 토큰 정렬) → [{ from, t, text, read }]
-    this.matches = []; // 튄더 매칭 { id, a, b, t, msgs }
+    this.dms = {}; // 젤리그램 DM: 'a|b' (캐릭터 토큰 정렬) → [{ from, t, text, read }]
+    this.matches = []; // 말랑팅 매칭 { id, a, b, t, msgs }
     this.photoDir = path.join(dataDir, 'photos');
     fs.mkdirSync(this.photoDir, { recursive: true });
     this.affinity = {}; // npcId → { token: value }
@@ -577,7 +577,7 @@ export class World {
     if (v) this.send(v, { t: 'smsIn', m: { ...m, read: false } });
   }
 
-  // ---------------- 튄더 (다른 플레이어와 매칭) ----------------
+  // ---------------- 말랑팅 (다른 플레이어와 매칭) ----------------
   tinderPerson(token) {
     const a = this.accounts[token];
     if (!a) return null;
@@ -627,7 +627,7 @@ export class World {
     if (o) this.send(o, { t: 'tdMsg', mid: m.id, msg: item, name: me.name });
   }
 
-  // ---------------- 사진 · 인스타그램 ----------------
+  // ---------------- 사진 · 젤리그램 ----------------
   ownsChar(sub, token) { return this.users[sub]?.chars.includes(token) && this.accounts[token]; }
   savePhoto(sub, char, dataUrl) {
     const acc = this.ownsChar(sub, char);
@@ -679,7 +679,7 @@ export class World {
     p.comments ||= [];
     p.comments.push({ id: crypto.randomBytes(5).toString('hex'), by: char, name: acc.name, text, t: Date.now() });
     if (p.comments.length > 200) p.comments.shift();
-    if (p.owner !== char) this.notify(p.owner, { t: 'sys', text: `💬 ${acc.name}님이 내 인스타 사진에 댓글을 남겼어요: ${text.slice(0, 30)}` });
+    if (p.owner !== char) this.notify(p.owner, { t: 'sys', text: `💬 ${acc.name}님이 내 젤리그램 사진에 댓글을 남겼어요: ${text.slice(0, 30)}` });
     this.dirty = true;
     return this.instaComments(char, id);
   }
@@ -723,7 +723,7 @@ export class World {
     return toks.map((t) => ({ token: t, name: this.accounts[t].name, level: this.accounts[t].profile?.level || 1 }));
   }
 
-  // ---------------- 인스타 DM ----------------
+  // ---------------- 젤리그램 DM ----------------
   dmKey(a, b) { return a < b ? `${a}|${b}` : `${b}|${a}`; }
   dmThreads(char) {
     const out = [];
@@ -773,7 +773,7 @@ export class World {
     if (!this.ownsChar(sub, char) || !p || p.owner !== char) throw new Error('내 사진이 아니에요');
     p.posted = true; p.postedAt = Date.now(); p.caption = String(caption || '').slice(0, 150);
     this.dirty = true;
-    this.broadcast({ t: 'sys', text: `📸 ${this.accounts[char].name}님이 인스타그램에 새 사진을 올렸어요!` });
+    this.broadcast({ t: 'sys', text: `📸 ${this.accounts[char].name}님이 젤리그램에 새 사진을 올렸어요!` });
   }
   likeInsta(sub, char, id) {
     const p = this.photos[id];
@@ -782,7 +782,7 @@ export class World {
     if (i >= 0) p.likes.splice(i, 1); else {
       p.likes.push(char);
       const owner = [...this.players.values()].find((x) => x.token === p.owner);
-      if (owner && p.owner !== char) this.send(owner, { t: 'sys', text: `❤️ ${this.accounts[char].name}님이 내 인스타 사진을 좋아해요` });
+      if (owner && p.owner !== char) this.send(owner, { t: 'sys', text: `❤️ ${this.accounts[char].name}님이 내 젤리그램 사진을 좋아해요` });
     }
     this.dirty = true;
     return p.likes.length;

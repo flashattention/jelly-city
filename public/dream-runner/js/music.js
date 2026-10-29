@@ -87,7 +87,7 @@ function schedule() {
   }
 }
 
-// 젤리라이더: 엔진 소리 (속도 0~1, 부스터면 더 높게). 0 이면 끈다
+// 젤리드리프트: 엔진 소리 (속도 0~1, 부스터면 더 높게). 0 이면 끈다
 let eng = null;
 export function engine(level, boost = 0) {
   if (!ensure() || sound.muted) { if (eng) eng.g.gain.value = 0; return; }

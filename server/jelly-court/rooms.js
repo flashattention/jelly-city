@@ -1,12 +1,12 @@
-// 젤리뱅 방: 4~7명 숨은 역할 카드 대결 · 모자라는 자리는 젤리봇이 채운다 · 규칙은 서버가 판정 (손패는 주인에게만)
+// 젤리궁정 방: 4~7명 숨은 역할 카드 대결 · 모자라는 자리는 젤리봇이 채운다 · 규칙은 서버가 판정 (손패는 주인에게만)
 import { BaseRooms } from '../shared/rooms.js';
-import { newGame, act, tick, botMove, view } from '../../public/jelly-bang/js/rules.js';
+import { newGame, act, tick, botMove, view } from '../../public/jelly-court/js/rules.js';
 
 const BOT_NAMES = ['젤리봇 딸기', '젤리봇 포도', '젤리봇 레몬', '젤리봇 민트', '젤리봇 복숭아', '젤리봇 소다'];
 const BOT_COLORS = ['#ff6b8b', '#9b6bff', '#ffd84d', '#5fe0b0', '#ffab91', '#6ec6ff'];
 const MIN = 4, MAX = 7;
 
-export class BangRooms extends BaseRooms {
+export class CourtRooms extends BaseRooms {
   constructor(userOf) { super(userOf, { max: MAX, hz: 5, countdown: 2500, defaults: { bots: 3 } }); }
   allow(cur, n) { return { bots: Number.isFinite(Number(n.bots)) ? Math.max(0, Math.min(6, Math.round(Number(n.bots)))) : cur.bots }; }
   list() { return [...this.rooms.values()].filter((r) => !r.practice).map((r) => this.roomInfo(r)); }

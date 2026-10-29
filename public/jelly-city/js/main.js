@@ -280,7 +280,7 @@ async function startGame(session, char) {
   const others = game.players.list.size;
   ui.toast(`젤리시티에 오신 걸 환영해요, ${game.profile.name}! 🎉`);
   if (others) ui.toast(`👥 지금 ${others}명의 플레이어가 함께 있어요`);
-  if (game.gotOdm) setTimeout(() => ui.lootBanner('🪝 젤리병단 장비를 받았어요!', '핫바에서 골라 쓰세요 · 우클릭 갈고리(꾹 = 당기기) · 좌클릭 칼 · Space 가스 · 거대 젤리는 뒷목!', '#2f5d3e', ''), 1500);
+  if (game.gotOdm) setTimeout(() => ui.lootBanner('🪝 하늘갈고리 장비를 받았어요!', '핫바에서 골라 쓰세요 · 우클릭 갈고리(꾹 = 당기기) · 좌클릭 칼 · Space 가스 · 거대 젤리는 뒷목!', '#2f5d3e', ''), 1500);
   if (welcome.homeId == null) setTimeout(() => ui.toast('🏨 아직 집이 없어서 호텔에서 지내요. 부동산 🏘️ 에서 집을 살 수 있어요!'), 2000);
   if (!welcome.stats) setTimeout(() => ui.toast('시청 🏛️ 에서 일자리를 구해보세요. 숫자키로 핫바, I키로 가방!'), 4500);
 }
@@ -300,7 +300,7 @@ function startTour() {
   const sub = game.city.buildings.find((b) => b.suburb && b.type === 'house');
   if (sub) tour.shots.push({ b: sub, label: '🏡 교외 전원주택단지', r: 40, h: 22 });
   pick('apartment', '🏢 아파트 단지', 50, 26);
-  pick('dojang', '🥋 무릉도장', 40, 18);
+  pick('dojang', '🥋 말랑 도장', 40, 18);
   pick('hotel', '🏨 그랜드 젤리 호텔', 40, 22);
   tour.i = Math.floor(Math.random() * tour.shots.length);
   tour.t = 0;
@@ -425,7 +425,7 @@ function enterGame(w) {
   game.inv = new Inventory(game);
   // 새 캐릭터: 고른 기본 악세서리를 가방에 넣고 착용
   if (w.starter) for (const id of Object.values(w.starter)) { const it = game.inv.add(id); if (it) game.inv.equip(it.uid); }
-  // 거대 젤리와 싸울 수 있게: 접속하면 젤리병단 장비를 준다 (없을 때만, 빈 핫바 칸에 들어간다)
+  // 거대 젤리와 싸울 수 있게: 접속하면 하늘갈고리 장비를 준다 (없을 때만, 빈 핫바 칸에 들어간다)
   game.gotOdm = !game.inv.count('odm_gear') && !!game.inv.add('odm_gear', 1);
   syncKeys();
   game.stats.level ||= 1; game.stats.exp ||= 0;
@@ -452,7 +452,7 @@ function syncKeys() {
 game.homeLabelOf = (k) => homeLabel(game.city.buildings[k.bid], k.unit);
 game.ownsHome = (b, unit) => game.myHomes.some((h) => h.bid === b.id && (unit == null || h.unit === unit));
 
-// 2단 점프와 대쉬는 기본. 3단 점프·대쉬 거리·점프력은 무릉도장 수련으로
+// 2단 점프와 대쉬는 기본. 3단 점프·대쉬 거리·점프력은 말랑 도장 수련으로
 function applySkills() {
   const sk = game.stats.skills;
   game.player.maxJumps = sk.includes('jump3') ? 3 : 2;
@@ -561,7 +561,7 @@ function setupNet() {
   net.on('rideNo', () => { if (game.player.mountSteed != null) { game.player.mountSteed = null; dismount(false); ui.toast('🐎 다른 사람이 먼저 탔어요'); } });
   net.on('titanNew', (m) => { ui.toast(`🧸 거대 젤리가 한 마리 더 나타났어요! (지금 ${m.n}마리)`); sfx('stomp', null, 10); });
   net.on('titanRaid', (m) => {
-    ui.lootBanner(`🚨 거대 젤리 ${m.n}마리 습격!`, '🪝 젤리병단 장비(가방·핫바에 있어요)를 들고 우클릭 갈고리로 날아가 뒷목을 베세요!', '#c62828', '');
+    ui.lootBanner(`🚨 거대 젤리 ${m.n}마리 습격!`, '🪝 하늘갈고리 장비(가방·핫바에 있어요)를 들고 우클릭 갈고리로 날아가 뒷목을 베세요!', '#c62828', '');
     sfx('raid');
   });
   net.on('rpos', (m) => game.runners.applyPos(m.a || []));
@@ -635,7 +635,7 @@ function setupNet() {
   net.on('knock', (m) => {
     const p = game.player;
     if (p.inCar) return;
-    if (p.odm) { p.odm.vel.x += m.x; p.odm.vel.z += m.z; p.odm.vel.y += m.up; return; } // 입체기동 중엔 밀려날 뿐 뒤집히지 않는다
+    if (p.odm) { p.odm.vel.x += m.x; p.odm.vel.z += m.z; p.odm.vel.y += m.up; return; } // 갈고리 비행 중엔 밀려날 뿐 뒤집히지 않는다
     p.knock = { x: m.x, z: m.z, t: 0.45 };
     if (p.flying) p.flying = false;
     p.vy = m.up; p.onGround = false;
@@ -662,14 +662,14 @@ function setupNet() {
     ui.toast(`💬 ${who}: ${m.m.text.slice(0, 40)}`);
     refreshPhone('sms');
   });
-  // 인스타 DM
+  // 젤리그램 DM
   net.on('dm', (m) => {
     const open = !document.getElementById('phone').classList.contains('hidden') && ui.phoneTab === 'insta' && ui.igTab === 'dm';
     if (open && (!ui.igDm || ui.igDm === m.from)) { ui.openPhone('insta'); return; }
     game.igUnread = (game.igUnread || 0) + 1;
-    ui.toast(`✉️ 인스타 DM · ${m.name}: ${m.text.slice(0, 40)}`);
+    ui.toast(`✉️ 젤리그램 DM · ${m.name}: ${m.text.slice(0, 40)}`);
   });
-  // 튄더
+  // 말랑팅
   const refreshTd = () => refreshPhone('tinder');
   net.on('tdCards', (m) => { game.tdCards = m.list; game.tdMe = m.me; refreshTd(); });
   net.on('tdMe', (m) => { game.tdMe = m.me; });
@@ -677,9 +677,9 @@ function setupNet() {
   net.on('tdMsgs', (m) => { if (ui.tdChat === m.mid) { game.tdMsgs = m.msgs; game.tdOther = m.other; refreshTd(); } });
   net.on('tdMsg', (m) => {
     if (ui.tdChat === m.mid && !document.getElementById('phone').classList.contains('hidden')) { (game.tdMsgs ||= []).push(m.msg); refreshTd(); }
-    else if (m.msg.from !== game.char) { game.tdUnread = (game.tdUnread || 0) + 1; ui.toast(`🔥 튄더 · ${m.name}: ${m.msg.contact ? '📇 연락처를 보냈어요' : m.msg.text.slice(0, 30)}`); }
+    else if (m.msg.from !== game.char) { game.tdUnread = (game.tdUnread || 0) + 1; ui.toast(`🔥 말랑팅 · ${m.name}: ${m.msg.contact ? '📇 연락처를 보냈어요' : m.msg.text.slice(0, 30)}`); }
   });
-  net.on('tdMatch', (m) => { ui.lootBanner('💘 매칭 성공!', `${m.other.name}님과 서로 좋아요! 휴대폰 🔥 튄더에서 대화해 보세요`, '#ff2d6f', ''); });
+  net.on('tdMatch', (m) => { ui.lootBanner('💘 매칭 성공!', `${m.other.name}님과 서로 좋아요! 휴대폰 🔥 말랑팅에서 대화해 보세요`, '#ff2d6f', ''); });
   net.on('numReq', async (m) => { if (await ui.confirm(`📞 ${m.name}님이 번호를 교환하고 싶어해요. 수락할까요?`, '📞 수락', '거절')) net.send({ t: 'numAccept', id: m.id }); });
   net.on('flirtRes', (m) => ui.toast(m.player ? `💖 ${m.name}님에게 하트를 날렸어요!` : m.ok ? `💗 ${m.name}의 마음이 흔들려요! (친밀도 ↑)` : `💔 ${m.name}에게 안 통했어요...`));
   net.on('flirted', (m) => { ui.toast(`💖 ${m.name}님이 나에게 하트를 날렸어요!`); game.player.roach.setEmotion('love', 3); });
@@ -803,7 +803,7 @@ canvas.addEventListener('mousedown', (e) => {
   if (!game.started || ui.anyPanelOpen()) return;
   if (game.emoteWheel) { closeEmoteWheel(true); return; } // 휠이 열려 있으면 클릭으로도 고른다
   if (e.button === 2) {
-    // 젤리병단 장비: 오른쪽 클릭 = 갈고리 발사 (꾹 누르는 동안 당긴다)
+    // 하늘갈고리 장비: 오른쪽 클릭 = 갈고리 발사 (꾹 누르는 동안 당긴다)
     if (game.odm?.has() && game.odm.fire()) return;
     // 드래곤을 타고 있으면 오른쪽 클릭 = 불덩이
     if (game.player?.mount?.ride.fly) { game.combat.dragonFireball(game.player.mount); return; }
@@ -827,7 +827,7 @@ window.addEventListener('mousemove', (e) => {
   const c = game.player.cam;
   const sens = sensOf('city') / (game.zoomNow || 1); // 줌 중에는 감도를 낮춘다 · 마우스 감도 설정(1배 = 원래)
   c.yaw -= dx * 0.0028 * sens;
-  // 젤리병단 장비: 하늘(건물 꼭대기 · 거대 젤리 뒷목)을 올려다보며 갈고리를 걸 수 있게 위로도 크게 (카메라는 땅에 닿으면 땅을 타고 미끄러진다)
+  // 하늘갈고리 장비: 하늘(건물 꼭대기 · 거대 젤리 뒷목)을 올려다보며 갈고리를 걸 수 있게 위로도 크게 (카메라는 땅에 닿으면 땅을 타고 미끄러진다)
   c.pitch = clamp(c.pitch + dy * 0.0022 * sens, game.player.fp || game.player.aim > 0.5 || game.player.odmHeld ? -1.3 : -0.35, 1.25);
   game.mouseT = 1.5;
 });
@@ -986,7 +986,7 @@ function leaveCar(silent) {
 }
 
 function toggleCar() {
-  if (game.player.odm) return; // 입체기동 중엔 차를 못 탄다
+  if (game.player.odm) return; // 갈고리 비행 중엔 차를 못 탄다
   const p = game.player;
   if (p.inCar) {
     if (p.inCar.kind === 'heli' && (p.inCar.pos.y || 0) > 2) { ui.toast('🚁 먼저 착륙하세요 (Shift로 하강)'); return; }
@@ -1711,7 +1711,7 @@ function tvInfo() {
   const h = game.hour();
   return {
     headline: game.news?.[0] ? `속보: ${game.news[0].slice(0, 34)}` : `${game.players.list.size + 1}명이 젤리시티에서 생활 중`,
-    ticker: [`오늘 날씨 ${game.weather}`, ...(game.news || []).slice(1, 5), '설탕 값 대폭락 🎉', '무릉도장 신규 수련생 모집 🥋'].join('   ·   '),
+    ticker: [`오늘 날씨 ${game.weather}`, ...(game.news || []).slice(1, 5), '설탕 값 대폭락 🎉', '말랑 도장 신규 수련생 모집 🥋'].join('   ·   '),
     weather: game.weather, temp: Math.round(18 + Math.sin(((h - 9) / 24) * Math.PI * 2) * 6), newsEmoji: game.stars ? '🚓' : '🏙️',
   };
 }
@@ -1867,9 +1867,9 @@ function allBadges() {
   if (legends) out.push({ key: 'legend', text: `🌟전설무기 ${legends}개` });
   const keys = S.items.filter((it) => it.id === 'car_key');
   const cnt = (k) => keys.filter((it) => it.car?.kind === k).length;
-  if (cnt('sport_f')) out.push({ key: 'ferrari', text: `🐎풰라리 ${cnt('sport_f')}대` });
-  if (cnt('sport_l')) out.push({ key: 'lambo', text: `🐂람부르기니${cnt('sport_l') > 1 ? ' ' + cnt('sport_l') + '대' : ''}` });
-  if (cnt('sport_b')) out.push({ key: 'bugatti', text: '💎부가디' });
+  if (cnt('sport_f')) out.push({ key: 'ferrari', text: `⚡번개카 ${cnt('sport_f')}대` });
+  if (cnt('sport_l')) out.push({ key: 'lambo', text: `🔺쐐기카${cnt('sport_l') > 1 ? ' ' + cnt('sport_l') + '대' : ''}` });
+  if (cnt('sport_b')) out.push({ key: 'bugatti', text: '💎하이퍼카' });
   if (cnt('sport_m') || cnt('sport_p')) out.push({ key: 'sports', text: `🏁스포츠카 ${cnt('sport_m') + cnt('sport_p')}대` });
   const bikes = keys.filter((it) => BIKES[it.car?.kind]).length;
   if (keys.length - bikes) out.push({ key: 'cars', text: `🚗자동차 ${keys.length - bikes}대` });
@@ -1879,7 +1879,7 @@ function allBadges() {
   if (types.has('apartment')) out.push({ key: 'apt', text: '🏢아파트' });
   if (types.has('villa')) out.push({ key: 'villa', text: '🏘️빌라' });
   if (game.myHomes.length > 1) out.push({ key: 'homes', text: `🏘️집 ${game.myHomes.length}채` });
-  if (S.skills.includes('jump3')) out.push({ key: 'dojang', text: '🥋무릉고수' });
+  if (S.skills.includes('jump3')) out.push({ key: 'dojang', text: '🥋도장 고수' });
   if ((S.rangeBest || 0) >= 800) out.push({ key: 'sniper', text: '🎯명사수' });
   if (S.captured) out.push({ key: 'captured', text: `🪢포획 ${S.captured}마리` });
   if (S.items.some((it) => it.id === 'mount_dragon')) out.push({ key: 'dragon', text: '🐉드래곤 라이더' });
@@ -1902,7 +1902,7 @@ function toggleFly() {
   const p = game.player;
   if (p.inCar) return;
   if (game.jail && !p.flying) { ui.toast('🔒 감옥 안에서는 날 수 없어요'); return; }
-  if (!p.flying && game.odm?.has() && !p.mount?.ride.fly) { ui.toast('🪝 젤리병단 장비를 든 동안엔 날개로 못 날아요 — 우클릭 갈고리로 날아요!'); return; }
+  if (!p.flying && game.odm?.has() && !p.mount?.ride.fly) { ui.toast('🪝 하늘갈고리 장비를 든 동안엔 날개로 못 날아요 — 우클릭 갈고리로 날아요!'); return; }
   if (p.mount && !p.mount.ride.fly) { ui.toast(`${p.mount.def.emoji} ${p.mount.def.name}은(는) 날 수 없어요. F로 내려서 날아요`); return; }
   if (p.flying) { p.flying = false; p.vy = 0; p.onGround = false; p.jumps = p.maxJumps; ui.toast('🪽 날개를 접었어요 — 떨어진다!'); return; }
   if (p.takeOff()) ui.toast('🪽 날기! Space 꾹 위로 · X 아래로 · Shift 빠르게 · Space 두 번 = 날개 접기');
@@ -2150,7 +2150,7 @@ function grabCanvas() {
 }
 
 // ------------------------------------------------------------------
-// 무릉도장 수련
+// 말랑 도장 수련
 // ------------------------------------------------------------------
 function startCourse(id) {
   const c = game.interior.courses.find((x) => x.id === id);
@@ -2416,13 +2416,13 @@ function frame() {
   const canZoom = !p.inCar && selD?.zoom && !blocked;
   p.aim += ((canZoom && game.aimHeld ? 1 : 0) - p.aim) * Math.min(1, dt * 10);
   p.adsFP = !!selD && ['gun', 'launcher'].includes(selD.cat); // 총·활은 우클릭하면 1인칭 조준
-  p.odmHeld = !!selD?.odm; // 젤리병단 장비: 카메라를 조금 더 가까이
+  p.odmHeld = !!selD?.odm; // 하늘갈고리 장비: 카메라를 조금 더 가까이
   const maxZoom = scopeZoomOf(selId) ?? selD?.zoom ?? 1;
   game.zoomNow = 1 + (maxZoom - 1) * p.aim;
   const fov = 55 / game.zoomNow;
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov = fov; camera.updateProjectionMatrix(); }
   ui.setScope(selD?.zoom >= 4 && p.aim > 0.85, SCOPES[selId] ? maxZoom : null);
-  // 광선검을 들고 있으면 웅웅 (꺼내는 순간 치이잉)
+  // 빛 막대을 들고 있으면 웅웅 (꺼내는 순간 치이잉)
   const saber = !!selId?.startsWith('saber_') && !p.inCar && !game.dead && !game.busy;
   if (saber && game.heldSaber !== selId) sfx('saberOn');
   game.heldSaber = saber ? selId : null;
@@ -2430,8 +2430,8 @@ function frame() {
   updateUnitSounds();
   updateMoveSounds(dt);
   updateShopMarkers(t);
-  if (p.odm && (game.mode !== 'city' || game.dead || game.busy || game.jail)) { p.odm = null; game.odm.release(); } // 건물 안 · 쓰러짐 · 체포 땐 입체기동 끝
-  if (p.flying && !p.mount && game.odm.has()) { p.flying = false; p.vy = 0; p.onGround = false; p.jumps = p.maxJumps; ui.toast('🪝 젤리병단 장비를 들면 날개를 접어요 — 우클릭 갈고리로 날아요!'); }
+  if (p.odm && (game.mode !== 'city' || game.dead || game.busy || game.jail)) { p.odm = null; game.odm.release(); } // 건물 안 · 쓰러짐 · 체포 땐 갈고리 비행 끝
+  if (p.flying && !p.mount && game.odm.has()) { p.flying = false; p.vy = 0; p.onGround = false; p.jumps = p.maxJumps; ui.toast('🪝 하늘갈고리 장비를 들면 날개를 접어요 — 우클릭 갈고리로 날아요!'); }
   game.titans.update(dt, game.odm.has());
   game.odm.update(dt);
   if (game.emoting) {

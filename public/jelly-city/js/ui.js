@@ -6,7 +6,7 @@ import { ITEMS, GEMS, SHOPS, ENCHANT_FEE, CLUB_CHARM, RARITY, itemDef, shopItems
 import { SLOTS } from './inventory.js';
 // 조준점 색 추천 (설정에서 직접 고를 수도 있다)
 const XH_COLORS = ['#ffffff', '#ff3b30', '#ffcc00', '#4cd964', '#00e5ff', '#ff4fd8', '#000000'];
-const APP_TITLES = { quests: '퀘스트', camera: '카메라', gallery: '사진', insta: 'Jellystagram', tinder: '튄더', contacts: '연락처', sms: '메시지', police: '112 신고', map: '지도', me: '내 정보', feedback: '건의하기', help: '도움말', settings: '설정', admin: '건의함' };
+const APP_TITLES = { quests: '퀘스트', camera: '카메라', gallery: '사진', insta: 'Jellygram', tinder: '말랑팅', contacts: '연락처', sms: '메시지', police: '112 신고', map: '지도', me: '내 정보', feedback: '건의하기', help: '도움말', settings: '설정', admin: '건의함' };
 const SKILL_NAMES = { jump2: '2단 점프', jump3: '3단 점프', dash: '대쉬 거리 강화', jumpboost: '점프력 강화', dashlong: '대쉬 거리 강화' };
 import { LOOK_PARTS, LOOK_COLORS, DEFAULT_LOOK } from '../../shared/js/look.js';
 import { PHONE_APPS } from './phone.js';
@@ -139,13 +139,13 @@ export class UI {
     const K = (k) => k.split('+').map((x) => `<kbd>${x}</kbd>`).join('');
     const groups = [
       ['🚶 이동', [['W A S D', '걷기 (방향키도 OK)'], ['Shift', '달리기 (바퀴 모드에선 여섯 다리로 기어 달려요!)'], ['Space', '점프 · 공중에서 한 번 더 2단 점프 (3단은 수련*)'], ['C', '대쉬 (거리 강화는 수련*)'], ['Space 두 번', '🪽 날기 — 날면서 Space 꾹 위로 · X 아래로 · Space 두 번 = 날개 접고 떨어지기 (G도 가능)'], ['V', '1인칭 ↔ 3인칭'], ['벽으로 걷기', '🧗 벽에 대고 계속 걸으면 벽을 기어올라요 (W/S 위아래 · A/D 옆 · Space 뛰어내리기) — 옥상도 걸을 수 있어요'], ['마우스', '화면 클릭 후 움직이면 시점 회전 · 휠로 확대/축소'], ['R', '지도에 찍은 목적지까지 자동으로 걷기']]],
-      ['💬 생활', [['E', '대화하기 · 건물 들어가기/나가기 · 행동하기 · 아이템 줍기'], ['B', '💘 플러팅 — 앞에 있는 상대에게 하트 날리기'], ['P', '📷 사진 찍기 (갤러리·인스타는 휴대폰)'], ['Enter', '전체 채팅 (T도 가능)'], ['I', '가방'], ['M', '도시 전체 지도'], ['K / Tab', '📱 휴대폰 열기·닫기 — 퀘스트·카메라·인스타·튄더·연락처·문자·112'], ['Esc', '창 닫기']]],
-      ['⚔️ 전투 · 아이템', [['1 ~ 0', '핫바 칸 선택 (무기, 마법봉, 음식, 차 키)'], ['왼쪽 클릭', '공격 / 마법 / 먹기 · 활은 꾹 눌러 당겼다가 놓기!'], ['오른쪽 클릭', '🔭 1인칭 조준 (총·활) · 저격총은 스코프 · 총마다 반동이 달라요'], ['우클릭 (젤리병단 장비)', '🪝 갈고리를 건물·거대 젤리에 박고 꾹 = 당겨서 날기, 떼면 그 기세로 날아감 · 건 동안 Space 가스 · 놓은 뒤 Space 2단 점프(옥상 올라서기) · 좌클릭 쌍검 · 거대 젤리는 뒷목(빨간 과녁)을 베야 쓰러져요 — 작은 건 한 번, 클수록 여러 번(머리 위 체력바)'], ['E (도시 말 옆)', '🐎 바로 올라타기 · Shift 질주 · F 내리기'], ['U', '🛒 상점 목록 — 어디서든 가게를 골라 바로 구경·구매, 📍 길 안내'], ['J 꾹 누르기', '💃 이모트 휠 — 마우스로 고르고 떼면 춤 (🎵 표시는 공식 챌린지 노래도 나와요)'], ['스코프 중 휠', '🔍 배율 조절 (저격총 2~8배 · 엽총 2~6배 · 바렛 4~15배)'], ['낚싯대 클릭', '🎣 물을 보고 던지기 → "입질!" 뜨면 바로 클릭'], ['Q', '선택한 아이템 바닥에 버리기'], ['Z 꾹 → 떼기', '🪢 동물 포획 — 체력을 절반 아래로 깎고, 바늘이 초록칸일 때 떼기 (가축은 언제나)'], ['F (탈것)', '🐎 포획한 동물에서 내리기 · 드래곤은 클릭으로 불 뿜기'], ['← →', '차에 치여 뒤집히면 번갈아 연타해서 일어나기']]],
+      ['💬 생활', [['E', '대화하기 · 건물 들어가기/나가기 · 행동하기 · 아이템 줍기'], ['B', '💘 플러팅 — 앞에 있는 상대에게 하트 날리기'], ['P', '📷 사진 찍기 (갤러리·젤리그램은 휴대폰)'], ['Enter', '전체 채팅 (T도 가능)'], ['I', '가방'], ['M', '도시 전체 지도'], ['K / Tab', '📱 휴대폰 열기·닫기 — 퀘스트·카메라·젤리그램·말랑팅·연락처·문자·112'], ['Esc', '창 닫기']]],
+      ['⚔️ 전투 · 아이템', [['1 ~ 0', '핫바 칸 선택 (무기, 마법봉, 음식, 차 키)'], ['왼쪽 클릭', '공격 / 마법 / 먹기 · 활은 꾹 눌러 당겼다가 놓기!'], ['오른쪽 클릭', '🔭 1인칭 조준 (총·활) · 저격총은 스코프 · 총마다 반동이 달라요'], ['우클릭 (하늘갈고리 장비)', '🪝 갈고리를 건물·거대 젤리에 박고 꾹 = 당겨서 날기, 떼면 그 기세로 날아감 · 건 동안 Space 가스 · 놓은 뒤 Space 2단 점프(옥상 올라서기) · 좌클릭 쌍검 · 거대 젤리는 뒷목(빨간 과녁)을 베야 쓰러져요 — 작은 건 한 번, 클수록 여러 번(머리 위 체력바)'], ['E (도시 말 옆)', '🐎 바로 올라타기 · Shift 질주 · F 내리기'], ['U', '🛒 상점 목록 — 어디서든 가게를 골라 바로 구경·구매, 📍 길 안내'], ['J 꾹 누르기', '💃 이모트 휠 — 마우스로 고르고 떼면 춤 (🎵 표시는 공식 챌린지 노래도 나와요)'], ['스코프 중 휠', '🔍 배율 조절 (저격총 2~8배 · 엽총 2~6배 · 바렛 4~15배)'], ['낚싯대 클릭', '🎣 물을 보고 던지기 → "입질!" 뜨면 바로 클릭'], ['Q', '선택한 아이템 바닥에 버리기'], ['Z 꾹 → 떼기', '🪢 동물 포획 — 체력을 절반 아래로 깎고, 바늘이 초록칸일 때 떼기 (가축은 언제나)'], ['F (탈것)', '🐎 포획한 동물에서 내리기 · 드래곤은 클릭으로 불 뿜기'], ['← →', '차에 치여 뒤집히면 번갈아 연타해서 일어나기']]],
       ['🚗 자동차', [['F', '차 타기 · 빼앗기 · 내리기'], ['H (차 안)', '📯 빵빵 경적'], ['W / S', '가속 / 후진'], ['A / D', '핸들'], ['Space', '브레이크 (헬기는 상승)'], ['Shift', '부스트 (헬기는 하강)'], ['왼쪽 클릭', '전차 주포 · 헬기 미사일']]],
     ];
     this.openModal(`<h3 class="mh">⌨️ 조작법 <small>H 키로 열고 닫아요</small></h3>
       <div class="keys">${groups.map(([t, rows]) => `<div class="keygroup"><b>${t}</b>${rows.map(([k, d]) => `<div class="keyrow"><span class="kk">${K(k)}</span><span>${d}</span></div>`).join('')}</div>`).join('')}</div>
-      <div class="keynote">* 3단 점프 · 대쉬 거리 강화 · 점프력 강화는 무릉도장 🥋 수련으로 배워요. 처음 화면을 클릭하면 마우스가 화면에 고정되고, Esc로 풀 수 있어요.</div>
+      <div class="keynote">* 3단 점프 · 대쉬 거리 강화 · 점프력 강화는 말랑 도장 🥋 수련으로 배워요. 처음 화면을 클릭하면 마우스가 화면에 고정되고, Esc로 풀 수 있어요.</div>
       <div style="margin-top:12px"><button class="btn" id="keys-ok">알겠어요! 🎮 <kbd>H</kbd></button> <button class="btn ghost" id="keys-bug" title="곰돌이 젤리 ↔ 바퀴벌레 모습 바꾸기 (내 화면에서만)"></button></div>`, 'keys');
     $('modal-inner').classList.add('wide');
     $('keys-ok').onclick = () => this.closeModal();
@@ -340,7 +340,7 @@ export class UI {
     const d = sel ? itemDef(sel.id) : ITEMS.fist;
     const aim = !!g.player.inCar ? ['tank', 'heli'].includes(g.player.inCar.kind) : ['gun', 'launcher', 'throw', 'wand'].includes(d.cat) || !!d.odm;
     $('crosshair').classList.toggle('hidden', !(aim && this.locked));
-    // 젤리병단 장비: 갈고리가 닿는 곳(95m 안의 건물 · 거대 젤리)을 겨누면 초록
+    // 하늘갈고리 장비: 갈고리가 닿는 곳(95m 안의 건물 · 거대 젤리)을 겨누면 초록
     $('crosshair').classList.toggle('hookable', !!d.odm && !g.player.inCar && !!g.odm?.canHook());
     const ammoTxt = d.ammo ? ` · ${ammoName(d.ammo)} ${g.inv.count(d.ammo)}발` : d.cat === 'wand' ? ` · 💧${d.mana} · ${d.skill}` : d.skill ? ` · ${d.skill}` : '';
     const tmpTxt = sel?.expiresAt ? ` · ⏳ ${Math.max(0, Math.ceil((sel.expiresAt - Date.now()) / 60000))}분 남음` : '';
@@ -796,8 +796,8 @@ export class UI {
     $('phone-home').classList.remove('hidden');
     const unread = (g.sms || []).filter((m) => !m.mine && !m.read).length;
     const apps = [
-      ['quests', '📋', '퀘스트', '#7e57c2'], ['camera', '📷', '카메라', '#455a64'], ['gallery', '🖼️', '사진', '#ffb300'], ['insta', '📸', '인스타', 'linear-gradient(135deg,#f58529,#dd2a7b,#8134af)'],
-      ['tinder', '🔥', '튄더', 'linear-gradient(135deg,#ff6a3d,#ff2d6f)'], ['contacts', '📞', '연락처', '#43a047'], ['sms', '💬', '메시지', '#2ecc71', unread], ['police', '🚨', '112', '#e53935'],
+      ['quests', '📋', '퀘스트', '#7e57c2'], ['camera', '📷', '카메라', '#455a64'], ['gallery', '🖼️', '사진', '#ffb300'], ['insta', '📸', '젤리그램', 'linear-gradient(135deg,#ffb86b,#ff7eb6,#9b8cff)'],
+      ['tinder', '💌', '말랑팅', 'linear-gradient(135deg,#ff9ec4,#c48bff)'], ['contacts', '📞', '연락처', '#43a047'], ['sms', '💬', '메시지', '#2ecc71', unread], ['police', '🚨', '112', '#e53935'],
       ['map', '🗺️', '지도', '#29b6f6'], ['online', '👥', '접속자', '#5c6bc0'], ['badges', '🏅', '훈장', '#ff8f00'], ['me', '🙂', '내 정보', '#8d6e63'],
       ['feedback', '💡', '건의하기', '#fdd835'], ['help', '❓', '도움말', '#78909c'],
     ];
@@ -906,9 +906,9 @@ export class UI {
         <b>생활</b>: 포만감·재미·사교·청결과 체력을 관리하세요. NPC들도 똑같은 욕구가 있어서 배고프면 밥을 먹으러 가고, 다치면 병원에 가요.<br>
         <b>직업</b>: 시청 🏛️ 일자리 게시판에서 직업을 골라 직장에서 일하세요.<br>
         <b>집</b>: 처음엔 호텔에서 지내요. 부동산 🏘️ 에서 집을 사면 그 집에서 자고 부활해요.<br>
-        <b>무기 상점</b>: 관우네 병기점(삼국지), 젤리 택티컬(밀리터리·전차·헬기), 은하 무기상(광선검·블래스터). 보석상 💎 에서 보석을 사서 무기와 방어구에 박을 수 있어요.<br>
+        <b>무기 상점</b>: 관우네 병기점(삼국지), 젤리 택티컬(밀리터리·전차·헬기), 은하 무기상(빛 막대·레이저 총). 보석상 💎 에서 보석을 사서 무기와 방어구에 박을 수 있어요.<br>
         <b>치장</b>: 모자 가게·안경원·옷가게의 아이템을 장착하면 매력이 올라가요. 클럽 🪩 은 누구나 들어갈 수 있어요.<br>
-        <b>무릉도장</b> 🥋: 점프맵은 점프력 강화, 고급 점프맵은 3단 점프, 용암 징검다리는 대쉬 거리 강화를 배워요.<br>
+        <b>말랑 도장</b> 🥋: 점프맵은 점프력 강화, 고급 점프맵은 3단 점프, 용암 징검다리는 대쉬 거리 강화를 배워요.<br>
         <b>범죄 · 112</b>: 경찰은 누군가 112에 신고해야만 출동해요. 시민은 맞으면 화가 나서 신고하고, 플레이어는 휴대폰 🚨 112에서 나를 공격한 사람을 신고할 수 있어요. 신고가 쌓이면 별 4~5개에 군대가 출동해요.<br>
         <b>레벨</b>: 일하기·퀘스트·수련·사격장·플레이어 쓰러뜨리기로 경험치를 얻어 레벨업! 레벨이 오르면 체력·파워·명중률이 좋아져요 (만렙 없음).<br>
         <b>마법</b>: 마법봉 공방 🪄 에서 화염·얼음·번개·바람·독·빛·어둠 지팡이를 팔아요. 마나 💧 를 써요.<br>
@@ -1026,7 +1026,7 @@ export class UI {
     }
     $('inv-body').innerHTML = `<h3 class="mh">🎒 가방 <small>💰 ₩${Math.floor(S.money).toLocaleString()} · ⭐ Lv.${S.level || 1} · 🛡️ 방어 ${t.def} · ✨ 매력 ${t.charm} · ❤️ ${Math.round(g.hp)}/${g.maxHp}</small></h3>
       <div class="eqrow">${slotsHtml}</div>
-      <div class="skills">🥋 무공: 2단 점프 · 대쉬(C)${S.skills.length ? ' · ' + S.skills.map((k) => (SKILL_NAMES[k] || k)).join(', ') : ''} <small>(무릉도장에서 3단 점프·대쉬 거리·점프력 수련)</small></div>
+      <div class="skills">🥋 무공: 2단 점프 · 대쉬(C)${S.skills.length ? ' · ' + S.skills.map((k) => (SKILL_NAMES[k] || k)).join(', ') : ''} <small>(말랑 도장에서 3단 점프·대쉬 거리·점프력 수련)</small></div>
       <div class="tabs-row">${Object.entries(CATS).map(([k, v]) => `<button class="btn mini ${k === this.invCat ? '' : 'ghost'}" data-cat="${k}">${v}</button>`).join('')}</div>
       <div class="inv-wrap"><div class="inv-grid">${grid}</div>${detail}</div>
       <div style="margin-top:10px"><button class="btn ghost" id="inv-close">닫기 (I)</button></div>`;

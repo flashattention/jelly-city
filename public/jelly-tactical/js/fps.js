@@ -5,7 +5,7 @@ import { floorAt, boxesIn } from './maps.js';
 const R = 0.35, R_FOOT = 0.29, H_STAND = 1.72, H_CROUCH = 1.18, EYE_STAND = 1.55, EYE_CROUCH = 1.05;
 export class Player {
   constructor() { this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3(); this.yaw = 0; this.pitch = 0; this.onGround = true; this.crouch = 0; this.prone = 0; this.alive = false; this.hp = 100; this.stepT = 0; this.snapDY = 0; }
-  // prone: 엎드리기 (젤리배그) · 눈 0.45m · 키 0.6m
+  // prone: 엎드리기 (젤리드롭) · 눈 0.45m · 키 0.6m
   get eyeH() { return (EYE_STAND + (EYE_CROUCH - EYE_STAND) * this.crouch) * (1 - this.prone) + 0.45 * this.prone; }
   get height() { return (H_STAND + (H_CROUCH - H_STAND) * this.crouch) * (1 - this.prone) + 0.6 * this.prone; }
   eye(out = new THREE.Vector3()) { return out.set(this.pos.x, this.pos.y + this.eyeH, this.pos.z); }
@@ -24,7 +24,7 @@ export class Player {
     const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw), rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
     let wx = fx * inp.f + rx * inp.s, wz = fz * inp.f + rz * inp.s;
     const L = Math.hypot(wx, wz); if (L > 1) { wx /= L; wz /= L; }
-    // keepVel: 돌진 · 넉백처럼 정해진 속도로 (젤리워치) · airCtl: 공중 조작 배수 · noGrav: 날기
+    // keepVel: 돌진 · 넉백처럼 정해진 속도로 (젤리수호대) · airCtl: 공중 조작 배수 · noGrav: 날기
     const k = Math.min(1, dt * (this.onGround ? 14 : 3 * (inp.airCtl || 1)));
     if (!inp.keepVel) { this.vel.x += (wx * speed - this.vel.x) * k; this.vel.z += (wz * speed - this.vel.z) * k; }
     if (inp.jump && this.onGround && !inp.prone) { this.vel.y = inp.jumpV || 7; this.onGround = false; ev.push('jump'); }

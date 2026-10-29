@@ -30,24 +30,24 @@ jobs:
           curl -sf localhost:8123/ > /dev/null
           curl -sf localhost:8123/jelly-city/ > /dev/null
           curl -sf localhost:8123/dream-runner/ > /dev/null
-          curl -sf localhost:8123/jelly-rider/ > /dev/null
-          curl -sf localhost:8123/jelly-attack/ > /dev/null
-          curl -sf localhost:8123/jelly-attack/bg/ > /dev/null
-          curl -sf localhost:8123/jelly-bg/ > /dev/null
-          curl -sf localhost:8123/jelly-watch/ > /dev/null
-          curl -sf localhost:8123/jelly-apple/ > /dev/null
+          curl -sf localhost:8123/jelly-drift/ > /dev/null
+          curl -sf localhost:8123/jelly-tactical/ > /dev/null
+          curl -sf localhost:8123/jelly-tactical/bg/ > /dev/null
+          curl -sf localhost:8123/jelly-drop/ > /dev/null
+          curl -sf localhost:8123/jelly-guard/ > /dev/null
+          curl -sf localhost:8123/jelly-ten/ > /dev/null
           curl -sf localhost:8123/jelly-word/ > /dev/null
           curl -sf localhost:8123/jelly-draw/ > /dev/null
           curl -sf localhost:8123/jelly-type/ > /dev/null
           curl -sf localhost:8123/jelly-survivor/ > /dev/null
           curl -sf localhost:8123/jelly-sketch/ > /dev/null
-          curl -sf localhost:8123/jelly-guys/ > /dev/null
+          curl -sf localhost:8123/jelly-rumble/ > /dev/null
           curl -sf localhost:8123/jelly-merge/ > /dev/null
-          curl -sf localhost:8123/jelly-bang/ > /dev/null
+          curl -sf localhost:8123/jelly-court/ > /dev/null
           curl -sf localhost:8123/jelly-ding/ > /dev/null
           curl -sf localhost:8123/jelly-slide/ > /dev/null
           curl -sf 'localhost:8123/api/surv/board?b=normal' > /dev/null
-          curl -sf 'localhost:8123/api/apple/board?b=t120' > /dev/null
+          curl -sf 'localhost:8123/api/ten/board?b=t120' > /dev/null
           curl -sf localhost:8123/api/dream/board
 
   deploy:

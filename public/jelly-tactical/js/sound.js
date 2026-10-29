@@ -1,5 +1,5 @@
-// 젤리어택 소리: 총 종류마다 다른 총소리 · 장전 · 맞힘 · 발소리 · 수류탄 (파일 없이 합성, 멀수록 작게)
-const MUTE_KEY = 'jellyattack.mute';
+// 젤리택티컬 소리: 총 종류마다 다른 총소리 · 장전 · 맞힘 · 발소리 · 수류탄 (파일 없이 합성, 멀수록 작게)
+const MUTE_KEY = 'jellytactical.mute';
 let ctx = null, bus = null, noise = null;
 export const sound = { muted: (() => { try { return localStorage.getItem(MUTE_KEY) === '1'; } catch { return false; } })() };
 function ensure() {

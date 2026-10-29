@@ -1,4 +1,4 @@
-/* 젤리 사과게임 */
+/* 젤리텐 */
 #game { align-items: center; justify-content: center; gap: 16px; padding: 16px; }
 #side-l { display: flex; flex-direction: column; gap: 12px; width: 150px; flex: none; }
 #side-l .panel { padding: 14px; text-align: center; }

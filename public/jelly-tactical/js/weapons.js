@@ -1,4 +1,4 @@
-// 젤리어택 무기: 젤리시티 무기(위력 · 연사 · 사거리 · 반동 · 산탄 수)를 그대로 쓰고, 탄창 · 장전 · 퍼짐만 더한다
+// 젤리택티컬 무기: 젤리시티 무기(위력 · 연사 · 사거리 · 반동 · 산탄 수)를 그대로 쓰고, 탄창 · 장전 · 퍼짐만 더한다
 //   서버도 이 파일로 피해를 계산한다
 import { ITEMS } from '../../jelly-city/js/items.js';
 
@@ -21,14 +21,14 @@ const EXTRA = {
   revolver: { cls: 'pistol', mag: 6, reload: 2.2, spread: 0.01, move: 0.025 },
   deagle: { cls: 'pistol', mag: 7, reload: 1.9, spread: 0.014, move: 0.03 },
   blaster: { cls: 'pistol', mag: 15, reload: 1.5, spread: 0.012, move: 0.02 },
-  // 젤리배그 전용 (젤리시티에는 없는 총)
+  // 젤리드롭 전용 (젤리시티에는 없는 총)
   kar98: { cls: 'sniper', mag: 5, reload: 3.2, spread: 0.002, move: 0.12, iron: true },
   mini14: { cls: 'sniper', mag: 20, reload: 2.4, spread: 0.004, move: 0.06, iron: true },
   vector: { cls: 'smg', mag: 19, reload: 1.6, spread: 0.022, move: 0.024 },
   s1897: { cls: 'shotgun', mag: 5, reload: 3.4, spread: 0.0, move: 0.02 },
   crossbow: { cls: 'sniper', mag: 1, reload: 3.4, spread: 0.002, move: 0.1, iron: true },
 };
-// 젤리배그 전용 총 (이름 · 위력 · 연사 · 사거리 · 반동)
+// 젤리드롭 전용 총 (이름 · 위력 · 연사 · 사거리 · 반동)
 const BG_DEF = {
   kar98: { name: 'Kar98k', emoji: '🎯', dmg: 82, rate: 1.7, range: 150, held: 'sniper', tracer: '#ffffff', recoil: [0.06, 0.01, 0.3], zoom: 1.6 },
   mini14: { name: 'Mini14', emoji: '🔫', dmg: 34, rate: 0.22, range: 120, held: 'sniper', recoil: [0.03, 0.01, 0.12], zoom: 1.6 },

@@ -1,6 +1,6 @@
-// 젤리배그 더하기: 물(호수 · 바다) · 레드존 · 보급상자(낙하산 · 빨간 연기) · 화염병 불 · 섬광탄 · 넘기(파쿠르)
+// 젤리드롭 더하기: 물(호수 · 바다) · 레드존 · 보급상자(낙하산 · 빨간 연기) · 화염병 불 · 섬광탄 · 넘기(파쿠르)
 import * as THREE from 'three';
-import { boxesIn, floorAt } from '../../jelly-attack/js/maps.js';
+import { boxesIn, floorAt } from '../../jelly-tactical/js/maps.js';
 
 const toon = (c, o = {}) => new THREE.MeshToonMaterial({ color: c, ...o });
 let _glow = null;

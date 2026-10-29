@@ -1,4 +1,4 @@
-// 젤리워치 그림: 영웅 곰돌이(손 무기 · 장비) · 1인칭 무기 · 방벽 · 돔 · 지뢰 같은 설치물 · 투사체 · 줄기 · 폭발 · 피해 숫자
+// 젤리수호대 그림: 영웅 곰돌이(손 무기 · 장비) · 1인칭 무기 · 방벽 · 돔 · 지뢰 같은 설치물 · 투사체 · 줄기 · 폭발 · 피해 숫자
 import * as THREE from 'three';
 import { Roach } from '../../shared/js/roach.js';
 import { PROJ, shieldRect } from './heroes.js';
@@ -54,7 +54,7 @@ export function heroBear(h, { name, look } = {}) {
   bear.root.scale.setScalar(0.85 * size); bear.size = size;
   return bear;
 }
-// 디젤바 로봇: 곰돌이를 태운 분홍 젤리 로봇 (몸통 · 다리 · 양팔 캐논)
+// 뿅뿅 로봇: 곰돌이를 태운 분홍 젤리 로봇 (몸통 · 다리 · 양팔 캐논)
 export function dvaMech() {
   const g = new THREE.Group(), pink = toon('#ff9fcf'), white = toon('#fff4fb'), dark = toon('#3b3f4a');
   part(g, SPH, pink, 0, 1.25, 0, 0.95, 0.75, 0.95); part(g, SPH, white, 0, 1.35, -0.45, 0.6, 0.45, 0.4);

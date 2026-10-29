@@ -1,4 +1,4 @@
-/* 젤리뱅 */
+/* 젤리궁정 */
 #game { flex-direction: column; }
 #table { position: relative; flex: 1 1 auto; min-height: 0; margin: 10px 250px 0 16px; }
 #felt { position: absolute; inset: 9% 12%; border-radius: 50%; background: radial-gradient(ellipse at 50% 40%, #ff9fcb 0%, #d65a99 55%, #8e2f6b 100%); box-shadow: inset 0 -14px 40px rgba(60,0,40,.45), inset 0 10px 30px rgba(255,255,255,.3), 0 0 0 12px #6b3a22, 0 0 0 16px #4a2614, 0 30px 60px rgba(0,0,0,.45); }

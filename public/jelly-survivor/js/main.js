@@ -246,7 +246,7 @@ function onEvent(ev) {
     case 'elite': banner('⚠️ 엘리트 충치균!', '녹이면 🎁 보물 상자'); break;
     case 'warn': banner('🚨 포위!', ev[1]); S.sfx('boss'); break;
     case 'boss': banner(`${ev[1] === 1 ? '👑 왕 충치균' : '😈 충치 대마왕'}${ev[2] > 1 ? ` ×${ev[2]}` : ''} 등장!`, ev[1] === 1 ? '돌진 · 꼬마 충치균을 불러요' : game.endless ? '녹이면 보물 상자!' : '녹이면 이겨요!'); S.sfx('boss'); break;
-    case 'bossdown': banner(ev[1] === 1 ? '🎉 왕 충치균을 녹였어요!' : ev[1] === 3 ? '🎉 충치 대마왕을 녹였어요!' : '🍬 이겼젤! 충치 대마왕 퇴치!', ev[1] === 2 ? '' : '🎁 보물 상자 + 설탕 잔뜩'); S.sfx('win'); confetti(); break;
+    case 'bossdown': banner(ev[1] === 1 ? '🎉 왕 충치균을 녹였어요!' : ev[1] === 3 ? '🎉 충치 대마왕을 녹였어요!' : '🍬 승리! 충치 대마왕 퇴치!', ev[1] === 2 ? '' : '🎁 보물 상자 + 설탕 잔뜩'); S.sfx('win'); confetti(); break;
     case 'lvup': banner(`🔥 단계 ${ev[1]}!`, '충치균이 더 세고 많아져요'); S.sfx('boss'); setStageLook(ev[1]); break;
     case 'down': { const P = V.pl.get(ev[1]); shell.toast(ev[1] === me ? '😵 쓰러졌어요! 친구가 옆에 서 있으면 일어나요 (25초)' : `🆘 ${P?.name || ''} 쓰러졌어요! 옆에 서서 살려 주세요`, 2600); break; }
     case 'revive': { const P = V.pl.get(ev[1]); shell.toast(`💖 ${P?.name || ''} 다시 일어났어요!`, 1600); S.sfx('ok'); break; }
@@ -555,7 +555,7 @@ function finishView() { game.mode = 'over'; S.stopMusic(); hideChoices(); $('hud
 function results(m) {
   finishView();
   const mine = m.rank.find((e) => e.id === game.myId);
-  $('ov-title').textContent = m.win ? '🍬 이겼젤! 충치 대마왕 퇴치!' : `😵 충치균에게 졌어요 · ${fmt(m.time)} 버팀`;
+  $('ov-title').textContent = m.win ? '🍬 승리! 충치 대마왕 퇴치!' : `😵 충치균에게 졌어요 · ${fmt(m.time)} 버팀`;
   $('ov-me').textContent = mine ? `나: ${mine.kills}마리 녹임 · Lv${mine.lvl} · 피해 ${mine.dmg}` : '';
   $('ov-rank').innerHTML = m.rank.map((e) => rowHtml({ ...e, look: game.members.find((x) => x.id === e.id)?.look })).join('');
   $('ov-save').classList.add('hidden');
@@ -571,7 +571,7 @@ async function endSolo() {
   const score = game.endless ? r.time : r.kills + r.time * 2 + (sim.win ? 1500 + 500 * game.stage : 0) + (game.stage - 1) * 300;
   if (sim.win && !game.endless && game.stage >= unlocked() - 0 && game.stage < STAGES.length + 1) store.set(STAGE_KEY, String(Math.max(Number(store.get(STAGE_KEY)) || 0, game.stage)));
   const next = sim.win && !game.endless && game.stage < STAGES.length;
-  $('ov-title').textContent = game.endless ? `♾️ ${fmt(r.time)} 버텼어요 · ${sim.lv()}단계` : sim.win ? `🍬 이겼젤! ${game.stage}단계 클리어!` : `😵 ${game.stage}단계 · ${fmt(r.time)} 버텼어요`;
+  $('ov-title').textContent = game.endless ? `♾️ ${fmt(r.time)} 버텼어요 · ${sim.lv()}단계` : sim.win ? `🍬 승리! ${game.stage}단계 클리어!` : `😵 ${game.stage}단계 · ${fmt(r.time)} 버텼어요`;
   $('ov-me').textContent = `🦷 ${r.kills}마리 · Lv${r.lvl}${game.endless ? '' : ` · 점수 ${score}`}${next ? ` · 🔓 ${game.stage + 1}단계 열림!` : ''}`;
   $('ov-rank').innerHTML = ''; $('again-btn').textContent = next ? `▶ ${game.stage + 1}단계로` : '🔁 한 판 더';
   game.nextStage = next;

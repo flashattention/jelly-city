@@ -64,20 +64,20 @@ export const ITEMS = {
   heli: { name: '공격 헬기', emoji: '🚁', cat: 'vehicle', shop: 'armory_mil', price: 14000, vehicle: 'heli' },
 
   // ---------------- 은하 무기상 (미래형) ----------------
-  saber_blue: { name: '광선검 (푸른빛)', emoji: '🔵', cat: 'melee', shop: 'armory_sf', price: 4000, dmg: 58, rate: 0.38, range: 2.4, kind: 'melee', held: 'saber:#40c4ff', sockets: 2, charm: 10 },
-  // 젤리병단 장비 (진격의 거인 입체기동장치처럼): 좌클릭 쌍검 · 우클릭 갈고리를 걸고 날아간다. 거대 젤리는 이걸로 뒷목을 베어야만 쓰러진다
-  odm_gear: { name: '젤리병단 장비', emoji: '🪝', cat: 'melee', shop: 'armory_mil', price: 3500, dmg: 34, rate: 0.42, range: 2.6, kind: 'melee', held: 'odm', sockets: 2, odm: true, skill: '좌클릭 쌍검 · 우클릭 갈고리(꾹 = 당기기) · 걸고 Space 가스 · 놓고 Space 2단 점프 · 거대 젤리는 뒷목!' },
-  saber_red: { name: '광선검 (붉은빛)', emoji: '🔴', cat: 'melee', shop: 'armory_sf', price: 4400, dmg: 64, rate: 0.4, range: 2.4, kind: 'melee', held: 'saber:#ff1744', sockets: 2, charm: 10 },
-  saber_green: { name: '광선검 (초록빛)', emoji: '🟢', cat: 'melee', shop: 'armory_sf', price: 4200, dmg: 60, rate: 0.38, range: 2.4, kind: 'melee', held: 'saber:#76ff03', sockets: 3, charm: 10 },
-  blaster: { name: '블래스터 권총', emoji: '🔫', cat: 'gun', shop: 'armory_sf', price: 1500, dmg: 24, rate: 0.3, range: 55, ammo: 'ammo_cell', kind: 'hitscan', held: 'blaster', tracer: '#ff5252', sockets: 2 },
-  blaster_rifle: { name: '블래스터 소총', emoji: '🔫', cat: 'gun', shop: 'armory_sf', price: 3400, dmg: 17, rate: 0.11, range: 65, ammo: 'ammo_cell', kind: 'hitscan', auto: true, held: 'blaster_rifle', tracer: '#ff1744', sockets: 2 },
+  saber_blue: { name: '빛 막대 (푸른빛)', emoji: '🔵', cat: 'melee', shop: 'armory_sf', price: 4000, dmg: 58, rate: 0.38, range: 2.4, kind: 'melee', held: 'saber:#40c4ff', sockets: 2, charm: 10 },
+  // 하늘갈고리 장비: 좌클릭 쌍검 · 우클릭 갈고리를 걸고 날아간다. 거대 젤리는 이걸로 뒷목을 베어야만 쓰러진다
+  odm_gear: { name: '하늘갈고리 장비', emoji: '🪝', cat: 'melee', shop: 'armory_mil', price: 3500, dmg: 34, rate: 0.42, range: 2.6, kind: 'melee', held: 'odm', sockets: 2, odm: true, skill: '좌클릭 쌍검 · 우클릭 갈고리(꾹 = 당기기) · 걸고 Space 가스 · 놓고 Space 2단 점프 · 거대 젤리는 뒷목!' },
+  saber_red: { name: '빛 막대 (붉은빛)', emoji: '🔴', cat: 'melee', shop: 'armory_sf', price: 4400, dmg: 64, rate: 0.4, range: 2.4, kind: 'melee', held: 'saber:#ff1744', sockets: 2, charm: 10 },
+  saber_green: { name: '빛 막대 (초록빛)', emoji: '🟢', cat: 'melee', shop: 'armory_sf', price: 4200, dmg: 60, rate: 0.38, range: 2.4, kind: 'melee', held: 'saber:#76ff03', sockets: 3, charm: 10 },
+  blaster: { name: '레이저 권총', emoji: '🔫', cat: 'gun', shop: 'armory_sf', price: 1500, dmg: 24, rate: 0.3, range: 55, ammo: 'ammo_cell', kind: 'hitscan', held: 'blaster', tracer: '#ff5252', sockets: 2 },
+  blaster_rifle: { name: '레이저 소총', emoji: '🔫', cat: 'gun', shop: 'armory_sf', price: 3400, dmg: 17, rate: 0.11, range: 65, ammo: 'ammo_cell', kind: 'hitscan', auto: true, held: 'blaster_rifle', tracer: '#ff1744', sockets: 2 },
   ion_cannon: { name: '이온 캐논', emoji: '⚡', cat: 'launcher', shop: 'armory_sf', price: 7500, dmg: 110, radius: 7, rate: 2.5, range: 100, ammo: 'ammo_ion', kind: 'rocket', held: 'ion', tracer: '#18ffff', sockets: 3 },
-  ammo_cell: { name: '블래스터 에너지 셀 ×40', emoji: '🔋', cat: 'ammo', shop: 'armory_sf', price: 120, stack: true, pack: 40 },
+  ammo_cell: { name: '레이저 에너지 셀 ×40', emoji: '🔋', cat: 'ammo', shop: 'armory_sf', price: 120, stack: true, pack: 40 },
   ammo_ion: { name: '이온 코어 ×2', emoji: '💠', cat: 'ammo', shop: 'armory_sf', price: 500, stack: true, pack: 2 },
-  thermal: { name: '열 폭탄', emoji: '🟠', cat: 'throw', shop: 'armory_sf', price: 400, stack: true, dmg: 95, radius: 7, rate: 0.8, range: 30, kind: 'grenade', held: 'thermal', sockets: 0 },
-  storm_helmet: { name: '스톰 헬멧', emoji: '⚪', cat: 'head', slot: 'head', shop: 'armory_sf', price: 2000, def: 18, charm: 6, vis: 'storm_helmet', sockets: 2 },
-  jedi_robe: { name: '제다이 로브', emoji: '🧥', cat: 'body', slot: 'body', shop: 'armory_sf', price: 2500, def: 12, charm: 15, vis: 'jedi_robe', sockets: 2 },
-  mando_armor: { name: '베스카 강철 갑옷', emoji: '🛡️', cat: 'body', slot: 'body', shop: 'armory_sf', price: 9500, def: 38, charm: 20, vis: 'mando_armor', sockets: 3 },
+  thermal: { name: '폭죽 사탕', emoji: '🟠', cat: 'throw', shop: 'armory_sf', price: 400, stack: true, dmg: 95, radius: 7, rate: 0.8, range: 30, kind: 'grenade', held: 'thermal', sockets: 0 },
+  storm_helmet: { name: '우주 헬멧', emoji: '⚪', cat: 'head', slot: 'head', shop: 'armory_sf', price: 2000, def: 18, charm: 6, vis: 'storm_helmet', sockets: 2 },
+  jedi_robe: { name: '수도사 로브', emoji: '🧥', cat: 'body', slot: 'body', shop: 'armory_sf', price: 2500, def: 12, charm: 15, vis: 'jedi_robe', sockets: 2 },
+  mando_armor: { name: '은하 강철 갑옷', emoji: '🛡️', cat: 'body', slot: 'body', shop: 'armory_sf', price: 9500, def: 38, charm: 20, vis: 'mando_armor', sockets: 3 },
 
   // ---------------- 모자 가게 ----------------
   baseball_cap: { name: '야구모자', emoji: '🧢', cat: 'head', slot: 'head', shop: 'hatshop', price: 40, charm: 3, vis: 'cap:#42a5f5' },

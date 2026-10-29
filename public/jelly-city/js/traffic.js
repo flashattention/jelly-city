@@ -14,27 +14,27 @@ const OCC_COLORS = ['#8a5634', '#9b6038', '#7a4a2c', '#a86b3e', '#6e3f25', '#b07
 // 차종: L 길이, W 폭, c 바닥, h1 차체 높이, h2 지붕, cab [앞유리 아래, 지붕 앞, 지붕 뒤, 뒷유리 아래] (z), r 바퀴, max 최고속도
 const M = (o) => ({ c: 0.32, r: 0.4, hp: 160, max: 13, ...o });
 export const MODELS = {
-  sedan: M({ name: '젤리 소나타', L: 4.3, W: 2.0, h1: 0.95, h2: 1.62, cab: [0.95, 0.25, -0.8, -1.45] }),
-  hatch: M({ name: '젤리 아반떼 해치', L: 3.8, W: 1.95, h1: 0.95, h2: 1.65, cab: [0.85, 0.2, -1.4, -1.8] }),
-  suv: M({ name: '젤리 쏘렌토', L: 4.5, W: 2.15, c: 0.45, h1: 1.2, h2: 2.0, cab: [1.05, 0.55, -1.75, -2.15], r: 0.5, hp: 220 }),
-  mini: M({ name: '젤리 모닝', L: 3.2, W: 1.8, h1: 0.95, h2: 1.75, cab: [0.85, 0.35, -1.2, -1.5], r: 0.35, max: 11 }),
+  sedan: M({ name: '젤리 세단', L: 4.3, W: 2.0, h1: 0.95, h2: 1.62, cab: [0.95, 0.25, -0.8, -1.45] }),
+  hatch: M({ name: '젤리 해치백', L: 3.8, W: 1.95, h1: 0.95, h2: 1.65, cab: [0.85, 0.2, -1.4, -1.8] }),
+  suv: M({ name: '젤리 SUV', L: 4.5, W: 2.15, c: 0.45, h1: 1.2, h2: 2.0, cab: [1.05, 0.55, -1.75, -2.15], r: 0.5, hp: 220 }),
+  mini: M({ name: '젤리 꼬마차', L: 3.2, W: 1.8, h1: 0.95, h2: 1.75, cab: [0.85, 0.35, -1.2, -1.5], r: 0.35, max: 11 }),
   wagon: M({ name: '젤리 왜건', L: 4.6, W: 2.0, h1: 0.95, h2: 1.65, cab: [0.95, 0.3, -1.95, -2.2] }),
-  van: M({ name: '젤리 스타리아', L: 4.9, W: 2.1, c: 0.4, h1: 1.15, h2: 2.35, cab: [2.0, 1.2, -2.25, -2.4], r: 0.45, hp: 220, max: 11 }),
+  van: M({ name: '젤리 승합차', L: 4.9, W: 2.1, c: 0.4, h1: 1.15, h2: 2.35, cab: [2.0, 1.2, -2.25, -2.4], r: 0.45, hp: 220, max: 11 }),
   taxi: M({ name: '젤리 택시', L: 4.3, W: 2.0, h1: 0.95, h2: 1.62, cab: [0.95, 0.25, -0.8, -1.45] }),
   police: M({ name: '경찰차', L: 4.4, W: 2.0, h1: 0.95, h2: 1.62, cab: [0.95, 0.25, -0.8, -1.45], hp: 220, max: 15 }),
-  ev: M({ name: '젤슬라 모델6', L: 4.5, W: 2.0, h1: 0.9, h2: 1.55, cab: [1.25, 0.4, -1.0, -2.0], max: 16 }),
+  ev: M({ name: '젤리 전기차 E6', L: 4.5, W: 2.0, h1: 0.9, h2: 1.55, cab: [1.25, 0.4, -1.0, -2.0], max: 16 }),
   limo: M({ name: '젤리 리무진', L: 6.6, W: 2.05, h1: 0.95, h2: 1.6, cab: [1.9, 1.25, -2.4, -3.0], hp: 240, max: 12 }),
-  jeep: M({ name: '젤리 랭글러', L: 4.0, W: 2.1, c: 0.5, h1: 1.25, h2: 2.05, cab: [0.75, 0.6, -1.85, -1.95], r: 0.52, hp: 240 }),
+  jeep: M({ name: '젤리 오프로더', L: 4.0, W: 2.1, c: 0.5, h1: 1.25, h2: 2.05, cab: [0.75, 0.6, -1.85, -1.95], r: 0.52, hp: 240 }),
   convertible: M({ name: '젤리 오픈카', L: 4.3, W: 2.0, h1: 0.9, h2: 1.3, cab: [0.95, 0.75, -0.5, -0.6], open: true, max: 16 }),
   icecream: M({ name: '아이스크림 트럭', L: 4.9, W: 2.1, c: 0.4, h1: 1.15, h2: 2.4, cab: [2.0, 1.2, -2.25, -2.4], r: 0.45, hp: 200, max: 10 }),
   pickup: M({ name: '젤리 픽업트럭', L: 5.0, W: 2.15, c: 0.48, h1: 1.2, h2: 2.0, cab: [1.25, 0.75, -0.55, -0.7], r: 0.5, hp: 240, bed: true }),
   truck: M({ name: '젤리 탑차', L: 6.4, W: 2.3, c: 0.5, h1: 1.35, h2: 2.4, cab: [2.85, 2.55, 1.75, 1.6], r: 0.55, hp: 350, max: 10, cargo: true }),
   // 스포츠카 5종
-  sport_f: M({ name: '풰라리 F8 젤리', L: 4.5, W: 2.1, c: 0.22, h1: 0.72, h2: 1.2, cab: [0.55, -0.15, -0.85, -1.6], r: 0.42, max: 26, spoiler: 'lip', sport: true }),
-  sport_l: M({ name: '람부르기니 젤리칸', L: 4.6, W: 2.2, c: 0.2, h1: 0.66, h2: 1.12, cab: [1.0, -0.05, -0.75, -1.75], r: 0.44, max: 28, spoiler: 'wing', wedge: true, sport: true }),
-  sport_p: M({ name: '포르셰 911 더듬', L: 4.3, W: 2.0, c: 0.24, h1: 0.8, h2: 1.3, cab: [0.7, 0.05, -0.75, -1.9], r: 0.42, max: 24, spoiler: 'duck', round: true, sport: true }),
-  sport_m: M({ name: '맥라랜 720젤리', L: 4.6, W: 2.1, c: 0.2, h1: 0.7, h2: 1.15, cab: [0.85, 0.0, -0.7, -1.7], r: 0.43, max: 27, spoiler: 'wing', sport: true }),
-  sport_b: M({ name: '부가디 시롱젤리', L: 4.6, W: 2.15, c: 0.22, h1: 0.78, h2: 1.2, cab: [0.7, -0.05, -0.75, -1.5], r: 0.45, max: 32, spoiler: 'lip', twoTone: true, sport: true, hp: 260 }),
+  sport_f: M({ name: '번개 스포츠카', L: 4.5, W: 2.1, c: 0.22, h1: 0.72, h2: 1.2, cab: [0.55, -0.15, -0.85, -1.6], r: 0.42, max: 26, spoiler: 'lip', sport: true }),
+  sport_l: M({ name: '쐐기 스포츠카', L: 4.6, W: 2.2, c: 0.2, h1: 0.66, h2: 1.12, cab: [1.0, -0.05, -0.75, -1.75], r: 0.44, max: 28, spoiler: 'wing', wedge: true, sport: true }),
+  sport_p: M({ name: '동글 스포츠카', L: 4.3, W: 2.0, c: 0.24, h1: 0.8, h2: 1.3, cab: [0.7, 0.05, -0.75, -1.9], r: 0.42, max: 24, spoiler: 'duck', round: true, sport: true }),
+  sport_m: M({ name: '날개 스포츠카', L: 4.6, W: 2.1, c: 0.2, h1: 0.7, h2: 1.15, cab: [0.85, 0.0, -0.7, -1.7], r: 0.43, max: 27, spoiler: 'wing', sport: true }),
+  sport_b: M({ name: '다이아 하이퍼카', L: 4.6, W: 2.15, c: 0.22, h1: 0.78, h2: 1.2, cab: [0.7, -0.05, -0.75, -1.5], r: 0.45, max: 32, spoiler: 'lip', twoTone: true, sport: true, hp: 260 }),
 };
 export const CAR_KINDS = Object.keys(MODELS);
 // 이륜차: 자전거·스쿠터·오토바이 (지붕 없음, 커브에서 기울어짐)
@@ -42,8 +42,8 @@ export const BIKES = {
   bicycle: { name: '젤리 자전거', max: 5, hp: 60, accel: 6, pedal: true },
   scooter: { name: '젤리 배달 스쿠터', max: 8, hp: 90, accel: 8 },
   motorcycle: { name: '젤리 네이키드 바이크', max: 15, hp: 120, accel: 13 },
-  chopper: { name: '할리 젤리슨 크루저', max: 13, hp: 150, accel: 11 },
-  sportbike: { name: '닌자 젤리 레이싱 바이크', max: 22, hp: 110, accel: 18, sport: true },
+  chopper: { name: '젤리 크루저 바이크', max: 13, hp: 150, accel: 11 },
+  sportbike: { name: '젤리 레이싱 바이크', max: 22, hp: 110, accel: 18, sport: true },
 };
 export const BIKE_KINDS = Object.keys(BIKES);
 export const SPORT_KINDS = CAR_KINDS.filter((k) => MODELS[k].sport);

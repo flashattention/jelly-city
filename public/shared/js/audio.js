@@ -254,7 +254,7 @@ function gunshot(out, t, id) {
 function whoosh(out, t, dur, f1, f2, vol) { nz(out, t, dur, { f: f1, f2, q: 2.5, vol: vol * 3, a: dur * 0.35, curve: 'lin' }); } // 좁은 대역 잡음이라 3배
 function swing(out, t, id) {
   if (id?.startsWith('saber_')) {
-    // 광선검: 위이잉
+    // 빛 막대: 위이잉
     osc(out, t, 0.45, { type: 'sawtooth', f: 95, curve: [[0.15, 150], [0.45, 80]], vol: 0.35, filter: { f: 900, q: 3 }, a: 0.03 });
     osc(out, t, 0.45, { type: 'sawtooth', f: 98, curve: [[0.15, 156], [0.45, 84]], vol: 0.25, filter: { f: 1400 }, a: 0.03 });
     whoosh(out, t, 0.35, 500, 2000, 0.25);
@@ -426,7 +426,7 @@ export function sfx(name, pos = null, arg = null, vol = 1) {
   else if (name === 'saberOn') { osc(out, t, 0.6, { type: 'sawtooth', f: 40, curve: [[0.4, 110]], vol: 0.35, filter: { f: 1200, q: 4 } }); nz(out, t, 0.3, { type: 'highpass', f: 2500, vol: 0.2, curve: 'lin' }); }
 }
 
-// 계속 울리는 소리: 경찰 사이렌 · 헬기 · 광선검 웅웅. vol 0이면 조용히 끈다
+// 계속 울리는 소리: 경찰 사이렌 · 헬기 · 빛 막대 웅웅. vol 0이면 조용히 끈다
 const loops = {};
 export function loop(name, vol = 0, pos = null, range = 150) {
   if (!ctx) return;
@@ -462,7 +462,7 @@ function makeLoop(name) {
     l.frequency.value = 0.3; lg.gain.value = 250; l.connect(lg).connect(fl.frequency);
     n.connect(fl).connect(ng).connect(g); src.push(n, l);
   } else if (name === 'gas') {
-    // 입체기동 가스 분사: 쉬이익
+    // 갈고리 장비 가스 분사: 쉬이익
     const n = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), ng = ctx.createGain();
     n.buffer = noiseBuf; n.loop = true; fl.type = 'bandpass'; fl.frequency.value = 2600; fl.Q.value = 0.8; ng.gain.value = 0.45;
     n.connect(fl).connect(ng).connect(g); src.push(n);

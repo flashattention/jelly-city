@@ -83,7 +83,7 @@ export function gummyColorFor(seed) {
 
 // 이모트별 표정
 const EMOTE_FACE = { creamcheese: 'love', redred: 'surprised', apt: 'happy', ganbare: 'angry', slickback: 'neutral', heart: 'love', shuffle: 'happy', wave: 'happy' };
-// 젤리병단 문장: 방패 + 하얗고 파란 젤리 석상 (한 번만 그린다)
+// 하늘갈고리 문장: 방패 + 하얗고 파란 젤리 석상 (한 번만 그린다)
 let _crest = null;
 function jellyCrestTex() {
   if (_crest) return _crest;
@@ -1073,7 +1073,7 @@ export class Roach {
         this.heldPose = 'wand'; break;
       }
       case 'food': buildFood(g, spec.split(':')[1], spec.split(':')[2] || '#ffcc80'); this.heldPose = 'food'; break;
-      case 'odm': { // 젤리병단 장비: 양손에 길쭉한 칼날 (망토·가스통은 setOdmGear)
+      case 'odm': { // 하늘갈고리 장비: 양손에 길쭉한 칼날 (망토·가스통은 setOdmGear)
         const odmBlade = (grp) => { mesh(G.box(), toon('#37474f'), grp, 0, 0.05, 0, 0.09, 0.26, 0.1); mesh(G.box(), toon('#eceff1'), grp, 0, -0.62, 0.02, 0.03, 1.05, 0.12); mesh(G.box(), toon('#b0bec5'), grp, 0, -0.62, 0.075, 0.02, 1.05, 0.02); };
         odmBlade(g);
         this.heldPose = 'melee'; break;
@@ -1089,7 +1089,7 @@ export class Roach {
     g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   }
 
-  // 젤리병단 장비를 들면: 등에 초록 망토(젤리 석상 문장) · 허리에 가스통 · 왼손에도 칼
+  // 하늘갈고리 장비를 들면: 등에 초록 망토(젤리 석상 문장) · 허리에 가스통 · 왼손에도 칼
   setOdmGear(on) {
     if (this.odmGear) { this.torso.remove(this.odmGear); this.odmGear = null; this.cape = null; }
     if (this.odmBladeL) { this.odmBladeL.parent?.remove(this.odmBladeL); this.odmBladeL = null; }
@@ -1102,7 +1102,7 @@ export class Roach {
     const cloth = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.78, 1.25, 20, 1, true, Math.PI - 1.35, 2.7), green);
     cloth.position.y = -0.62; cloth.castShadow = true; cape.add(cloth);
     mesh(G.sphereLow(), green, cape, 0, 0.02, -0.33, 0.36, 0.17, 0.22); // 접힌 두건
-    // 문장: 방패 안에 하얗고 파란 젤리 석상 (조사병단 날개 문장 같은 색감)
+    // 문장: 방패 안에 하얗고 파란 젤리 석상 (하늘색 · 흰색 젤리 문장)
     const emb = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.7), new THREE.MeshBasicMaterial({ map: jellyCrestTex(), transparent: true, side: THREE.DoubleSide }));
     emb.position.set(0, -0.55, -0.72); emb.rotation.y = Math.PI; emb.rotation.x = 0.17; cape.add(emb);
     // 가스통과 칼집 (허리 양옆)
@@ -1111,7 +1111,7 @@ export class Roach {
       mesh(G.box(), toon('#455a64'), G2, sx * 0.6, 0.6, 0.18, 0.12, 0.18, 0.5);
     }
     mesh(G.box(), strap, G2, 0, 0.82, 0, 1.12, 0.07, 0.95); // 허리 벨트
-    mesh(G.box(), metal, G2, 0, 0.82, -0.5, 0.36, 0.22, 0.14); // 입체기동 본체
+    mesh(G.box(), metal, G2, 0, 0.82, -0.5, 0.36, 0.22, 0.14); // 갈고리 장비 본체
     // 왼손 칼
     const L = this.odmBladeL = new THREE.Group(); L.position.set(0, -0.42, 0); this.arms[0].add(L);
     mesh(G.box(), toon('#37474f'), L, 0, 0.05, 0, 0.09, 0.26, 0.1); mesh(G.box(), toon('#eceff1'), L, 0, -0.62, 0.02, 0.03, 1.05, 0.12);

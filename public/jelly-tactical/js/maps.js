@@ -1,4 +1,4 @@
-// 젤리어택 맵: 상자(벽 · 건물 · 컨테이너 · 나무상자)들로 만든다. 서버도 이 파일로 벽 판정 · 봇 길찾기
+// 젤리택티컬 맵: 상자(벽 · 건물 · 컨테이너 · 나무상자)들로 만든다. 서버도 이 파일로 벽 판정 · 봇 길찾기
 //   상자 = { x, z: 가운데, w(x 폭), d(z 폭), y: 바닥 높이, h: 높이, k: 종류(색) }
 const B = (x, z, w, d, h, k = 'wall', y = 0) => ({ x, z, w, d, h, k, y });
 function walls(W, D, h = 6) { return [B(0, -D / 2 - 0.5, W + 2, 1, h, 'outer'), B(0, D / 2 + 0.5, W + 2, 1, h, 'outer'), B(-W / 2 - 0.5, 0, 1, D, h, 'outer'), B(W / 2 + 0.5, 0, 1, D, h, 'outer')]; }
@@ -46,7 +46,7 @@ function crates(list) { return list.flatMap(([x, z, n = 1]) => Array.from({ leng
 
 export const MAPS = [
   {
-    id: 'depot', name: '제3보급창고', emoji: '📦', W: 84, D: 64,
+    id: 'depot', name: '젤리 물류창고', emoji: '📦', W: 84, D: 64,
     sky: ['#7fa7d6', '#e8d9b8', '#c9b48a'], fog: [40, 160], floor: '#b8a582', floor2: '#a89470',
     colors: { floor: '#b59b7a', roofslab: '#6d5a48', outer: '#8d8a80', wall: '#c9b99a', ware: '#a0846a', roof: '#6d5a48', cont1: '#c0504d', cont2: '#3f7cb5', cont3: '#5f8f4e', crate: '#b8864b', low: '#9e9686', step: '#8d8a80' },
     boxes: [
@@ -104,7 +104,7 @@ const hidden = (x, z, w, d, h) => ({ ...B(x, z, w, d, h, 'low'), hide: true });
 const barrel = (x, z, c) => [hidden(x, z, 0.85, 0.85, 1), { t: 'barrel', x, z, c }];
 const car = (x, z, r, c) => [hidden(x, z, r ? 3.9 : 1.9, r ? 1.9 : 3.9, 1.5), { t: 'car', x, z, r: r ? Math.PI / 2 : 0, c }];
 function dress(map, items) { for (const it of items.flat()) (it.t ? (map.deco ||= []) : map.boxes).push(it); }
-// 제3보급창고: 지게차 길 · 가로등 · 드럼통 · 차 · 깃발 · 표지판
+// 젤리 물류창고: 지게차 길 · 가로등 · 드럼통 · 차 · 깃발 · 표지판
 dress(MAPS[0], [
   barrel(-6, -12), barrel(-5, -12.9, '#3f7cb5'), barrel(6, 12), barrel(7, 12.8, '#5f8f4e'), barrel(-28, -24), barrel(28, 24, '#ffd84d'),
   car(-26, 6, 0, '#ff8fb8'), car(26, -6, 0, '#7cd8ff'), car(-6, -28, 1, '#ffd27a'),
@@ -112,7 +112,7 @@ dress(MAPS[0], [
   { t: 'lamp', x: -12, z: 0, light: true }, { t: 'lamp', x: 12, z: 0, light: true }, { t: 'lamp', x: -34, z: -28 }, { t: 'lamp', x: 34, z: 28 },
   { t: 'flags', x: -20, z: -20, x2: -8, z2: -20, h: 6.5 }, { t: 'flags', x: 8, z: 20, x2: 20, z2: 20, h: 6.5 },
   { t: 'cone', x: -3, z: -23 }, { t: 'cone', x: 3, z: 23 }, { t: 'cone', x: -1, z: -23.5 }, { t: 'puddle', x: 15, z: -4, c: '#7cd8ff' }, { t: 'puddle', x: -15, z: 5 },
-  { t: 'sign', x: -38, z: 26, text: '제3보급창고', c: '#5f8f4e', r: Math.PI / 2 }, { t: 'sign', x: 38, z: -26, text: '젤리 보급', c: '#c0504d', r: -Math.PI / 2 },
+  { t: 'sign', x: -38, z: 26, text: '젤리 물류창고', c: '#5f8f4e', r: Math.PI / 2 }, { t: 'sign', x: 38, z: -26, text: '젤리 보급', c: '#c0504d', r: -Math.PI / 2 },
   { t: 'bush', x: -38, z: -30 }, { t: 'bush', x: 38, z: 30 }, { t: 'tree', x: -40, z: 30 }, { t: 'tree', x: 40, z: -30 },
 ]);
 MAPS[0].roads = [{ x: 0, z: 0, w: 70, d: 6, c: '#8d8478', line: true }, { x: 0, z: 0, w: 6, d: 50, c: '#8d8478' }];
@@ -271,7 +271,7 @@ for (const s of [-1, 1]) MAPS[2].boxes.push(...[0, 1, 2, 3].map((i) => B(s * (7.
 export const mapById = (id) => MAPS.find((m) => m.id === id) || MAPS[0];
 
 // ---------- 판정 (서버 · 화면 같이) ----------
-// 상자가 많은 맵(젤리배그)도 빠르게: 12m 격자에 상자를 나눠 담고, 필요한 칸만 본다
+// 상자가 많은 맵(젤리드롭)도 빠르게: 12m 격자에 상자를 나눠 담고, 필요한 칸만 본다
 const CELL = 12;
 function gridOf(map) {
   if (map._grid) return map._grid;
@@ -334,5 +334,5 @@ export function floorAt(map, x, z, y, r = 0.35) {
   return top;
 }
 
-// 다른 게임(젤리워치)도 같은 상자 · 건물 도구로 맵을 짓는다
+// 다른 게임(젤리수호대)도 같은 상자 · 건물 도구로 맵을 짓는다
 export { B, walls, crates, building, stairs };

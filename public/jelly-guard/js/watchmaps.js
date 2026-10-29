@@ -1,6 +1,6 @@
-// 젤리워치 맵: 점령전(공격팀이 A → B 거점을 차례로 점령) · 쟁탈전(가운데 거점을 먼저 100% 차지)
-//   상자 도구는 젤리어택 maps.js 를 같이 쓴다. 판마다 새로 만든다 (출발 문이 열리면 상자가 빠지니까)
-import { B, walls, crates, building, stairs } from '../../jelly-attack/js/maps.js';
+// 젤리수호대 맵: 점령전(공격팀이 A → B 거점을 차례로 점령) · 쟁탈전(가운데 거점을 먼저 100% 차지)
+//   상자 도구는 젤리택티컬 maps.js 를 같이 쓴다. 판마다 새로 만든다 (출발 문이 열리면 상자가 빠지니까)
+import { B, walls, crates, building, stairs } from '../../jelly-tactical/js/maps.js';
 
 const COLORS = {
   floor: '#d9c7b0', roofslab: '#8a6f5a', outer: '#a99ab8', wall: '#e8d7c3', step: '#c9b8a6', crate: '#c8925a', low: '#c7b9a8', gate: '#7cd8ff',
@@ -38,7 +38,7 @@ function jellymura() {
     B(-27, -50, 18, 1, 6, 'wall'), B(0, -50, 24, 1, 6, 'wall'), B(27, -50, 18, 1, 6, 'wall'),
   ];
   return {
-    id: 'jellymura', name: '젤리무라', emoji: '🌸', mode: 'assault', W: 72, D: 124,
+    id: 'jellymura', name: '벚꽃 젤리 마을', emoji: '🌸', mode: 'assault', W: 72, D: 124,
     sky: ['#9cc4ff', '#ffe1ec', '#f3c8d8'], fog: [50, 190], floor: '#e8d2c2', floor2: '#d9bfae', colors: COLORS, boxes,
     points: [{ id: 'A', x: 0, z: 4, y: 0, r: 5.5 }, { id: 'B', x: 0, z: -35, y: 1.2, r: 5.5 }],
     spawns: {
@@ -81,7 +81,7 @@ function jellyos() {
     ...crates([[-14, 6], [14, -6], [-16, -12, 2], [16, 12, 2], [-4, 20], [4, -20], [-28, 2], [28, -2], [6, 30], [-6, -30]]),
   ];
   return {
-    id: 'jellyos', name: '젤리오스', emoji: '🏛️', mode: 'control', W: 96, D: 92,
+    id: 'jellyos', name: '레몬 신전', emoji: '🏛️', mode: 'control', W: 96, D: 92,
     sky: ['#7fc4ff', '#ffe9c4', '#ffd2a3'], fog: [60, 210], floor: '#f0dcc0', floor2: '#e2c8a6', colors: COLORS, boxes: symmetric(boxes),
     points: [{ id: 'C', x: 0, z: 0, y: 0.9, r: 6.5 }],
     spawns: {
@@ -201,8 +201,8 @@ function symmetric(boxes) {
   return [...center, ...half, ...half.map((b) => ({ ...b, x: -b.x, z: -b.z }))];
 }
 export const WMAPS = [
-  { id: 'jellymura', name: '젤리무라', emoji: '🌸', mode: 'assault', make: jellymura, desc: '점령전 · 공격팀은 A → B 거점을 차례로 점령!' },
-  { id: 'jellyos', name: '젤리오스', emoji: '🏛️', mode: 'control', make: jellyos, desc: '쟁탈전 · 가운데 거점을 먼저 100% 차지하면 승리' },
+  { id: 'jellymura', name: '벚꽃 젤리 마을', emoji: '🌸', mode: 'assault', make: jellymura, desc: '점령전 · 공격팀은 A → B 거점을 차례로 점령!' },
+  { id: 'jellyos', name: '레몬 신전', emoji: '🏛️', mode: 'control', make: jellyos, desc: '쟁탈전 · 가운데 거점을 먼저 100% 차지하면 승리' },
   { id: 'cookie', name: '쿠키 성', emoji: '🍪', mode: 'assault', make: cookieKeep, desc: '점령전 · 성문 마당(A) → 왕좌의 방(B) · 성벽 위를 걸어요' },
   { id: 'cotton', name: '솜사탕 항구', emoji: '🍭', mode: 'control', make: cottonPort, desc: '쟁탈전 · 컨테이너 사이 부두 광장 · 2단 컨테이너 위 높은 곳' },
 ];

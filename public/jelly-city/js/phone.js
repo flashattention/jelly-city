@@ -1,11 +1,11 @@
-// 휴대폰 앱들: 퀘스트, 카메라, 갤러리, 인스타그램, 연락처, 문자, 112, 건의함
+// 휴대폰 앱들: 퀘스트, 카메라, 갤러리, 젤리그램, 연락처, 문자, 112, 건의함
 import { escapeHtml, brand } from '../../shared/js/utils.js';
 import { questDef } from './quests.js';
 import { expNeed, levelStats } from './level.js';
 import * as THREE from 'three';
 import { Roach } from '../../shared/js/roach.js';
 
-// 캐릭터 사진 (튄더 카드용)
+// 캐릭터 사진 (말랑팅 카드용)
 let thumbR = null, thumbScene = null, thumbCam = null;
 const thumbCache = new Map();
 export function roachThumb(pr) {
@@ -57,7 +57,7 @@ export const PHONE_APPS = {
       <h3>⭐ Lv.${L} <small style="font-size:13px;color:var(--ink-soft)">경험치 ${S.exp || 0} / ${expNeed(L)}</small></h3>
       <div class="xpbig"><div style="width:${Math.min(100, ((S.exp || 0) / expNeed(L)) * 100)}%"></div></div>
       ❤️ 최대 체력 <b>${ls.maxHp}</b> · 💪 파워 <b>×${ls.dmg.toFixed(2)}</b> · 🎯 명중 <b>+${Math.round((1 - ls.acc) * 100)}%</b> · 💥 치명타 <b>+${Math.round(ls.crit * 100)}%</b> · 💧 마나 <b>${ls.mana}</b><br>
-      <small>레벨에 끝은 없어요. 대신 올라갈수록 필요한 경험치가 많아져요. 일하기 · 퀘스트 · 무릉도장 · 사격장 · 플레이어 쓰러뜨리기로 경험치를 얻어요.</small>
+      <small>레벨에 끝은 없어요. 대신 올라갈수록 필요한 경험치가 많아져요. 일하기 · 퀘스트 · 말랑 도장 · 사격장 · 플레이어 쓰러뜨리기로 경험치를 얻어요.</small>
     </div>
     <div class="profile-big" style="margin-top:12px"><h3>📋 오늘의 퀘스트 <small style="font-size:12px;color:var(--ink-soft)">${g.day() + 1}일차 · 날이 바뀌면 새 퀘스트</small></h3>
       ${list.map((q) => { const d = questDef(q.id); return `<div class="qrow ${q.done ? 'done' : ''}"><span>${q.done ? '✅' : '⬜'} ${escapeHtml(d.text)}</span><span class="qr">${q.done ? '완료' : `${Math.floor(q.p)}/${d.n}`} · +${d.xp}EXP ₩${d.money}</span></div>`; }).join('')}
@@ -81,29 +81,29 @@ export const PHONE_APPS = {
     body.innerHTML = '<div class="profile-big">불러오는 중...</div>';
     try {
       const { list } = await api(g, `/api/photos?char=${g.char}`);
-      body.innerHTML = `<div class="gallery-head">🖼️ 내 사진 ${list.length}장 <small>사진을 누르면 크게 보고 인스타에 올릴 수 있어요</small></div>
+      body.innerHTML = `<div class="gallery-head">🖼️ 내 사진 ${list.length}장 <small>사진을 누르면 크게 보고 젤리그램에 올릴 수 있어요</small></div>
         <div class="gallery">${list.map((p) => `<div class="ph" data-id="${p.id}"><img loading="lazy" src="/photos/${p.id}.jpg">${p.posted ? `<span class="tagp">📸 ❤️${p.likes}</span>` : ''}</div>`).join('') || '<p>아직 사진이 없어요. 📷 카메라로 찍어보세요!</p>'}</div>`;
       body.querySelectorAll('.ph').forEach((el) => { el.onclick = () => PHONE_APPS.viewPhoto(ui, body, g, list.find((p) => p.id === el.dataset.id)); });
     } catch (e) { body.innerHTML = `<div class="profile-big">사진을 불러오지 못했어요 (${escapeHtml(e.message)})</div>`; }
   },
   viewPhoto(ui, body, g, p) {
-    body.innerHTML = `<div class="photo-view"><img src="/photos/${p.id}.jpg"><div class="pv-meta">${new Date(p.t).toLocaleString('ko-KR')}${p.posted ? ` · 📸 인스타 게시됨 · ❤️ ${p.likes}` : ''}</div>
-      ${p.posted ? '' : '<input id="pv-cap" class="search" maxlength="150" placeholder="인스타그램에 쓸 글 (해시태그도 좋아요 #젤리시티)">'}
-      <div>${p.posted ? '' : '<button class="btn" id="pv-post">📸 인스타에 올리기</button>'}<a class="btn ghost" href="/photos/${p.id}.jpg" download="roachcity-${p.id}.jpg">⬇️ 저장</a><button class="btn ghost" id="pv-del">🗑️ 삭제</button><button class="btn ghost" id="pv-back">← 갤러리</button></div></div>`;
+    body.innerHTML = `<div class="photo-view"><img src="/photos/${p.id}.jpg"><div class="pv-meta">${new Date(p.t).toLocaleString('ko-KR')}${p.posted ? ` · 📸 젤리그램 게시됨 · ❤️ ${p.likes}` : ''}</div>
+      ${p.posted ? '' : '<input id="pv-cap" class="search" maxlength="150" placeholder="젤리그램에 쓸 글 (해시태그도 좋아요 #젤리시티)">'}
+      <div>${p.posted ? '' : '<button class="btn" id="pv-post">📸 젤리그램에 올리기</button>'}<a class="btn ghost" href="/photos/${p.id}.jpg" download="roachcity-${p.id}.jpg">⬇️ 저장</a><button class="btn ghost" id="pv-del">🗑️ 삭제</button><button class="btn ghost" id="pv-back">← 갤러리</button></div></div>`;
     $('pv-cap')?.addEventListener('keydown', (e) => e.stopPropagation());
     $('pv-back').onclick = () => PHONE_APPS.gallery(ui, body, g);
     $('pv-del').onclick = async () => { if (!(await ui.confirm('이 사진을 지울까요?', '🗑️ 삭제'))) return; await api(g, `/api/photo/${p.id}?char=${g.char}`, { method: 'DELETE' }); PHONE_APPS.gallery(ui, body, g); };
     if ($('pv-post')) $('pv-post').onclick = async () => {
-      try { await api(g, '/api/insta', { method: 'POST', body: { char: g.char, id: p.id, caption: $('pv-cap').value } }); g.questEvent('insta'); ui.toast('📸 인스타그램에 올렸어요!'); ui.openPhone('insta'); } catch (e) { ui.toast(e.message); }
+      try { await api(g, '/api/insta', { method: 'POST', body: { char: g.char, id: p.id, caption: $('pv-cap').value } }); g.questEvent('insta'); ui.toast('📸 젤리그램에 올렸어요!'); ui.openPhone('insta'); } catch (e) { ui.toast(e.message); }
     };
   },
 
-  // ---------------- 인스타그램: 피드 · 팔로잉 · DM · 프로필 · 댓글 ----------------
+  // ---------------- 젤리그램: 피드 · 팔로잉 · DM · 프로필 · 댓글 ----------------
   async insta(ui, body, g) {
     const tab = ui.igTab || 'all';
     const av = brand.bug ? '🪳' : '🐻';
     const tabs = `<div class="td-tabs ig-tabs"><button class="${tab === 'all' ? 'on' : ''}" data-ig="all">🏠 피드</button><button class="${tab === 'following' ? 'on' : ''}" data-ig="following">👥 팔로잉</button><button class="${tab === 'dm' ? 'on' : ''}" data-ig="dm">✉️ DM${g.igUnread ? ` (${g.igUnread})` : ''}</button><button class="${tab === 'me' ? 'on' : ''}" data-ig="me">👤 나</button></div>`;
-    const head = `<div class="insta-head">📸 <b>Jellystagram</b> <small>젤리시티 사람들의 사진</small></div>`;
+    const head = `<div class="insta-head">📸 <b>Jellygram</b> <small>젤리시티 사람들의 사진</small></div>`;
     const go = (t, extra = {}) => { Object.assign(ui, { igTab: t, igUser: null, igDm: null, igList: null }, extra); PHONE_APPS.insta(ui, body, g); };
     const bindTabs = () => body.querySelectorAll('[data-ig]').forEach((b) => { b.onclick = () => go(b.dataset.ig); });
     const noKeys = (el) => el.addEventListener('keydown', (e) => e.stopPropagation());
@@ -275,7 +275,7 @@ export const PHONE_APPS = {
     $('sms-in').focus();
   },
 
-  // ---------------- 튄더 ----------------
+  // ---------------- 말랑팅 ----------------
   tinder(ui, body, g) {
     const tab = ui.tdTab || 'swipe';
     const tabs = `<div class="td-tabs"><button class="${tab === 'swipe' ? 'on' : ''}" data-td="swipe">💘 둘러보기</button><button class="${tab === 'matches' ? 'on' : ''}" data-td="matches">💬 매칭${g.tdUnread ? ` (${g.tdUnread})` : ''}</button><button class="${tab === 'profile' ? 'on' : ''}" data-td="profile">👤 내 프로필</button></div>`;
@@ -324,7 +324,7 @@ export const PHONE_APPS = {
     // 내 프로필
     const me = g.tdMe || {};
     body.innerHTML = tabs + `<div class="td-card"><img class="td-img" src="${pic({ ...g.profile, photo: me.photo })}"><div class="td-info"><b>${escapeHtml(g.profile.name)}</b> ${g.profile.age}<small>⭐ Lv.${g.stats.level || 1} · ${escapeHtml(g.profile.jobName || '무직')}</small></div></div>
-      <div class="profile-big" style="margin-top:10px"><b>한 줄 소개</b><textarea id="td-bio" maxlength="120" rows="3" placeholder="예) 치킨 좋아하는 무릉도장 고수 🍗">${escapeHtml(me.bio || '')}</textarea>
+      <div class="profile-big" style="margin-top:10px"><b>한 줄 소개</b><textarea id="td-bio" maxlength="120" rows="3" placeholder="예) 치킨 좋아하는 말랑 도장 고수 🍗">${escapeHtml(me.bio || '')}</textarea>
       <b>프로필 사진</b><div class="gallery" id="td-photos"><div class="ph" data-ph="">${brand.bug ? '🪳' : '🐻'}<small>캐릭터</small></div></div>
       <button class="btn" id="td-save" style="margin-top:8px">저장</button></div>`;
     bindTabs();
@@ -334,7 +334,7 @@ export const PHONE_APPS = {
       $('td-photos').innerHTML = `<div class="ph ${!photo ? 'on' : ''}" data-ph="" style="display:grid;place-items:center;font-size:34px;background:#ffe0e8">${brand.bug ? '🪳' : '🐻'}</div>` + list.map((p) => `<div class="ph ${photo === p.id ? 'on' : ''}" data-ph="${p.id}"><img src="/photos/${p.id}.jpg"></div>`).join('');
       body.querySelectorAll('[data-ph]').forEach((el) => { el.onclick = () => { photo = el.dataset.ph || null; body.querySelectorAll('[data-ph]').forEach((x) => x.classList.toggle('on', x === el)); }; });
     }).catch(() => {});
-    $('td-save').onclick = () => { g.net.send({ t: 'tdProfile', bio: $('td-bio').value, photo }); ui.toast('🔥 튄더 프로필을 저장했어요'); };
+    $('td-save').onclick = () => { g.net.send({ t: 'tdProfile', bio: $('td-bio').value, photo }); ui.toast('🔥 말랑팅 프로필을 저장했어요'); };
   },
 
   police(ui, body, g) {

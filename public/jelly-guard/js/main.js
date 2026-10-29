@@ -1,12 +1,13 @@
-// 젤리워치: 영웅 16명이 겨루는 팀 슈팅 (점령전 · 쟁탈전 · 6 대 6 · 봇)
+// 젤리수호대: 영웅 16명이 겨루는 팀 슈팅 (점령전 · 쟁탈전 · 6 대 6 · 봇)
+import '../../shared/js/renamed.js'; // 옛 이름으로 저장된 값 옮기기 (맨 먼저)
 import * as THREE from 'three';
 import { openSens, sensOf } from '../../shared/js/sens.js';
 import { store } from '../../shared/js/account.js';
 import { Shell, esc, TEAMS } from '../../shared/js/shell.js';
-import { rayBoxes, floorAt, clearLine } from '../../jelly-attack/js/maps.js';
-import { buildMap } from '../../jelly-attack/js/world.js';
-import { Player } from '../../jelly-attack/js/fps.js';
-import { explosion, updateFx as updateBig } from '../../jelly-attack/js/fx.js';
+import { rayBoxes, floorAt, clearLine } from '../../jelly-tactical/js/maps.js';
+import { buildMap } from '../../jelly-tactical/js/world.js';
+import { Player } from '../../jelly-tactical/js/fps.js';
+import { explosion, updateFx as updateBig } from '../../jelly-tactical/js/fx.js';
 import { HEROES, ROLES, heroById, PROJ, blockBy, RESPAWN_MS } from './heroes.js';
 import { WMAPS, wmapById, makeMap, openGates, inRoom } from './watchmaps.js';
 import { heroBear, dvaMech, Plate, HeroVM, EntViews, puff, ring, flashSphere, line, dmgNum, updateFx, beamMesh, setBeam, projMesh, trailPuff, glowTex, TEAM_COL } from './vfx.js';
@@ -14,7 +15,7 @@ import { makeKit } from './kits.js';
 import { sfx, unlock, toggleMute, sound, say } from './wsound.js';
 
 const $ = (id) => document.getElementById(id);
-const PICK_KEY = 'jellywatch.pick', HERO_KEY = 'jellywatch.hero';
+const PICK_KEY = 'jellyguard.pick', HERO_KEY = 'jellyguard.hero';
 const coarse = matchMedia('(pointer: coarse)').matches;
 const F = { stun: 1, sleep: 2, invuln: 4, nano: 8, boost: 16, matrix: 32, deflect: 64, grav: 128, anti: 256, hboost: 512, primal: 1024, pilot: 2048, valk: 4096, bub: 8192, reveal: 16384, blossom: 32768, hogult: 65536, blade: 131072, barrage: 262144, deadeye: 524288, coal: 1 << 20, ghost: 1 << 21, spd: 1 << 22, amp: 1 << 23, visor: 1 << 24, breath: 1 << 25, songheal: 1 << 26, poison: 1 << 27, shield: 1 << 28 };
 const BEAM_COL = { mercy: '#ffe48a', winston: '#9fe8ff', zarya: '#ff8fd0', moira: '#c07bff' };
@@ -372,7 +373,7 @@ function optsUI(el, o, editable, set) {
 function renderTitleOpts() { optsUI($('title-opts'), game.pick, true, (o) => { Object.assign(game.pick, o); store.set(PICK_KEY, JSON.stringify(game.pick)); renderTitleOpts(); loadMap(game.pick.map); }); }
 const shell = new Shell({
   sound: { muted: () => sound.muted, toggle: () => { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; } },
-  key: 'jellywatch', title: '⚡ 젤리워치', subtitle: '젤리 영웅 16명의 팀 대결!<br>거점을 점령하고 궁극기로 승부를 뒤집어요', wsPath: '/watch-ws', max: 12,
+  key: 'jellyguard', title: '⚡ 젤리수호대', subtitle: '젤리 영웅 16명의 팀 대결!<br>거점을 점령하고 궁극기로 승부를 뒤집어요', wsPath: '/guard-ws', max: 12,
   multiLabel: '👥 같이 하기', roomIcon: '⚡', startLabel: '⚡ 출전!',
   keysHelp: 'WASD 이동 · 마우스 조준 · 클릭 기본 공격 · 우클릭 보조 · Shift · E 기술 · Q 궁극기 · R 장전 · V 근접 · Space 점프 · H 영웅 바꾸기 · Tab 점수판',
   buttons: [{ id: 'practice-btn', label: '🎯 연습전 <small>봇과 바로 대결</small>', onClick: () => practice() }],
@@ -390,7 +391,7 @@ const shell = new Shell({
 });
 shell.pickOpts = () => ({ map: game.pick.map, size: game.pick.size });
 function practice() {
-  if (coarse) shell.toast('젤리워치는 키보드 · 마우스가 있는 PC에서 가장 잘 돼요', 2500);
+  if (coarse) shell.toast('젤리수호대는 키보드 · 마우스가 있는 PC에서 가장 잘 돼요', 2500);
   shell.sendAfterHello({ t: 'practice', opts: { map: game.pick.map, size: game.pick.size } });
 }
 function loadMap(id) {
@@ -817,7 +818,7 @@ function drawAims(now) {
   if (game.visor && me.alive) { let best = null, bd = 0.55; const e = eye(), f = fwd(); for (const o of game.others.values()) { if (!enemy(o) || !o.alive || !o.seen) continue; const dd = o.chest().sub(e).normalize().dot(f); if (dd > bd) { bd = dd; best = o; } } if (best) { const q = scr(best.chest()); if (q) html.push(`<div class="mk lockon" style="left:${q[0]}px;top:${q[1]}px"></div>`); } }
   $('marks').innerHTML = html.join('');
   const g = list.find((a) => a.k === 'grap'); $('grap').classList.toggle('hidden', !g); if (g) $('grap').classList.toggle('ok', g.ok);
-  // 디바 방어 매트릭스: 앞에 분홍 부채꼴 · 젤리우: 곡이 닿는 범위
+  // 디바 방어 매트릭스: 앞에 분홍 부채꼴 · 둥둥: 곡이 닿는 범위
   matrixFan.visible = me.alive && game.h?.id === 'dva' && has('matrix');
   if (matrixFan.visible) { matrixFan.position.copy(camera.position); matrixFan.quaternion.copy(camera.quaternion); matrixFan.children[0].material.opacity = 0.18 + Math.sin(now / 60) * 0.05; }
   auraRing.visible = me.alive && game.h?.id === 'lucio';
@@ -907,7 +908,7 @@ function toTitle() {
 // ---------- 줄기 그리기 ----------
 const beamPool = []; let beamUsed = 0;
 function beam(a, b, col, w = 0.06, wob = 0) { let g = beamPool[beamUsed]; if (!g) { g = beamMesh(col, w); beamPool.push(g); scene.add(g); } beamUsed++; g.visible = true; g.children[0].material.color.set(col); g.userData.w = w; setBeam(g, a, b, wob); }
-// 번개 (젤리스턴 테슬라): 꺾인 줄 몇 가닥
+// 번개 (통통박사 테슬라): 꺾인 줄 몇 가닥
 function bolt(a, b, col = '#bfefff') {
   for (let k = 0; k < 2; k++) {
     let prev = a.clone(); const n = 7;

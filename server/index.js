@@ -17,20 +17,20 @@ import { llmEnabled, MODEL } from './jelly-city/llm.js';
 import { GOOGLE_CLIENT_ID, DEV_LOGIN, verifyGoogle, readJson } from './auth.js';
 import { DreamBoard, dreamApi } from './dream-runner/leaderboard.js';
 import { DreamRooms } from './dream-runner/rooms.js';
-import { RiderRooms } from './jelly-rider/rooms.js';
-import { AttackRooms } from './jelly-attack/rooms.js';
-import { BgRooms } from './jelly-bg/rooms.js';
-import { WatchRooms } from './jelly-watch/rooms.js';
-import { AppleRooms } from './jelly-apple/rooms.js';
+import { DriftRooms } from './jelly-drift/rooms.js';
+import { TacticalRooms } from './jelly-tactical/rooms.js';
+import { DropRooms } from './jelly-drop/rooms.js';
+import { GuardRooms } from './jelly-guard/rooms.js';
+import { TenRooms } from './jelly-ten/rooms.js';
 import { SurvRooms } from './jelly-survivor/rooms.js';
 import { SketchRooms } from './jelly-sketch/rooms.js';
 import { WordRooms } from './jelly-word/rooms.js';
 import { Dict } from './jelly-word/dict.js';
 import { DrawRooms } from './jelly-draw/rooms.js';
 import { TypeRooms } from './jelly-type/rooms.js';
-import { GuysRooms } from './jelly-guys/rooms.js';
+import { RumbleRooms } from './jelly-rumble/rooms.js';
 import { MergeRooms } from './jelly-merge/rooms.js';
-import { BangRooms } from './jelly-bang/rooms.js';
+import { CourtRooms } from './jelly-court/rooms.js';
 import { DingRooms } from './jelly-ding/rooms.js';
 import { SlideRooms } from './jelly-slide/rooms.js';
 import { normWord } from '../public/jelly-draw/js/prompts.js';
@@ -39,6 +39,12 @@ import { Records } from './shared/records.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
+// 이름이 바뀐 게임들: 옛 주소 → 새 주소 (이미 나간 초대 링크 · 즐겨찾기가 깨지지 않게)
+const RENAMED = [
+  ['/jelly-attack/bg', '/jelly-drop'], ['/jelly-bg', '/jelly-drop'], ['/jelly-watch', '/jelly-guard'], ['/jelly-rider', '/jelly-drift'],
+  ['/jelly-attack', '/jelly-tactical'], ['/jelly-guys', '/jelly-rumble'], ['/jelly-bang', '/jelly-court'], ['/jelly-apple', '/jelly-ten'],
+];
+const OLD_WS = { '/bg-ws': '/drop-ws', '/watch-ws': '/guard-ws', '/rider-ws': '/drift-ws', '/attack-ws': '/tactical-ws', '/guys-ws': '/rumble-ws', '/bang-ws': '/court-ws', '/apple-ws': '/ten-ws' };
 const PORT = Number(process.env.PORT) || 8000;
 const PASSWORD = process.env.GAME_PASSWORD || '';
 const TICK = 1 / 20;
@@ -55,15 +61,20 @@ try {
 const world = new World({ dataDir: DATA_DIR });
 const dreamBoard = new DreamBoard(DATA_DIR); // 드림 러너 리더보드
 const dreamRooms = new DreamRooms((sid) => world.userOf(sid)); // 드림 러너 같이 달리기 방
-// 젤리라이더: 방 · 트랙별 최고 기록 (짧을수록 좋다)
+// 젤리드리프트: 방 · 트랙별 최고 기록 (짧을수록 좋다)
 const RIDER_TRACKS = ['candy', 'cloud', 'neon', 'lava', 'sakura', 'synth', 'snow', 'deep', 'hairpin', 'choco', 'crystal', 'steam', 'park', 'rainbow', 'moon', 'chess'];
-const riderRooms = new RiderRooms((sid) => world.userOf(sid));
-const attackRooms = new AttackRooms((sid) => world.userOf(sid)); // 젤리어택 방 (봇은 서버가 움직인다)
-const bgRooms = new BgRooms((sid) => world.userOf(sid)); // 젤리배그 (최대 30명)
-const watchRooms = new WatchRooms((sid) => world.userOf(sid)); // 젤리워치 (6 대 6 · 봇은 서버가)
-// 젤리 사과게임: 방 · 시간별 최고 점수 (클수록 좋다)
-const appleRooms = new AppleRooms((sid) => world.userOf(sid));
-const appleRecords = new Records(DATA_DIR, 'jelly-apple', {
+const driftRooms = new DriftRooms((sid) => world.userOf(sid));
+const tacticalRooms = new TacticalRooms((sid) => world.userOf(sid)); // 젤리택티컬 방 (봇은 서버가 움직인다)
+const dropRooms = new DropRooms((sid) => world.userOf(sid)); // 젤리드롭 (최대 30명)
+const guardRooms = new GuardRooms((sid) => world.userOf(sid)); // 젤리수호대 (6 대 6 · 봇은 서버가)
+// 젤리텐: 방 · 시간별 최고 점수 (클수록 좋다)
+const tenRooms = new TenRooms((sid) => world.userOf(sid));
+// 기록 파일도 새 이름으로 (한 번만 · 새 파일이 이미 있으면 그대로)
+for (const [o, n] of [['jelly-apple', 'jelly-ten'], ['jelly-rider', 'jelly-drift']]) {
+  const a = path.join(DATA_DIR, `${o}.json`), b = path.join(DATA_DIR, `${n}.json`);
+  try { if (fs.existsSync(a) && !fs.existsSync(b)) { fs.renameSync(a, b); console.log(`📦 기록 파일 ${o}.json → ${n}.json`); } } catch (e) { console.warn('기록 파일 옮기기 실패', o, e.message); }
+}
+const tenRecords = new Records(DATA_DIR, 'jelly-ten', {
   boards: ['t60', 't120', 't180'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.score)),
   check: (b) => (Number.isInteger(Number(b.score)) && Number(b.score) >= 0 && Number(b.score) <= 170 ? null : '기록이 이상해요'),
 });
@@ -80,16 +91,16 @@ const sketchRooms = new SketchRooms((sid) => world.userOf(sid)); // 젤리 스�
 const guessHits = new Map();
 // 젤리 타자연습: 경주 방 · 짧은 글 최고 타수(정확도 90% 이상) · 젤리비 최고 점수
 const typeRooms = new TypeRooms((sid) => world.userOf(sid));
-const guysRooms = new GuysRooms((sid) => world.userOf(sid)); // 젤리 가이즈 (파티 장애물 레이스 · 봇은 서버가)
+const rumbleRooms = new RumbleRooms((sid) => world.userOf(sid)); // 젤리대소동 (파티 장애물 레이스 · 봇은 서버가)
 const mergeRooms = new MergeRooms((sid) => world.userOf(sid)); // 젤리 머지
-const bangRooms = new BangRooms((sid) => world.userOf(sid)); // 젤리뱅 (숨은 역할 카드 결투)
+const courtRooms = new CourtRooms((sid) => world.userOf(sid)); // 젤리궁정 (숨은 역할 카드 결투)
 const dingRooms = new DingRooms((sid) => world.userOf(sid)); // 젤리 땡 (종 치기)
 const slideRooms = new SlideRooms((sid) => world.userOf(sid)); // 젤리 슬라이드 (밀어서 합치기)
 const typeRecords = new Records(DATA_DIR, 'jelly-type', {
   boards: ['kpm', 'rain'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.value)),
   check: (b) => { const v = Number(b.value); return Number.isFinite(v) && v >= 0 && v <= (b.b === 'kpm' ? 1600 : 5000000) ? null : '기록이 이상해요'; },
 });
-const riderRecords = new Records(DATA_DIR, 'jelly-rider', {
+const driftRecords = new Records(DATA_DIR, 'jelly-drift', {
   boards: RIDER_TRACKS, better: (a, b) => a.value < b.value, value: (b) => Math.round(Number(b.time) * 1000) / 1000,
   check: (b) => (Number.isFinite(Number(b.time)) && Number(b.time) >= 25 && Number(b.time) <= 3600 ? null : '기록이 이상해요'),
 });
@@ -133,7 +144,8 @@ async function api(req, res, url) {
   }
   // 드림 러너 (계정 · 로그인은 젤리시티와 같이 쓴다)
   if (url.pathname.startsWith('/api/dream/')) return dreamApi(req, res, url, world.userOf(sid), dreamBoard, json);
-  if (url.pathname.startsWith('/api/rider/')) return riderRecords.api(req, res, url, world.userOf(sid), json, '/api/rider');
+  if (url.pathname.startsWith('/api/drift/')) return driftRecords.api(req, res, url, world.userOf(sid), json, '/api/drift');
+  if (url.pathname.startsWith('/api/rider/')) return driftRecords.api(req, res, url, world.userOf(sid), json, '/api/rider'); // 옛 주소
   // 혼자 그려보기: AI 젤리봇이 그림을 보고 맞힌다 (그림은 저장하지 않는다)
   if (url.pathname === '/api/draw/guess' && req.method === 'POST') {
     if (!llmEnabled) return json(res, 503, { error: 'AI 젤리봇이 쉬는 중이에요' });
@@ -154,7 +166,8 @@ async function api(req, res, url) {
     } catch (e) { console.warn('그림 맞히기 실패', e.message); return json(res, 502, { error: 'AI 젤리봇이 그림을 못 봤어요' }); }
   }
   if (url.pathname.startsWith('/api/type/')) return typeRecords.api(req, res, url, world.userOf(sid), json, '/api/type');
-  if (url.pathname.startsWith('/api/apple/')) return appleRecords.api(req, res, url, world.userOf(sid), json, '/api/apple');
+  if (url.pathname.startsWith('/api/ten/')) return tenRecords.api(req, res, url, world.userOf(sid), json, '/api/ten');
+  if (url.pathname.startsWith('/api/apple/')) return tenRecords.api(req, res, url, world.userOf(sid), json, '/api/apple'); // 옛 주소
   if (url.pathname.startsWith('/api/surv/')) return survRecords.api(req, res, url, world.userOf(sid), json, '/api/surv');
   const who = world.userOf(sid);
   if (!who) return json(res, 401, { error: 'login' });
@@ -171,7 +184,7 @@ async function api(req, res, url) {
       if (!world.ownsChar(who.sub, char) || world.photos[id]?.owner !== char) return json(res, 403, { error: '내 사진이 아니에요' });
       world.deletePhoto(id); return json(res, 200, { ok: true });
     }
-    // 인스타그램
+    // 젤리그램
     if (url.pathname === '/api/insta' && req.method === 'GET') return json(res, 200, { feed: world.instaFeed(char, url.searchParams.get('mode') === 'following' ? 'following' : 'all') });
     if (url.pathname === '/api/insta' && req.method === 'POST') { const b = await readJson(req); world.postInsta(who.sub, b.char, b.id, b.caption); return json(res, 200, { ok: true }); }
     if (url.pathname === '/api/insta/like' && req.method === 'POST') { const b = await readJson(req); return json(res, 200, { likes: world.likeInsta(who.sub, b.char, b.id) }); }
@@ -181,7 +194,7 @@ async function api(req, res, url) {
     if (url.pathname === '/api/insta/follow' && req.method === 'POST') { const b = await readJson(req); return json(res, 200, world.follow(who.sub, b.char, b.target)); }
     if (url.pathname === '/api/insta/profile') return json(res, 200, world.instaProfile(char, url.searchParams.get('user')));
     if (url.pathname === '/api/insta/follows') return json(res, 200, { list: world.followList(url.searchParams.get('user'), url.searchParams.get('which')) });
-    // 인스타 DM
+    // 젤리그램 DM
     if (url.pathname === '/api/dm' && req.method === 'GET') { if (!world.ownsChar(who.sub, char)) return json(res, 403, { error: '내 캐릭터가 아니에요' }); return json(res, 200, { threads: world.dmThreads(char) }); }
     if (url.pathname === '/api/dm/thread') return json(res, 200, world.dmThread(who.sub, char, url.searchParams.get('with')));
     if (url.pathname === '/api/dm' && req.method === 'POST') { const b = await readJson(req); return json(res, 200, world.sendDm(who.sub, b.char, b.to, b.text)); }
@@ -237,6 +250,7 @@ const server = http.createServer((req, res) => {
   }
   // 옛 주소: 젤리시티가 / 에 있던 시절의 관리자 페이지
   if (url.pathname === '/admin.html') { res.writeHead(301, { Location: '/jelly-city/admin.html' }); res.end(); return; }
+  for (const [o, n] of RENAMED) if (url.pathname === o || url.pathname.startsWith(o + '/')) { res.writeHead(301, { Location: n + url.pathname.slice(o.length) + url.search }); res.end(); return; }
   let file = path.normalize(path.join(PUBLIC, decodeURIComponent(url.pathname)));
   if (!file.startsWith(PUBLIC)) { res.writeHead(403); res.end(); return; }
   if (fs.existsSync(file) && fs.statSync(file).isDirectory()) {
@@ -257,17 +271,17 @@ const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024, perMess
 // 드림 러너 방(최대 12명): 따로 연결
 const dreamWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
 dreamWss.on('connection', (ws) => dreamRooms.connect(ws));
-const riderWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
-riderWss.on('connection', (ws) => riderRooms.connect(ws));
-const attackWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
-attackWss.on('connection', (ws) => attackRooms.connect(ws));
-const bgWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
-bgWss.on('connection', (ws) => bgRooms.connect(ws));
-const watchWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
-watchWss.on('connection', (ws) => watchRooms.connect(ws));
+const driftWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
+driftWss.on('connection', (ws) => driftRooms.connect(ws));
+const tacticalWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
+tacticalWss.on('connection', (ws) => tacticalRooms.connect(ws));
+const dropWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
+dropWss.on('connection', (ws) => dropRooms.connect(ws));
+const guardWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
+guardWss.on('connection', (ws) => guardRooms.connect(ws));
 const partyWss = (rooms) => { const w = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false }); w.on('connection', (ws) => rooms.connect(ws)); return w; };
-const appleWss = partyWss(appleRooms), wordWss = partyWss(wordRooms), typeWss = partyWss(typeRooms);
-const guysWss = partyWss(guysRooms), mergeWss = partyWss(mergeRooms), bangWss = partyWss(bangRooms), dingWss = partyWss(dingRooms), slideWss = partyWss(slideRooms);
+const tenWss = partyWss(tenRooms), wordWss = partyWss(wordRooms), typeWss = partyWss(typeRooms);
+const rumbleWss = partyWss(rumbleRooms), mergeWss = partyWss(mergeRooms), courtWss = partyWss(courtRooms), dingWss = partyWss(dingRooms), slideWss = partyWss(slideRooms);
 const drawWss = new WebSocketServer({ noServer: true, maxPayload: 160 * 1024, perMessageDeflate: { threshold: 2048 } }); // 그림은 커서 더 크게 · 압축
 drawWss.on('connection', (ws) => drawRooms.connect(ws));
 const survWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: { threshold: 512 } }); // 충치균이 많아서 압축
@@ -276,8 +290,8 @@ const sketchWss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024, p
 sketchWss.on('connection', (ws) => sketchRooms.connect(ws));
 // 주소로 나눠 받는다: /ws = 젤리시티 · /dream-ws = 드림 러너
 server.on('upgrade', (req, socket, head) => {
-  const p = new URL(req.url, 'http://x').pathname;
-  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/rider-ws' ? riderWss : p === '/attack-ws' ? attackWss : p === '/bg-ws' ? bgWss : p === '/watch-ws' ? watchWss : p === '/apple-ws' ? appleWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : p === '/type-ws' ? typeWss : p === '/surv-ws' ? survWss : p === '/sketch-ws' ? sketchWss : p === '/guys-ws' ? guysWss : p === '/merge-ws' ? mergeWss : p === '/bang-ws' ? bangWss : p === '/ding-ws' ? dingWss : p === '/slide-ws' ? slideWss : null;
+  const p0 = new URL(req.url, 'http://x').pathname, p = OLD_WS[p0] || p0;
+  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/drift-ws' ? driftWss : p === '/tactical-ws' ? tacticalWss : p === '/drop-ws' ? dropWss : p === '/guard-ws' ? guardWss : p === '/ten-ws' ? tenWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : p === '/type-ws' ? typeWss : p === '/surv-ws' ? survWss : p === '/sketch-ws' ? sketchWss : p === '/rumble-ws' ? rumbleWss : p === '/merge-ws' ? mergeWss : p === '/court-ws' ? courtWss : p === '/ding-ws' ? dingWss : p === '/slide-ws' ? slideWss : null;
   if (!target) { socket.destroy(); return; }
   target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
 });
@@ -332,7 +346,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
     stopping = true;
     world.broadcast({ t: 'sys', text: '🔧 서버가 업데이트돼요! 잠시 후 자동으로 다시 접속해요' });
     try { world.save(); console.log('💾 세계를 저장했어요'); } catch (e) { console.error('저장 실패', e); }
-    dreamBoard.save(); riderRecords.save(); appleRecords.save(); survRecords.save(); wordDict.save(); typeRecords.save();
+    dreamBoard.save(); driftRecords.save(); tenRecords.save(); survRecords.save(); wordDict.save(); typeRecords.save();
     setTimeout(() => process.exit(0), 500);
   });
 }

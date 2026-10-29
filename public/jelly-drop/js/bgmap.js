@@ -1,6 +1,6 @@
-// 젤리배그 섬: 240m 섬 (20~30명이 붙기 좋은 크기) · 이름 있는 동네 7곳 · 들어갈 수 있는 집(문 · 2층 · 계단) · 숲 · 바위 · 길
+// 젤리드롭 섬: 240m 섬 (20~30명이 붙기 좋은 크기) · 이름 있는 동네 7곳 · 들어갈 수 있는 집(문 · 2층 · 계단) · 숲 · 바위 · 길
 //   서버 · 화면이 같은 씨앗으로 같은 섬을 만든다. 아이템이 나올 자리(loot)도 함께
-import { rng } from '../../jelly-apple/js/board.js';
+import { rng } from '../../jelly-ten/js/board.js';
 
 const B = (x, z, w, d, h, k = 'wall', y = 0, extra = {}) => ({ x, z, w, d, h, k, y, ...extra });
 export const BG_SIZE = 240;

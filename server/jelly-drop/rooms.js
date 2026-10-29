@@ -1,11 +1,11 @@
-// 젤리배그 방: 최대 30명(사람 + 젤리봇으로 채우기) · 젤리 비행선에서 뛰어내려 · 줍고 · 싸우고 · 줄어드는 젤리 자기장 · 마지막 한 명
+// 젤리드롭 방: 최대 30명(사람 + 젤리봇으로 채우기) · 젤리 비행선에서 뛰어내려 · 줍고 · 싸우고 · 줄어드는 젤리 자기장 · 마지막 한 명
 //   아이템 · 가방 · 피해(방어구) · 회복 · 자기장 피해 · 순위는 서버가 정한다. 움직임은 각자 화면이 보내고, 맞힘은 서버가 벽 · 거리 · 연사로 확인
 import { BaseRooms } from '../shared/rooms.js';
-import { getBgMap, BG_MAPS, BG_SIZE } from '../../public/jelly-bg/js/bgmap.js';
-import { clearLine } from '../../public/jelly-attack/js/maps.js';
-import { weapon, NADE, nadeDmg, KNIFE, falloff } from '../../public/jelly-attack/js/weapons.js';
-import { ARMOR_CUT, HEALS, DROP, makeLoot, makeZones, zoneAt, makePlane, planeAt, emptyInv, rollItem, AMMO, AMMO_OF, ATTS, fits, CAP, BOOSTS, ammoTotal, makeVehicles, VEHICLES, THROWS, throwCount, rollCrate, inWater } from '../../public/jelly-bg/js/bgrules.js';
-import { rng } from '../../public/jelly-apple/js/board.js';
+import { getBgMap, BG_MAPS, BG_SIZE } from '../../public/jelly-drop/js/bgmap.js';
+import { clearLine } from '../../public/jelly-tactical/js/maps.js';
+import { weapon, NADE, nadeDmg, KNIFE, falloff } from '../../public/jelly-tactical/js/weapons.js';
+import { ARMOR_CUT, HEALS, DROP, makeLoot, makeZones, zoneAt, makePlane, planeAt, emptyInv, rollItem, AMMO, AMMO_OF, ATTS, fits, CAP, BOOSTS, ammoTotal, makeVehicles, VEHICLES, THROWS, throwCount, rollCrate, inWater } from '../../public/jelly-drop/js/bgrules.js';
+import { rng } from '../../public/jelly-ten/js/board.js';
 
 const EYE = 1.55, MAX = 30;
 const BOT_NAMES = ['딸기', '소다', '푸딩', '망고', '민트', '라임', '자두', '복숭아', '포도', '레몬', '체리', '키위', '바닐라', '초코', '멜론', '유자', '코코넛', '블루베리', '귤', '수박', '자몽', '카라멜', '마카롱', '솜사탕', '모찌', '쿠키', '와플', '팝콘', '젤리빈'];
@@ -16,7 +16,7 @@ const REVIVE_MS = 8000, RED_R = 26;
 // 같은 분대인가 (혼자 하기면 자기만)
 const mates = (a, b) => a === b || (a.sq != null && a.sq === b.sq);
 
-export class BgRooms extends BaseRooms {
+export class DropRooms extends BaseRooms {
   constructor(userOf) {
     super(userOf, { max: MAX, hz: 15, countdown: 3000, defaults: { fill: 24, map: 'random', squad: 1 } });
     this.navs = new Map();

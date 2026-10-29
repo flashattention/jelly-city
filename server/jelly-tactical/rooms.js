@@ -1,8 +1,8 @@
-// 젤리어택 방: 최대 12명 + 봇. 팀 데스매치 · 개인전. 맞았는지는 쏜 사람 화면이 알리고, 서버가 벽 · 거리 · 연사를 확인해서 피해를 준다
+// 젤리택티컬 방: 최대 12명 + 봇. 팀 데스매치 · 개인전. 맞았는지는 쏜 사람 화면이 알리고, 서버가 벽 · 거리 · 연사를 확인해서 피해를 준다
 //   봇은 서버가 움직인다 (길찾기 격자 → 길 따라 이동 → 보이면 조준해서 쏜다)
 import { BaseRooms, clean } from '../shared/rooms.js';
-import { mapById, clearLine, rayBoxes } from '../../public/jelly-attack/js/maps.js';
-import { weapon, PRIMARY, SECONDARY, KNIFE, NADE, nadeDmg, falloff } from '../../public/jelly-attack/js/weapons.js';
+import { mapById, clearLine, rayBoxes } from '../../public/jelly-tactical/js/maps.js';
+import { weapon, PRIMARY, SECONDARY, KNIFE, NADE, nadeDmg, falloff } from '../../public/jelly-tactical/js/weapons.js';
 
 const MAP_IDS = ['depot', 'desert', 'factory', 'harbor', 'school', 'snow', 'subway'];
 const TIME = Number(process.env.ATTACK_SEC) || 6 * 60; // 한 판 시간 (초)
@@ -12,7 +12,7 @@ const BOT_COLORS = ['#ff8fb1', '#7cd8ff', '#ffd27a', '#ffb36b', '#9be7a7', '#c39
 const BOT_GUNS = ['m4', 'ak47', 'rifle', 'mp5', 'scar', 'shotgun', 'sniper', 'uzi'];
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
-export class AttackRooms extends BaseRooms {
+export class TacticalRooms extends BaseRooms {
   teamChat(r) { return r.opts.mode !== 'ffa'; } // 팀 데스매치면 팀 채팅
   constructor(userOf) {
     super(userOf, { max: 12, hz: 20, countdown: 3000, defaults: { map: 'depot', mode: 'tdm', bots: 4 } });

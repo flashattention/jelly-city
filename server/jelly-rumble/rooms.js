@@ -1,18 +1,18 @@
-// 젤리 가이즈 방: 최대 20명 + 젤리봇으로 채워서 여러 판(레이스 · 버티기 · 결승)을 이어 한다
+// 젤리대소동 방: 최대 20명 + 젤리봇으로 채워서 여러 판(레이스 · 버티기 · 결승)을 이어 한다
 //   코스는 씨앗으로 모두 같게 만들고, 장애물은 시간으로 움직여서 따로 보내지 않는다
 //   사람 몸은 각자 화면이 움직이고(위치만 보냄), 봇은 서버가 같은 몸 규칙으로 움직인다
 //   통과 · 탈락 · 떨어지는 판 · 터진 문은 서버가 정해서 모두에게 알린다
 import { BaseRooms } from '../shared/rooms.js';
-import { buildRound, planEpisode, quotaFor, ROUNDS } from '../../public/jelly-guys/js/rounds.js';
-import { newBody, step, pushApart } from '../../public/jelly-guys/js/phys.js';
-import { newBrain, think } from '../../public/jelly-guys/js/bots.js';
+import { buildRound, planEpisode, quotaFor, ROUNDS } from '../../public/jelly-rumble/js/rounds.js';
+import { newBody, step, pushApart } from '../../public/jelly-rumble/js/phys.js';
+import { newBrain, think } from '../../public/jelly-rumble/js/bots.js';
 
 const BOT_NAMES = ['젤리봇 딸기', '젤리봇 포도', '젤리봇 레몬', '젤리봇 민트', '젤리봇 복숭아', '젤리봇 소다', '젤리봇 콜라', '젤리봇 메론', '젤리봇 자두', '젤리봇 망고', '젤리봇 체리', '젤리봇 키위', '젤리봇 라임', '젤리봇 블루', '젤리봇 코코', '젤리봇 우유', '젤리봇 녹차', '젤리봇 꿀', '젤리봇 사과', '젤리봇 귤', '젤리봇 수박', '젤리봇 바나나', '젤리봇 오렌지', '젤리봇 자몽'];
 const BOT_COLORS = ['#ff6b8b', '#9b6bff', '#ffd84d', '#5fe0b0', '#ffab91', '#6ec6ff', '#ff8a3d', '#b5e655', '#d36bff', '#ffc94d', '#ff4f6d', '#7ed957', '#c6f06b', '#4d8bff', '#c49a6c', '#fff3e0', '#8bc34a', '#ffca28', '#ef5350', '#ffa726', '#66bb6a', '#fff176', '#ff9800', '#ff7f7f'];
 export const FILLS = [8, 12, 16, 20];
 const INTRO = 3600, COUNT = 3000, RESULT = 3600, DT = 1 / 60;
 
-export class GuysRooms extends BaseRooms {
+export class RumbleRooms extends BaseRooms {
   constructor(userOf) { super(userOf, { max: 20, hz: 20, countdown: 1500, defaults: { fill: 16 } }); }
   allow(cur, n) { return { fill: FILLS.includes(Number(n.fill)) ? Number(n.fill) : cur.fill || 16 }; }
   list() { return [...this.rooms.values()].filter((r) => !r.practice).map((r) => this.roomInfo(r)); }

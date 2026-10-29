@@ -1,4 +1,5 @@
-// 젤리라이더: 꿈나라 트랙을 곰돌이 카트로 달린다 (혼자: AI 5대 · 타임어택 · 같이: 최대 12명, 스피드전/아이템전 · 개인전/팀전)
+// 젤리드리프트: 꿈나라 트랙을 곰돌이 카트로 달린다 (혼자: AI 5대 · 타임어택 · 같이: 최대 12명, 스피드전/아이템전 · 개인전/팀전)
+import '../../shared/js/renamed.js'; // 옛 이름으로 저장된 값 옮기기 (맨 먼저)
 import * as THREE from 'three';
 import { account, store } from '../../shared/js/account.js';
 import { Shell, esc, TEAMS } from '../../shared/js/shell.js';
@@ -13,7 +14,7 @@ const $ = (id) => document.getElementById(id);
 const fmt = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(3).padStart(6, '0')}`;
 const BOT_NAMES = ['딸기봇', '소다봇', '푸딩봇', '망고봇', '민트봇', '라임봇', '자두봇'];
 const BOT_COLORS = ['#ff8fb1', '#7cd8ff', '#ffd27a', '#ffb36b', '#9be7a7', '#c39bff', '#ff7a7a'];
-const MODE_KEY = 'jellyrider.mode', TRACK_KEY = 'jellyrider.track', ANON_KEY = 'dreamrunner.anon';
+const MODE_KEY = 'jellydrift.mode', TRACK_KEY = 'jellydrift.track', ANON_KEY = 'dreamrunner.anon';
 
 // ---------- 3D ----------
 const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, powerPreference: 'high-performance' });
@@ -103,7 +104,7 @@ function renderTitleOpts() {
 const shell = new Shell({
   onEscape: () => { if (!$('howto').classList.contains('hidden')) { $('howto').classList.add('hidden'); return true; } return false; },
   sound: { muted: () => sound.muted, toggle: () => { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; if (sound.muted) engine(0); } },
-  key: 'jellyrider', title: '🏁 젤리라이더', subtitle: '꿈나라 트랙을 곰돌이 카트로 질주!<br>드리프트로 니트로를 모아 역전해요', wsPath: '/rider-ws', max: 12,
+  key: 'jellydrift', title: '🏁 젤리드리프트', subtitle: '꿈나라 트랙을 곰돌이 카트로 질주!<br>드리프트로 니트로를 모아 역전해요', wsPath: '/drift-ws', max: 12,
   multiLabel: '👥 같이 달리기', roomIcon: '🏁', startLabel: '🏁 다 같이 출발!',
   keysHelp: '↑ 가속 · ↓ 브레이크 · ← → 핸들 · Shift 드리프트(→ 니트로) · Ctrl/Space 니트로·아이템 (↓+아이템: 물폭탄 뒤로 떨구기) · R 트랙으로 · M 소리',
   buttons: [
@@ -465,7 +466,7 @@ function showResults(m) {
 function anonId() { let a = store.get(ANON_KEY); if (!/^[a-f0-9]{24}$/.test(a || '')) { a = [...crypto.getRandomValues(new Uint8Array(12))].map((b) => b.toString(16).padStart(2, '0')).join(''); store.set(ANON_KEY, a); } return a; }
 async function saveRecord(rec) {
   try {
-    const r = await account.api('/api/rider/record', { method: 'POST', body: rec });
+    const r = await account.api('/api/drift/record', { method: 'POST', body: rec });
     game.boards = {}; loadTops(); // 새 기록이 처음 화면에 바로 보이게
     $('ov-best').textContent = r.best ? `🎉 이 트랙 내 최고 기록! 전체 ${r.me.rank}위` : `내 최고 ${fmt(r.me.value)} · 전체 ${r.me.rank}위`;
     if (r.best) sfx('best');
@@ -477,13 +478,13 @@ $('home-btn').onclick = () => { if (game.multi) { shell.send({ t: 'leave' }); sh
 
 // ---------- 기록판 ----------
 // 트랙마다 1등 기록 (처음 화면 버튼) · 고른 트랙 TOP 5
-async function loadTops() { try { game.tops = (await account.api('/api/rider/tops')).tops; if (game.mode === 'title' || !game.mode) renderTitleOpts(); } catch { /* 무시 */ } }
+async function loadTops() { try { game.tops = (await account.api('/api/drift/tops')).tops; if (game.mode === 'title' || !game.mode) renderTitleOpts(); } catch { /* 무시 */ } }
 async function miniBoard(id) {
   const el = $('mini-board'); if (!el) return;
   if (isRandom(id)) { el.innerHTML = ''; return; }
   const t = TRACKS.find((x) => x.id === id);
   let d = game.boards?.[id];
-  if (!d) { try { d = await account.api(`/api/rider/board?b=${id}` + (shell.logged() ? '' : `&anon=${anonId()}`)); (game.boards ||= {})[id] = d; } catch { d = { top: [] }; } }
+  if (!d) { try { d = await account.api(`/api/drift/board?b=${id}` + (shell.logged() ? '' : `&anon=${anonId()}`)); (game.boards ||= {})[id] = d; } catch { d = { top: [] }; } }
   if (!$('mini-board')) return;
   const rows = (d.top || []).slice(0, 5).map((e) => `<div class="mb-row${e.id === d.me?.id ? ' me' : ''}"><span>${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm">${esc(e.name)}</span><b>${fmt(e.value)}</b></div>`).join('');
   $('mini-board').innerHTML = `<div class="mb-title">🏆 ${t.emoji} ${esc(t.name)} 최고 기록</div>${rows || '<div class="mb-empty">아직 기록이 없어요 · 타임어택으로 첫 기록을!</div>'}${d.me && d.me.rank > 5 ? `<div class="mb-row me"><span>${d.me.rank}</span><span class="nm">나</span><b>${fmt(d.me.value)}</b></div>` : ''}`;
@@ -495,7 +496,7 @@ async function openBoard(id) {
   el.querySelectorAll('[data-t]').forEach((b) => { b.onclick = () => openBoard(b.dataset.t); });
   $('board-list').innerHTML = '<div class="empty">불러오는 중…</div>';
   let d = { top: [] };
-  try { d = await account.api(`/api/rider/board?b=${id}` + (shell.logged() ? '' : `&anon=${anonId()}`)); } catch { /* 무시 */ }
+  try { d = await account.api(`/api/drift/board?b=${id}` + (shell.logged() ? '' : `&anon=${anonId()}`)); } catch { /* 무시 */ }
   const myId = d.me?.id;
   const row = (e) => `<div class="brow${e.id === myId ? ' me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.name)}${e.guest ? ' <span class="guest">체험판</span>' : e.anon ? ' <span class="guest">비로그인</span>' : ''}</span><span class="sc">${fmt(e.value)}</span></div>`;
   $('board-list').innerHTML = (d.top || []).map(row).join('') + (d.me && d.me.rank > 30 ? '<div class="brow gap">⋯</div>' + row(d.me) : '') || '<div class="empty">아직 기록이 없어요. 첫 기록의 주인공이 되어 보세요!</div>';

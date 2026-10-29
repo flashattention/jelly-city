@@ -298,7 +298,7 @@ export class FX {
     }
   }
 
-  // 휘두르기 궤적: 무기 등급이 높을수록 화려하게 (일반 → 고급 → 희귀 → 전설), 광선검은 제 색으로 빛난다
+  // 휘두르기 궤적: 무기 등급이 높을수록 화려하게 (일반 → 고급 → 희귀 → 전설), 빛 막대은 제 색으로 빛난다
   slash(p, heading, wid = 'fist') {
     const d = itemDef(wid) || {};
     const saber = SABER_COL[wid];
@@ -334,7 +334,7 @@ export class FX {
     }
   }
 
-  // 젤리병단 쌍검: 끝은 가늘고 가운데는 두꺼운 초승달 빛 두 줄기가 X자로 교차 (곰돌이를 따라다녀서 날면서 베도 보인다)
+  // 하늘갈고리 쌍검: 끝은 가늘고 가운데는 두꺼운 초승달 빛 두 줄기가 X자로 교차 (곰돌이를 따라다녀서 날면서 베도 보인다)
   twinSlash(pos, heading) {
     const fwd = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
     const one = (roll, dir, delay) => {
@@ -351,7 +351,7 @@ export class FX {
   }
 
   // 1인칭 휘두르기: 눈앞에서 화면을 가로질러 베는 궤적 (카메라에 붙어 다녀서 빨리 날아도 보인다)
-  //   젤리병단 장비(쌍검)는 두 칼이 X자로 교차한다
+  //   하늘갈고리 장비(쌍검)는 두 칼이 X자로 교차한다
   fpSlash(cam, wid = 'fist') {
     const saber = SABER_COL[wid], tier = wid === 'fist' ? -1 : saber ? 3 : TIER[rarityOf(wid)] ?? 0;
     const twin = !!itemDef(wid)?.odm;
@@ -671,7 +671,7 @@ export class Combat {
       const big = u.kind === 'tank' || u.kind === 'heli';
       out.push({ tt: 'unit', id: u.id, base: u.obj.position, r: big ? 2.4 : 0.55, h: big ? 3 : 2 });
     }
-    // 거대 젤리 (총알·마법은 서버가 '효과 없음', 젤리병단 칼은 뒷목 판정)
+    // 거대 젤리 (총알·마법은 서버가 '효과 없음', 하늘갈고리 칼은 뒷목 판정)
     if (g.mode === 'city' && g.titans) for (const sh of g.titans.shapes()) out.push({ tt: 'titan', id: sh.id, base: sh.base, r: sh.r, h: sh.h });
     // 차에서 뛰어내려 도망가는 시민
     if (g.mode === 'city') for (const o of g.runners?.list.values() || []) if (!o.dead) out.push({ tt: 'runner', id: o.id, base: o.r.root.position, r: 0.55, h: o.r.height });
@@ -784,13 +784,13 @@ export class Combat {
   // 상대 피해 보정 (활 당긴 정도 등)
   sendHit(t, w, extra = {}) {
     if (t.tt === 'rtarget') { this.g.hitRangeTarget?.(t.rt, extra.point); return; }
-    // 거대 젤리: 젤리병단 장비가 아니면 맞아도 튕겨 나간다 (맞았는지 빗나갔는지 알 수 있게 불꽃 · 문구)
+    // 거대 젤리: 하늘갈고리 장비가 아니면 맞아도 튕겨 나간다 (맞았는지 빗나갔는지 알 수 있게 불꽃 · 문구)
     const blocked = t.tt === 'titan' && !itemDef(w.id).odm;
     this.g.ui.hitMarker(blocked);
     if (blocked) {
       const at = (extra.point || t.point)?.clone?.() || t.base.clone().setY(t.base.y + t.h * 0.5);
       for (let i = 0; i < 10; i++) this.fx.part(at, new THREE.Vector3((Math.random() - 0.5) * 8, Math.random() * 6, (Math.random() - 0.5) * 8), Math.random() < 0.5 ? '#ffe082' : '#ffffff', 0.35, 0.3, 0, { grav: 12 });
-      if (performance.now() - (this.blockMsgT || 0) > 900) { this.blockMsgT = performance.now(); this.g.ui.floatText(at, '🛡️ 효과 없음 · 젤리병단 장비로 뒷목을!', '#ffab40'); }
+      if (performance.now() - (this.blockMsgT || 0) > 900) { this.blockMsgT = performance.now(); this.g.ui.floatText(at, '🛡️ 효과 없음 · 하늘갈고리 장비로 뒷목을!', '#ffab40'); }
     }
     const { point, ...rest } = extra;
     void point;

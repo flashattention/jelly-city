@@ -1,5 +1,5 @@
-// 젤리배그 규칙 (서버 · 화면 같이): 아이템 · 방어구 · 회복 · 젤리 자기장 · 젤리 비행선
-import { rng } from '../../jelly-apple/js/board.js';
+// 젤리드롭 규칙 (서버 · 화면 같이): 아이템 · 방어구 · 회복 · 젤리 자기장 · 젤리 비행선
+import { rng } from '../../jelly-ten/js/board.js';
 import { BG_SIZE } from './bgmap.js';
 
 export const ARMOR_CUT = [0, 0.3, 0.4, 0.55];   // 조끼(몸) · 헬멧(머리) 단계별 피해 줄임

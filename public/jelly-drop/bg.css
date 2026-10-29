@@ -1,4 +1,4 @@
-/* 젤리배그: 젤리어택 화면(../style.css) 위에 더하는 것 */
+/* 젤리드롭: 젤리택티컬 화면(../style.css) 위에 더하는 것 */
 #bg-top { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; font-size: 19px; }
 #bg-top span { padding: 4px 14px; border-radius: 999px; background: rgba(20,8,50,.6); white-space: nowrap; }
 #zone-txt.warn { background: rgba(70,140,255,.75) !important; }

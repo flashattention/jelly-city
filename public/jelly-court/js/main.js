@@ -1,12 +1,13 @@
-// 젤리뱅: 숨은 역할 카드 대결 (4~7명 · 모자라면 젤리봇) · 규칙 판정은 서버, 화면은 받은 판을 그린다
+// 젤리궁정: 숨은 역할 카드 대결 (4~7명 · 모자라면 젤리봇) · 규칙 판정은 서버, 화면은 받은 판을 그린다
+import '../../shared/js/renamed.js'; // 옛 이름으로 저장된 값 옮기기 (맨 먼저)
 import { store } from '../../shared/js/account.js';
 import { Shell, esc } from '../../shared/js/shell.js';
 import { faceHtml, makeSound, confetti } from '../../shared/js/party.js';
 import { CARDS, CHARS, ROLES, MELT_ROUND, HAND_MAX, SUGAR_MAX } from './rules.js';
 
 const $ = (id) => document.getElementById(id);
-const S = makeSound('jellybang');
-const PICK_KEY = 'jellybang.pick';
+const S = makeSound('jellycourt');
+const PICK_KEY = 'jellycourt.pick';
 const pick0 = (() => { try { return JSON.parse(store.get(PICK_KEY) || '{}'); } catch { return {}; } })();
 const game = window.bang = { mode: 'title', g: null, myId: 0, me: -1, aim: null, pick: { bots: Math.max(3, Math.min(6, pick0.bots ?? 4)) }, deadline: 0, reactEnd: 0, lastTurn: -1, practice: false };
 
@@ -206,7 +207,7 @@ function practice() { S.unlock(); game.practice = true; shell.sendAfterHello({ t
 
 const shell = new Shell({
   sound: { muted: () => S.sound.muted, toggle: () => { S.toggleMute(); $('b-mute').textContent = S.sound.muted ? '🔇' : '🔊'; } },
-  key: 'jellybang', title: '🍮 젤리뱅', subtitle: '숨은 역할을 지키며 젤리를 던지는 카드 대결!<br>👑 젤리왕을 지킬까, 노릴까? 아무도 믿지 마요', wsPath: '/bang-ws', max: 7,
+  key: 'jellycourt', title: '🍮 젤리궁정', subtitle: '숨은 역할을 지키며 젤리를 던지는 카드 대결!<br>👑 젤리왕을 지킬까, 노릴까? 아무도 믿지 마요', wsPath: '/court-ws', max: 7,
   multiLabel: '👥 같이 하기', roomIcon: '🍮', startLabel: '🍮 다 같이 시작!',
   keysHelp: '카드를 누르고 → 빛나는 사람을 눌러 써요 · 4명이 안 되면 젤리봇이 채워요 · 📖 규칙에서 카드를 다 볼 수 있어요',
   buttons: [{ id: 'bot-btn', label: '🤖 젤리봇과 한 판 <small>바로 시작</small>', onClick: () => practice() }],

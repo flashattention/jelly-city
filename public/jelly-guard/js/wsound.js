@@ -1,5 +1,5 @@
-// 젤리워치 소리: 파일 없이 합성 (총 · 로켓 · 줄기 · 치유 · 기술 · 궁극기 · 거점 · 승리/패배) + 궁극기 대사 (브라우저 음성)
-const MUTE_KEY = 'jellywatch.mute';
+// 젤리수호대 소리: 파일 없이 합성 (총 · 로켓 · 줄기 · 치유 · 기술 · 궁극기 · 거점 · 승리/패배) + 궁극기 대사 (브라우저 음성)
+const MUTE_KEY = 'jellyguard.mute';
 let ctx = null, bus = null, noise = null;
 export const sound = { muted: (() => { try { return localStorage.getItem(MUTE_KEY) === '1'; } catch { return false; } })() };
 function ensure() {

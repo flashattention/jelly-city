@@ -1,12 +1,12 @@
-// 젤리 사과게임 방: 최대 12명 · 움직임은 서버가 다시 확인해서 점수를 센다 · 봇도 함께
+// 젤리텐 방: 최대 12명 · 움직임은 서버가 다시 확인해서 점수를 센다 · 봇도 함께
 //   mode 'race': 각자 같은 판(씨앗)으로 겨루기 · 'shared': 판 하나를 다 같이 (먼저 묶는 사람이 임자 = 땅따먹기)
 import { BaseRooms } from '../shared/rooms.js';
-import { makeBoard, tryMove, findMove, rng, normRect, COLS, ROWS, TIMES } from '../../public/jelly-apple/js/board.js';
+import { makeBoard, tryMove, findMove, rng, normRect, COLS, ROWS, TIMES } from '../../public/jelly-ten/js/board.js';
 
 const BOT_NAMES = ['젤리봇 딸기', '젤리봇 포도', '젤리봇 레몬', '젤리봇 민트', '젤리봇 복숭아', '젤리봇 소다'];
 const BOT_COLORS = ['#ff6b8b', '#9b6bff', '#ffd84d', '#5fe0b0', '#ffab91', '#6ec6ff'];
 
-export class AppleRooms extends BaseRooms {
+export class TenRooms extends BaseRooms {
   constructor(userOf) { super(userOf, { max: 12, hz: 4, countdown: 3500, defaults: { time: 120, bots: 0, mode: 'race' } }); }
   allow(cur, n) {
     return {

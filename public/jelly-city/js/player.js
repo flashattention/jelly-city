@@ -182,7 +182,7 @@ export class Player {
     root.visible = !this.fp && !(this.adsFP && this.aim > 0.75);
   }
 
-  // ---------------- 젤리병단 장비 (입체기동) ----------------
+  // ---------------- 하늘갈고리 장비 ----------------
   // 갈고리를 건 동안: 걸린 곳으로 당겨지고(줄 길이만큼은 진자처럼 흔들림) · WASD로 방향 · Space 가스로 가속.
   // 갈고리를 풀면 그 기세로 날아가다가 땅이나 옥상에 내려앉는다
   odmStart(vel) {
@@ -331,7 +331,7 @@ export class Player {
     const c = this.cam;
     const seatH = this.mount ? this.mount.ride.seat * this.mount.scale : 0; // 탈것에 타면 시점도 높아진다
     const tgt = this.inCar ? this.inCar.pos.clone().setY((this.inCar.pos.y || 0) + 1.8) : this.pos.clone().setY(this.pos.y + 1.5 + seatH * 0.8);
-    // 젤리병단 장비: 카메라가 곰돌이 머리보다 위를 보게 해서 곰돌이가 조준점(화면 가운데) 아래에 보인다
+    // 하늘갈고리 장비: 카메라가 곰돌이 머리보다 위를 보게 해서 곰돌이가 조준점(화면 가운데) 아래에 보인다
     if (!this.inCar && !this.mount) tgt.y += 1.15 * (this.odmK || 0);
     if (this.inCar) {
       // 차 뒤로 자연스럽게 따라감
@@ -350,7 +350,7 @@ export class Player {
       this.snap = false;
       return;
     }
-    // 젤리병단 장비를 들면 3인칭 카메라가 곰돌이에게 조금 더 붙는다 (부드럽게)
+    // 하늘갈고리 장비를 들면 3인칭 카메라가 곰돌이에게 조금 더 붙는다 (부드럽게)
     this.odmK = (this.odmK || 0) + ((this.odmHeld && !this.mount && !this.inCar ? 1 : 0) - (this.odmK || 0)) * Math.min(1, dt * 4);
     const dist0 = this.mount ? c.dist + this.mount.scale * this.mount.ride.seat * (this.mount.ride.fly ? 2.2 : 1.4) : this.inCar ? Math.max(c.dist, this.inCar.kind === 'heli' || this.inCar.kind === 'tank' ? 16 : this.inCar.kind === 'bus' || this.inCar.kind === 'truck' ? 14 : 11) : c.dist * (1 - 0.38 * this.odmK);
     // 총·활 조준(우클릭)은 1인칭으로 부드럽게 넘어가고, 마법봉 조준은 살짝 가까이

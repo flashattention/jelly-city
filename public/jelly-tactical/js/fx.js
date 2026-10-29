@@ -1,4 +1,4 @@
-// 큰 효과 (젤리어택 · 젤리배그 같이): 수류탄 폭발 · 연막
+// 큰 효과 (젤리택티컬 · 젤리드롭 같이): 수류탄 폭발 · 연막
 //   폭발 = 하얀 섬광 + 불덩이 + 땅을 쓸고 가는 충격파 + 파편 + 오래 남는 검은 연기 + 순간 조명
 import * as THREE from 'three';
 import { rayBoxes, floorAt } from './maps.js';

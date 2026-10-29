@@ -1,5 +1,6 @@
-// 젤리 사과게임: 숫자 곰젤리를 네모로 묶어 합이 10이 되면 팡! (혼자 · 봇과 대결 · 같이 최대 12명)
+// 젤리텐: 숫자 곰젤리를 네모로 묶어 합이 10이 되면 팡! (혼자 · 봇과 대결 · 같이 최대 12명)
 //   같이 하기는 '각자 판' (같은 판을 따로따로 겨루기) 과 '한 판 같이' (판 하나를 다 같이 · 먼저 묶으면 임자 · 내 색으로 물든다)
+import '../../shared/js/renamed.js'; // 옛 이름으로 저장된 값 옮기기 (맨 먼저)
 import { account, store } from '../../shared/js/account.js';
 import { Shell, esc } from '../../shared/js/shell.js';
 import { faceHtml, makeSound, confetti, rankIcon } from '../../shared/js/party.js';
@@ -8,8 +9,8 @@ import { COLS, ROWS, TIMES, makeBoard, sumRect, tryMove } from './board.js';
 const MODES = [['race', '🍎 각자 판', '같은 판을 따로따로'], ['shared', '🍏 한 판 같이', '판 하나를 다 같이 · 먼저 묶으면 임자']];
 
 const $ = (id) => document.getElementById(id);
-const S = makeSound('jellyapple');
-const PICK_KEY = 'jellyapple.pick', ANON_KEY = 'dreamrunner.anon';
+const S = makeSound('jellyten');
+const PICK_KEY = 'jellyten.pick', ANON_KEY = 'dreamrunner.anon';
 const pick0 = (() => { try { return JSON.parse(store.get(PICK_KEY) || '{}'); } catch { return {}; } })();
 const game = window.apple = {
   mode: 'title', kind: 'solo', board: null, score: 0, time: 120, startAt: 0, endAt: 0, players: new Map(), myId: 0,
@@ -276,7 +277,7 @@ function renderLive(hit) {
 }
 const shell = new Shell({
   sound: { muted: () => S.sound.muted, toggle: () => { S.toggleMute(); $('b-mute').textContent = S.sound.muted ? '🔇' : '🔊'; } },
-  key: 'jellyapple', title: '🍎 젤리 사과게임', subtitle: '숫자 곰젤리를 네모로 묶어 합이 10이 되면 팡!<br>제한 시간 안에 최대한 많이 터뜨려요', wsPath: '/apple-ws', max: 12,
+  key: 'jellyten', title: '🔟 젤리텐', subtitle: '숫자 곰젤리를 네모로 묶어 합이 10이 되면 팡!<br>제한 시간 안에 최대한 많이 터뜨려요', wsPath: '/ten-ws', max: 12,
   multiLabel: '👥 같이 하기', roomIcon: '🍎', startLabel: '🍎 다 같이 시작!',
   keysHelp: '마우스(손가락)로 드래그해서 네모로 묶기 · 합이 딱 10이면 사라져요 · 같이 하기는 모두 같은 판으로 겨뤄요',
   buttons: [{ id: 'solo-btn', label: '🍎 혼자 하기 <small>최고 점수 도전</small>', onClick: () => startSolo() }, { id: 'bot-btn', label: '🤖 봇과 대결 <small>젤리봇과 같은 판</small>', cls: 'ghost', onClick: () => practice() }],
@@ -344,28 +345,28 @@ async function endSolo() {
   shell.show('over');
   game.rec = { b: `t${game.time}`, score: game.score, color: shell.profile?.color };
   if (shell.logged()) await saveRecord({ ...game.rec, name: shell.profile?.name });
-  else { $('ov-save').classList.remove('hidden'); $('ov-nick').value = store.get('jellyapple.nick') || shell.profile?.name || ''; $('ov-me').textContent = '닉네임을 정하면 순위표에 남아요'; showTop(game.rec.b); }
+  else { $('ov-save').classList.remove('hidden'); $('ov-nick').value = store.get('jellyten.nick') || shell.profile?.name || ''; $('ov-me').textContent = '닉네임을 정하면 순위표에 남아요'; showTop(game.rec.b); }
 }
 function anonId() { let a = store.get(ANON_KEY); if (!/^[a-f0-9]{24}$/.test(a || '')) { a = [...crypto.getRandomValues(new Uint8Array(12))].map((b) => b.toString(16).padStart(2, '0')).join(''); store.set(ANON_KEY, a); } return a; }
 async function saveRecord(rec) {
   try {
-    const r = await account.api('/api/apple/record', { method: 'POST', body: rec });
+    const r = await account.api('/api/ten/record', { method: 'POST', body: rec });
     game.bestOf = { ...(game.bestOf || {}), [game.time]: Math.max(r.me?.value || 0, game.bestOf?.[game.time] || 0) };
     $('ov-me').textContent = r.best ? `🎉 새 최고 기록! 순위 ${r.me?.rank}등` : `최고 기록 ${r.me?.value}개 · 순위 ${r.me?.rank}등`;
     if (r.best) { confetti(); S.sfx('win'); }
     renderTop(r.top, r.me);
   } catch (e) { $('ov-me').textContent = `기록을 저장하지 못했어요 (${e.message})`; }
 }
-$('ov-save-btn').onclick = async () => { const name = $('ov-nick').value.trim(); if (!name) return shell.toast('닉네임을 정해 주세요'); store.set('jellyapple.nick', name); $('ov-save').classList.add('hidden'); await saveRecord({ ...game.rec, name, anon: anonId() }); };
+$('ov-save-btn').onclick = async () => { const name = $('ov-nick').value.trim(); if (!name) return shell.toast('닉네임을 정해 주세요'); store.set('jellyten.nick', name); $('ov-save').classList.add('hidden'); await saveRecord({ ...game.rec, name, anon: anonId() }); };
 function renderTop(top, me, el = $('ov-rank')) {
   const myId = me?.id;
   el.innerHTML = (top || []).slice(0, 10).map((e) => `<div class="brow${e.id === myId ? ' me' : ''}"><span class="rk">${rankIcon(e.rank)}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.name)}${e.guest ? ' <span class="guest">체험판</span>' : e.anon ? ' <span class="guest">비로그인</span>' : ''}</span><span class="sc">${e.value}<small>개</small></span></div>`).join('') || '<div class="empty">아직 기록이 없어요. 첫 기록의 주인공이 되어 보세요!</div>';
   if (me && me.rank > 10) el.insertAdjacentHTML('beforeend', `<div class="brow gap">⋯</div><div class="brow me"><span class="rk">${me.rank}</span><span class="nm">${esc(me.name)}</span><span class="sc">${me.value}<small>개</small></span></div>`);
 }
-async function showTop(b, el) { try { const d = await account.api(`/api/apple/board?b=${b}` + (shell.logged() ? '' : `&anon=${anonId()}`)); renderTop(d.top, d.me, el); } catch { /* 무시 */ } }
+async function showTop(b, el) { try { const d = await account.api(`/api/ten/board?b=${b}` + (shell.logged() ? '' : `&anon=${anonId()}`)); renderTop(d.top, d.me, el); } catch { /* 무시 */ } }
 async function loadBest() {
   game.bestOf = {};
-  for (const t of TIMES) { try { const d = await account.api(`/api/apple/board?b=t${t}` + (shell.logged() ? '' : `&anon=${anonId()}`)); if (d.me) game.bestOf[t] = d.me.value; } catch { /* 무시 */ } }
+  for (const t of TIMES) { try { const d = await account.api(`/api/ten/board?b=t${t}` + (shell.logged() ? '' : `&anon=${anonId()}`)); if (d.me) game.bestOf[t] = d.me.value; } catch { /* 무시 */ } }
 }
 function openBoard(t) {
   $('bd-seg').innerHTML = TIMES.map((x) => `<button data-t="${x}" class="${x === t ? 'on' : ''}">⏱️ ${x === 60 ? '1분' : x === 120 ? '2분' : '3분'}</button>`).join('');

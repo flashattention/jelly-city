@@ -1,4 +1,4 @@
-// 젤리 가이즈 몸 움직임: 내 화면과 서버 봇이 똑같이 쓴다
+// 젤리대소동 몸 움직임: 내 화면과 서버 봇이 똑같이 쓴다
 //   p = { x,y,z (발), vx,vy,vz, yaw, ground, stun, dive, coyote, carry }
 //   inp = { mx, mz (월드 방향, 길이 ≤ 1), jump, dive }   st = { tiles: Map(id → 떨어지는 시각), doors: Set(펑 터진 문) }
 import { moverAt, spinAngle, spinOmega, hammerAt, ballAt, ballsNow } from './rounds.js';

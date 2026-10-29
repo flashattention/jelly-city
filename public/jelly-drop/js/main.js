@@ -1,25 +1,26 @@
-// 젤리배그: 젤리어택의 무기 · 몸놀림 그대로 배틀로얄로 (최대 30명 · 젤리봇으로 채우기)
-//   젤리 비행선 → 뛰어내리기(F) → 낙하산 → 착지 → 줍기(E) → 싸우기 → 줄어드는 젤리 자기장 → 마지막 한 명 '이겼젤!'
+// 젤리드롭: 젤리택티컬의 무기 · 몸놀림 그대로 배틀로얄로 (최대 30명 · 젤리봇으로 채우기)
+//   젤리 비행선 → 뛰어내리기(F) → 낙하산 → 착지 → 줍기(E) → 싸우기 → 줄어드는 젤리 자기장 → 마지막 한 명 '마지막 곰젤리!'
+import '../../shared/js/renamed.js'; // 옛 이름으로 저장된 값 옮기기 (맨 먼저)
 import * as THREE from 'three';
 import { store } from '../../shared/js/account.js';
 import { openSens, sensOf } from '../../shared/js/sens.js';
 import { Shell, esc } from '../../shared/js/shell.js';
 import { Roach } from '../../shared/js/roach.js';
 import { confetti } from '../../shared/js/party.js';
-import { rayBoxes, floorAt } from '../../jelly-attack/js/maps.js';
+import { rayBoxes, floorAt } from '../../jelly-tactical/js/maps.js';
 import { getBgMap, BG_MAPS, BG_SIZE } from './bgmap.js';
 import { HEALS, DROP, zoneAt, planeAt, itemLabel, emptyInv, ARMOR_NAME, AMMO, AMMO_OF, ATTS, SLOTS, CAP, BOOSTS, BAG_NAME, ammoTotal, VEHICLES, THROWS, THROW_ORDER, inWater } from './bgrules.js';
 import { buildWater, makeRedZone, makeCrate, makeFire, updateFire, vaultTarget, WATER_Y } from './bgextra.js';
 import { buildVehicle, drive, poseVehicle, dressGear, extraLoot } from './bgparts.js';
-import { weapon, KNIFE, NADE, SMOKE } from '../../jelly-attack/js/weapons.js';
-import { buildMap } from '../../jelly-attack/js/world.js';
-import { Player, ViewModel, gunModel } from '../../jelly-attack/js/fps.js';
-import { sfx, unlock, toggleMute, sound } from '../../jelly-attack/js/sound.js';
-import { explosion, smoke, updateFx as updateBig, stepNade, NadeArc } from '../../jelly-attack/js/fx.js';
+import { weapon, KNIFE, NADE, SMOKE } from '../../jelly-tactical/js/weapons.js';
+import { buildMap } from '../../jelly-tactical/js/world.js';
+import { Player, ViewModel, gunModel } from '../../jelly-tactical/js/fps.js';
+import { sfx, unlock, toggleMute, sound } from '../../jelly-tactical/js/sound.js';
+import { explosion, smoke, updateFx as updateBig, stepNade, NadeArc } from '../../jelly-tactical/js/fx.js';
 
 const $ = (id) => document.getElementById(id);
 const wpn = (id) => weapon(id) || THROWS[id]; // 총 · 투척(화염병 · 섬광탄 · 신호탄 총)
-const PICK_KEY = 'jellybg.pick';
+const PICK_KEY = 'jellydrop.pick';
 let MAP = getBgMap('island');
 
 // ---------- 3D ----------
@@ -140,7 +141,7 @@ addEventListener('keyup', (e) => { keys.delete(e.code); if (e.code === 'KeyF' &&
 addEventListener('blur', () => { keys.clear(); mouseL = mouseR = false; game.free = null; if (game.reviving) stopRevive(); });
 function muteBtn() { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; shell.syncSound(); }
 $('b-mute').onclick = muteBtn; $('b-mute').textContent = sound.muted ? '🔇' : '🔊';
-$('b-quit').onclick = () => { if (game.mode !== 'dead' && !confirm('젤리배그에서 나갈까요?')) return; quit(); };
+$('b-quit').onclick = () => { if (game.mode !== 'dead' && !confirm('젤리드롭에서 나갈까요?')) return; quit(); };
 
 // ---------- 다른 곰돌이 ----------
 const chuteM = new THREE.MeshToonMaterial({ color: '#ff8fc4', transparent: true, opacity: 0.85, side: THREE.DoubleSide });
@@ -585,10 +586,10 @@ function results(m) {
   for (const id of ['hud', 'lockmsg', 'spec', 'bigmap', 'scope']) $(id).classList.add('hidden');
   const mine = m.rank.find((e) => e.id === game.myId), won = mine?.rank === 1;
   const out = !won && game.alive > 1; // 연습에서 내가 떨어지면 남은 봇끼리는 끝까지 안 겨룬다
-  $('ov-title').innerHTML = won ? '🍬 이겼젤! 오늘 간식은 젤리다!' : out ? `💥 #${mine?.rank || game.place}등으로 탈락!` : `🏆 ${esc(m.rank[0]?.name || '')} 우승!`;
+  $('ov-title').innerHTML = won ? '🍬 마지막 곰젤리! 우승!' : out ? `💥 #${mine?.rank || game.place}등으로 탈락!` : `🏆 ${esc(m.rank[0]?.name || '')} 우승!`;
   const teams = new Set(m.rank.map((e) => e.sq)).size;
   $('ov-me').textContent = mine ? `${game.squad > 1 ? `우리 팀 #${mine.rank}등 / ${teams}팀` : `나는 #${mine.rank}등 / ${m.rank.length}명`} · ${mine.k}킬 · 피해 ${mine.dmg}` : '';
-  if (won && game.squad > 1) $('ov-title').innerHTML = '🍬 이겼젤! 우리 팀 오늘 간식은 젤리다!';
+  if (won && game.squad > 1) $('ov-title').innerHTML = '🍬 마지막 곰젤리 팀! 우승!';
   const mySq = mine?.sq;
   $('ov-rank').innerHTML = m.rank.slice(0, 30).map((e) => `<div class="brow${e.id === game.myId ? ' me' : ''}${game.squad > 1 && e.sq === mySq ? ' mysq' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : '#' + e.rank}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${e.bot ? '🤖 ' : ''}${esc(e.name)}</span><span class="sc">${e.k}<small>킬 · ${e.dmg}</small></span></div>`).join('');
   game.lastPractice = !!m.practice;
@@ -822,7 +823,7 @@ function frame() {
 // ---------- 공용 틀 ----------
 const shell = new Shell({
   sound: { muted: () => sound.muted, toggle: () => { toggleMute(); $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; } },
-  key: 'jellybg', title: '🪂 젤리배그', subtitle: '젤리 비행선에서 뛰어내려 무기를 줍고<br>줄어드는 젤리 자기장 속 마지막 곰돌이가 되어요!', wsPath: '/bg-ws', max: 30,
+  key: 'jellydrop', title: '🪂 젤리드롭', subtitle: '젤리 비행선에서 뛰어내려 무기를 줍고<br>줄어드는 젤리 자기장 속 마지막 곰돌이가 되어요!', wsPath: '/drop-ws', max: 30,
   multiLabel: '👥 같이 하기', roomIcon: '🪂', startLabel: '🪂 비행선 출발!',
   keysHelp: 'F/Space 뛰어내리기 · WASD 이동 · 마우스 조준 · 클릭 사격 · 우클릭 조준(스코프 배율) · F 줍기 · 차 타기 · 동료 살리기(누르고 있기) · R 장전(차 안: 기름) · 1~5 무기(5 여러 번: 투척 고르기) · 6 아드레날린 · 7 붕대 · 8 구급상자 · 9 음료 · 0 진통제 · G 던지기 · X 버리기 · B 단발/연사 · Z 엎드리기 · Q/E 기울이기 · Space 점프 · 넘기 · Alt 둘러보기 · Tab 가방 · Shift 달리기 · C/Ctrl 앉기 · M 지도',
   buttons: [{ id: 'practice-btn', label: '🪂 바로 하기 <small>젤리봇과 배틀로얄</small>', onClick: () => practice() }],

@@ -443,7 +443,7 @@ kbd { display: inline-block; background: #fff; color: #4a3428; border: 1px solid
 .post { background: rgba(255,255,255,.85); border-radius: 16px; overflow: hidden; color: #4a3428; }
 .post img { width: 100%; display: block; }
 .ph-h { padding: 8px 10px; display: flex; align-items: center; gap: 6px; }
-.ph-h .av { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #f58529, #dd2a7b, #8134af); display: grid; place-items: center; }
+.ph-h .av { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #ffb86b, #ff7eb6, #9b8cff); display: grid; place-items: center; }
 .ph-h small { color: #8a6f5f; }
 .ph-a { padding: 6px 10px 0; }
 .like { border: 0; background: none; font-size: 18px; cursor: pointer; }
@@ -485,7 +485,7 @@ kbd { background: #fff; color: #4a3428; border-radius: 5px; padding: 0 6px; bord
 .bp { background: rgba(255,255,255,.6); color: #4a3428; border-radius: 12px; padding: 8px 10px; cursor: pointer; border: 2px solid transparent; font-size: 14px; }
 .bp.on { border-color: #7e57c2; background: #ede7f6; }
 
-/* ---------- 아이폰 (GTA5처럼 오른쪽 아래) ---------- */
+/* ---------- 휴대폰 (오른쪽 아래) ---------- */
 #phone { position: fixed; inset: auto 22px 18px auto; background: none; display: block; z-index: 42; }
 #phone.hidden { display: none; }
 #phone:not(.hidden) #iphone { animation: phoneup .28s cubic-bezier(.2, 1.2, .4, 1); }
@@ -529,7 +529,7 @@ kbd { background: #fff; color: #4a3428; border-radius: 5px; padding: 0 6px; bord
 #homebar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 120px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.85); cursor: pointer; z-index: 4; }
 #phone-app ~ #homebar, #phone-app:not(.hidden) + #homebar { background: #1c1c1e; }
 @media (max-width: 720px) { #phone { inset: auto 8px 8px auto; } #iphone { width: min(340px, calc(100vw - 16px)); } }
-/* 튄더 */
+/* 말랑팅 */
 .td-card { position: relative; background: #fff; border-radius: 18px; overflow: hidden; box-shadow: 0 6px 18px rgba(0,0,0,.15); touch-action: none; user-select: none; transition: transform .25s; }
 .td-card .td-img { width: 100%; aspect-ratio: 3/4; object-fit: cover; display: block; background: radial-gradient(circle at 50% 40%, #fff3f7, #ffd1dc); }
 .td-card .td-info { position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 14px 12px; background: linear-gradient(transparent, rgba(0,0,0,.75)); color: #fff; }
@@ -542,7 +542,7 @@ kbd { background: #fff; color: #4a3428; border-radius: 5px; padding: 0 6px; bord
 .td-btns button { width: 60px; height: 60px; border-radius: 50%; border: 0; background: #fff; font-size: 28px; box-shadow: 0 4px 12px rgba(0,0,0,.15); cursor: pointer; }
 .td-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
 .td-tabs button { flex: 1; border: 0; border-radius: 10px; padding: 8px; background: #e5e5ea; cursor: pointer; font-weight: 600; }
-.td-tabs button.on { background: linear-gradient(135deg, #ff6a3d, #ff2d6f); color: #fff; }
+.td-tabs button.on { background: linear-gradient(135deg, #ff9ec4, #c48bff); color: #fff; }
 .td-match { display: flex; gap: 10px; align-items: center; background: #fff; border-radius: 14px; padding: 8px; margin-bottom: 6px; cursor: pointer; }
 .td-match img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: #ffe0e8; }
 .td-match .unread { background: #ff2d6f; color: #fff; border-radius: 10px; padding: 0 7px; font-size: 12px; margin-left: auto; }
@@ -587,9 +587,9 @@ body.bug-mode .cute-bear { display: none !important; }
 .pline.anon { background: rgba(55, 71, 79, .8); }
 .pline.anon b { color: #b0bec5; }
 
-/* 인스타: 팔로우 · 댓글 · 프로필 */
+/* 젤리그램: 팔로우 · 댓글 · 프로필 */
 .ig-tabs button { padding: 7px 4px; font-size: 13px; }
-.ig-tabs button.on { background: linear-gradient(135deg, #f58529, #dd2a7b, #8134af); }
+.ig-tabs button.on { background: linear-gradient(135deg, #ffb86b, #ff7eb6, #9b8cff); }
 .ig-name, .ig-c b, .ig-link { cursor: pointer; }
 .ig-follow { margin-left: auto; border: 0; border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: 700; background: #0095f6; color: #fff; cursor: pointer; }
 .ig-follow.on { background: #e5e5ea; color: #262626; }
@@ -602,7 +602,7 @@ body.bug-mode .cute-bear { display: none !important; }
 .ig-cadd { padding: 0 10px 10px; }
 .ig-cadd input { padding: 6px 10px; font-size: 13px; }
 .ig-ph { display: flex; align-items: center; gap: 12px; }
-.ig-big { width: 56px; height: 56px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 30px; background: linear-gradient(135deg, #f58529, #dd2a7b, #8134af); }
+.ig-big { width: 56px; height: 56px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 30px; background: linear-gradient(135deg, #ffb86b, #ff7eb6, #9b8cff); }
 .ig-stats { display: flex; justify-content: space-around; text-align: center; margin: 12px 0 4px; }
 .ig-stats b { display: block; font-size: 17px; }
 .ig-stats small { color: #8a6f5f; }
@@ -655,7 +655,7 @@ body.bug-mode .cute-bear { display: none !important; }
 #hitmarker.show { animation: hitmark 0.22s ease-out; }
 @keyframes hitmark { 0% { opacity: 1; transform: scale(1.3); } 100% { opacity: 0; transform: scale(0.9); } }
 
-/* 젤리병단 장비: 갈고리가 닿는 곳을 겨누면 조준점이 초록 */
+/* 하늘갈고리 장비: 갈고리가 닿는 곳을 겨누면 조준점이 초록 */
 #crosshair.hookable { color: #69f0ae !important; text-shadow: 0 0 6px #00c853, 0 0 3px #000; }
 
 /* 닉네임 정하기 */

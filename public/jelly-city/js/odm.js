@@ -1,4 +1,4 @@
-// 젤리병단 장비(입체기동)와 거대 젤리 (브라우저)
+// 하늘갈고리 장비와 거대 젤리 (브라우저)
 import * as THREE from 'three';
 import { Roach } from '../../shared/js/roach.js';
 import { TITAN, napePos } from './titans.js';
@@ -147,7 +147,7 @@ const ropeGeo = new THREE.CylinderGeometry(1, 1, 1, 6, 1, true).translate(0, 0.5
 const ropeMat = new THREE.MeshBasicMaterial({ color: '#263238' });
 const clawMat = new THREE.MeshToonMaterial({ color: '#cfd8dc', emissive: '#455a64' });
 const UP = new THREE.Vector3(0, 1, 0);
-// 양쪽 허리에서 줄 하나씩 (진격의 거인처럼 두 가닥), 끝에 세 갈래 갈고리
+// 양쪽 허리에서 줄 하나씩 (두 가닥), 끝에 세 갈래 갈고리
 function makeClaw() {
   const g = new THREE.Group();
   const tip = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.55, 6), clawMat); tip.position.y = 0.1; g.add(tip);
@@ -168,7 +168,7 @@ function makeCable() {
   });
 }
 
-// ---------------- 젤리병단 장비 ----------------
+// ---------------- 하늘갈고리 장비 ----------------
 export class Odm {
   constructor(game, scene) {
     this.g = game; this.scene = scene;

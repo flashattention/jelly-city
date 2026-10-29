@@ -1,4 +1,4 @@
-/* 젤리라이더: 달리는 화면 · 결과 · 기록판 (처음 화면 · 방은 shared/css/shell.css) */
+/* 젤리드리프트: 달리는 화면 · 결과 · 기록판 (처음 화면 · 방은 shared/css/shell.css) */
 #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 #speedlines { position: fixed; inset: 0; pointer-events: none; z-index: 2; opacity: 0; transition: opacity .15s;
   background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(255,255,255,0) 0deg 5deg, rgba(255,255,255,.22) 5deg 5.5deg);

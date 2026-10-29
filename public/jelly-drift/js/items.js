@@ -1,4 +1,4 @@
-// 젤리라이더 아이템전: ? 상자 · 아이템 8가지 · 함정 · 물폭탄 · 미사일 · 번개
+// 젤리드리프트 아이템전: ? 상자 · 아이템 8가지 · 함정 · 물폭탄 · 미사일 · 번개
 //   맞았는지는 '내 화면에서 움직이는 카트'(나 · 혼자 할 땐 AI)만 판정한다 → 같이 할 때 각자 자기 카트를 책임진다
 import * as THREE from 'three';
 import { makeBox, makeTrap, glowTex } from '../../dream-runner/js/items.js';

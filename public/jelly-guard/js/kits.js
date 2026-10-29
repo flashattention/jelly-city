@@ -1,8 +1,8 @@
-// 젤리워치 영웅 조작: 기본 공격 종류(즉발 · 투사체 · 근접 · 줄기 · 안개) + 영웅마다 우클릭 · Shift · E · Q
+// 젤리수호대 영웅 조작: 기본 공격 종류(즉발 · 투사체 · 근접 · 줄기 · 안개) + 영웅마다 우클릭 · Shift · E · Q
 //   G (main.js) 가 주는 것: me · send · hitscan · fireProj · melee · findTarget · coneTargets · has(상태) · vm · sfx · toast · ps(내 서버 상태)
 import * as THREE from 'three';
 import { PROJ } from './heroes.js';
-import { rayBoxes, floorAt } from '../../jelly-attack/js/maps.js';
+import { rayBoxes, floorAt } from '../../jelly-tactical/js/maps.js';
 
 const GUN_SND = { cassidy: 'pistol', reaper: 'heavy', hog: 'heavy', dva: 'smg', widow: 'smg', soldier: 'pulse', tracer: 'smg', ana: 'sniper' };
 export const VM_KIND = { rein: 'hammer', winston: 'tesla', dva: 'cannons', hog: 'scrap', zarya: 'particle', pharah: 'rpg', reaper: 'shotgun2', cassidy: 'revolver', soldier: 'rifle', genji: 'shuriken', widow: 'sniper', tracer: 'pistols', mercy: 'staff', ana: 'biorifle', lucio: 'sonic', moira: 'hands' };
@@ -128,7 +128,7 @@ export function makeKit(h, G) {
     if (s.type === 'fan') { st.latchS = true; if (reloading()) return; K.fan(); return; }
     if (s.type === 'cone') { st.latchS = true; if (!useCd('s', s.cd)) return; abil('s'); G.wave(); G.sfx('boom', null, 0.5); return; }
   };
-  // 젤리크리 난사: 남은 총알을 빠르게
+  // 빵야 난사: 남은 총알을 빠르게
   K.fan = () => {
     if (st.mode === 'fan' || st.mag <= 0) return; st.mode = 'fan';
     const tick = () => { if (!G.me.alive || st.mag <= 0 || G.has('stun')) { st.mode = null; if (st.mag <= 0) K.reload(); return; } st.mag--; G.hitscan({ ...h.s, near: 10, far: 20 }, { a: 's', spread: h.s.spread }); G.vm.kick(0.7); G.sfx('gun', 'pistol', 0.8); setTimeout(tick, h.s.rate * 1000); };
@@ -307,7 +307,7 @@ export function makeKit(h, G) {
   K.aims = () => {
     const out = [], now = performance.now(), ready = (sl) => cdLeft(sl) <= 0;
     if (st.aim === 'tp') out.push({ k: 'tp', ...K.tpTarget() });
-    // 아군 대상 기술: 젤리시 수호천사 · 자리젤리 방벽 씌우기 · 젤리아나 나노
+    // 아군 대상 기술: 토닥 수호천사 · 탱글 방벽 씌우기 · 꿀잠 나노
     const allyAim = h.id === 'mercy' && ready('shift') ? { range: 30, arc: 0.9, label: '🪽 Shift' } : h.id === 'zarya' && ready('e') ? { range: 30, arc: 0.95, label: '🛡️ E' } : null;
     if (allyAim) { const t = G.findTarget({ range: allyAim.range, arc: allyAim.arc, lock: 'ally' }); if (t) out.push({ k: 'ally', o: t, label: allyAim.label, col: h.id === 'mercy' ? '#ffe48a' : '#ff8fd0' }); }
     if (h.id === 'ana' && (G.ps?.[4] ?? 0) >= 100) { const t = G.findTarget({ range: 45, arc: 0.93, lock: 'ally' }); if (t) out.push({ k: 'ally', o: t, label: '💉 Q', col: '#7cf0ff' }); }

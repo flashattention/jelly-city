@@ -679,7 +679,7 @@ export class Combat {
       for (const v of this.w.players.values()) {
         if (v === driver || v.dead || v.loc !== -1 || v.car >= 0 || v.emote) continue; // 춤추는 사람은 차도 못 친다
         const dx = v.pos.x - car.pos.x, dz = v.pos.z - car.pos.z, d = Math.hypot(dx, dz);
-        // 차 높이 위로 떠 있으면(날기 · 입체기동 · 점프) 차에 안 치인다
+        // 차 높이 위로 떠 있으면(날기 · 갈고리 비행 · 점프) 차에 안 치인다
         if (d > r || v.pos.y - (car.pos.y || 0) > (car.height || 2.4) || now - (v.lastCarHit || 0) < 1200) continue;
         v.lastCarHit = now;
         const k = sp * 0.7;
