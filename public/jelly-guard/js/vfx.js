@@ -111,7 +111,7 @@ export class HeroVM {
   }
   set(kind, col) {
     if (kind === this.kind && col === this.col) return;
-    this.kind = kind; this.col = col; this.rig.clear(); this.muzzles = []; this.head = null;
+    this.kind = kind; this.col = col; this.rig.clear(); this.muzzles = []; this.head = null; this.fl = null;
     if (this.trail) { this.scene.remove(this.trail, this.guard); this.trail = this.guard = null; }
     const g = this.rig, m = toon(col), dark = toon('#33363f'), metal = toon('#8f97a6'), gold = toon('#ffd36b');
     const paw = toon(col, { transparent: true, opacity: 0.95 });
@@ -125,7 +125,7 @@ export class HeroVM {
       case 'scrap': part(g, BOX, toon('#8a6a4a'), 0.26, -0.26, -0.55, 0.16, 0.18, 0.6); part(g, CYL, dark, 0.26, -0.24, -0.92, 0.08, 0.2, 0.08, Math.PI / 2); part(g, CYL, toon('#c98a3a'), 0.26, -0.36, -0.5, 0.1, 0.12, 0.1, 0, 0, Math.PI / 2); pawAt(0.26, -0.36, -0.32, 1.3); pawAt(0.22, -0.32, -0.75, 1.3); mz(0.26, -0.24, -1.02); break;
       case 'particle': part(g, BOX, dark, 0.28, -0.3, -0.55, 0.2, 0.2, 0.75); for (let i = 0; i < 3; i++) part(g, TOR, toon('#ff7ab8'), 0.28, -0.3, -0.35 - i * 0.18, 0.14, 0.14, 0.4); part(g, SPH, glowM('#ffb3dd'), 0.28, -0.29, -0.95, 0.09, 0.09, 0.09); pawAt(0.28, -0.42, -0.35, 1.2); pawAt(0.24, -0.4, -0.7, 1.2); mz(0.28, -0.29, -0.98); break;
       case 'rpg': part(g, CYL, toon('#4f8fe8'), 0.3, -0.22, -0.5, 0.1, 0.9, 0.1, Math.PI / 2); part(g, CYL, toon('#ffd36b'), 0.3, -0.22, -0.95, 0.11, 0.05, 0.11, Math.PI / 2); part(g, BOX, dark, 0.3, -0.34, -0.4, 0.05, 0.14, 0.06); pawAt(0.3, -0.36, -0.36, 1.1); pawAt(0.26, -0.3, -0.68); mz(0.3, -0.22, -1.0); break;
-      case 'shotgun2': for (const s of [-1, 1]) { part(g, BOX, toon('#2a2733'), s * 0.3, -0.26, -0.5, 0.09, 0.12, 0.5); part(g, CYL, dark, s * 0.3, -0.24, -0.8, 0.045, 0.14, 0.045, Math.PI / 2); part(g, BOX, toon('#c0392b'), s * 0.3, -0.19, -0.5, 0.02, 0.02, 0.4); pawAt(s * 0.3, -0.34, -0.36); mz(s * 0.3, -0.24, -0.88); } break;
+      case 'shotgun2': this.fl = [-1, 1].map((s) => { const f = part(g, SPH, glowM('#ff5a4a', 0.9), s * 0.3, -0.24, -0.95, 0.12, 0.12, 0.12); f.visible = false; return f; }); for (const s of [-1, 1]) { part(g, BOX, toon('#2a2733'), s * 0.3, -0.26, -0.5, 0.09, 0.12, 0.5); part(g, CYL, dark, s * 0.3, -0.24, -0.8, 0.045, 0.14, 0.045, Math.PI / 2); part(g, BOX, toon('#c0392b'), s * 0.3, -0.19, -0.5, 0.02, 0.02, 0.4); pawAt(s * 0.3, -0.34, -0.36); mz(s * 0.3, -0.24, -0.88); } break;
       case 'revolver': part(g, BOX, toon('#5a5f6a'), 0.24, -0.2, -0.48, 0.06, 0.08, 0.32); part(g, CYL, toon('#8f97a6'), 0.24, -0.2, -0.4, 0.06, 0.08, 0.06, 0, 0, Math.PI / 2); part(g, BOX, toon('#7a4f2d'), 0.24, -0.28, -0.36, 0.05, 0.14, 0.07, 0.3); pawAt(0.24, -0.31, -0.34); mz(0.24, -0.19, -0.66); break;
       case 'rifle': part(g, BOX, toon('#e8edf5'), 0.26, -0.24, -0.5, 0.1, 0.14, 0.62); part(g, BOX, toon('#5a7099'), 0.26, -0.16, -0.5, 0.08, 0.04, 0.4); part(g, CYL, dark, 0.26, -0.22, -0.88, 0.035, 0.2, 0.035, Math.PI / 2); part(g, BOX, glowM('#8fe6ff'), 0.26, -0.3, -0.7, 0.11, 0.05, 0.12); pawAt(0.26, -0.34, -0.34); pawAt(0.24, -0.3, -0.68); mz(0.26, -0.22, -0.98); break;
       case 'hands': pawAt(-0.28, -0.3, -0.5, 1.2); pawAt(0.28, -0.3, -0.5, 1.2); this.gL = part(g, SPH, glowM('#ffe48a', 0.6), -0.28, -0.24, -0.58, 0.07, 0.07, 0.07); this.gR = part(g, SPH, glowM('#c08bff', 0.6), 0.28, -0.24, -0.58, 0.07, 0.07, 0.07); mz(-0.28, -0.24, -0.62); mz(0.28, -0.24, -0.62); break;
@@ -149,7 +149,7 @@ export class HeroVM {
   kick(k = 0.6) { this.kickT = Math.min(1, this.kickT + k); }
   swing(dur) { this.swingT = dur || this.swingDur; this.swingLen = this.swingT; this.swingSide = -(this.swingSide || 1); }
   reload(d) { this.reloadT = d; this.reloadDur = d; }
-  update(dt, aspect, moving, ads, glow, deflect) {
+  update(dt, aspect, moving, ads, glow, deflect, bloom) {
     this.cam.aspect = aspect; this.cam.updateProjectionMatrix();
     this.ads += ((ads ? 1 : 0) - this.ads) * Math.min(1, dt * 12);
     this.kickT = Math.max(0, this.kickT - dt * 6); this.swingT = Math.max(0, this.swingT - dt); this.reloadT = Math.max(0, this.reloadT - dt);
@@ -167,6 +167,8 @@ export class HeroVM {
       else if (this.kind !== 'sword') g.rotation.set(-s * 0.3, side * s * 0.9, -side * s * 0.6);
     }
     if (this.kind === 'sword' && this.trail) this.swordPose(dt, side0(this), deflect);
+    // 죽음의 꽃: 두 총을 번갈아 쏘며 좌우로 휘두른다 (총구 불꽃)
+    if (this.fl) { const n = performance.now() / 1000; g.rotation.y += bloom ? Math.sin(n * 13) * 0.45 : 0; g.rotation.z += bloom ? Math.sin(n * 13) * 0.15 : 0; this.fl.forEach((f, i) => { f.visible = !!bloom && Math.sin(n * 60 + i * Math.PI) > 0.2; f.scale.setScalar(0.1 + Math.random() * 0.08); }); }
     if (this.spin) this.spin.rotation.y += dt * 20;
     const pulse = 0.6 + Math.sin(performance.now() / 90) * 0.25;
     if (this.gL) { this.gL.material.opacity = glow === 'L' ? pulse + 0.3 : 0.35; this.gR.material.opacity = glow === 'R' ? pulse + 0.3 : 0.35; }

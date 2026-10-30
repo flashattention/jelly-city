@@ -151,6 +151,7 @@ export function makeKit(h, G) {
     if (slot === 'q') {
       if ((G.ps?.[4] ?? 0) < 100) { G.sfx('cd'); return; }
       if (h.id === 'ana') { const t = G.findTarget({ range: 45, arc: 0.93, lock: 'ally' }); if (!t) { G.toast('💉 나노 강화제: 아군을 조준하고 Q'); return; } return abil('q', { to: t.id }); }
+      if (h.id === 'dva' && !G.has('pilot')) { const fly = st.mode === 'boost'; abil('q', { fly }); if (fly) st.mode = null; return; } // 부스터 중이면 날려 보내고, 아니면 그 자리 자폭
       abil('q');
       if (h.id === 'zarya') setTimeout(() => G.fireProj('grav', { a: 'q' }), 60);
       if (h.id === 'tracer') setTimeout(() => G.fireProj('pulse', { a: 'q', stick: true }), 60);
@@ -162,7 +163,7 @@ export function makeKit(h, G) {
     switch (`${h.id}.${slot}`) {
       case 'rein.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); st.mode = 'charge'; st.until = now + 2600; st.cyaw = me.yaw; G.sfx('dash'); return;
       case 'rein.e': if (!useCd('e', sp.cd)) return; abil('e'); G.vm.swing(0.4); setTimeout(() => G.fireProj('fire', { a: 'e', pierce: true }), 250); G.sfx('swing'); return;
-      case 'winston.shift': if (!useCd('shift', G.has('primal') ? 1.5 : sp.cd)) return; abil('shift'); me.vel.set(flat.x * (G.has('primal') ? 20 : 17), 9.5, flat.z * (G.has('primal') ? 20 : 17)); me.onGround = false; st.mode = 'leap'; st.until = now + 3000; st.leapT = now; G.sfx('rocket'); return;
+      case 'winston.shift': if (!useCd('shift', G.has('primal') ? 1.5 : sp.cd)) return; abil('shift'); me.vel.set(flat.x * (G.has('primal') ? 20 : 17), 10.5, flat.z * (G.has('primal') ? 20 : 17)); me.onGround = false; st.mode = 'leap'; st.until = now + 3000; st.leapT = now; G.sfx('rocket'); return;
       case 'winston.e': if (!useCd('e', sp.cd)) return; abil('e'); G.sfx('abil'); return;
       case 'dva.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); st.mode = 'boost'; st.until = now + 2000; st.bumped = new Map(); G.sfx('rocket'); return;
       case 'dva.e': if (!useCd('e', sp.cd)) return; abil('e'); for (let i = 0; i < 18; i++) setTimeout(() => { if (me.alive) G.fireProj('mini', { a: 'e', i: 1, jitter: 0.06 }); }, i * 55); G.sfx('rocket'); return;
@@ -222,6 +223,14 @@ export function makeKit(h, G) {
     if (G.has('deadeye')) inp.speedMul *= 0.35;
     if (G.has('blade')) inp.speedMul *= 1.2;
     if (G.has('primal')) { inp.speedMul *= 1.25; inp.jumpV = 10; }
+    // 점프 팩: 날아가는 동안 빠르기를 지키고(공중에서 걷기 빠르기로 줄지 않게) 보는 쪽으로 조금씩 꺾는다
+    if (h.id === 'winston' && st.mode === 'leap' && !me.onGround) {
+      inp.keepVel = true;
+      const v = Math.hypot(me.vel.x, me.vel.z), k = Math.min(1, dt * 2.5);
+      if (v > 1) { const nx = me.vel.x / v + (flat.x - me.vel.x / v) * k, nz = me.vel.z / v + (flat.z - me.vel.z / v) * k, L = Math.hypot(nx, nz) || 1; me.vel.x = nx / L * v; me.vel.z = nz / L * v; }
+    }
+    // 죽음의 꽃: 내 화면에도 빙글 도는 붉은 꽃잎 · 발밑 고리 · 양손 연사
+    if (G.has('blossom')) { st.bloomT = (st.bloomT || 0) - dt; if (st.bloomT <= 0) { st.bloomT = 0.1; G.vm.kick(0.5); G.sfx('heavy', null, 0.35); if ((st.bloomN = (st.bloomN || 0) + 1) % 3 === 0) G.ring(me.pos, '#ff3b5c', 8, 0.35); } }
     if (G.has('ghost') && h.id === 'reaper') inp.speedMul *= 1.5;
     if (G.has('coal')) inp.speedMul *= 1.25;
     if (h.id === 'moira' && st.mode === 'fade') inp.speedMul *= 2.2;

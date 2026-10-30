@@ -438,10 +438,12 @@ export class GuardRooms extends BaseRooms {
       case 'winston': c.fx.primal = now + 10000; c.prim = 500; c.hp = this.maxHp(c); return true;
       case 'dva': {
         if (c.pilot) { c.pilot = false; c.hp = this.maxHp(c); this.toRoom(r, { t: 'form', id: c.id, pilot: false }); return true; }
-        const bp = { x: c.pos.x + f.x * 3, y: c.pos.y + 0.5, z: c.pos.z + f.z * 3 };
-        if (!clearLine(r.g.map, { ...c.pos, y: c.pos.y + 0.8 }, { ...bp, y: bp.y + 0.3 })) { bp.x = c.pos.x; bp.z = c.pos.z; }
-        this.addEnt(r, { k: 'bomb', team: c.team, owner: c, x: bp.x, y: bp.y, z: bp.z, vx: f.x * 9, vz: f.z * 9, until: now + 3000 });
-        c.pilot = true; c.hp = this.maxHp(c); c.mtxOn = false; this.toRoom(r, { t: 'form', id: c.id, pilot: true });
+        // 자폭: 그 자리에서 터진다. 부스터로 날아가는 중에 쓰면 로봇이 앞으로 날아가며 터진다
+        const fly = !!m?.fly && now - (c.boostAt || 0) < 2300;
+        const bp = { x: c.pos.x + (fly ? f.x * 3 : 0), y: c.pos.y + 0.5, z: c.pos.z + (fly ? f.z * 3 : 0) };
+        if (fly && !clearLine(r.g.map, { ...c.pos, y: c.pos.y + 0.8 }, { ...bp, y: bp.y + 0.3 })) { bp.x = c.pos.x; bp.z = c.pos.z; }
+        this.addEnt(r, { k: 'bomb', team: c.team, owner: c, x: bp.x, y: bp.y, z: bp.z, vx: fly ? f.x * 16 : 0, vz: fly ? f.z * 16 : 0, until: now + 3000 });
+        c.pilot = true; c.hp = this.maxHp(c); c.mtxOn = false; this.toRoom(r, { t: 'form', id: c.id, pilot: true, fly });
         return true;
       }
       case 'hog': c.fx.hogult = now + 6000; return true;
@@ -517,7 +519,7 @@ export class GuardRooms extends BaseRooms {
     t.hp -= amt;
     t.lastHurt = now; if (t.fx.sleep > now) t.fx.sleep = 0;
     if (by) {
-      if (by !== t) { by.dmg += dealt; this.charge(by, dealt); t.dmgBy.set(by.id, now); }
+      if (by !== t) { by.dmg += dealt; if (o.a !== 'q') this.charge(by, dealt); t.dmgBy.set(by.id, now); } // 궁극기 피해로는 궁 게이지가 안 찬다
       if (o.steal && by !== t) this.heal(r, by, dealt * o.steal, by, now);
     }
     if (o.kb && t.alive && by) { const f = fwd(by.yaw); this.knock(r, t, [f.x * o.kb, 3.5, f.z * o.kb]); }
@@ -544,7 +546,8 @@ export class GuardRooms extends BaseRooms {
     if (by && by !== t) { by.k++; by.fb++; }
     for (const id of assists) { const p = r.players.find((q) => q.id === id); if (p) p.k++; }
     this.toRoom(r, { t: 'kill', by: by?.id ?? t.id, to: t.id, a: a || 'p', bh: by?.hero, th: t.hero, head: !!head, as: assists, ms: RESPAWN_MS });
-    if (by?.hero === 'genji' && by !== t) { by.cd.shift = 0; this.send(by, { t: 'reset', s: 'shift' }); }
+    // 칼바람 질풍참: 처치에 함께했으면(마무리 · 6초 안에 피해를 준 도움) 다시 쓸 수 있다
+    for (const p of r.players) if (p.hero === 'genji' && p !== t && (p === by || assists.includes(p.id))) { p.cd.shift = 0; this.send(p, { t: 'reset', s: 'shift' }); }
     if (t.hero === 'dva') t.pilot = false;
     for (const e of r.g.ents.filter((e) => e.owner === t && (e.k === 'shield'))) this.removeEnt(r, e);
   }

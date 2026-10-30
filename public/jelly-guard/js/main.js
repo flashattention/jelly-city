@@ -35,7 +35,7 @@ const vm = new HeroVM();
 const ents = new EntViews(scene);
 const pick0 = (() => { try { return JSON.parse(store.get(PICK_KEY) || '{}'); } catch { return {}; } })();
 const game = window.watch = {
-  me, vm, mode: 'title', map: null, world: null, others: new Map(), myId: 0, team: null, atk: null, mmode: 'assault', phase: null, ps: null, obj: null, h: null, kit: null,
+  me, vm, ents, mode: 'title', map: null, world: null, others: new Map(), myId: 0, team: null, atk: null, mmode: 'assault', phase: null, ps: null, obj: null, h: null, kit: null,
   pick: { map: pick0.map || 'jellymura', size: pick0.size || 5 }, stats: new Map(), cd: {}, ult: 0, flags: 0, deadAt: 0, points: [], gateMeshes: [], cut: null, sel: null,
 };
 const keys = new Set(); let mouseL = false, mouseR = false, edgeL = false, edgeR = false, relR = false, jumpEdge = false;
@@ -681,7 +681,7 @@ shell.on('pull', (m) => { me.pos.set(m.p[0], m.p[1], m.p[2]); me.vel.set(0, 0, 0
 shell.on('reset', (m) => { game.cd[m.s] = 0; sfx('ultready', null, 0.5); });
 shell.on('cd', (m) => { game.cd[m.s] = performance.now() + m.ms; });
 shell.on('form', (m) => {
-  if (m.id === game.myId) { if (m.pilot) { banner2(m.eject ? '🤖 로봇이 부서졌어요! 꼬마 모드' : '☢️ 자폭! 로봇을 날려 보냈어요'); game.kit?.spawned(); } else { banner2('🤖 로봇 호출!'); me.vel.y = 6; } }
+  if (m.id === game.myId) { if (m.pilot) { banner2(m.eject ? '🤖 로봇이 부서졌어요! 꼬마 모드' : m.fly ? '☢️ 자폭! 로봇을 날려 보냈어요' : '☢️ 자폭! 3초 안에 멀리 피하세요'); game.kit?.spawned(); if (!m.eject && !m.fly) { const f = fwd(); me.vel.set(-f.x * 7, 8, -f.z * 7); me.onGround = false; } } else { banner2('🤖 로봇 호출!'); me.vel.y = 6; } }
   const o = game.others.get(m.id); if (o) puff(scene, o.chest(), '#ff9fcf', 14, 0.5, 4);
 });
 shell.on('cap', (m) => {
@@ -1012,7 +1012,7 @@ function frame() {
     if (game.shake > 0) { game.shake = Math.max(0, game.shake - dt * 1.8); const k = game.shake * game.shake * 0.3; camera.position.x += (Math.random() - 0.5) * k; camera.position.y += (Math.random() - 0.5) * k; camera.rotation.z += (Math.random() - 0.5) * k * 0.3; }
     const fov = 78 / scopeZoom();
     if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 14); camera.updateProjectionMatrix(); }
-    vm.update(dt, camera.aspect, Math.hypot(me.vel.x, me.vel.z) > 1.5 && me.onGround, mouseR && game.h?.s?.type === 'scope', game.h?.id === 'moira' ? (mouseL ? 'L' : mouseR ? 'R' : null) : mouseL && !!game.kit?.st.beams?.length, has('deflect'));
+    vm.update(dt, camera.aspect, Math.hypot(me.vel.x, me.vel.z) > 1.5 && me.onGround, mouseR && game.h?.s?.type === 'scope', game.h?.id === 'moira' ? (mouseL ? 'L' : mouseR ? 'R' : null) : mouseL && !!game.kit?.st.beams?.length, has('deflect'), has('blossom'));
     sendT -= dt;
     if (sendT <= 0 && me.alive) { sendT = 0.05; shell.send({ t: 'st', p: [me.pos.x, me.pos.y, me.pos.z, me.yaw, me.pitch, (me.crouch > 0.5 ? 1 : 0) | (Math.hypot(me.vel.x, me.vel.z) > 1 ? 2 : 0)] }); }
     hud(now);

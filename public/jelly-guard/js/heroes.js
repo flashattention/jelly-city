@@ -51,7 +51,7 @@ export const HEROES = [
     s: { type: 'hold', name: '방어 매트릭스', icon: '🟪', desc: '누르는 동안 앞에서 오는 공격을 먹어 치워요 (3초 분량)' },
     shift: { name: '부스터', icon: '💨', cd: 4, desc: '앞으로 날아가며 부딪힌 적을 밀쳐요' },
     e: { name: '마이크로 미사일', icon: '🎆', cd: 8, desc: '작은 미사일을 우르르 쏴요' },
-    q: { name: '자폭', icon: '☢️', desc: '로봇을 날려 보내 3초 뒤 큰 폭발! (꼬마 모드일 땐 로봇 호출)' },
+    q: { name: '자폭', icon: '☢️', desc: '그 자리에서 3초 뒤 큰 폭발! 부스터(Shift)로 날아가며 쓰면 로봇이 앞으로 날아가요 (꼬마 모드일 땐 로봇 호출)' },
     pilot: { hp: 150, p: { type: 'hit', name: '광선총', dmg: 14, rate: 0.15, mag: 0, spread: 0.01, near: 20, far: 30, head: 2, auto: true } } },
   { id: 'hog', name: '끈끈이', role: 'tank', emoji: '🐷', color: '#c99a6b', hp: 600, speed: 0.95, ult: 1800, held: 'scrap', acc: ['mask', 'overalls:#5b4a3a'],
     motto: '꿀꿀! 이리 와!', desc: '갈고리로 끌어오고 한 방에 날려 버리는 덩치 큰 돼지 곰',
