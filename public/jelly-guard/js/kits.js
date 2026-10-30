@@ -2,7 +2,7 @@
 //   G (main.js) 가 주는 것: me · send · hitscan · fireProj · melee · findTarget · coneTargets · has(상태) · vm · sfx · toast · ps(내 서버 상태)
 import * as THREE from 'three';
 import { PROJ } from './heroes.js';
-import { rayBoxes, floorAt } from '../../jelly-tactical/js/maps.js';
+import { rayBoxes, floorAt, clearLine } from '../../jelly-tactical/js/maps.js';
 
 const GUN_SND = { cassidy: 'pistol', reaper: 'heavy', hog: 'heavy', dva: 'smg', widow: 'smg', soldier: 'pulse', tracer: 'smg', ana: 'sniper' };
 export const VM_KIND = { rein: 'hammer', winston: 'tesla', dva: 'cannons', hog: 'scrap', zarya: 'particle', pharah: 'rpg', reaper: 'shotgun2', cassidy: 'revolver', soldier: 'rifle', genji: 'shuriken', widow: 'sniper', tracer: 'pistols', mercy: 'staff', ana: 'biorifle', lucio: 'sonic', moira: 'hands' };
@@ -18,7 +18,7 @@ export function makeKit(h, G) {
   const reloading = () => st.reloadEnd > now0();
   K.reload = () => { const sp = spec(); if (!sp.mag || reloading() || st.mag >= sp.mag) return; st.reloadEnd = now0() + (sp.reload || 1.4) * 1000; G.vm.reload(sp.reload || 1.4); G.sfx('reload'); };
   K.spawned = () => { st.mag = spec().mag || 0; st.reloadEnd = 0; st.mode = null; st.fuel = 1; st.blinks = 3; st.hist = []; st.acc.clear(); };
-  K.vmKind = () => G.has('blade') ? 'sword' : G.has('primal') ? 'paws' : h.id === 'dva' && G.has('pilot') ? 'pilot' : VM_KIND[h.id];
+  K.vmKind = () => G.has('blade') || G.has('deflect') ? 'sword' : G.has('primal') ? 'paws' : h.id === 'dva' && G.has('pilot') ? 'pilot' : VM_KIND[h.id];
   // 지금 쏠 수 없는 상태 (기절 · 망령화 · 방벽 들고 · 돌진 …)
   const busy = () => !!st.aim || G.has('stun') || G.has('sleep') || G.has('ghost') || G.has('blossom') || G.has('hogult') || G.has('coal') || st.mode === 'charge' || st.mode === 'tp' || st.mode === 'recall' || st.mode === 'grap' || st.mode === 'ga' || (h.id === 'rein' && G.mouseR) || (h.id === 'dva' && G.mouseR && !G.has('pilot')) || G.has('deflect');
 
@@ -66,7 +66,7 @@ export function makeKit(h, G) {
     if (!held) { st.latch = false; st.tgt = null; return; }
     if (busy() || reloading()) return;
     // 궁극기 · 변신 중 기본 공격
-    if (G.has('blade')) { if (now < st.next) return; st.next = now + 750; G.vm.swing(0.35); G.sfx('swing'); G.melee({ range: 5.5, arc: 0.45, a: 'blade', cleave: true }); return; }
+    if (G.has('blade')) { if (now < st.next) return; st.next = now + 750; G.vm.swing(0.42); G.sfx('swing'); G.melee({ range: 7, arc: 0.3, a: 'blade', cleave: true }); return; }
     if (G.has('primal')) { if (now < st.next) return; st.next = now + 550; G.vm.swing(0.3); G.sfx('thud'); G.melee({ range: 5.5, arc: 0.4, a: 'punch', cleave: true }); return; }
     if (G.has('barrage')) return;
     if (h.id === 'cassidy' && G.has('deadeye')) { if (edge) K.deadeyeFire(); return; }
@@ -285,8 +285,17 @@ export function makeKit(h, G) {
     }
     if (h.id === 'widow' && st.grapJump) { if (me.onGround || now > st.grapJump) st.grapJump = 0; else if (G.jumpEdge) { st.grapJump = 0; const fw = flat.clone(); me.vel.x += fw.x * 5; me.vel.z += fw.z * 5; me.vel.y = 8.5; G.sfx('jump'); G.puff(me.pos.clone(), '#9466e0', 6, 0.3, 1); } }
     if (h.id === 'genji') {
-      if (me.onGround) st.dj = true;
-      else if (G.jumpEdge && st.dj) { st.dj = false; me.vel.y = 7.6; G.sfx('jump'); G.puff(me.pos.clone(), '#b6ff8a', 6, 0.3, 1); }
+      // 벽 타기: 벽을 보고 Space 를 누르고 있으면 기어오른다 (땅에 닿을 때마다 1.4초). 꼭대기에 닿으면 훌쩍 넘어간다
+      const wall = [0.35, 1.2].some((y) => { const a = me.pos.clone(); a.y += y; return !clearLine(G.map, a, a.clone().addScaledVector(flat, 0.75)); });
+      if (me.onGround) { st.dj = true; st.climb = 1.4; }
+      if (!me.onGround && G.keys.has('Space') && wall && st.climb > 0 && !st.mode) {
+        if (!st.climbing) G.sfx('jump');
+        st.climbing = true; st.climb -= dt; me.vel.y = 6.5; me.vel.x *= 0.5; me.vel.z *= 0.5;
+        st.climbFx = (st.climbFx || 0) - dt; if (st.climbFx <= 0) { st.climbFx = 0.12; G.puff(me.pos.clone().addScaledVector(flat, 0.45).setY(me.pos.y + 0.6), '#b6ff8a', 2, 0.2, 0.6); }
+      } else if (st.climbing) {
+        st.climbing = false;
+        if (!wall && G.keys.has('Space')) { me.vel.y = Math.max(me.vel.y, 5.5); me.vel.x += flat.x * 3; me.vel.z += flat.z * 3; } // 벽 꼭대기: 앞으로 넘어간다
+      } else if (!me.onGround && G.jumpEdge && st.dj && !(wall && st.climb > 0)) { st.dj = false; me.vel.y = 7.6; G.sfx('jump'); G.puff(me.pos.clone(), '#b6ff8a', 6, 0.3, 1); }
     }
     if (h.id === 'mercy') {
       if (G.has('valk')) { inp.noGrav = true; me.vel.y = G.keys.has('Space') ? 5 : inp.crouch ? -5 : me.vel.y * 0.85; inp.crouch = false; inp.speedMul *= 1.25; inp.airCtl = 4; }

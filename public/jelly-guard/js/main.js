@@ -35,7 +35,7 @@ const vm = new HeroVM();
 const ents = new EntViews(scene);
 const pick0 = (() => { try { return JSON.parse(store.get(PICK_KEY) || '{}'); } catch { return {}; } })();
 const game = window.watch = {
-  me, mode: 'title', map: null, world: null, others: new Map(), myId: 0, team: null, atk: null, mmode: 'assault', phase: null, ps: null, obj: null, h: null, kit: null,
+  me, vm, mode: 'title', map: null, world: null, others: new Map(), myId: 0, team: null, atk: null, mmode: 'assault', phase: null, ps: null, obj: null, h: null, kit: null,
   pick: { map: pick0.map || 'jellymura', size: pick0.size || 5 }, stats: new Map(), cd: {}, ult: 0, flags: 0, deadAt: 0, points: [], gateMeshes: [], cut: null, sel: null,
 };
 const keys = new Set(); let mouseL = false, mouseR = false, edgeL = false, edgeR = false, relR = false, jumpEdge = false;
@@ -52,6 +52,8 @@ const BUB_M = new THREE.ShaderMaterial({
   vertexShader: 'varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vP = position; gl_Position = projectionMatrix * mv; }',
   fragmentShader: 'uniform float t; uniform vec3 c; varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ float f = pow(1. - abs(dot(vN, vV)), 2.2); float hex = 0.5 + 0.5 * sin(vP.y * 18. + t * 3.) * sin(vP.x * 18. - t * 2.); gl_FragColor = vec4(c * (0.35 + f * 1.4 + hex * 0.12), 0.12 + f * 0.75); }',
 });
+// 튕겨내기 (칼바람): 앞쪽에 납작한 초록 막
+const DFL_M = BUB_M.clone(); DFL_M.uniforms = { t: BUB_M.uniforms.t, c: { value: new THREE.Color('#9dff6a') } };
 { const warm = new THREE.Mesh(BUB_G, BUB_M); warm.position.set(0, -500, 0); warm.scale.setScalar(0.001); warm.frustumCulled = false; scene.add(warm); } // 처음 켤 때 멈추지 않게 미리 그려 둔다
 // ---------- 다른 영웅 ----------
 class Other {
@@ -109,6 +111,12 @@ class Other {
     this.xray.visible = !!xr && !game.cut; if (xr) this.xray.position.set(this.pos.x, this.pos.y + 1, this.pos.z);
     // 입자 방벽 구슬: 켜질 때 톡 커지고, 꺼지면 사라진다
     const bubOn = !!(this.flags & F.bub) && show && !game.cut;
+    const dflOn = !!(this.flags & F.deflect) && show && !game.cut;
+    if (dflOn && !this.dfl) { this.dfl = new THREE.Mesh(BUB_G, DFL_M); this.dfl.renderOrder = 8; scene.add(this.dfl); }
+    if (this.dfl) {
+      if (!dflOn) { scene.remove(this.dfl); this.dfl = null; }
+      else { const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw); this.dfl.position.set(this.pos.x + fx * 0.75 * this.size, this.pos.y + 1.0 * this.size, this.pos.z + fz * 0.75 * this.size); this.dfl.rotation.set(0, this.yaw, 0); this.dfl.scale.set(0.95 * this.size, 0.95 * this.size, 0.28 * this.size); }
+    }
     if (bubOn && !this.bub) { this.bub = new THREE.Mesh(BUB_G, BUB_M); this.bub.renderOrder = 8; scene.add(this.bub); this.bubK = 0; }
     if (this.bub) {
       this.bubK = Math.max(0, Math.min(1, this.bubK + (bubOn ? dt * 6 : -dt * 5)));
@@ -136,7 +144,7 @@ class Other {
       if (this.flags & F.primal) puff(scene, c, '#9fe8ff', 1, 0.6, 1, 0.3);
     }
   }
-  remove() { for (const o of [this.bear?.root, this.mech, this.plate.s, this.xray, this.feet, this.bub]) if (o) scene.remove(o); }
+  remove() { for (const o of [this.bear?.root, this.mech, this.plate.s, this.xray, this.feet, this.bub, this.dfl]) if (o) scene.remove(o); }
   // 맞았나: 머리(공) · 몸(원기둥)
   hit(o, d) {
     const p = this.pos, mech = this.mech && !this.pilot, s = mech ? 1.25 : this.size * (this.flags & F.primal ? 1.3 : 1);
@@ -1004,7 +1012,7 @@ function frame() {
     if (game.shake > 0) { game.shake = Math.max(0, game.shake - dt * 1.8); const k = game.shake * game.shake * 0.3; camera.position.x += (Math.random() - 0.5) * k; camera.position.y += (Math.random() - 0.5) * k; camera.rotation.z += (Math.random() - 0.5) * k * 0.3; }
     const fov = 78 / scopeZoom();
     if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 14); camera.updateProjectionMatrix(); }
-    vm.update(dt, camera.aspect, Math.hypot(me.vel.x, me.vel.z) > 1.5 && me.onGround, mouseR && game.h?.s?.type === 'scope', game.h?.id === 'moira' ? (mouseL ? 'L' : mouseR ? 'R' : null) : mouseL && !!game.kit?.st.beams?.length);
+    vm.update(dt, camera.aspect, Math.hypot(me.vel.x, me.vel.z) > 1.5 && me.onGround, mouseR && game.h?.s?.type === 'scope', game.h?.id === 'moira' ? (mouseL ? 'L' : mouseR ? 'R' : null) : mouseL && !!game.kit?.st.beams?.length, has('deflect'));
     sendT -= dt;
     if (sendT <= 0 && me.alive) { sendT = 0.05; shell.send({ t: 'st', p: [me.pos.x, me.pos.y, me.pos.z, me.yaw, me.pitch, (me.crouch > 0.5 ? 1 : 0) | (Math.hypot(me.vel.x, me.vel.z) > 1 ? 2 : 0)] }); }
     hud(now);

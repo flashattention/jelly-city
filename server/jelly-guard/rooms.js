@@ -189,7 +189,7 @@ export class GuardRooms extends BaseRooms {
   atkSpec(c, h, a) {
     if (a === 'm') return { ...QUICK_MELEE, type: 'melee' };
     if (a === 'dash') return { type: 'melee', dmg: 50, range: 18, rate: 0.05 };
-    if (a === 'blade') return { type: 'melee', dmg: 110, range: 6, rate: 0.75 };
+    if (a === 'blade') return { type: 'melee', dmg: 110, range: 7.5, rate: 0.75 };
     if (a === 'punch') return { type: 'melee', dmg: 40, range: 5.5, rate: 0.55, kb: 11 };
     if (a === 's') return h.s;
     return c.pilot ? h.pilot.p : h.p;
@@ -879,7 +879,7 @@ export class GuardRooms extends BaseRooms {
     const moving = !!(tgt.st && tgt.st[5] & 1) || !tgt.bot;
     const pAcc = (base) => Math.max(0.06, Math.min(0.9, base)) * (0.55 + b.skill * 0.6) * (b.fx.visor > now ? 1.6 : 1) * (moving ? 0.9 : 1);
     if (b.fx.blade > now || (b.hero === 'winston' && b.fx.primal > now)) {
-      if (td < 5.5 && now >= b.fireT) { b.fireT = now + (b.fx.blade > now ? 800 : 600); this.toRoom(r, { t: 'fx', k: 'swing', by: b.id }); if (blocked) this.hurtEnt(r, blocked.e, 100, b); else this.damage(r, tgt, b.fx.blade > now ? 110 : 40, b, now, { a: b.fx.blade > now ? 'blade' : 'punch', melee: true, kb: b.fx.primal > now ? 11 : 0 }); }
+      if (td < (b.fx.blade > now ? 6.5 : 5.5) && now >= b.fireT) { b.fireT = now + (b.fx.blade > now ? 800 : 600); this.toRoom(r, { t: 'fx', k: 'swing', by: b.id }); if (blocked) this.hurtEnt(r, blocked.e, 100, b); else this.damage(r, tgt, b.fx.blade > now ? 110 : 40, b, now, { a: b.fx.blade > now ? 'blade' : 'punch', melee: true, kb: b.fx.primal > now ? 11 : 0 }); }
       return;
     }
     if (b.reloadT > 0) { b.reloadT -= dt; if (b.reloadT <= 0) b.mag = spec.mag; return; }
