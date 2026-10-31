@@ -118,7 +118,11 @@ export class HeroVM {
     const pawAt = (x, y, z, s = 1) => { const p = part(g, SPH, paw, x, y, z, 0.075 * s, 0.068 * s, 0.1 * s); return p; };
     const mz = (x, y, z) => this.muzzles.push(new THREE.Vector3(x, y, z));
     switch (kind) {
-      case 'hammer': { const h = new THREE.Group(); h.position.set(0.32, -0.32, -0.55); h.rotation.set(0.5, 0, -0.3); g.add(h); part(h, CYL, toon('#7a5a3a'), 0, 0.2, 0, 0.035, 1.1, 0.035); part(h, BOX, toon('#c9d2e3'), 0, 0.8, 0, 0.42, 0.3, 0.3); part(h, BOX, toon('#ff8f4a'), 0.22, 0.8, 0, 0.04, 0.22, 0.22); part(h, BOX, gold, 0, 0.8, 0, 0.44, 0.06, 0.32); pawAt(0.3, -0.42, -0.45, 1.3); pawAt(0.2, -0.3, -0.62, 1.3); this.swingDur = 0.55; this.head = h; break; }
+      case 'hammer': { const h = new THREE.Group(); h.position.set(0.32, -0.32, -0.55); h.rotation.set(0.5, 0, -0.3); g.add(h); part(h, CYL, toon('#7a5a3a'), 0, 0.2, 0, 0.035, 1.1, 0.035); part(h, BOX, toon('#c9d2e3'), 0, 0.8, 0, 0.42, 0.3, 0.3); part(h, BOX, toon('#ff8f4a'), 0.22, 0.8, 0, 0.04, 0.22, 0.22); part(h, BOX, gold, 0, 0.8, 0, 0.44, 0.06, 0.32); pawAt(0.3, -0.42, -0.45, 1.3); pawAt(0.2, -0.3, -0.62, 1.3); this.swingDur = 0.55; this.head = h;
+        // 휘두를 때 남는 넓은 궤적
+        this.trail = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.72, 40, 1, 0.15, Math.PI * 0.75), new THREE.MeshBasicMaterial({ color: '#ffe2b0', transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
+        this.trail.visible = false; this.trail.position.set(0, -0.35, -0.95); this.scene.add(this.trail);
+        break; }
       case 'tesla': part(g, BOX, toon('#d8dde6'), 0.25, -0.22, -0.5, 0.18, 0.16, 0.5); part(g, CYL, metal, 0.25, -0.2, -0.8, 0.05, 0.16, 0.05, Math.PI / 2); for (let i = 0; i < 3; i++) part(g, TOR, toon('#8fd8ff'), 0.25, -0.22, -0.4 - i * 0.12, 0.12, 0.12, 0.5); part(g, SPH, glowM('#bfefff'), 0.25, -0.2, -0.9, 0.05, 0.05, 0.05); pawAt(0.25, -0.33, -0.35, 1.2); mz(0.25, -0.2, -0.9); break;
       case 'cannons': for (const s of [-1, 1]) { part(g, BOX, m, s * 0.42, -0.36, -0.62, 0.22, 0.22, 0.6); part(g, CYL, dark, s * 0.42, -0.34, -0.98, 0.07, 0.2, 0.07, Math.PI / 2); part(g, BOX, toon('#fff4fb'), s * 0.42, -0.24, -0.6, 0.18, 0.04, 0.4); mz(s * 0.42, -0.34, -1.1); } break;
       case 'pilot': part(g, BOX, toon('#ff9fcf'), 0.24, -0.2, -0.45, 0.06, 0.09, 0.22); part(g, BOX, dark, 0.24, -0.27, -0.38, 0.05, 0.12, 0.06); pawAt(0.24, -0.3, -0.36); mz(0.24, -0.19, -0.58); break;
@@ -147,6 +151,7 @@ export class HeroVM {
     }
   }
   kick(k = 0.6) { this.kickT = Math.min(1, this.kickT + k); }
+  impact() { this.impactT = 0.16; } // 근접 공격이 맞은 순간: 무기가 멈칫 · 덜덜
   swing(dur) { this.swingT = dur || this.swingDur; this.swingLen = this.swingT; this.swingSide = -(this.swingSide || 1); }
   reload(d) { this.reloadT = d; this.reloadDur = d; }
   update(dt, aspect, moving, ads, glow, deflect, bloom) {
@@ -162,10 +167,12 @@ export class HeroVM {
     g.rotation.set(this.kickT * 0.1 + rel * 0.5, rel * 0.3, 0);
     if (this.swingT > 0) {
       const s = Math.sin((1 - this.swingT / this.swingLen) * Math.PI), side = this.swingSide || 1;
-      if (this.kind === 'hammer') g.rotation.set(-s * 0.2, side * s * 1.1, side * s * 0.8);
+      if (this.kind === 'hammer') this.hammerPose(side);
       else if (this.kind === 'paws') { this.pL.position.z = -0.45 - (side < 0 ? s * 0.4 : 0); this.pR.position.z = -0.45 - (side > 0 ? s * 0.4 : 0); }
       else if (this.kind !== 'sword') g.rotation.set(-s * 0.3, side * s * 0.9, -side * s * 0.6);
     }
+    if (this.kind === 'hammer' && this.trail && this.swingT <= 0) this.trail.visible = false;
+    if (this.impactT > 0) { this.impactT -= dt; const k = this.impactT / 0.16; g.position.x += (Math.random() - 0.5) * 0.03 * k; g.position.y += (Math.random() - 0.5) * 0.03 * k; g.scale.setScalar(0.5 * (1 + k * 0.06)); }
     if (this.kind === 'sword' && this.trail) this.swordPose(dt, side0(this), deflect);
     // 죽음의 꽃: 두 총을 번갈아 쏘며 좌우로 휘두른다 (총구 불꽃)
     if (this.fl) { const n = performance.now() / 1000; g.rotation.y += bloom ? Math.sin(n * 13) * 0.45 : 0; g.rotation.z += bloom ? Math.sin(n * 13) * 0.15 : 0; this.fl.forEach((f, i) => { f.visible = !!bloom && Math.sin(n * 60 + i * Math.PI) > 0.2; f.scale.setScalar(0.1 + Math.random() * 0.08); }); }
@@ -174,6 +181,17 @@ export class HeroVM {
     if (this.gL) { this.gL.material.opacity = glow === 'L' ? pulse + 0.3 : 0.35; this.gR.material.opacity = glow === 'R' ? pulse + 0.3 : 0.35; }
     if (this.tip) this.tip.material.opacity = glow ? pulse + 0.3 : 0.5;
     g.visible = this.ads < 0.85 || !(this.kind === 'sniper' || this.kind === 'biorifle');
+  }
+  // 망치: 크게 들어 올렸다가(0~25%) 화면을 가로질러 내려치고(25~50%) 천천히 돌아온다 · 내려칠 때 넓은 궤적
+  hammerPose(side) {
+    const g = this.rig, p = 1 - this.swingT / this.swingLen, ease = (x) => x * x * (3 - 2 * x);
+    let rx, ry, rz, px = 0, py = 0;
+    if (p < 0.25) { const e = ease(p / 0.25); rx = -0.7 * e; ry = side * 0.7 * e; rz = side * 0.5 * e; py = 0.12 * e; px = side * 0.1 * e; }
+    else if (p < 0.5) { const e = ease((p - 0.25) / 0.25); rx = -0.7 + 1.3 * e; ry = side * (0.7 - 2.1 * e); rz = side * (0.5 - 1.4 * e); py = 0.12 - 0.2 * e; px = side * (0.1 - 0.3 * e); }
+    else { const e = ease((p - 0.5) / 0.5); rx = 0.6 * (1 - e); ry = -side * 1.4 * (1 - e); rz = -side * 0.9 * (1 - e); py = -0.08 * (1 - e); px = -side * 0.2 * (1 - e); }
+    g.rotation.set(rx, ry, rz); g.position.x += px; g.position.y += py;
+    const tr = this.trail, on = p > 0.22 && p < 0.62;
+    tr.visible = on; if (on) { const k = Math.sin(((p - 0.22) / 0.4) * Math.PI); tr.material.opacity = k * 0.6; tr.scale.set(side, 1, 1); tr.rotation.set(-0.5, 0, side * (0.9 - 2.2 * ease(Math.min(1, (p - 0.22) / 0.3)))); }
   }
   // 칼: 베기는 화면을 가로질러 크게 휘두르고(초승달 궤적), 튕겨내기는 앞에서 칼을 빠르게 휘저으며 초록 막을 친다
   swordPose(dt, side, deflect) {
@@ -259,11 +277,11 @@ export class EntViews {
   constructor(scene) { this.scene = scene; this.map = new Map(); }
   sync(list, myTeam) {
     const seen = new Set();
-    for (const [id, k, team, x, y, z, yaw, hp, max] of list) {
+    for (const [id, k, team, x, y, z, yaw, hp, max, owner] of list) {
       seen.add(id);
       let v = this.map.get(id);
       if (!v) { v = this.make(k, team, myTeam); v.k = k; this.map.set(id, v); this.scene.add(v.o); v.o.position.set(x, y, z); }
-      v.tgt = { x, y, z, yaw }; v.hp = hp; v.max = max; v.team = team; v.id = id;
+      v.tgt = { x, y, z, yaw }; v.hp = hp; v.max = max; v.team = team; v.id = id; v.owner = owner;
     }
     for (const [id, v] of this.map) if (!seen.has(id)) { this.scene.remove(v.o); this.map.delete(id); }
   }

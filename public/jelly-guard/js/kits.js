@@ -8,17 +8,20 @@ const GUN_SND = { cassidy: 'pistol', reaper: 'heavy', hog: 'heavy', dva: 'smg', 
 export const VM_KIND = { rein: 'hammer', winston: 'tesla', dva: 'cannons', hog: 'scrap', zarya: 'particle', pharah: 'rpg', reaper: 'shotgun2', cassidy: 'revolver', soldier: 'rifle', genji: 'shuriken', widow: 'sniper', tracer: 'pistols', mercy: 'staff', ana: 'biorifle', lucio: 'sonic', moira: 'hands' };
 
 export function makeKit(h, G) {
-  const st = { mag: h.p.mag || 0, reloadEnd: 0, next: 0, nextS: 0, latch: false, latchS: false, beamT: 0, tgt: null, tgtS: null, beams: [], fuel: 1, dj: true, scopeAt: 0, acc: new Map(), hist: [], blinks: 3, blinkT: 0, mode: null };
+  const st = { mag: (h.p.alt || h.p).mag || 0, reloadEnd: 0, next: 0, nextS: 0, latch: false, latchS: false, beamT: 0, tgt: null, tgtS: null, beams: [], fuel: 1, dj: true, scopeAt: 0, acc: new Map(), hist: [], blinks: 3, blinkT: 0, mode: null };
   const K = { st, h };
   const now0 = () => performance.now();
   const spec = () => (G.has('pilot') ? h.pilot.p : h.p);
+  const magSpec = () => (h.p.alt && !G.has('pilot') ? h.p.alt : spec()); // 탄창이 있는 무기 (토닥은 딱총)
   const cdLeft = (s) => Math.max(0, (G.cd[s] || 0) - now0());
   const useCd = (s, sec) => { if (cdLeft(s) > 0) { G.sfx('cd'); return false; } G.cd[s] = now0() + sec * 1000; return true; };
   const abil = (s, extra = {}) => G.send({ t: 'abil', s, ...extra });
   const reloading = () => st.reloadEnd > now0();
-  K.reload = () => { const sp = spec(); if (!sp.mag || reloading() || st.mag >= sp.mag) return; st.reloadEnd = now0() + (sp.reload || 1.4) * 1000; G.vm.reload(sp.reload || 1.4); G.sfx('reload'); };
-  K.spawned = () => { st.mag = spec().mag || 0; st.reloadEnd = 0; st.mode = null; st.fuel = 1; st.blinks = 3; st.hist = []; st.acc.clear(); };
-  K.vmKind = () => G.has('blade') || G.has('deflect') ? 'sword' : G.has('primal') ? 'paws' : h.id === 'dva' && G.has('pilot') ? 'pilot' : VM_KIND[h.id];
+  K.reload = () => { const sp = magSpec(); if (!sp.mag || reloading() || st.mag >= sp.mag) return; st.reloadEnd = now0() + (sp.reload || 1.4) * 1000; G.vm.reload(sp.reload || 1.4); G.sfx('reload'); };
+  K.spawned = () => { st.mag = magSpec().mag || 0; st.reloadEnd = 0; st.mode = null; st.fuel = 1; st.blinks = 3; st.hist = []; st.acc.clear(); };
+  K.vmKind = () => G.has('blade') || G.has('deflect') ? 'sword' : G.has('primal') ? 'paws' : h.id === 'dva' && G.has('pilot') ? 'pilot' : h.id === 'mercy' && st.gun ? 'pilot' : VM_KIND[h.id];
+  // 토닥: 휠로 지팡이(치유 · 강화) ↔ 딱총
+  K.wheel = () => { if (h.id !== 'mercy' || busy()) return; st.gun = !st.gun; st.tgt = st.tgtS = null; st.beams = []; st.beamsS = []; G.sfx('pick'); G.toast(st.gun ? '🔫 딱총 (휠로 지팡이)' : '🪄 지팡이 (휠로 딱총)'); };
   // 지금 쏠 수 없는 상태 (기절 · 망령화 · 방벽 들고 · 돌진 …)
   const busy = () => !!st.aim || G.has('stun') || G.has('sleep') || G.has('ghost') || G.has('blossom') || G.has('hogult') || G.has('coal') || st.mode === 'charge' || st.mode === 'tp' || st.mode === 'recall' || st.mode === 'grap' || st.mode === 'ga' || (h.id === 'rein' && G.mouseR) || (h.id === 'dva' && G.mouseR && !G.has('pilot')) || G.has('deflect');
 
@@ -72,10 +75,11 @@ export function makeKit(h, G) {
     if (h.id === 'cassidy' && G.has('deadeye')) { if (edge) K.deadeyeFire(); return; }
     const sp = spec();
     if (h.id === 'mercy') {
-      // 아군을 조준하면 치유 줄기 · 아니면 광선총
+      if (st.gun) { if (now < st.next) return; return fireProjSpec(sp.alt, 'p', now); }
+      // 지팡이: 아군을 조준하면 치유 줄기
       st.tgt = G.findTarget({ range: G.has('valk') ? 30 : 15, arc: 0.95, lock: 'ally', prev: st.tgt });
-      if (st.tgt) { const list = [st.tgt]; if (G.has('valk')) for (const o of G.coneTargets({ range: 12, arc: -1, ally: true, from: st.tgt.chest() })) if (o !== st.tgt && list.length < 6) list.push(o); beamTick(now, 'p', list, 760); return; }
-      if (now < st.next || (!sp.alt.auto && st.latch)) return; st.latch = true; return fireProjSpec(sp.alt, 'p', now);
+      if (st.tgt) { const list = [st.tgt]; if (G.has('valk')) for (const o of G.coneTargets({ range: 12, arc: -1, ally: true, from: st.tgt.chest() })) if (o !== st.tgt && list.length < 6) list.push(o); beamTick(now, 'p', list, 760); }
+      return; // 지팡이 모드는 치유만 (쏘려면 휠로 딱총)
     }
     if (sp.type === 'hit') {
       if (now < st.next || (!sp.auto && st.latch)) return;
@@ -84,7 +88,12 @@ export function makeKit(h, G) {
       return fireHit(sp, 'p', now);
     }
     if (sp.type === 'proj') { if (now < st.next || (!sp.auto && st.latch)) return; st.latch = true; return fireProjSpec(sp, 'p', now); }
-    if (sp.type === 'melee') { if (now < st.next) return; st.next = now + sp.rate * 1000; G.vm.swing(); G.sfx('swing'); setTimeout(() => { if (G.me.alive && G.melee({ range: sp.range, arc: sp.arc, a: 'p', cleave: sp.cleave })) G.sfx('thud'); }, 140); return; }
+    if (sp.type === 'melee') {
+      if (now < st.next) return; st.next = now + sp.rate * 1000; G.vm.swing(); G.sfx('swing');
+      // 망치: 휘두르는 한가운데(0.2초)에 맞는다 · 맞으면 쾅 소리 · 화면 흔들림 · 망치가 멈칫
+      setTimeout(() => { if (!G.me.alive) return; const n = G.melee({ range: sp.range, arc: sp.arc, a: 'p', cleave: sp.cleave }); if (n) { G.sfx(h.id === 'rein' ? 'smash' : 'thud'); G.shake(h.id === 'rein' ? 0.45 : 0.2); G.vm.impact?.(); } }, h.id === 'rein' ? 200 : 140);
+      return;
+    }
     if (sp.type === 'beam') {
       let list;
       if (sp.chain) list = G.coneTargets({ range: sp.range, arc: sp.arc, ally: false }).slice(0, sp.chain);
@@ -111,6 +120,7 @@ export function makeKit(h, G) {
     }
     if (h.id === 'widow' || h.id === 'ana') { if (edge) st.scopeAt = now; return; }
     if (h.id === 'tracer') { if (edge) K.abil('shift', now); return; } // 쌩쌩: 우클릭도 점멸
+    if (h.id === 'mercy' && st.gun) return; // 딱총 모드엔 강화 줄기 없음
     if (!held) { st.latchS = false; st.tgtS = null; return; }
     if (busy() || !s) return;
     if (G.has('blade') || G.has('primal') || G.has('barrage') || G.has('deadeye')) return;
@@ -161,7 +171,7 @@ export function makeKit(h, G) {
     const sp = h[slot]; if (!sp) return;
     if (h.id === 'dva' && G.has('pilot')) return;
     switch (`${h.id}.${slot}`) {
-      case 'rein.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); st.mode = 'charge'; st.until = now + 2600; st.cyaw = me.yaw; G.sfx('dash'); return;
+      case 'rein.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); st.mode = 'charge'; st.until = now + 2600; st.cyaw = me.yaw; st.pinId = 0; G.sfx('dash'); return;
       case 'rein.e': if (!useCd('e', sp.cd)) return; abil('e'); G.vm.swing(0.4); setTimeout(() => G.fireProj('fire', { a: 'e', pierce: true }), 250); G.sfx('swing'); return;
       case 'winston.shift': if (!useCd('shift', G.has('primal') ? 1.5 : sp.cd)) return; abil('shift'); me.vel.set(flat.x * (G.has('primal') ? 20 : 17), 10.5, flat.z * (G.has('primal') ? 20 : 17)); me.onGround = false; st.mode = 'leap'; st.until = now + 3000; st.leapT = now; G.sfx('rocket'); return;
       case 'winston.e': if (!useCd('e', sp.cd)) return; abil('e'); G.sfx('abil'); return;
@@ -171,7 +181,7 @@ export function makeKit(h, G) {
       case 'hog.e': if (!useCd('e', sp.cd)) return; abil('e'); G.sfx('heal'); return;
       case 'zarya.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); G.sfx('abil'); return;
       case 'zarya.e': { if (!useCd('e', sp.cd)) return; const t = G.findTarget({ range: 30, arc: 0.95, lock: 'ally' }); abil('e', { to: t?.id }); G.sfx('abil'); return; }
-      case 'pharah.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); me.vel.y = 17; me.onGround = false; G.sfx('rocket'); return;
+      case 'pharah.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); me.vel.y = 17; me.onGround = false; st.mode = 'jet'; st.until = now + 400; G.sfx('rocket'); return;
       case 'pharah.e': if (!useCd('e', sp.cd)) return; abil('e'); G.fireProj('conc', { a: 'e' }); G.sfx('throw'); return;
       case 'reaper.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); st.mag = h.p.mag; G.sfx('abil'); return;
       case 'reaper.e': {
@@ -199,7 +209,7 @@ export function makeKit(h, G) {
         G.flash('#9fe8ff'); G.sfx('blink'); return;
       }
       case 'tracer.e': if (!useCd('e', sp.cd)) return; abil('e'); st.mode = 'recall'; st.until = now + 700; st.rpath = [...st.hist].reverse(); G.sfx('blink'); return;
-      case 'mercy.shift': { const t = G.findTarget({ range: 30, arc: 0.9, lock: 'ally' }); if (!t) { G.toast('🪽 날아갈 아군을 조준해요'); return; } if (!useCd('shift', G.has('valk') ? 1 : sp.cd)) return; abil('shift', { to: t.id }); st.mode = 'ga'; st.until = now + 1600; st.gaTo = t; G.sfx('dash'); return; }
+      case 'mercy.shift': { const t = G.findTarget({ range: 30, arc: 0.9, lock: 'ally' }) || G.findTarget({ range: 30, arc: 0.9, lock: 'ally', dead: true }); if (!t) { G.toast('🪽 날아갈 아군을 조준해요'); return; } if (!useCd('shift', G.has('valk') ? 1 : sp.cd)) return; abil('shift', { to: t.id }); st.mode = 'ga'; st.until = now + 1600; st.gaTo = t; G.sfx('dash'); return; }
       case 'mercy.e': if (cdLeft('e') > 0) { G.sfx('cd'); return; } G.cd.e = now + 1000; abil('e'); return;
       case 'ana.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); G.fireProj('sleep', { a: 'shift' }); G.sfx('laser'); return;
       case 'ana.e': if (!useCd('e', sp.cd)) return; abil('e'); G.fireProj('biotic', { a: 'e' }); G.sfx('throw'); return;
@@ -216,7 +226,7 @@ export function makeKit(h, G) {
     const me = G.me, f = G.fwd(), flat = new THREE.Vector3(f.x, 0, f.z).normalize();
     inp.speedMul = h.speed * (G.ps?.[9] || 1);
     inp.airCtl = 1.6;
-    if (st.reloadEnd && now >= st.reloadEnd) { st.mag = spec().mag || 0; st.reloadEnd = 0; }
+    if (st.reloadEnd && now >= st.reloadEnd) { st.mag = magSpec().mag || 0; st.reloadEnd = 0; }
     if (h.id === 'rein' && G.mouseR) inp.speedMul *= 0.7;
     if (h.id === 'soldier' && G.keys.has('ShiftLeft') && inp.f > 0 && !G.mouseL) inp.speedMul *= 1.5;
     if (G.has('blossom')) inp.speedMul *= 0.6;
@@ -235,7 +245,7 @@ export function makeKit(h, G) {
     if (G.has('coal')) inp.speedMul *= 1.25;
     if (h.id === 'moira' && st.mode === 'fade') inp.speedMul *= 2.2;
     if (h.id === 'dva' && G.mouseR && !G.has('pilot')) inp.speedMul *= 0.8;
-    if (st.mode && now > st.until) { if (st.mode === 'roll') { st.mag = h.p.mag; st.reloadEnd = 0; } if (st.mode === 'grap') { me.vel.y = Math.max(me.vel.y, 5); st.grapJump = now + 700; } if (st.mode === 'dash' || st.mode === 'boost') { me.vel.x *= 0.3; me.vel.z *= 0.3; } st.mode = st.mode === 'leap' && !me.onGround ? 'leap' : null; }
+    if (st.mode && now > st.until) { if (st.mode === 'charge' && st.pinId) { abil('slam', { wall: false }); st.pinId = 0; } if (st.mode === 'roll') { st.mag = h.p.mag; st.reloadEnd = 0; } if (st.mode === 'grap') { me.vel.y = Math.max(me.vel.y, 5); st.grapJump = now + 700; } if (st.mode === 'dash' || st.mode === 'boost') { me.vel.x *= 0.3; me.vel.z *= 0.3; } st.mode = st.mode === 'leap' && !me.onGround ? 'leap' : null; }
     // 멈춤 (기절 · 수면 · 포화 · 순간이동 준비)
     if (G.has('stun') || G.has('sleep') || st.mode === 'tp') { inp.f = 0; inp.s = 0; inp.jump = false; }
     if (st.mode === 'tp' && now >= st.until - 30) { me.pos.copy(st.tpTo); me.vel.set(0, 0, 0); st.mode = null; G.flash('#4a4356'); G.sfx('blink'); }
@@ -246,8 +256,9 @@ export function makeKit(h, G) {
         const dir = new THREE.Vector3(-Math.sin(st.cyaw), 0, -Math.cos(st.cyaw));
         inp.keepVel = true; me.vel.x = dir.x * 16; me.vel.z = dir.z * 16;
         const o = me.pos.clone().setY(me.pos.y + 1);
-        if (rayBoxes(G.map, o, dir, 1.2) < 1.1) { st.mode = null; G.shake(0.6); G.sfx('thud'); }
-        for (const t of G.enemies()) if (t.pos.distanceTo(me.pos) < 2.2) { abil('pin', { to: t.id }); st.mode = null; G.shake(0.8); G.sfx('thud'); break; }
+        // 벽에 부딪히면 멈춘다 (붙잡은 적이 1.5m 앞에 있으니 벽이 그만큼 앞이면 박는다)
+        if (rayBoxes(G.map, o, dir, st.pinId ? 2.8 : 1.2) < (st.pinId ? 2.6 : 1.1)) { st.mode = null; G.shake(st.pinId ? 1 : 0.6); G.sfx(st.pinId ? 'smash' : 'thud'); if (st.pinId) abil('slam', { wall: true }); st.pinId = 0; break; }
+        if (!st.pinId) for (const t of G.enemies()) if (t.pos.distanceTo(me.pos) < 2.2) { abil('pin', { to: t.id }); st.pinId = t.id; G.shake(0.5); G.sfx('thud'); break; } // 붙잡고 계속 달린다
         break;
       }
       case 'boost': {
@@ -269,7 +280,7 @@ export function makeKit(h, G) {
         break;
       }
       case 'ga': {
-        const t = st.gaTo; if (!t || !t.alive) { st.mode = null; break; }
+        const t = st.gaTo; if (!t || (!t.alive && !(t.deadT >= 0 && t.deadT < 10))) { st.mode = null; break; } // 쓰러진 아군에게도 날아간다 (되살릴 수 있는 동안)
         const d = t.chest().sub(me.pos.clone().setY(me.pos.y + 1)); const L = d.length();
         if (L < 2.6) { st.mode = null; me.vel.multiplyScalar(0.4); break; }
         inp.keepVel = true; inp.noGrav = true; me.vel.copy(d.normalize().multiplyScalar(18));
@@ -282,6 +293,7 @@ export function makeKit(h, G) {
         if (k >= 1) { st.mode = null; st.hist = []; }
         break;
       }
+      case 'jet': me.vel.y = Math.max(me.vel.y, 15); me.onGround = false; break;
       case 'leap': if (me.onGround && now - st.leapT > 250) { st.mode = null; abil('land'); G.ring(me.pos, '#8fd8ff', 4.5); G.shake(0.5); G.sfx('thud'); } break;
     }
     // 영웅마다 움직임 특징
@@ -331,15 +343,15 @@ export function makeKit(h, G) {
     if (st.aim === 'tp') out.push({ k: 'tp', ...K.tpTarget() });
     // 아군 대상 기술: 토닥 수호천사 · 탱글 방벽 씌우기 · 꿀잠 나노
     const allyAim = h.id === 'mercy' && ready('shift') ? { range: 30, arc: 0.9, label: '🪽 Shift' } : h.id === 'zarya' && ready('e') ? { range: 30, arc: 0.95, label: '🛡️ E' } : null;
-    if (allyAim) { const t = G.findTarget({ range: allyAim.range, arc: allyAim.arc, lock: 'ally' }); if (t) out.push({ k: 'ally', o: t, label: allyAim.label, col: h.id === 'mercy' ? '#ffe48a' : '#ff8fd0' }); }
+    if (allyAim) { const t = G.findTarget({ range: allyAim.range, arc: allyAim.arc, lock: 'ally' }) || (h.id === 'mercy' ? G.findTarget({ range: allyAim.range, arc: allyAim.arc, lock: 'ally', dead: true }) : null); if (t) out.push({ k: 'ally', o: t, label: allyAim.label, col: h.id === 'mercy' ? '#ffe48a' : '#ff8fd0' }); }
     if (h.id === 'ana' && (G.ps?.[4] ?? 0) >= 100) { const t = G.findTarget({ range: 45, arc: 0.93, lock: 'ally' }); if (t) out.push({ k: 'ally', o: t, label: '💉 Q', col: '#7cf0ff' }); }
     if (h.id === 'widow' && ready('shift')) { const e = G.eye(), tt = rayBoxes(G.map, e, G.fwd(), 26); out.push({ k: 'grap', ok: tt < 26 }); }
     if (h.id === 'cassidy' && G.has('deadeye')) for (const [id, v] of st.acc) { const o = G.others.get(id); if (o?.alive) out.push({ k: 'dead', o, v, kill: v >= o.hp + o.temp }); }
     void now; return out;
   };
   K.barrage = (now) => {
-    if (now < (st.barT || 0)) return; st.barT = now + 95; st.barSide = -(st.barSide || 1);
-    G.fireProj('barrage', { a: 'q', i: 1, side: st.barSide * 0.5, jitter: 0.07 }); G.sfx('rocket', null, 0.5);
+    if (now < (st.barT || 0)) return; st.barT = now + 80; st.barSide = -(st.barSide || 1);
+    G.fireProj('barrage', { a: 'q', i: 1, side: st.barSide * 0.5, jitter: 0.045 }); G.sfx('rocket', null, 0.5);
   };
   // 오른쪽 아래 표시 (탄 · 자원)
   K.ammo = () => {
@@ -350,7 +362,7 @@ export function makeKit(h, G) {
     if (h.id === 'zarya') return { big: `${Math.round(G.ps?.[6] ?? 0)}%`, small: '에너지' };
     if (h.id === 'dva' && !G.has('pilot')) return { big: '∞', small: `매트릭스 ${Math.round(G.ps?.[8] ?? 300) / 3 | 0}%` };
     if (sp.type === 'beam' || sp.type === 'melee') return { big: '∞', small: sp.name };
-    if (h.id === 'mercy') return { big: st.mag, small: '/ 20' };
+    if (h.id === 'mercy') return st.gun ? { big: st.mag, small: '/ 20 딱총' } : { big: '🪄', small: '지팡이 · 휠 = 딱총' };
     return { big: reloading() ? '…' : st.mag, small: sp.mag ? `/ ${sp.mag}` : '' };
   };
   K.extra = () => {

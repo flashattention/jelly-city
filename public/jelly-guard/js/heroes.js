@@ -4,17 +4,17 @@
 export const ROLES = { tank: { name: '돌격', icon: '🛡️', color: '#7cc4ff' }, dps: { name: '공격', icon: '⚔️', color: '#ff7a8a' }, sup: { name: '지원', icon: '✚', color: '#9be7a7' } };
 export const BASE_SPEED = 5.6, RESPAWN_MS = 8000, ULT_PASSIVE = 5; // 궁극기: 1초에 5점 + 준 피해 · 치유 1당 1점
 
-// 투사체: speed(m/s) · grav(중력 배수) · dmg(직격) · splash(폭발 최대) · r(폭발 반경) · kb(밀어내기) · self(자기 피해 배수) · life(초) · size · color
+// 투사체: speed(m/s) · grav(중력 배수) · dmg(직격 추가) · splash(폭발 최대, 직격 대상도 받는다) · r(폭발 반경) · kb(밀어내기) · self(자기 피해 배수) · life(초) · size · color
 export const PROJ = {
-  rocket: { speed: 38, grav: 0, dmg: 60, splash: 75, r: 2.6, kb: 7, self: 0.25, life: 3, size: 0.22, color: '#7cc8ff', trail: '#cfe8ff' },
-  barrage: { speed: 34, grav: 0, dmg: 20, splash: 25, r: 2.4, kb: 2, self: 0, life: 2.5, size: 0.14, color: '#9fd8ff', trail: '#e6f4ff' },
+  rocket: { speed: 38, grav: 0, dmg: 45, splash: 75, r: 2.6, kb: 7, self: 0.25, life: 3, size: 0.22, color: '#7cc8ff', trail: '#cfe8ff' },
+  barrage: { speed: 36, grav: 0, dmg: 15, splash: 30, r: 3, kb: 2, self: 0, life: 2.5, size: 0.14, color: '#9fd8ff', trail: '#e6f4ff' },
   conc: { speed: 40, grav: 0, dmg: 10, splash: 0, r: 4.5, kb: 15, self: 1, selfKb: true, life: 1.2, size: 0.3, color: '#bfe6ff', trail: '#ffffff' },
   fire: { speed: 26, grav: 0, dmg: 90, splash: 0, r: 0, pierce: true, life: 1.6, size: 0.6, color: '#ff9a3c', trail: '#ffd27a', wide: 1.2 },
   mini: { speed: 32, grav: 0, dmg: 5, splash: 6, r: 2, kb: 0.5, self: 0, life: 2, size: 0.1, color: '#ffb3d9', trail: '#ffe0f0' },
   egren: { speed: 26, grav: 0.55, dmg: 0, splash: 50, r: 3, kb: 6, self: 0, selfKb: true, life: 3, size: 0.25, color: '#ff8fd0', trail: '#ffd0ec' },
   grav: { speed: 24, grav: 0.3, dmg: 0, splash: 0, r: 0, life: 3, size: 0.4, color: '#c79bff', trail: '#e6d6ff', make: 'grav' },
   hook: { speed: 42, grav: 0, dmg: 30, splash: 0, r: 0, life: 0.5, size: 0.2, color: '#c9c9d6', trail: '#8a8a99', chain: true },
-  helix: { speed: 48, grav: 0, dmg: 40, splash: 70, r: 3, kb: 5, self: 0.4, selfKb: true, life: 2.5, size: 0.16, color: '#8fe6ff', trail: '#d6f7ff', count: 3 },
+  helix: { speed: 48, grav: 0, dmg: 50, splash: 70, r: 3, kb: 5, self: 0.4, selfKb: true, life: 2.5, size: 0.16, color: '#8fe6ff', trail: '#d6f7ff', count: 3 },
   shuri: { speed: 62, grav: 0, dmg: 29, splash: 0, r: 0, life: 1, size: 0.12, color: '#b6ff8a', trail: '#e8ffd6', head: 2 },
   flash: { speed: 30, grav: 0.2, dmg: 25, splash: 0, r: 3, life: 0.45, size: 0.18, color: '#fff3a0', trail: '#ffffff', stun: 0.8, burst: true },
   mine: { speed: 18, grav: 1, dmg: 0, splash: 0, r: 0, life: 3, size: 0.2, color: '#c47bff', trail: '#e8c8ff', make: 'mine' },
@@ -36,9 +36,9 @@ export const HEROES = [
     motto: '정의의 망치를 받아라!', desc: '거대한 망치와 방벽으로 팀을 지키는 젤리 기사',
     p: { type: 'melee', name: '로켓 해머', dmg: 75, rate: 0.95, range: 5, arc: 0.45, cleave: true },
     s: { type: 'hold', name: '방벽 방패', icon: '🛡️', hp: 1200, desc: '누르는 동안 앞에 큰 방벽 (총알 · 투사체를 막아요)' },
-    shift: { name: '돌진', icon: '🐂', cd: 8, desc: '앞으로 돌진! 처음 부딪힌 적에게 큰 피해' },
+    shift: { name: '돌진', icon: '🐂', cd: 8, desc: '앞으로 돌진! 처음 부딪힌 적을 붙잡고 달려 벽에 박으면 큰 피해' },
     e: { name: '화염 강타', icon: '🔥', cd: 6, desc: '적을 꿰뚫는 불꽃을 날려요' },
-    q: { name: '대지 분쇄', icon: '💥', desc: '앞쪽 넓은 땅을 내리쳐 적을 모두 기절시켜요' } },
+    q: { name: '대지 분쇄', icon: '💥', desc: '앞쪽 넓은 땅을 내리쳐 적을 모두 넘어뜨려요' } },
   { id: 'winston', name: '통통박사', role: 'tank', emoji: '🦍', color: '#8a86a6', hp: 500, speed: 1, ult: 1700, held: 'tesla', acc: ['glasses', 'vest'],
     motto: '과학의 힘이다!', desc: '전기 대포 · 점프팩 · 방벽 돔을 쓰는 천재 과학자 곰',
     p: { type: 'beam', name: '테슬라 캐논', range: 8.5, dps: 80, chain: 3, arc: 0.72, lock: 'enemy' },
@@ -115,10 +115,10 @@ export const HEROES = [
     q: { name: '펄스 폭탄', icon: '💣', desc: '적에게 붙는 강력한 폭탄' } },
   // ---------- 지원 ----------
   { id: 'mercy', name: '토닥', role: 'sup', emoji: '😇', color: '#fff0c8', hp: 225, speed: 1, ult: 1800, held: 'staff', acc: ['halo', 'wings', 'dress:#fff8e6'],
-    motto: '영웅은 죽지 않아요!', desc: '아군을 조준하면 치유 줄기 · 우클릭은 공격력 강화',
+    motto: '영웅은 죽지 않아요!', desc: '아군을 조준하면 치유 줄기 · 우클릭은 공격력 강화 · 휠로 지팡이 ↔ 딱총',
     p: { type: 'beam', name: '카두세우스 지팡이', range: 15, hps: 55, lock: 'ally', alt: { type: 'proj', k: 'bolt', rate: 0.2, mag: 20, reload: 1.3, auto: true } },
     s: { type: 'beam', name: '공격력 강화', icon: '💛', range: 15, boost: 0.3, lock: 'ally' },
-    shift: { name: '수호천사', icon: '🪽', cd: 2.5, desc: '조준한 아군에게 날아가요' },
+    shift: { name: '수호천사', icon: '🪽', cd: 2.5, desc: '조준한 아군에게 날아가요 (쓰러진 아군에게도)' },
     e: { name: '부활', icon: '✝️', cd: 30, desc: '가까이 쓰러진 아군을 되살려요' },
     q: { name: '발키리', icon: '🌟', desc: '15초 동안 날며 치유 줄기가 주변 아군에게 퍼져요' } },
   { id: 'ana', name: '꿀잠', role: 'sup', emoji: '🎯', color: '#7fc8d8', hp: 200, speed: 1, ult: 1900, held: 'sniper', acc: ['eyepatch', 'beret:#3b5b7c', 'coat:#4a6382'],

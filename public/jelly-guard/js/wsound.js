@@ -43,6 +43,7 @@ export function sfx(name, arg, vol = 1) {
     case 'bigboom': hiss(o, t, 0.1, { f: 3500, vol: 1, type: 'highpass' }); tone(o, t, 2, 80, { vol: 1, f2: 20 }); hiss(o, t, 2.2, { f: 1600, vol: 0.9, type: 'lowpass', f2: 60 }); break;
     case 'swing': hiss(o, t, 0.25, { f: 700, q: 1.2, vol: 0.35, f2: 2200 }); break;
     case 'thud': tone(o, t, 0.2, 120, { vol: 0.45, f2: 50 }); hiss(o, t, 0.15, { f: 600, vol: 0.3, type: 'lowpass' }); break;
+    case 'smash': tone(o, t, 0.4, 95, { vol: 0.75, f2: 32 }); tone(o, t, 0.09, 260, { type: 'square', vol: 0.16, f2: 70 }); hiss(o, t, 0.3, { f: 1500, vol: 0.45, type: 'lowpass' }); break; // 망치에 맞았을 때: 묵직하게 쾅
     case 'beam': tone(o, t, 0.11, arg || 520, { type: 'sawtooth', vol: 0.03 }); break;
     case 'heal': tone(o, t, 0.12, 880, { type: 'sine', vol: 0.05, f2: 1320 }); break;
     case 'hit': tone(o, t, 0.06, 1500, { type: 'square', vol: 0.07, f2: 900 }); break;

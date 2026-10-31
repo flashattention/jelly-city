@@ -17,8 +17,9 @@ import { sfx, unlock, toggleMute, sound, say } from './wsound.js';
 const $ = (id) => document.getElementById(id);
 const PICK_KEY = 'jellyguard.pick', HERO_KEY = 'jellyguard.hero';
 const coarse = matchMedia('(pointer: coarse)').matches;
-const F = { stun: 1, sleep: 2, invuln: 4, nano: 8, boost: 16, matrix: 32, deflect: 64, grav: 128, anti: 256, hboost: 512, primal: 1024, pilot: 2048, valk: 4096, bub: 8192, reveal: 16384, blossom: 32768, hogult: 65536, blade: 131072, barrage: 262144, deadeye: 524288, coal: 1 << 20, ghost: 1 << 21, spd: 1 << 22, amp: 1 << 23, visor: 1 << 24, breath: 1 << 25, songheal: 1 << 26, poison: 1 << 27, shield: 1 << 28 };
-const BEAM_COL = { mercy: '#ffe48a', winston: '#9fe8ff', zarya: '#ff8fd0', moira: '#c07bff' };
+const F = { stun: 1, sleep: 2, invuln: 4, nano: 8, boost: 16, matrix: 32, deflect: 64, grav: 128, anti: 256, hboost: 512, primal: 1024, pilot: 2048, valk: 4096, bub: 8192, reveal: 16384, blossom: 32768, hogult: 65536, blade: 131072, barrage: 262144, deadeye: 524288, coal: 1 << 20, ghost: 1 << 21, spd: 1 << 22, amp: 1 << 23, visor: 1 << 24, breath: 1 << 25, songheal: 1 << 26, poison: 1 << 27, shield: 1 << 28, down: 1 << 29 };
+const BEAM_COL = { mercy: '#ffd400', winston: '#9fe8ff', zarya: '#ff8fd0', moira: '#c07bff' };
+const MERCY_HEAL = '#ffd400', MERCY_BOOST = '#1f7bff'; // 토닥 치유(진한 노랑) · 강화(진한 파랑)
 
 // ---------- 3D ----------
 const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, powerPreference: 'high-performance' });
@@ -85,14 +86,14 @@ class Other {
     // 쓰러짐: 죽으면(체력 0 이어도) 뒤로 넘어졌다가 2초쯤 뒤 바닥으로 스르르 사라진다 · 수면총에 맞으면 옆으로 누워 잔다
     const alive = this.alive && !(this.hp <= 0 && this.max > 0);
     if (alive || game.cut) this.deadT = -1; else if (this.deadT < 0 || this.deadT == null) this.deadT = 0; else this.deadT += dt;
-    const fallen = !alive && !game.cut && this.deadT < 2.4, sleep = alive && !game.cut && !!(this.flags & F.sleep);
-    this.lie = (this.lie || 0) + ((fallen || sleep ? 1 : 0) - (this.lie || 0)) * Math.min(1, dt * (fallen ? 9 : 6));
+    const fallen = !alive && !game.cut && this.deadT < 2.4, sleep = alive && !game.cut && !!(this.flags & F.sleep), down = alive && !game.cut && !!(this.flags & F.down);
+    this.lie = (this.lie || 0) + ((fallen || sleep || down ? 1 : 0) - (this.lie || 0)) * Math.min(1, dt * (fallen || down ? 9 : 6));
     const b = this.bear, mech = this.mech && !this.pilot && alive, ghost = this.flags & F.ghost, show = ((alive || game.cut) && !(ghost && Math.sin(t * 30) > -0.6)) || fallen;
     if (this.mech) { this.mech.visible = mech && show; this.mech.position.copy(this.pos); this.mech.rotation.y = this.yaw + Math.PI; }
     b.root.visible = show;
     b.root.position.copy(this.pos); if (mech) b.root.position.y += 1.35;
     b.root.rotation.order = 'YXZ';
-    b.root.rotation.set(fallen ? -this.lie * Math.PI / 2 : 0, this.yaw + Math.PI, sleep ? this.lie * Math.PI / 2 : 0);
+    b.root.rotation.set(fallen || (down && !sleep) ? -this.lie * Math.PI / 2 : 0, this.yaw + Math.PI, sleep ? this.lie * Math.PI / 2 : 0); // 쓰러짐 · 대지 분쇄는 뒤로 벌러덩, 잠은 옆으로
     if (this.lie > 0.01) b.root.position.y += this.lie * 0.35 * this.size - (fallen ? Math.max(0, this.deadT - 1.6) * 1.4 : 0); // 넘어진 몸이 바닥에 묻히지 않게 · 사라질 땐 가라앉기
     b.root.scale.setScalar(0.85 * (mech ? 0.55 : this.size) * (this.flags & F.primal ? 1.35 : 1));
     b.setSeated?.(!!mech);
@@ -131,7 +132,7 @@ class Other {
       if (this.flags & F.bub && Math.random() < 0.4) puff(scene, c, '#ff9fe0', 1, 1.1, 0.2, 0.2);
       if (this.flags & F.nano) puff(scene, c, '#7cf0ff', 2, 0.5, 1.5, 0.4);
       if (this.flags & F.sleep) puff(scene, c.setY(c.y + 1.2), '#d6c2ff', 1, 0.4, 0.4, 0.8);
-      if (this.flags & F.stun) puff(scene, c.setY(c.y + 1.1), '#ffe48a', 2, 0.25, 1, 0.3);
+      if (this.flags & F.stun) puff(scene, c.setY(c.y + (this.flags & F.down ? 0 : 1.1)), '#ffe48a', 2, 0.25, 1, 0.3);
       if (this.flags & F.matrix) puff(scene, c.clone().add(new THREE.Vector3(-Math.sin(this.yaw) * 2, 0.2, -Math.cos(this.yaw) * 2)), '#ff6fd8', 3, 0.8, 1.2, 0.25);
       if (this.flags & F.deflect) puff(scene, c, '#b6ff8a', 2, 0.6, 2, 0.25);
       if (this.flags & F.blossom) for (let i = 0; i < 4; i++) puff(scene, c.clone().add(new THREE.Vector3(Math.cos(t * 9 + i * 1.6) * 3, 0, Math.sin(t * 9 + i * 1.6) * 3)), '#ff4a6a', 2, 0.5, 1, 0.3);
@@ -174,9 +175,11 @@ function computeSeen() {
     o.seen = (myTeamOf(o) || L < 90) && (clearLine(game.map, e, c) || clearLine(game.map, e, c.clone().setY(c.y + 0.5)));
   }
 }
-function findTarget({ range, arc, lock, prev }) {
+function findTarget({ range, arc, lock, prev, dead }) {
   const e = eye(), cf = fwd();
-  const ok = (o) => o.alive && (lock === 'ally' ? myTeamOf(o) : enemy(o) && !(o.flags & F.ghost)) && o.chest().distanceTo(e) < range && clearLine(game.map, e, o.chest());
+  // dead: 쓰러진 지 10초 안 된 아군 (되살릴 수 있는 동안)
+  const live = (o) => (dead ? !o.alive && myTeamOf(o) && o.hero && o.deadT >= 0 && o.deadT < 10 : o.alive);
+  const ok = (o) => live(o) && (lock === 'ally' ? myTeamOf(o) : enemy(o) && !(o.flags & F.ghost)) && o.chest().distanceTo(e) < range && clearLine(game.map, e, o.chest());
   if (prev && ok(prev) && prev.chest().sub(e).normalize().dot(cf) > 0.55) return prev;
   let best = null, bd = arc;
   for (const o of game.others.values()) { if (!ok(o)) continue; const dt = o.chest().sub(e).normalize().dot(cf); if (dt > bd) { bd = dt; best = o; } }
@@ -359,6 +362,7 @@ document.addEventListener('mousemove', (e) => {
 document.addEventListener('mousedown', (e) => { if (!locked()) return; if (e.button === 0) { mouseL = true; edgeL = true; } if (e.button === 2) { mouseR = true; edgeR = true; } });
 document.addEventListener('mouseup', (e) => { if (e.button === 0) mouseL = false; if (e.button === 2 && mouseR) { mouseR = false; relR = true; } });
 document.addEventListener('contextmenu', (e) => { if (game.mode === 'play') e.preventDefault(); });
+document.addEventListener('wheel', (e) => { if (!locked() || game.mode !== 'play' || !me.alive || Math.abs(e.deltaY) < 1) return; const t0 = performance.now(); if (t0 - (game.wheelT || 0) < 250) return; game.wheelT = t0; game.kit?.wheel?.(); }, { passive: true }); // 휠: 토닥 지팡이 ↔ 딱총
 window.addEventListener('keydown', (e) => {
   if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
   if (game.mode !== 'play') return;
@@ -673,11 +677,13 @@ shell.on('cc', (m) => {
   if (m.to !== game.myId) return;
   if (m.k === 'grav') game.gravAt = new THREE.Vector3(...m.p);
   if (m.k === 'stun') banner2('😵 기절!');
+  if (m.k === 'down') banner2('💥 넘어졌어요!');
+  if (m.k === 'pin') banner2('🐂 붙잡혔어요!');
   if (m.k === 'sleep') banner2('💤 잠들었어요… (맞으면 깨요)');
   if (m.k === 'grav') banner2('🌀 중력자탄에 끌려가요!');
 });
 shell.on('kb', (m) => { me.vel.x += m.v[0]; me.vel.y = Math.max(me.vel.y, m.v[1]); me.vel.z += m.v[2]; me.onGround = false; });
-shell.on('pull', (m) => { me.pos.set(m.p[0], m.p[1], m.p[2]); me.vel.set(0, 0, 0); banner2('⛓️ 끌려왔어요!'); });
+shell.on('pull', (m) => { me.pos.set(m.p[0], m.p[1], m.p[2]); me.vel.set(0, 0, 0); if (!m.q) banner2('⛓️ 끌려왔어요!'); });
 shell.on('reset', (m) => { game.cd[m.s] = 0; sfx('ultready', null, 0.5); });
 shell.on('cd', (m) => { game.cd[m.s] = performance.now() + m.ms; });
 shell.on('form', (m) => {
@@ -721,6 +727,7 @@ function fxEvent(m) {
     const d = by.pos.distanceTo(me.pos); if (d < 40) sfx('abil', null, Math.max(0.1, 1 - d / 40) * 0.5);
     return;
   }
+  if (m.k === 'slam' && p) { const q = p.clone().setY(p.y + 1); puff(scene, q, '#c9d2e3', m.wall ? 18 : 10, 0.5, 3); if (m.wall) ring(scene, p, '#ffd27a', 2.5, 0.4, 0.8); const d = p.distanceTo(me.pos); if (m.to === game.myId) { shake(1); banner2(m.wall ? '💥 벽에 박혔어요!' : '🐂 내동댕이쳐졌어요!'); } else if (d < 30) sfx('smash', null, Math.max(0.15, 1 - d / 30)); return; }
   if (m.k === 'land' && p) { ring(scene, p, '#8fd8ff', 4.5, 0.45); sfx('thud', null, 0.6); return; }
   if (m.k === 'swing' && by) { by.bear?.attack('melee'); return; }
   if (m.k === 'break') { const q = new THREE.Vector3(...m.p).setY(m.p[1] + 1.5); puff(scene, q, '#9fe8ff', 20, 0.5, 4); sfx('boom', null, 0.4); return; }
@@ -948,9 +955,9 @@ function drawBeams(t) {
   const kit = game.kit;
   if (kit && me.alive && game.mode === 'play') {
     // 내 줄기: 총구 조금 앞에서 · 가늘게 (화면 앞을 가리지 않게)
-    const mz = muzzle(0).addScaledVector(fwd(), 0.5), col = game.h.id === 'mercy' ? '#ffe48a' : BEAM_COL[game.h.id] || '#ffffff';
-    for (const o of kit.st.beams || []) { if (game.h.id === 'winston') bolt(mz, o.chest()); else beam(mz, o.chest(), col, 0.035, 0.2); }
-    for (const o of kit.st.beamsS || []) beam(mz, o.chest(), game.h.id === 'mercy' ? '#ffb347' : '#c07bff', 0.035, 0.2);
+    const mz = muzzle(0).addScaledVector(fwd(), 0.5), col = game.h.id === 'mercy' ? MERCY_HEAL : BEAM_COL[game.h.id] || '#ffffff', mw = game.h.id === 'mercy' ? 0.045 : 0.035;
+    for (const o of kit.st.beams || []) { if (game.h.id === 'winston') bolt(mz, o.chest()); else beam(mz, o.chest(), col, mw, 0.2); }
+    for (const o of kit.st.beamsS || []) beam(mz, o.chest(), game.h.id === 'mercy' ? MERCY_BOOST : '#c07bff', mw, 0.2);
     if (mouseL && kit.st.beamFree && game.h.id === 'zarya') beam(mz, eye().addScaledVector(fwd(), Math.min(15, rayBoxes(game.map, eye(), fwd(), 15))), '#ff8fd0', 0.035, 0.3);
     if (mouseL && game.h.id === 'winston' && !kit.st.beams?.length && !has('primal')) for (let i = 0; i < 2; i++) { const d = fwd().add(new THREE.Vector3((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.5)); bolt(mz, eye().addScaledVector(d, 7)); }
     if (mouseL && game.h.id === 'moira' && kit.st.spray && Math.random() < 0.6) puff(scene, eye().addScaledVector(fwd(), 2 + Math.random() * 6).add(new THREE.Vector3((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 2)), '#ffe48a', 1, 0.6, 0.5, 0.4);
@@ -971,11 +978,24 @@ function drawBeams(t) {
       const t2 = o.beamTo === game.myId ? me.pos.clone().setY(me.pos.y + 1.1) : game.others.get(o.beamTo)?.chest();
       const tTeam = o.beamTo === game.myId ? game.team : game.others.get(o.beamTo)?.team;
       if (t2 && hh.id === 'winston') bolt(o.hand(), t2);
-      else if (t2) beam(o.hand(), t2, hh.id === 'mercy' ? '#ffe48a' : hh.id === 'moira' ? (tTeam === o.team ? '#ffe48a' : '#c07bff') : BEAM_COL[hh.id] || '#ffffff', 0.06, 0.2);
+      else if (t2) beam(o.hand(), t2, hh.id === 'mercy' ? ((o.beamTo === game.myId ? has('boost') : game.others.get(o.beamTo)?.flags & F.boost) ? MERCY_BOOST : MERCY_HEAL) : hh.id === 'moira' ? (tTeam === o.team ? '#ffe48a' : '#c07bff') : BEAM_COL[hh.id] || '#ffffff', 0.06, 0.2);
     }
     if (o.flags & F.coal) { const d = new THREE.Vector3(-Math.sin(o.yaw) * Math.cos(o.pitch), Math.sin(o.pitch), -Math.cos(o.yaw) * Math.cos(o.pitch)); beam(o.hand(), o.hand().addScaledVector(d, 30), '#c07bff', 0.16, 0.15); }
   }
   for (let i = beamUsed; i < beamPool.length; i++) beamPool[i].visible = false;
+}
+
+// 3인칭(말랑방패 방벽)일 때 내 곰돌이 · 내 방벽을 내 자리에 그린다
+let tpBear = null;
+function drawSelf(dt) {
+  const on = game.mode === 'play' && me.alive && (game.tp || 0) > 0.05 && game.h?.id === 'rein';
+  if (on && !tpBear) { tpBear = heroBear(heroById('rein'), {}); scene.add(tpBear.root); }
+  if (!tpBear) return;
+  tpBear.root.visible = on;
+  if (!on) { if ((game.tp || 0) <= 0.01) { scene.remove(tpBear.root); tpBear = null; } return; }
+  tpBear.root.position.copy(me.pos); tpBear.root.rotation.set(0, me.yaw + Math.PI, 0); tpBear.root.scale.setScalar(0.85 * tpBear.size);
+  tpBear.update(dt, Math.min(9, Math.hypot(me.vel.x, me.vel.z)), { noCrawl: true });
+  for (const v of ents.map.values()) if (v.k === 'shield' && v.owner === game.myId) { v.o.position.set(me.pos.x, me.pos.y, me.pos.z); v.yaw = me.yaw; v.o.rotation.y = me.yaw; }
 }
 
 // ---------- 매 프레임 ----------
@@ -1007,7 +1027,16 @@ function frame() {
     // 카메라: 살아 있으면 눈 · 죽으면 쓰러진 자리 위에서 천천히
     // 잠들면 내 눈도 바닥으로 · 옆으로 기울어진다
     game.zz = (game.zz || 0) + ((me.alive && has('sleep') ? 1 : 0) - (game.zz || 0)) * Math.min(1, dt * 5);
-    if (me.alive) { camera.position.copy(me.viewEye()); camera.position.y -= game.zz * 1.15; camera.rotation.set(me.pitch * (1 - game.zz), me.yaw, game.zz * 1.25); }
+    game.dn = (game.dn || 0) + ((me.alive && has('down') && !has('sleep') ? 1 : 0) - (game.dn || 0)) * Math.min(1, dt * 7);
+    game.tp = (game.tp || 0) + ((me.alive && game.h?.id === 'rein' && mouseR && has('shield') ? 1 : 0) - (game.tp || 0)) * Math.min(1, dt * 8);
+    if (me.alive) {
+      camera.position.copy(me.viewEye()); camera.position.y -= game.zz * 1.15 + game.dn * 1.1;
+      camera.rotation.set(me.pitch * (1 - game.zz) * (1 - game.dn) + game.dn * 1.2, me.yaw, game.zz * 1.25);
+      if (game.tp > 0.01) { // 방벽: 몸 뒤 위쪽으로 (벽이 있으면 그 앞까지만)
+        const back = new THREE.Vector3(Math.sin(me.yaw) * 3.4 + Math.cos(me.yaw) * 0.7, 0.9, Math.cos(me.yaw) * 3.4 - Math.sin(me.yaw) * 0.7).multiplyScalar(game.tp), L = back.length();
+        if (L > 0.01) { const dir = back.clone().divideScalar(L), wall = rayBoxes(game.map, camera.position, dir, L + 0.3); camera.position.addScaledVector(dir, Math.max(0, Math.min(L, wall - 0.3))); }
+      }
+    }
     else { const a = t * 0.25, c = me.pos; camera.position.set(c.x + Math.cos(a) * 7, c.y + 5, c.z + Math.sin(a) * 7); camera.lookAt(c.x, c.y + 1, c.z); }
     if (game.shake > 0) { game.shake = Math.max(0, game.shake - dt * 1.8); const k = game.shake * game.shake * 0.3; camera.position.x += (Math.random() - 0.5) * k; camera.position.y += (Math.random() - 0.5) * k; camera.rotation.z += (Math.random() - 0.5) * k * 0.3; }
     const fov = 78 / scopeZoom();
@@ -1025,12 +1054,13 @@ function frame() {
     if (camera.fov !== 60) { camera.fov = 60; camera.updateProjectionMatrix(); }
     if (game.phase === 'select') { const left = Math.max(0, Math.ceil((game.selUntil - now) / 1000)); $('sel-time').textContent = `⏱️ ${left}`; }
   }
+  drawSelf(dt);
   drawBeams(t);
   drawPreview(dt);
   updateFx(dt, scene); updateBig(dt, camera);
   renderer.clear();
   renderer.render(scene, camera);
-  if (game.mode === 'play' && me.alive && game.phase !== 'select' && !has('ghost')) vm.render(renderer);
+  if (game.mode === 'play' && me.alive && game.phase !== 'select' && !has('ghost') && (game.tp || 0) < 0.3) vm.render(renderer);
 }
 
 // ---------- 시작 ----------

@@ -16,7 +16,7 @@ const BOT_NAMES = ['젤리봇 딸기', '젤리봇 소다', '젤리봇 푸딩', '
 // 영웅마다 쏠 수 있는 투사체
 const PKINDS = { rein: ['fire'], dva: ['mini'], zarya: ['egren', 'grav'], pharah: ['rocket', 'conc', 'barrage'], hog: ['hook'], soldier: ['helix'], genji: ['shuri'], cassidy: ['flash'], widow: ['mine'], tracer: ['pulse'], mercy: ['bolt'], ana: ['sleep', 'biotic'], lucio: ['sonic'], moira: [] };
 // 상태 이상 → 화면에 보내는 비트
-const F = { stun: 1, sleep: 2, invuln: 4, nano: 8, boost: 16, matrix: 32, deflect: 64, grav: 128, anti: 256, hboost: 512, primal: 1024, pilot: 2048, valk: 4096, bub: 8192, reveal: 16384, blossom: 32768, hogult: 65536, blade: 131072, barrage: 262144, deadeye: 524288, coal: 1 << 20, ghost: 1 << 21, spd: 1 << 22, amp: 1 << 23, visor: 1 << 24, breath: 1 << 25, songheal: 1 << 26, poison: 1 << 27, shield: 1 << 28 };
+const F = { stun: 1, sleep: 2, invuln: 4, nano: 8, boost: 16, matrix: 32, deflect: 64, grav: 128, anti: 256, hboost: 512, primal: 1024, pilot: 2048, valk: 4096, bub: 8192, reveal: 16384, blossom: 32768, hogult: 65536, blade: 131072, barrage: 262144, deadeye: 524288, coal: 1 << 20, ghost: 1 << 21, spd: 1 << 22, amp: 1 << 23, visor: 1 << 24, breath: 1 << 25, songheal: 1 << 26, poison: 1 << 27, shield: 1 << 28, down: 1 << 29 };
 const d2 = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const d3 = (a, b) => Math.hypot(a.x - b.x, (a.y || 0) - (b.y || 0), a.z - b.z);
 const fwd = (yaw, pitch = 0) => ({ x: -Math.sin(yaw) * Math.cos(pitch), y: Math.sin(pitch), z: -Math.cos(yaw) * Math.cos(pitch) });
@@ -264,8 +264,11 @@ export class GuardRooms extends BaseRooms {
     if (!Array.isArray(m.p)) return;
     const p = { x: +m.p[0], y: +m.p[1], z: +m.p[2] }; if (![p.x, p.y, p.z].every(Number.isFinite)) return;
     if (d3(p, c.pos) > P.speed * (P.life || 2) + 8) return;
+    let to = m.to != null ? r.players.find((q) => q.id === +m.to) : null, ent = m.e != null ? r.g.ents.find((e) => e.id === +m.e) : null;
+    // 곧게 날아가는 투사체(갈고리 · 수면총 …)는 쏜 사람과 맞은 사람 사이에 적 방벽이 있으면 방벽이 맞은 것으로
+    if (to && !P.grav && to.team !== c.team) { const bl = blockBy(r.g.ents, eyeOf(c), chest(to), c.team); if (bl) { to = null; ent = ent || bl.e; } }
     this.toRoom(r, { t: 'boom', k, p: [p.x, p.y, p.z], by: c.id });
-    this.explode(r, c, k, p, m.to != null ? r.players.find((q) => q.id === +m.to) : null, m.e != null ? r.g.ents.find((e) => e.id === +m.e) : null, now, m.part === 'head');
+    this.explode(r, c, k, p, to, ent, now, m.part === 'head');
   }
   // 투사체가 터졌다: 직격 · 폭발 · 특수 효과 (서버 봇도 같이 쓴다)
   explode(r, c, k, p, direct, ent, now, head) {
@@ -292,7 +295,7 @@ export class GuardRooms extends BaseRooms {
         if (t.team !== c.team || t === c) {
           if (t === c && !P.self && !P.selfKb) continue;
           if (t !== c && P.friendly && P.heal == null) continue;
-          if (P.splash && t !== direct) this.damage(r, t, P.splash * k1 * (t === c ? P.self || 0 : 1), c, now, { a: k, src: p });
+          if (P.splash) this.damage(r, t, P.splash * (t === direct ? 1 : k1) * (t === c ? P.self || 0 : 1), c, now, { a: k, src: p }); // 직격 대상도 폭발 피해를 다 받는다
           if (P.stun && t !== c) { t.fx.stun = now + P.stun * 1000; this.cc(r, t, 'stun', P.stun * 1000); }
           if (P.anti && t !== c) t.fx.anti = now + P.anti * 1000;
           if (P.kb && (t !== c || P.selfKb)) { const dx = q.x - p.x, dz = q.z - p.z, L = Math.hypot(dx, dz) || 1; this.knock(r, t, [dx / L * P.kb * k1, (t === c ? 0.75 : 0.45) * P.kb * k1 + 2, dz / L * P.kb * k1]); }
@@ -355,12 +358,13 @@ export class GuardRooms extends BaseRooms {
       if (c.hero === 'dva' && !c.pilot) c.mtxOn = !!m.on && c.mtx > 0.2;
       return;
     }
-    if (s === 'pin') { // 말랑방패 돌진에 부딪힌 적
-      const t = r.players.find((p) => p.id === +m.to); if (c.hero !== 'rein' || !t || t.team === c.team || now - (c.chargeAt || 0) > 3200 || c.pinned) return;
-      if (d2(t.pos, c.pos) > 4.5) return; c.pinned = true;
-      this.damage(r, t, 200, c, now, { a: 'shift', melee: true }); const f = fwd(c.yaw); this.knock(r, t, [f.x * 14, 5, f.z * 14]);
+    if (s === 'pin') { // 말랑방패 돌진에 부딪힌 적: 붙잡고 같이 달린다 (피해는 벽에 박거나 돌진이 끝날 때)
+      const t = r.players.find((p) => p.id === +m.to); if (c.hero !== 'rein' || !t || !t.alive || t.team === c.team || !(c.fx.charge > now) || c.pinUsed) return;
+      if (d2(t.pos, c.pos) > 4.5 || t.fx.invuln > now) return;
+      c.pinUsed = true; c.pinT = t; t.fx.stun = Math.max(t.fx.stun || 0, c.fx.charge + 300); this.cc(r, t, 'pin', c.fx.charge - now);
       return;
     }
+    if (s === 'slam') { if (c.hero === 'rein') this.slam(r, c, !!m.wall, now); return; }
     if (s === 'bump') { // 뿅뿅 부스터에 부딪힘
       const t = r.players.find((p) => p.id === +m.to); if (c.hero !== 'dva' || !t || t.team === c.team || now - (c.boostAt || 0) > 2500) return;
       if (d2(t.pos, c.pos) > 4 || now - (t.bumpedAt || 0) < 800) return; t.bumpedAt = now;
@@ -401,7 +405,7 @@ export class GuardRooms extends BaseRooms {
   abilEffect(r, c, h, slot, m, now) {
     const id = c.hero;
     const tok = (k, n = 1) => { c.tok[k] = Math.min(40, (c.tok[k] || 0) + n); };
-    if (id === 'rein') { if (slot === 'shift') { c.chargeAt = now; c.pinned = false; c.fx.charge = now + 2600; } if (slot === 'e') { c.fireAt = now; c.fireHits = 0; tok('fire'); } }
+    if (id === 'rein') { if (slot === 'shift') { c.chargeAt = now; c.pinUsed = false; c.pinT = null; c.fx.charge = now + 2600; } if (slot === 'e') { c.fireAt = now; c.fireHits = 0; tok('fire'); } }
     if (id === 'winston') { if (slot === 'shift') { c.leapAt = now; c.landed = false; } if (slot === 'e') this.addEnt(r, { k: 'dome', team: c.team, owner: c, x: c.pos.x, y: c.pos.y, z: c.pos.z, hp: 700, max: 700, until: now + 8000 }); }
     if (id === 'dva') { if (slot === 'shift') c.boostAt = now; if (slot === 'e' && !c.pilot) tok('mini', 18); }
     if (id === 'hog') { if (slot === 'shift') tok('hook'); if (slot === 'e') { c.fx.breath = now + 1800; c.hot = { until: now + 1800, rate: 300 / 1.8 }; } }
@@ -432,7 +436,7 @@ export class GuardRooms extends BaseRooms {
     const enemies = () => r.players.filter((t) => t.alive && t.team !== c.team);
     switch (id) {
       case 'rein': { // 대지 분쇄: 앞쪽 부채꼴 20m 기절
-        for (const t of enemies()) { const dx = t.pos.x - c.pos.x, dz = t.pos.z - c.pos.z, L = Math.hypot(dx, dz); if (L > 20 || (dx * f.x + dz * f.z) / (L || 1) < 0.78 || Math.abs(t.pos.y - c.pos.y) > 2.2 || !this.canSee(r, eyeOf(c), t) || blockBy(r.g.ents, eyeOf(c), chest(t), c.team)) continue; this.damage(r, t, 50, c, now, { a: 'q' }); if (t.alive && !(t.fx.invuln > now)) { t.fx.stun = now + 2500; this.cc(r, t, 'stun', 2500); } }
+        for (const t of enemies()) { const dx = t.pos.x - c.pos.x, dz = t.pos.z - c.pos.z, L = Math.hypot(dx, dz); if (L > 20 || (dx * f.x + dz * f.z) / (L || 1) < 0.78 || Math.abs(t.pos.y - c.pos.y) > 2.2 || !this.canSee(r, eyeOf(c), t) || blockBy(r.g.ents, eyeOf(c), chest(t), c.team)) continue; this.damage(r, t, 50, c, now, { a: 'q' }); if (t.alive && !(t.fx.invuln > now)) { t.fx.stun = now + 2500; t.fx.down = now + 2500; this.cc(r, t, 'down', 2500); } }
         return true;
       }
       case 'winston': c.fx.primal = now + 10000; c.prim = 500; c.hp = this.maxHp(c); return true;
@@ -448,7 +452,7 @@ export class GuardRooms extends BaseRooms {
       }
       case 'hog': c.fx.hogult = now + 6000; return true;
       case 'zarya': tok('grav'); return true;
-      case 'pharah': c.fx.barrage = now + 3000; tok('barrage', 50); return true;
+      case 'pharah': c.fx.barrage = now + 3000; tok('barrage', 60); return true;
       case 'reaper': c.fx.blossom = now + 3000; return true;
       case 'cassidy': c.fx.deadeye = now + 7000; c.deadAt = now; c.deadDone = new Set(); return true;
       case 'soldier': c.fx.visor = now + 6000; return true;
@@ -485,6 +489,15 @@ export class GuardRooms extends BaseRooms {
     this.toRoom(r, { t: 'fx', k: 'rez', by: c.id, to: t.id });
     this.spawn(r, t, now, [t.deathPos.x, t.deathPos.z, t.deathPos.y]);
     return true;
+  }
+  // 돌진 끝: 붙잡은 적을 내리친다 (벽에 박으면 200 · 그냥 끝나면 120)
+  slam(r, c, wall, now) {
+    const t = c.pinT; c.pinT = null; c.fx.charge = 0; if (!t) return;
+    t.fx.stun = now + (wall ? 700 : 250);
+    if (!t.alive) return;
+    this.damage(r, t, wall ? 200 : 120, c, now, { a: 'shift', melee: true });
+    if (t.alive && !wall) { const f = fwd(c.yaw); this.knock(r, t, [f.x * 6, 4, f.z * 6]); }
+    this.toRoom(r, { t: 'fx', k: 'slam', by: c.id, to: t.id, wall, p: [t.pos.x, t.pos.y, t.pos.z] });
   }
   bubble(t, by, now) { t.bub = 200; t.fx.bub = now + 2000; t.bubBy = by; }
   syncShield(r, c) {
@@ -542,6 +555,7 @@ export class GuardRooms extends BaseRooms {
   kill(r, t, by, a, head, now) {
     t.alive = false; t.d++; t.respawnAt = now + RESPAWN_MS; t.deathPos = { ...t.pos }; t.deadAt = now;
     t.fx = {}; t.shieldOn = false; t.mtxOn = false; t.over = 0; t.prim = 0; t.bub = 0; t.hot = null; this.syncShield(r, t);
+    if (t.pinT) { t.pinT.fx.stun = 0; t.pinT = null; }
     const assists = [...t.dmgBy.entries()].filter(([id, at]) => now - at < 6000 && id !== by?.id).map(([id]) => id);
     if (by && by !== t) { by.k++; by.fb++; }
     for (const id of assists) { const p = r.players.find((q) => q.id === id); if (p) p.k++; }
@@ -553,7 +567,7 @@ export class GuardRooms extends BaseRooms {
   }
   cc(r, t, k, ms) { this.toRoom(r, { t: 'cc', to: t.id, k, ms }); if (t.bot) t.path = null; }
   knock(r, t, v) { if (t.bot) { t.kv = { x: v[0], z: v[2], until: Date.now() + 350 }; return; } this.send(t, { t: 'kb', v }); }
-  pullTo(r, t, p) { if (t.bot) { t.pos.x = p.x; t.pos.z = p.z; t.pos.y = floorAt(r.g.map, p.x, p.z, p.y + 1); return; } t.pos = { ...p }; this.send(t, { t: 'pull', p: [p.x, p.y, p.z] }); }
+  pullTo(r, t, p, quiet) { if (t.bot) { t.pos.x = p.x; t.pos.z = p.z; t.pos.y = floorAt(r.g.map, p.x, p.z, p.y + 1); return; } t.pos = { ...p }; this.send(t, { t: 'pull', p: [p.x, p.y, p.z], q: quiet ? 1 : 0 }); }
 
   // ---------- 매 틱 ----------
   onTick(r, now) {
@@ -591,6 +605,11 @@ export class GuardRooms extends BaseRooms {
       if (p.prim > 0 && !(p.fx.primal > now)) p.prim = 0;
       if (p.bub > 0 && !(p.fx.bub > now)) p.bub = 0;
       if (p.hero === 'zarya' && now - (p.lastEnergy || 0) > 0) p.energy = Math.max(0, p.energy - 3 * dt);
+      if (p.hero === 'rein' && p.pinT) {
+        const t = p.pinT;
+        if (!(p.fx.charge > now) || !t.alive) this.slam(r, p, false, now);
+        else { const f = fwd(p.yaw), q = { x: p.pos.x + f.x * 1.5, y: p.pos.y, z: p.pos.z + f.z * 1.5 }; if (clearLine(g.map, { ...p.pos, y: p.pos.y + 1 }, { ...q, y: q.y + 1 })) this.pullTo(r, t, q, true); }
+      }
       if (p.hero === 'rein') { if (p.shieldOn) { const e = g.ents.find((x) => x.k === 'shield' && x.owner === p); if (e) { e.x = p.pos.x; e.y = p.pos.y; e.z = p.pos.z; e.yaw = p.yaw; } } else if (now - (p.shieldBroke || 0) > 5000) p.shp = Math.min(1200, p.shp + 150 * dt); }
       if (p.hero === 'dva') { if (p.mtxOn) { p.mtx -= dt; if (p.mtx <= 0) { p.mtx = 0; p.mtxOn = false; } p.mtxUsed = now; } else if (now - (p.mtxUsed || 0) > 1000) p.mtx = Math.min(3, p.mtx + dt * 0.5); }
       if (p.hero === 'moira' && now - (p.sprayAt || 0) > 400) p.res = Math.min(100, p.res + 14 * dt);
@@ -611,7 +630,7 @@ export class GuardRooms extends BaseRooms {
             if (along < 0 || along > 30) continue;
             const off = Math.hypot(vx - f.x * along, vy - f.y * along, vz - f.z * along); if (off > 1.6) continue;
             if (!clearLine(g.map, e, q)) continue;
-            if (t.team === p.team) this.heal(r, t, 14, p, now); else this.damage(r, t, 7, p, now, { a: 'q', beam: true });
+            if (t.team === p.team) this.heal(r, t, 17, p, now); else this.damage(r, t, 7, p, now, { a: 'q', beam: true });
           }
         }
       }
@@ -673,12 +692,18 @@ export class GuardRooms extends BaseRooms {
   // 뿅뿅 자폭: 벽 뒤는 안전
   bigBoom(r, e, now) {
     this.toRoom(r, { t: 'boom', k: 'nuke', p: [e.x, e.y, e.z], by: e.owner.id });
+    const o = { x: e.x, y: e.y + 0.6, z: e.z }, hitEnts = new Map();
     for (const t of r.players) {
       if (!t.alive || (t.team === e.team && t !== e.owner)) continue;
       const q = chest(t), d = d3(q, e); if (d > 21) continue;
-      if (!clearLine(r.g.map, { x: e.x, y: e.y + 0.6, z: e.z }, q) || blockBy(r.g.ents, e, q, e.team)) continue;
+      if (!clearLine(r.g.map, o, q)) continue;
+      const bl = blockBy(r.g.ents, e, q, e.team);
+      if (bl) { hitEnts.set(bl.e, Math.max(hitEnts.get(bl.e) || 0, d)); continue; } // 방벽 뒤는 안전 · 그 방벽이 대신 맞는다
       this.damage(r, t, t === e.owner ? 0 : 1000 * Math.max(0.35, 1 - d / 30), e.owner, now, { a: 'q', src: e });
     }
+    // 폭발 안의 적 방벽 · 돔 (뒤에 숨은 사람이 없어도) 은 한 번씩 피해를 받는다
+    for (const x of r.g.ents) if ((x.k === 'shield' || x.k === 'dome') && x.team !== e.team && x.hp && !hitEnts.has(x)) { const d = d3(x, e); if (d < 21 && clearLine(r.g.map, o, { x: x.x, y: x.y + 1.5, z: x.z })) hitEnts.set(x, d); }
+    for (const [x, d] of hitEnts) if (r.g.ents.includes(x)) this.hurtEnt(r, x, 1000 * Math.max(0.35, 1 - d / 30), e.owner);
   }
   // ---------- 거점 ----------
   onPoint(r, pt, p) { return p.alive && Math.hypot(p.pos.x - pt.x, p.pos.z - pt.z) <= pt.r && p.pos.y > pt.y - 1 && p.pos.y < pt.y + 3.5; }
@@ -729,7 +754,7 @@ export class GuardRooms extends BaseRooms {
     if ((g.psT -= dt) > 0) return; g.psT = 0.1;
     const flags = (p) => {
       let f = 0; const x = p.fx;
-      for (const k of ['stun', 'sleep', 'invuln', 'nano', 'boost', 'deflect', 'grav', 'anti', 'hboost', 'primal', 'valk', 'blossom', 'hogult', 'blade', 'barrage', 'deadeye', 'coal', 'ghost', 'spd', 'amp', 'visor', 'breath', 'reveal']) if (x[k] > now) f |= F[k];
+      for (const k of ['stun', 'sleep', 'invuln', 'nano', 'boost', 'deflect', 'grav', 'anti', 'hboost', 'primal', 'valk', 'blossom', 'hogult', 'blade', 'barrage', 'deadeye', 'coal', 'ghost', 'spd', 'amp', 'visor', 'breath', 'reveal', 'down']) if (x[k] > now) f |= F[k];
       if (p.mtxOn) f |= F.matrix; if (p.pilot) f |= F.pilot; if (p.bub > 0 && x.bub > now) f |= F.bub; if (p.poison?.length) f |= F.poison; if (p.shieldOn) f |= F.shield; if (p.hero === 'lucio' && p.song === 'heal') f |= F.songheal;
       return f;
     };
@@ -956,7 +981,7 @@ export class GuardRooms extends BaseRooms {
         if (tgt && td < 25) { b.ult = 0; const tp = { ...chest(tgt) }; this.toRoom(r, { t: 'fx', k: 'ult', by: b.id, h: b.hero, team: b.team, p: [b.pos.x, b.pos.y, b.pos.z], yaw: b.yaw });
           if (b.hero === 'zarya') setTimeout(() => { if (r.g) { this.toRoom(r, { t: 'boom', k: 'grav', p: [tp.x, tp.y, tp.z], by: b.id }); this.addEnt(r, { k: 'grav', team: b.team, owner: b, x: tp.x, y: tp.y, z: tp.z, until: Date.now() + 4000, r: 6.5 }); } }, 600);
           if (b.hero === 'tracer') setTimeout(() => { if (r.g && tgt.alive && Math.random() < 0.6 + b.skill * 0.3) this.addEnt(r, { k: 'pulse', team: b.team, owner: b, on: tgt, x: tp.x, y: tp.y, z: tp.z, until: Date.now() + 1000, boom: 'pulsebomb' }); }, 400);
-          if (b.hero === 'pharah') { b.fx.barrage = now + 3000; for (let i = 0; i < 12; i++) setTimeout(() => { if (r.g && b.alive && tgt.alive) { const q = chest(tgt); const p = { x: q.x + rnd(-1.5, 1.5), y: q.y + rnd(-0.5, 0.5), z: q.z + rnd(-1.5, 1.5) }; if (clearLine(r.g.map, eyeOf(b), p)) { this.toRoom(r, { t: 'boom', k: 'barrage', p: [p.x, p.y, p.z], by: b.id }); this.explode(r, b, 'barrage', p, Math.random() < 0.4 ? tgt : null, null, Date.now()); } } }, 200 + i * 230); }
+          if (b.hero === 'pharah') { b.fx.barrage = now + 3000; for (let i = 0; i < 24; i++) setTimeout(() => { if (r.g && b.alive && tgt.alive) { const q = chest(tgt); const p = { x: q.x + rnd(-1.5, 1.5), y: q.y + rnd(-0.5, 0.5), z: q.z + rnd(-1.5, 1.5) }; if (clearLine(r.g.map, eyeOf(b), p)) { this.toRoom(r, { t: 'boom', k: 'barrage', p: [p.x, p.y, p.z], by: b.id }); this.explode(r, b, 'barrage', p, Math.random() < 0.4 ? tgt : null, null, Date.now()); } } }, 200 + i * 115); }
           return; }
       } else if (b.hero === 'cassidy') {
         b.ult = 0; b.fx.deadeye = now + 2500; this.toRoom(r, { t: 'fx', k: 'ult', by: b.id, h: b.hero, team: b.team, p: [b.pos.x, b.pos.y, b.pos.z], yaw: b.yaw });
@@ -1005,11 +1030,12 @@ export class GuardRooms extends BaseRooms {
     this.toRoom(r, { t: 'proj', by: b.id, k, o: [e.x, e.y, e.z], v: [(aim.x - e.x) / L * P.speed, (aim.y - e.y) / L * P.speed + (P.grav ? L * 0.25 : 0), (aim.z - e.z) / L * P.speed] });
     setTimeout(() => {
       if (!r.g || r.g.phase === 'over' || !b.alive) return;
-      if (!clearLine(r.g.map, e, aim)) return;
-      if (P.r || P.splash || P.make) this.toRoom(r, { t: 'boom', k, p: [aim.x, aim.y, aim.z], by: b.id });
-      const direct = hit && tgt.alive ? tgt : null;
-      if (P.friendly && tgt.team === b.team) this.explode(r, b, k, aim, null, null, Date.now());
-      else this.explode(r, b, k, aim, direct, null, Date.now());
+      const bl = blockBy(r.g.ents, e, aim, b.team), p = bl ? { x: e.x + (aim.x - e.x) * bl.t, y: e.y + (aim.y - e.y) * bl.t, z: e.z + (aim.z - e.z) * bl.t } : aim;
+      if (!bl && !clearLine(r.g.map, e, aim)) return;
+      if (P.r || P.splash || P.make || bl) this.toRoom(r, { t: 'boom', k, p: [p.x, p.y, p.z], by: b.id });
+      const direct = hit && tgt.alive && !bl ? tgt : null;
+      if (P.friendly && tgt.team === b.team) this.explode(r, b, k, p, null, null, Date.now());
+      else this.explode(r, b, k, p, direct, bl ? bl.e : null, Date.now());
     }, (L / P.speed) * 1000);
   }
 }
