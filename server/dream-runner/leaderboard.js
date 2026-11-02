@@ -18,12 +18,14 @@ export class DreamBoard {
     this.best = {};   // 스피드전: sub → { name, color, score, dist, stars, themes, time, at, guest }
     this.bestItem = {}; // 아이템전
     this.boards = {};   // 이지 말고 다른 난이도: 'speed:hard' → { sub → 기록 } (이지는 위 둘을 그대로 쓴다)
+    this.stats = {};    // sub → { runs, time, by: { easy: { runs, time } } } (순위와 상관없이 달린 판수 · 시간)
     this.runs = 0;
     this.lastPost = new Map();
+    this.lastPlay = new Map();
     this.ipHits = new Map();
     try {
       const d = JSON.parse(fs.readFileSync(this.file, 'utf8'));
-      this.best = d.best || {}; this.bestItem = d.bestItem || {}; this.boards = d.boards || {}; this.runs = d.runs || 0;
+      this.best = d.best || {}; this.bestItem = d.bestItem || {}; this.boards = d.boards || {}; this.stats = d.stats || {}; this.runs = d.runs || 0;
     } catch { /* 처음 */ }
     this.dirty = false;
     setInterval(() => this.save(), 20000).unref();
@@ -31,7 +33,7 @@ export class DreamBoard {
   save() {
     if (!this.dirty) return;
     this.dirty = false;
-    try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ best: this.best, bestItem: this.bestItem, boards: this.boards, runs: this.runs })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('드림 러너 저장 실패', e); }
+    try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ best: this.best, bestItem: this.bestItem, boards: this.boards, stats: this.stats, runs: this.runs })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('드림 러너 저장 실패', e); }
   }
   table(mode, diff) { if (diff !== 'easy') return (this.boards[`${mode}:${diff}`] ||= {}); return mode === 'item' ? this.bestItem : this.best; }
   sorted(mode, diff) { return Object.entries(this.table(mode, diff)).sort((a, b) => b[1].score - a[1].score || a[1].at - b[1].at); }
@@ -44,6 +46,25 @@ export class DreamBoard {
     const i = this.sorted(mode, diff).findIndex(([s]) => s === sub);
     const e = T[sub];
     return { rank: i + 1, id: sub.slice(-8), name: e.name, color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon };
+  }
+  // 달린 기록: 탈락 · 그만두기 · 팀전 끝 모두 센다 (순위에 올리지 않아도 센다)
+  played(sub, b) {
+    const now = Date.now(), time = Number(b.time);
+    if (now - (this.lastPlay.get(sub) || 0) < 2000) throw new Error('너무 빨라요');
+    if (!Number.isFinite(time) || time < 3 || time > 4 * 3600) throw new Error('기록이 이상해요');
+    this.lastPlay.set(sub, now);
+    const s = (this.stats[sub] ||= { runs: 0, time: 0, by: {} }), d = (s.by[diffOf(b.diff)] ||= { runs: 0, time: 0 });
+    s.runs++; s.time += Math.round(time); d.runs++; d.time += Math.round(time); this.dirty = true;
+  }
+  // 내 기록 한눈에: 판수 · 시간 · 난이도 · 모드별 지금 순위
+  myStats(sub) {
+    const s = (sub && this.stats[sub]) || { runs: 0, time: 0, by: {} }, diffs = {};
+    for (const k of Object.keys(DIFFS)) {
+      const row = { runs: s.by[k]?.runs || 0, time: s.by[k]?.time || 0 };
+      for (const mode of ['speed', 'item']) { const m = this.mine(sub, mode, k); row[mode] = m ? { rank: m.rank, score: m.score, of: Object.keys(this.table(mode, k)).length } : null; }
+      diffs[k] = row;
+    }
+    return { runs: s.runs, time: s.time, diffs };
   }
   // 한 판 끝: 말이 안 되는 기록은 거르고, 점수는 서버가 다시 계산한다
   submit(who, b) {
@@ -72,6 +93,17 @@ export async function dreamApi(req, res, url, who, board, json) {
   const anonId = url.searchParams.get('anon');
   const mode = url.searchParams.get('mode') === 'item' ? 'item' : 'speed', diff = diffOf(url.searchParams.get('diff'));
   if (url.pathname === '/api/dream/board') return json(res, 200, { mode, diff, top: board.top(mode, diff), me: board.mine(who?.sub || (ANON.test(anonId || '') ? 'anon:' + anonId : null), mode, diff), runs: board.runs });
+  if (url.pathname === '/api/dream/me') return json(res, 200, board.myStats(who?.sub || (ANON.test(anonId || '') ? 'anon:' + anonId : null)));
+  if (url.pathname === '/api/dream/played' && req.method === 'POST') {
+    const b = await readJson(req);
+    if (!who && !ANON.test(String(b.anon || ''))) return json(res, 401, { error: 'login' });
+    if (!who) { // 비로그인은 한 곳(IP)에서 너무 자주 못 올린다
+      const ip = req.headers['fly-client-ip'] || req.socket.remoteAddress || '', now = Date.now(), hits = (board.ipHits.get('p:' + ip) || []).filter((t) => now - t < 60000);
+      if (hits.length >= 20) return json(res, 429, { error: '잠시 후 다시 시도해 주세요' });
+      hits.push(now); board.ipHits.set('p:' + ip, hits);
+    }
+    try { board.played(who?.sub || 'anon:' + b.anon, b); return json(res, 200, { ok: true }); } catch (e) { return json(res, 400, { error: e.message }); }
+  }
   if (url.pathname === '/api/dream/score' && req.method === 'POST') {
     const b = await readJson(req);
     if (!who) {

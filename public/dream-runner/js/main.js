@@ -106,7 +106,7 @@ function syncSound() { document.querySelectorAll('#b-mute, [data-snd]').forEach(
 function muteBtn() { toggleMute(); syncSound(); }
 document.querySelectorAll('#b-mute, [data-snd]').forEach((b) => { b.onclick = muteBtn; });
 syncSound();
-$('b-quit').onclick = () => { if (game.multi) { net.send({ t: 'leave' }); leaveRun(); } else toTitle(); };
+$('b-quit').onclick = () => { reportPlay(); if (game.multi) { net.send({ t: 'leave' }); leaveRun(); } else toTitle(); };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- 로그인 · 캐릭터 ----------
@@ -233,12 +233,29 @@ for (const b of $('room-team').children) b.onclick = () => net.send({ t: 'team',
 $('team-btn').onclick = () => net.send({ t: 'switch' });
 game.boardMode = 'speed';
 for (const b of $('board-mode').children) b.onclick = async () => { game.boardMode = b.dataset.m; segSet('board-mode', game.boardMode); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff)); };
-$('board-btn').onclick = async () => { game.boardMode = game.pickMode; game.boardDiff = game.pickDiff; segSet('board-mode', game.boardMode); segSet('board-diff', game.boardDiff); show('board'); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff)); };
+$('board-btn').onclick = async () => { game.boardMode = game.pickMode; game.boardDiff = game.pickDiff; segSet('board-mode', game.boardMode); segSet('board-diff', game.boardDiff); show('board'); renderMyStats(); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff)); };
 $('board-close').onclick = () => show('title');
 $('home-btn').onclick = () => { if (game.multi) { net.send({ t: 'leave' }); game.multi = false; } toTitle(); };
 $('again-btn').onclick = () => { if (game.multi) { leaveRun(); show('room'); } else startSolo(); };
 
 // ---------- 순위표 ----------
+// 내 기록: 판수 · 달린 시간 · 난이도별 지금 순위
+const playTime = (t) => (t < 60 ? `${t}초` : t < 3600 ? `${Math.floor(t / 60)}분` : `${Math.floor(t / 3600)}시간 ${Math.floor(t / 60) % 60}분`);
+async function renderMyStats() {
+  const el = $('my-stats'); let d;
+  try { d = await account.api('/api/dream/me' + (logged() ? '' : `?anon=${anonId()}`)); } catch { el.innerHTML = ''; return; }
+  const cell = (r) => (r ? `<b>${r.rank.toLocaleString()}위</b><small>${r.score.toLocaleString()}점 · ${r.of.toLocaleString()}명 중</small>` : '<small>기록 없음</small>');
+  el.innerHTML = `<div class="ms-top"><div><small>내가 달린 판수</small><b>${d.runs.toLocaleString()}판</b></div><div><small>달린 시간</small><b>${playTime(d.time)}</b></div></div>
+    <div class="ms-table"><div class="ms-row ms-head"><span>난이도</span><span>판수 · 시간</span><span>⚡ 스피드전</span><span>🎁 아이템전</span></div>${Object.entries(DIFFS).map(([k, x]) => { const r = d.diffs[k]; return `<div class="ms-row"><span>${esc(x.name)}</span><span><b>${r.runs.toLocaleString()}판</b><small>${playTime(r.time)}</small></span><span>${cell(r.speed)}</span><span>${cell(r.item)}</span></div>`; }).join('')}</div>`;
+}
+// 달린 판수 · 시간 올리기 (한 판에 한 번, 서버 점검 중이면 다시 시도). 나갈 때는 페이지가 닫혀도 전해지게 한다
+function reportPlay(leaving) {
+  if (game.playSent || game.runT < 3) return; game.playSent = true;
+  const body = { time: game.runT, diff: game.diff, anon: logged() ? undefined : anonId() };
+  if (leaving) { fetch('/api/dream/played', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', ...(account.session ? { Authorization: `Bearer ${account.session}` } : {}) }, body: JSON.stringify(body) }).catch(() => {}); return; }
+  (async () => { for (let i = 0; i < 100; i++) { try { await account.api('/api/dream/played', { method: 'POST', body }); return; } catch (e) { if (e.status && e.status < 500) return; await new Promise((ok) => setTimeout(ok, 3000)); } } })();
+}
+addEventListener('pagehide', () => { if (game.mode === 'run' || game.mode === 'dead') reportPlay(true); });
 async function loadBoard(mode = 'speed', diff = 'easy') { try { return await account.api(`/api/dream/board?mode=${mode}&diff=${diff}` + (logged() ? '' : `&anon=${anonId()}`)); } catch { return { top: [] }; } }
 function renderBoard(el, d, hl) {
   const top = d.top || [], me = d.me;
@@ -261,7 +278,7 @@ function newRun(seed, itemMode = false, diff = 'easy') {
   runner.reset(0, 0);
   runner.multi = game.multi;
   renderItems(true);
-  game.dream = 0; game.dreamsSeen = 1; game.runT = 0; game.submitted = null;
+  game.dream = 0; game.dreamsSeen = 1; game.runT = 0; game.submitted = null; game.playSent = false;
   env.setTheme(track.themeOf(0), true);
   setMusic(track.themeOf(0).mus);
   $('h-alive').classList.toggle('hidden', !game.multi);
@@ -307,6 +324,7 @@ function score() { return Math.floor(runner.s) + runner.stars * 10; }
 async function died(why) {
   sfx(why.includes('떨어') ? 'die' : 'bonk');
   game.mode = 'dead'; game.deadT = 0; game.why = why;
+  reportPlay();
   const rec = { dist: Math.floor(runner.s), stars: runner.stars, themes: game.dreamsSeen, time: game.runT, name: game.profile.name, color: game.profile.color, mode: game.itemMode ? 'item' : 'speed', diff: game.diff };
   if (game.multi) net.send({ t: 'dead', dist: rec.dist, stars: rec.stars, why });
   game.rec = rec;
@@ -570,6 +588,7 @@ function showTeamOver(m) {
   renderRoom(m.rank);
 }
 net.on('finish', (m) => {
+  reportPlay(); // 팀전은 탈락 없이 끝난다
   if (m.team) { showTeamOver(m); return; }
   $('ov-board-title').classList.remove('hidden'); $('ov-board').classList.remove('hidden');
   // 모두 탈락: 방 안 순위 + 전체 순위표
