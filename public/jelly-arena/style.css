@@ -36,7 +36,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1c2a24; use
 .sk .key { position: absolute; left: 2px; bottom: 0; font-size: 11px; color: #ffe9a8; text-shadow: 0 1px 2px #000; }
 .sk .rk { position: absolute; left: 3px; right: 3px; top: 2px; display: flex; gap: 1px; }
 .sk .rk u { flex: 1; height: 3px; background: #0006; border-radius: 2px; } .sk .rk u.on { background: #ffd76a; }
-.sk .cd { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.62); border-radius: inherit; font-size: 17px; }
+.sk .cd { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: conic-gradient(rgba(0,0,0,.74) calc(var(--p, 1) * 360deg), rgba(0,0,0,.14) 0); border-radius: inherit; font-size: 17px; text-shadow: 0 1px 3px #000; }
+.sk.ready { animation: rdy .35s; } @keyframes rdy { 40% { filter: brightness(2.2); transform: scale(1.08); } }
+.sk.bad { animation: bad .24s; border-color: #ff5a7a; } @keyframes bad { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+.sk.aim { border-color: #ffe066; box-shadow: 0 0 10px #ffe06699; }
 .sk .up { position: absolute; left: 50%; top: -19px; transform: translateX(-50%); width: 24px; height: 18px; line-height: 15px; border-radius: 6px; border: 0; background: #ffd76a; color: #4a2a00; font-size: 15px; padding: 0; animation: upb .7s infinite alternate; font-family: inherit; }
 @keyframes upb { to { filter: brightness(1.3); transform: translateX(-50%) translateY(-2px); } }
 .bars > div { position: relative; overflow: hidden; background: #0c0f18; }
@@ -90,3 +93,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1c2a24; use
 #ov-sub { margin-bottom: 6px; }
 @media (max-width: 900px) { #b-stats { display: none; } #mini { width: 130px; height: 130px; bottom: auto; top: 50px; right: 6px; } #feed { top: 190px; } #bar { gap: 5px; padding: 6px; } .sk { width: 42px; height: 42px; font-size: 20px; } .sk.spell { width: 34px; height: 34px; } #b-face { width: 48px; height: 48px; font-size: 26px; } #b-items { grid-template-columns: repeat(3, 24px); } #b-items div { width: 24px; height: 24px; font-size: 13px; } }
 @media (max-height: 520px) { #pick { padding: 6px 10px; } .p-top h2 { font-size: 16px; } .p-top b { font-size: 20px; } .p-body { grid-template-columns: 130px 1fr 240px; margin-top: 4px; } #p-prev { display: none; } .p-slot { padding: 4px 6px; font-size: 12px; } .p-slot .em { font-size: 18px; width: 22px; } .p-detail { padding: 6px; gap: 4px; } #p-info { font-size: 11px; } #p-info h3 { font-size: 15px; } .p-roles span { display: none; } #p-lock { padding: 6px; font-size: 15px; } #p-filter button { padding: 3px 7px; font-size: 11px; } }
+
+#b-use { display: flex; gap: 3px; width: 100%; }
+#b-use button { position: relative; flex: 1; height: 26px; border: 1px solid #454b63; border-radius: 7px; background: #262b3d; color: #fff; font-size: 14px; padding: 0; font-family: inherit; }
+#b-use b { font-weight: normal; font-size: 12px; margin-left: 2px; color: #ffe9a8; } #b-use i { position: absolute; left: 3px; bottom: 0; font-style: normal; font-size: 9px; color: #9fd8ff; }
+#tgt { position: absolute; left: 12px; top: 10px; width: 210px; padding: 7px 10px; border-radius: 11px; background: rgba(15,18,30,.8); font-size: 14px; }
+#tgt .n { display: flex; justify-content: space-between; } #tgt .bar { height: 10px; border-radius: 4px; background: #0c0f18; overflow: hidden; margin-top: 3px; } #tgt .bar i { display: block; height: 100%; background: #ff5a7a; } #tgt small { font-size: 11px; opacity: .8; }
+#recap { margin-top: 6px; font-family: 'Gowun Dodum', sans-serif; font-size: 12px; min-width: 190px; } #recap div { display: flex; justify-content: space-between; gap: 12px; } #recap b { font-weight: normal; color: #ff9fb2; }
+#sh-next { width: 100%; margin-top: 6px; font-size: 15px; }
+#tip { width: min(380px, 92vw); } #tip .how { color: #9fd8ff; display: block; margin-top: 4px; } #tip .num { display: block; margin-top: 3px; } #tip .num b, #p-info .num b { font-family: inherit; font-size: inherit; color: #ffb36b; } #tip .ef, #p-info .ef { display: inline-block; margin: 3px 3px 0 0; padding: 0 6px; border-radius: 6px; background: rgba(255,255,255,.12); font-size: 11.5px; }
+#p-info .how { color: #9fd8ff; font-size: 11.5px; display: block; } #p-info .num { font-size: 11.5px; display: block; }

@@ -2,7 +2,7 @@
 //   new Arena(players) → tick(dt) 를 반복 · cmd(id, m) 로 명령 · take(team) 로 그 팀에게 보낼 사건 · snapshot(team) 으로 그 팀이 보는 모습
 import { LANES, BASE, FOUNTAIN, STRUCTS, CAMPS, EPICS, MONS, BUSHES, MAX_LEVEL, XP_NEED, R_LEVELS, champById, SPELLS, SPELL_OF_ROLE, ITEMS, BUILD, SKILL_ORDER, findPath, blocked, clear, CHAMPS } from '../../public/jelly-arena/js/data.js';
 
-const ME = { melee: { hp: 460, ad: 14, range: 2.2, ar: 10, mr: 0, as: 0.9, ms: 5.6, gold: 21, xp: 34 }, caster: { hp: 300, ad: 22, range: 8.5, ar: 0, mr: 0, as: 0.75, ms: 5.6, gold: 15, xp: 26, proj: 1 }, siege: { hp: 900, ad: 42, range: 10, ar: 30, mr: 0, as: 0.5, ms: 5.6, gold: 48, xp: 60, proj: 1 }, super: { hp: 2000, ad: 90, range: 2.6, ar: 60, mr: 30, as: 0.85, ms: 6.2, gold: 60, xp: 80 } };
+const ME = { melee: { hp: 460, ad: 19, range: 2.2, ar: 10, mr: 0, as: 0.62, ms: 5.6, gold: 21, xp: 34 }, caster: { hp: 300, ad: 30, range: 8.5, ar: 0, mr: 0, as: 0.55, ms: 5.6, gold: 15, xp: 26, proj: 1 }, siege: { hp: 900, ad: 56, range: 10, ar: 30, mr: 0, as: 0.38, ms: 5.6, gold: 48, xp: 60, proj: 1 }, super: { hp: 2000, ad: 120, range: 2.6, ar: 60, mr: 30, as: 0.62, ms: 6.2, gold: 60, xp: 80 } };
 const STRUCT_HP = { 1: 2600, 2: 3000, 3: 3400, 4: 2600 }, GATE_HP = 2400, HEART_HP = 5200;
 const WAVE_EVERY = 30, FIRST_WAVE = 25, CAMP_FIRST = 60, TOWER_RANGE = 15;
 const VISION = { champ: 16, minion: 10, tower: 17, gate: 12, heart: 22, ward: 12, mon: 0 };
@@ -66,10 +66,11 @@ export class Arena {
     const u = this.champOf(pid); if (!u || this.over) return;
     const num = (v) => (Number.isFinite(+v) ? clamp(+v, -90, 90) : null);
     switch (m.t) {
-      case 'mv': { const x = num(m.x), z = num(m.z); if (x == null || z == null || !u.alive) return; u.target = null; u.amove = null; u.moveTo = { x, z }; u.path = null; return; }
-      case 'amove': { const x = num(m.x), z = num(m.z); if (x == null || z == null || !u.alive) return; u.target = null; u.amove = { x, z }; u.moveTo = { x, z }; u.path = null; return; }
-      case 'atk': { const t = this.units.find((q) => q.id === +m.id); if (t && t.team !== u.team && t.alive && u.alive && this.canSee(u.team, t)) { u.target = t; u.moveTo = null; u.amove = null; u.path = null; } return; }
-      case 'stop': u.target = null; u.moveTo = null; u.amove = null; u.path = null; return;
+      case 'mv': { const x = num(m.x), z = num(m.z); if (x == null || z == null || !u.alive) return; this.cancelSwing(u); u.target = null; u.autoT = false; u.amove = null; u.castQ = null; u.moveTo = { x, z }; u.path = null; return; }
+      case 'amove': { const x = num(m.x), z = num(m.z); if (x == null || z == null || !u.alive) return; u.target = null; u.autoT = false; u.castQ = null; u.amove = { x, z }; u.moveTo = { x, z }; u.path = null; return; }
+      case 'atk': { const t = this.units.find((q) => q.id === +m.id); if (t && t.team !== u.team && t.alive && u.alive && this.canSee(u.team, t) && t.kind !== 'ward') { if (u.target !== t) this.cancelSwing(u); u.target = t; u.autoT = false; u.castQ = null; u.moveTo = null; u.amove = null; u.path = null; } return; }
+      case 'stop': this.cancelSwing(u); u.target = null; u.autoT = false; u.castQ = null; u.moveTo = null; u.amove = null; u.path = null; u.stopT = this.t + 0.6; return;
+      case 'ping': { const x = num(m.x), z = num(m.z); if (x == null || z == null) return; if (this.t - (u.pingAt || -9) < 0.8) return; u.pingAt = this.t; this.emit(u.team, { k: 'ping', x, z, c: m.c === 'danger' ? 'danger' : 'go', by: u.name }); return; }
       case 'cast': return this.cast(u, String(m.s), num(m.x) ?? u.x, num(m.z) ?? u.z, +m.id || 0);
       case 'spell': return this.useSpell(u, m.s === 'f' ? 'f' : 'd', num(m.x) ?? u.x, num(m.z) ?? u.z, +m.id || 0);
       case 'lvl': return this.levelSkill(u, String(m.s));
@@ -79,6 +80,8 @@ export class Arena {
       case 'ward': { const x = num(m.x), z = num(m.z); if (x == null || z == null) return; return this.placeWard(u, x, z); }
     }
   }
+  // 공격 준비 동작 중 다른 명령: 공격을 취소하고 재사용을 돌려준다 (치고 빠지기의 핵심)
+  cancelSwing(u) { if (u.windup > 0 && u.pending) { u.windup = 0; u.pending = null; u.attackT = 0; } }
   levelSkill(u, s) {
     if (u.pts <= 0 || !(s in u.rank)) return;
     if (s === 'r') { if (u.rank.r >= 3 || u.level < R_LEVELS[u.rank.r]) return; }
@@ -102,16 +105,26 @@ export class Arena {
   spec(u, s) { return u.def.skills[s]; }
   isCC(u) { return (u.fx.stunT || 0) > this.t; }
   cast(u, s, x, z, id) {
-    const sk = this.spec(u, s); if (!sk || !u.alive || u.rank[s] <= 0 || u.cds[s] > 0 || this.isCC(u) || (u.fx.silT || 0) > this.t || u.dash) return false;
+    const sk = this.spec(u, s); if (!sk || !u.alive || u.rank[s] <= 0 || (u.fx.silT || 0) > this.t) return false;
     if (u.mp < sk.mana) return false;
+    // 재사용 · 기절 · 돌진이 곧 끝나면 눌렀던 걸 기억했다가 바로 나간다 (입력이 씹힌 느낌 없게)
+    if (u.cds[s] > 0 || this.isCC(u) || u.dash) {
+      const wait = Math.max(u.cds[s], this.isCC(u) ? u.fx.stunT - this.t : 0, u.dash ? 0.25 : 0);
+      if (!u.bot && wait <= 0.3) u.buf = { s, x, z, id, until: this.t + wait + 0.1 };
+      return false;
+    }
     const rank = u.rank[s] - 1;
     let target = id ? this.units.find((q) => q.id === id && q.alive) : null;
     const dx0 = x - u.x, dz0 = z - u.z, L0 = Math.hypot(dx0, dz0) || 1, fx = dx0 / L0, fz = dz0 / L0;
     if (sk.kind === 'hit') {
       if (!target || target.team === u.team || !this.hitable(target) || !this.canSee(u.team, target)) target = this.nearestEnemy(u, x, z, 5, (q) => this.canSee(u.team, q) && q.kind !== 'ward');
-      if (!target || d2(u, target) > sk.range + target.r) return false;
+      if (!target) return false;
+      // 사거리 밖: 사람이면 걸어가서 닿는 순간 쓴다
+      if (d2(u, target) > sk.range + target.r) { if (u.bot) return false; u.castQ = { s, id: target.id }; u.target = target; u.autoT = false; u.moveTo = null; u.amove = null; u.path = null; return false; }
     }
+    u.castQ = null;
     u.mp -= sk.mana; u.cds[s] = sk.cd * (1 - Math.min(0.5, u.s.haste)); u.stealthT = 0; u.fx.stealth = 0;
+    u.face = Math.atan2(x - u.x, z - u.z); u.faceT = this.t + 0.35; // 기술 쏘는 쪽을 잠깐 본다
     const baseDmg = (sk.dmg?.[rank] || 0) + (sk.ad || 0) * u.s.ad + (sk.ap || 0) * u.s.ap;
     const pack = { src: u, dmg: baseDmg, type: sk.type || 'magic', on: sk.on, sk, rank };
     this.emitSeen(u, { k: 'cast', id: u.id, s, c: sk.kind, col: sk.color, x, z, ic: sk.icon });
@@ -229,6 +242,7 @@ export class Arena {
     // 보호막이 먼저
     for (const b of t.shields) { if (b.v <= 0) continue; const a = Math.min(b.v, dmg); b.v -= a; dmg -= a; if (dmg <= 0) break; }
     t.hp -= dmg; t.lastHit = this.t;
+    if (t.kind === 'champ') { const log = (t.dmgLog ||= []); const name = src.kind === 'champ' ? src.name : src.kind === 'tower' ? '포탑' : src.kind === 'minion' ? '꼬마' : src.kind === 'mon' ? '몬스터' : '건물'; const last = log[log.length - 1]; if (last && last.name === name && last.ty === type && this.t - last.at < 3) { last.n += dmg; last.at = this.t; } else log.push({ name, ty: type, n: dmg, at: this.t }); if (log.length > 14) log.shift(); }
     if (src.kind === 'champ') {
       src.lastCombat = this.t; src.revealT = this.t + 1.5; if (t.kind === 'champ') { src.dealt += dmg; t.hitBy.set(src.id, this.t); t.lastCombat = this.t; }
       if (o.basic && sp.lifesteal) this.heal(src, src, dmg * sp.lifesteal);
@@ -269,6 +283,8 @@ export class Arena {
         }
         for (const a of assists) if (a.team !== t.team) { a.a++; this.give(a, Math.round(bounty * 0.4 / Math.max(1, assists.length)), t); this.giveXp(a, 40 + t.level * 16); }
         t.hitBy.clear();
+        // 쓰러지기 전 12초 동안 누구에게 얼마나 맞았나 (쓰러진 사람에게만)
+        { const sum = new Map(); for (const l of t.dmgLog || []) if (this.t - l.at < 12) { const e = sum.get(l.name) || { name: l.name, phys: 0, magic: 0, tru: 0 }; e[l.ty === 'phys' ? 'phys' : l.ty === 'magic' ? 'magic' : 'tru'] += l.n; sum.set(l.name, e); } t.dmgLog = []; this.emit(t.team, { k: 'recap', id: t.id, list: [...sum.values()].map((e) => ({ name: e.name, phys: Math.round(e.phys), magic: Math.round(e.magic), tru: Math.round(e.tru) })).sort((a, b) => (b.phys + b.magic + b.tru) - (a.phys + a.magic + a.tru)).slice(0, 5) }); }
         this.emit(null, { k: 'kill', by: killer?.id || 0, byName: killer?.name || (src.kind === 'tower' ? '포탑' : src.kind === 'minion' ? '꼬마' : '몬스터'), byC: killer?.def.emoji || (src.kind === 'tower' ? '🗼' : '👶'), to: t.id, toName: t.name, toC: t.def.emoji, team: t.team, as: assists.length, sk: killer?.streak || 0, x: t.x, z: t.z });
         break;
       }
@@ -381,13 +397,17 @@ export class Arena {
     // 응원가: 근처에 노래새가 있으면 빨라진다
     u.aura = this.champs.some((c) => c !== u && c.team === u.team && c.alive && c.def.passive.kind === 'aura' && d2(c, u) < 12) ? 0.4 : 0;
     u.attackT -= dt;
+    if (u.buf) { const b = u.buf; if (this.t > b.until) u.buf = null; else if (!u.dash && !this.isCC(u) && u.cds[b.s] <= 0) { u.buf = null; this.cast(u, b.s, b.x, b.z, b.id); } }
     if (u.dash) return this.dashTick(u, dt);
     if (this.isCC(u)) return;
+    if (u.castQ) { const q = u.castQ, t = this.units.find((o) => o.id === q.id && o.alive); const sk = this.spec(u, q.s); if (!t || !this.canSee(u.team, t) || u.cds[q.s] > 0) u.castQ = null; else if (d2(u, t) <= sk.range + t.r) { u.castQ = null; this.cast(u, q.s, t.x, t.z, t.id); if (u.dash) return; } }
     // 공격 준비 중이면 잠깐 선다
     if (u.windup > 0) { u.windup -= dt; if (u.windup <= 0 && u.pending) { this.landAttack(u, u.pending); u.pending = null; } return; }
     if (u.target && (!u.target.alive || (u.target.team !== u.team && !this.canSee(u.team, u.target)))) { u.target = null; u.path = null; }
     // 공격 이동: 가다가 적을 만나면 공격
     if (u.amove && !u.target) { const t = this.acquire(u, u.s.range + 5); if (t) u.target = t; }
+    // 가만히 있다가 저절로 고른 대상이 멀어지면 쫓아가지 않는다 (엉뚱하게 끌려가지 않게)
+    if (u.autoT && u.target && d2(u, u.target) > u.s.range + u.target.r + 2.5) { u.target = null; u.autoT = false; u.path = null; }
     if (u.target) {
       const t = u.target, reach = u.s.range + t.r + 0.2, d = d2(u, t);
       if (d <= reach) {
@@ -407,14 +427,14 @@ export class Arena {
       return;
     }
     // 가만히 있으면 사거리 안의 적을 때린다 (사람만: 봇은 스스로 고른다)
-    if (!u.bot && !(u.stopT > this.t)) { const t = this.acquire(u, u.s.range + 2); if (t) u.target = t; }
+    if (!u.bot && !(u.stopT > this.t)) { const t = this.acquire(u, u.s.range + 1); if (t) { u.target = t; u.autoT = true; } }
   }
   attackable(t) { return !((t.kind === 'tower' || t.kind === 'gate' || t.kind === 'heart') && this.invuln(t)); }
   acquire(u, r) {
     let best = null, bd = 1e9;
     for (const q of this.units) {
       if (!q.alive || q.team === u.team || !this.canSee(u.team, q)) continue;
-      if (q.kind === 'ward') continue;
+      if (q.kind === 'ward' || q.kind === 'mon') continue; // 몬스터는 직접 눌러야 때린다
       const d = d2(u, q); if (d > r + q.r) continue;
       if (!this.attackable(q)) continue;
       const score = d + (q.kind === 'champ' ? -3 : q.kind === 'minion' ? 0 : 4);
@@ -437,6 +457,7 @@ export class Arena {
     if (u.nextMul > 1) { dmg *= u.nextMul; u.nextMul = 1; }
     if (pv.kind === 'stackas') { u.stackAs = Math.min(4, u.stackAs + 1); u.stackT = 3; }
     const delay = u.def.stats.proj ? d2(u, t) / 22 : 0;
+    this.emitSeen(u, { k: 'aland', id: u.id, to: t.id, r: u.def.stats.proj ? 1 : 0, col: u.def.color, crit: crit ? 1 : 0 });
     const land = () => {
       if (!t.alive || !u) return;
       this.deal(u, t, dmg, type, { basic: true, crit });
@@ -454,7 +475,7 @@ export class Arena {
     while (step > 0 && u.path.length) {
       const [px, pz] = u.path[0], dx = px - u.x, dz = pz - u.z, L = Math.hypot(dx, dz);
       if (L <= step) { u.x = px; u.z = pz; step -= L; u.path.shift(); continue; }
-      u.x += (dx / L) * step; u.z += (dz / L) * step; u.face = Math.atan2(dx, dz); step = 0;
+      u.x += (dx / L) * step; u.z += (dz / L) * step; if (!(u.faceT > this.t)) u.face = Math.atan2(dx, dz); step = 0;
     }
   }
   dashTick(u, dt) {
@@ -523,11 +544,13 @@ export class Arena {
     if (!near.length) return;
     const allies = this.champs.filter((c) => c.team === t.team && c.alive && d2(c, t) < TOWER_RANGE + 4);
     const agg = near.find((q) => q.kind === 'champ' && (q.lastCombat || -9) > this.t - 1 && allies.some((a) => a.hitBy.get(q.id) > this.t - 2));
-    const pick = agg || (t.cur?.alive && near.includes(t.cur) ? t.cur : null) || near.filter((q) => q.kind === 'minion').sort((a, b) => d2(a, t) - d2(b, t))[0] || near.sort((a, b) => d2(a, t) - d2(b, t))[0];
+    // 꼬마가 사거리 안에 있으면 꼬마 먼저. 때리던 꼬마가 살아 있으면 계속, 챔피언은 꼬마가 없거나 우리 챔피언을 때렸을 때만
+    const minions = near.filter((q) => q.kind === 'minion');
+    const pick = agg || (t.cur?.kind === 'minion' && t.cur.alive && near.includes(t.cur) ? t.cur : null) || minions.sort((a, b) => d2(a, t) - d2(b, t))[0] || near.sort((a, b) => d2(a, t) - d2(b, t))[0];
     t.cur = pick; t.reload = 0.95;
     const ad = t.baseAd + this.t / 60 * 8;
     const dmg = pick.kind === 'minion' ? pick.max * (pick.type === 'siege' ? 0.14 : pick.type === 'super' ? 0.06 : 0.42) : ad;
-    this.emit(null, { k: 'tshot', id: t.id, to: pick.id, team: t.team });
+    this.emit(null, { k: 'tshot', id: t.id, to: pick.id, team: t.team, agg: pick === agg ? 1 : 0 });
     this.later(d2(t, pick) / 34, () => { if (pick.alive && t.alive) this.deal(t, pick, dmg, 'phys', {}); });
   }
 
@@ -777,7 +800,7 @@ export class Arena {
   // 내 상태 (사람에게)
   mine(pid) {
     const u = this.champOf(pid); if (!u) return null; const s = u.s, cds = {}; for (const k in u.cds) cds[k] = +u.cds[k].toFixed(1);
-    return { id: u.id, gold: Math.floor(u.gold), lv: u.level, xp: Math.round(u.xp), need: XP_NEED[u.level - 1] || 1, pts: u.pts, rank: u.rank, cds, items: u.items, pot: u.potions, potT: +u.potT.toFixed(1), wards: u.wards, alive: u.alive, resp: u.alive ? 0 : Math.ceil(u.respawnAt - this.t), base: this.inBase(u) || !u.alive, spell: u.spell, st: { ad: Math.round(s.ad), ap: Math.round(s.ap), ar: Math.round(s.ar), mr: Math.round(s.mr), as: +s.as.toFixed(2), ms: +(s.moveSpeed * 10).toFixed(0), range: +s.range.toFixed(1), crit: Math.round(s.crit * 100), haste: Math.round(s.haste * 100), ls: Math.round(s.lifesteal * 100) }, cc: this.isCC(u) ? 1 : 0, sh: Math.round(u.shields.reduce((a, b) => a + b.v, 0)) };
+    return { id: u.id, gold: Math.floor(u.gold), lv: u.level, xp: Math.round(u.xp), need: XP_NEED[u.level - 1] || 1, pts: u.pts, rank: u.rank, cds, items: u.items, pot: u.potions, potT: +u.potT.toFixed(1), wards: u.wards, alive: u.alive, resp: u.alive ? 0 : Math.ceil(u.respawnAt - this.t), base: this.inBase(u) || !u.alive, spell: u.spell, st: { ad: Math.round(s.ad), ap: Math.round(s.ap), ar: Math.round(s.ar), mr: Math.round(s.mr), as: +s.as.toFixed(2), ms: +(s.moveSpeed * 10).toFixed(0), range: +s.range.toFixed(1), crit: Math.round(s.crit * 100), haste: Math.round(s.haste * 100), ls: Math.round(s.lifesteal * 100) }, cc: this.isCC(u) ? 1 : 0, sh: Math.round(u.shields.reduce((a, b) => a + b.v, 0)), atk: +Math.max(0, Math.min(1, u.attackT * u.s.as)).toFixed(2), tg: u.target?.alive ? u.target.id : 0, q: u.castQ?.s || null, sil: (u.fx.silT || 0) > this.t ? 1 : 0 };
   }
   score() {
     return { time: Math.floor(this.t), kills: this.kills, towers: this.towers, epics: this.epicN, honey: { blue: this.teamBuff.blue.honey, red: this.teamBuff.red.honey }, mold: { blue: this.teamBuff.blue.moldUntil > this.t, red: this.teamBuff.red.moldUntil > this.t }, list: this.champs.map((c) => ({ id: c.id, pid: c.pid, name: c.name, team: c.team, champ: c.def.id, role: c.role, lv: c.level, k: c.k, d: c.de, a: c.a, cs: c.cs, items: c.items, alive: c.alive, resp: c.alive ? 0 : Math.ceil(c.respawnAt - this.t), bot: c.bot, dealt: Math.round(c.dealt) })),

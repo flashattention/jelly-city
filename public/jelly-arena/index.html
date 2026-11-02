@@ -40,10 +40,11 @@
     <div id="h-score"><span class="b"><b id="s-kb">0</b> <small>🗼<i id="s-tb">0</i></small></span><span id="s-time">0:00</span><span class="r"><small>🗼<i id="s-tr">0</i></small> <b id="s-kr">0</b></span></div>
     <div id="h-me"><span id="s-kda">0/0/0</span><span id="s-cs">🌾 0</span></div>
     <div id="h-epic"></div>
-    <div class="hud-r"><button id="b-help" title="조작법">❔</button><button id="b-mute" title="소리 (M)">🔊</button><button id="b-lock" title="카메라 고정 (Y)">🔒</button><button id="b-quit" title="그만하기">✕</button></div>
+    <div class="hud-r"><button id="b-help" title="조작법">❔</button><button id="b-mute" title="소리 (M)">🔊</button><button id="b-lock" title="카메라 고정 (Y)">🔒</button><button id="b-quick" title="기술 쓰는 법 바꾸기"></button><button id="b-quit" title="그만하기">✕</button></div>
+    <div id="tgt" class="hidden"></div>
     <div id="feed"></div>
     <div id="banner" class="hidden"></div>
-    <div id="dead" class="hidden"><b>💤 쉬는 중</b><span id="dead-t">10</span><small>B 로 상점을 열 수 있어요</small></div>
+    <div id="dead" class="hidden"><b>💤 쉬는 중</b><span id="dead-t">10</span><small>B 로 상점을 열 수 있어요</small><div id="recap"></div></div>
     <!-- 아래 조작판 -->
     <div id="bar">
       <div id="b-face"><span id="b-emoji"></span><i id="b-lv">1</i></div>
@@ -53,6 +54,7 @@
       </div>
       <div id="b-right">
         <div id="b-items"></div>
+        <div id="b-use"><button id="use-pot" title="딸기 물약 (1)">🧃<b id="n-pot">2</b><i>1</i></button><button id="use-ward" title="눈 젤리 · 마우스 자리에 놓아요 (4)">👁️<b id="n-ward">2</b><i>4</i></button></div>
         <button id="b-shop" title="상점 (B)">🛒 <b id="b-gold">500</b></button>
       </div>
       <div id="b-stats"></div>
@@ -64,6 +66,7 @@
   <div id="shop" class="hidden"><div class="card wide">
     <div class="sh-top"><h2>🛒 상점</h2><span class="gold">💰 <b id="sh-gold">0</b></span><button id="sh-close" class="btn ghost">닫기 (B)</button></div>
     <div id="sh-note" class="note"></div>
+    <button id="sh-next" class="btn"></button>
     <div class="seg" id="sh-tabs"></div>
     <div id="sh-list"></div>
     <div class="sh-rec"><b>⭐ 추천 순서</b><span id="sh-rec"></span></div>
@@ -79,7 +82,7 @@
       <div><b>💰 강해지는 법</b><p>꼬마를 <b>마지막 한 대</b>로 잡으면 금화(CS)! 기지로 돌아가 <b>B</b>로 아이템을 사요. 레벨이 오르면 기술 위 <b>＋</b> 나 <b>Alt+Q/W/E/R</b> 로 기술을 배워요. R 은 5 · 9 · 13 레벨에 배워요.</p></div>
       <div><b>🌲 정글</b><p>길 사이 숲엔 몬스터가 있어요. <b>왕꿀벌</b>(3분)은 팀 전체를 영구히, <b>거대 곰팡이왕</b>(8분)은 2분 동안 크게 강하게 해 줘요. 정글러는 <b>F 강타</b>로 마지막 한 방을!</p></div>
     </div>
-    <div class="keys"><b>우클릭</b> 이동 · 공격 | <b>Q W E R</b> 기술 (누르면 범위가 보이고, 떼면 발사) | <b>D F</b> 주문 | <b>A</b> + 클릭 공격 이동 | <b>S</b> 멈춤 | <b>1</b> 물약 · <b>4</b> 와드 | <b>B</b> 상점 | <b>Tab</b> 점수판 | <b>Y</b> 카메라 고정 · <b>Space</b> 내 위치 · 휠 확대 | <b>Enter</b> 채팅</div>
+    <div class="keys"><b>우클릭</b> 이동 · 공격 (꾹 누르면 계속) | <b>Q W E R</b> 기술: 누르면 범위가 보이고 떼거나 좌클릭으로 발사, 우클릭이면 취소 | <b>D F</b> 주문 | <b>A</b> + 좌클릭 공격 이동 | <b>S</b> 멈춤 | <b>Shift</b> 누르고 클릭 = 챔피언만 노리기 | <b>C</b> 내 사거리 보기 | <b>1</b> 물약 · <b>4</b> 와드 | <b>B</b> 상점 | <b>Tab</b> 점수판 | <b>Y</b> 카메라 고정 · <b>Space</b> 내 위치 · 휠 확대 · 휠 버튼 끌기 이동 | <b>Alt</b> + 좌클릭 팀에게 알림 | <b>Enter</b> 채팅</div>
     <div class="row2"><button id="help-close" class="btn big">알겠어요!</button></div>
   </div></div>
   <!-- 결과 -->

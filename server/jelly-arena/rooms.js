@@ -74,22 +74,18 @@ export class ArenaRooms extends BaseRooms {
     const A = g.arena;
     g.acc += Math.min(0.25, (now - g.lastT) / 1000) * SPEED; g.lastT = now;
     let n = 0; while (g.acc >= STEP && n++ < 6 * SPEED) { A.tick(STEP); g.acc -= STEP; }
-    const evB = A.take('blue'), evR = A.take('red');
+    // 사건은 틱마다 바로(반응이 늦지 않게), 모습은 10Hz, 내 상태는 20Hz
+    const evB = A.take('blue'), evR = A.take('red'), jB = evB.length ? JSON.stringify({ t: 'e', e: evB }) : null, jR = evR.length ? JSON.stringify({ t: 'e', e: evR }) : null;
     g.sendT++; g.sbT++;
-    const full = g.sendT >= 2; if (full) g.sendT = 0; // 10Hz
-    const snapB = full ? JSON.stringify({ t: 's', T: +A.t.toFixed(2), u: A.snapshot('blue'), e: evB }) : null, snapR = full ? JSON.stringify({ t: 's', T: +A.t.toFixed(2), u: A.snapshot('red'), e: evR }) : null;
+    const full = g.sendT >= 2; if (full) g.sendT = 0;
+    const snapB = full ? JSON.stringify({ t: 's', T: +A.t.toFixed(2), u: A.snapshot('blue') }) : null, snapR = full ? JSON.stringify({ t: 's', T: +A.t.toFixed(2), u: A.snapshot('red') }) : null;
     for (const p of r.players) {
       if (p.ws?.readyState !== 1) continue;
-      const team = A.champOf(p.id)?.team || p.team;
-      if (full) {
-        // 사건은 틱마다 쌓였다가 같이 나간다
-        const held = team === 'blue' ? g.pendB : g.pendR;
-        p.ws.send(team === 'blue' ? snapB : snapR);
-        if (held?.length) p.ws.send(JSON.stringify({ t: 'e', e: held }));
-        p.ws.send(JSON.stringify({ t: 'me', ...A.mine(p.id) }));
-      }
+      const blue = (A.champOf(p.id)?.team || p.team) === 'blue', ev = blue ? jB : jR;
+      if (full) p.ws.send(blue ? snapB : snapR);
+      if (ev) p.ws.send(ev);
+      p.ws.send(JSON.stringify({ t: 'me', ...A.mine(p.id) }));
     }
-    if (!full) { g.pendB = evB; g.pendR = evR; } else { g.pendB = null; g.pendR = null; }
     if (g.sbT >= 20) { g.sbT = 0; this.toRoom(r, { t: 'sb', ...A.score() }); }
     if (A.over) {
       const score = A.score(); g.phase = 'over'; r.g = null;
