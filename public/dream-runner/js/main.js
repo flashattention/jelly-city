@@ -11,9 +11,10 @@ import { THEMES } from './themes.js';
 import { sfx, setMusic, unlock, toggleMute, sound } from './music.js';
 import { ITEMS } from './items.js';
 import { DIFFS, diffOf } from './diff.js';
+import { openPatchNotes } from '../../shared/js/patchnotes.js';
 
 const $ = (id) => document.getElementById(id);
-const MODE_KEY = 'dreamrunner.mode', DIFF_KEY = 'dreamrunner.diff';
+const MODE_KEY = 'dreamrunner.mode', DIFF_KEY = 'dreamrunner.diff', CAM_KEY = 'dreamrunner.cam';
 const CHAR_KEY = 'dreamrunner.char', NICK_KEY = 'dreamrunner.nick', ANON_KEY = 'dreamrunner.anon';
 // 비로그인: 이 브라우저의 임시 아이디 (순위표에서 내 기록을 찾는 데만 쓴다)
 function anonId() {
@@ -61,6 +62,7 @@ window.addEventListener('keydown', (e) => {
   if (['KeyS', 'ArrowDown'].includes(e.code)) input.slide = true;
   if (['KeyE', 'ShiftLeft', 'ShiftRight'].includes(e.code)) input.shove = true;
   if (e.code === 'KeyM') muteBtn();
+  if (e.code === 'KeyV') toggleCam();
   if (e.code === 'KeyQ') input.item = true;
   if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
   if (game.mode === 'over' && (e.code === 'Space' || e.code === 'Enter') && !game.multi) { e.preventDefault(); startSolo(); }
@@ -622,6 +624,12 @@ function multiTick(dt) {
 const clock = new THREE.Clock();
 let t = 0;
 const camLook = new THREE.Vector3();
+// 시점: 기본은 살짝 위에서 내려다봐 바로 앞 낮은 장애물까지 보인다. V 로 낮은 예전 시점과 바꾼다
+const CAM = { high: { up: 4.9, back: 7.2, look: 0.75, ahead: 10 }, low: { up: 3.3, back: 7.4, look: 1.2, ahead: 9 } };
+game.camLow = store.get(CAM_KEY) === 'low'; game.camK = game.camLow ? 1 : 0;
+function toggleCam() { game.camLow = !game.camLow; store.set(CAM_KEY, game.camLow ? 'low' : 'high'); $('b-cam').textContent = game.camLow ? '🎬' : '🎥'; toast(game.camLow ? '🎬 낮은 시점 (V)' : '🎥 높은 시점 (V)', 1200); }
+$('b-cam').onclick = toggleCam; $('b-cam').textContent = game.camLow ? '🎬' : '🎥';
+$('pn-btn').onclick = () => openPatchNotes();
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, clock.getDelta());
@@ -718,11 +726,13 @@ function followCamera(dt) {
   const k = 1 - Math.exp(-dt * 7);
   const v = w ? speedAt(s) * (runner.speedK || 1) : runner.v;
   const dead = game.mode === 'dead' && !w;
-  const cx = x * 0.85, cy = Math.max(y, -6) + 3.3;
+  game.camK += ((game.camLow ? 1 : 0) - game.camK) * Math.min(1, dt * 6);
+  const mix = (a, b) => a + (b - a) * game.camK, up = mix(CAM.high.up, CAM.low.up), back = mix(CAM.high.back, CAM.low.back), look = mix(CAM.high.look, CAM.low.look), ahead = mix(CAM.high.ahead, CAM.low.ahead);
+  const cx = x * 0.85, cy = Math.max(y, -6) + up;
   camera.position.x += (cx - camera.position.x) * k;
   camera.position.y += (cy - camera.position.y) * (dead ? k * 0.3 : k);
-  camera.position.z = dead ? camera.position.z : z + 7.4;
-  camLook.set(x, Math.max(y, -8) + 1.2, z - 9);
+  camera.position.z = dead ? camera.position.z : z + back;
+  camLook.set(x, Math.max(y, -8) + look, z - ahead);
   camera.lookAt(camLook);
   const fov = Math.min(88, 60 + (v - V0) * 0.55); // 아주 빠른 난이도에서 화면이 지나치게 벌어지지 않게
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * k; camera.updateProjectionMatrix(); }
