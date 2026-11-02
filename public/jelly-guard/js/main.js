@@ -536,6 +536,12 @@ function openSwap() {
 }
 function closeSwap() { $('select').classList.add('hidden'); $('select').classList.remove('swap'); if (game.mode === 'play') lock(); }
 $('sel-close').onclick = closeSwap;
+// 준비 시간에는 문이 닫힌 팀이 출발 방 밖으로 못 나간다 (벽 타기 · 점프 · 비행 모두)
+function keepInSpawn() {
+  if (game.phase !== 'setup' || (game.mmode === 'assault' && game.team !== game.atk)) return;
+  const R = roomOf(game.team); if (!R) return;
+  const M = 0.45; for (const [ax, lo, hi] of [['x', R.x0 + M, R.x1 - M], ['z', R.z0 + M, R.z1 - M]]) { const v = me.pos[ax], c = Math.max(lo, Math.min(hi, v)); if (c !== v) { me.pos[ax] = c; me.vel[ax] = 0; } }
+}
 function roomOf(team) { const rm = game.map.rooms; if (game.mmode === 'assault') return team === game.atk ? (game.obj?.pi >= 1 ? rm.atk2 : rm.atk) : (!(game.obj?.pi >= 1) && rm.def1 ? rm.def1 : rm.def); return rm[team]; }
 function openDex() {
   game.dexSel = game.dexSel || 'rein';
@@ -1028,6 +1034,7 @@ function frame() {
       game.kit.tick(dt, now, inp);
       for (const e of me.update(dt, inp, game.map)) sfx(e, null, e === 'step' ? 0.5 : 0.8);
       if (me.pos.y < -20) me.pos.y = 5;
+      keepInSpawn();
       if (!typing) { game.kit.primary(now, mouseL, edgeL); game.kit.secondary(now, mouseR, edgeR, relR); }
       else if (relR) game.kit.secondary(now, false, false, true);
       game.bloom = Math.max(0, (game.bloom || 0) - dt * 0.06);

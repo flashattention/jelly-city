@@ -7,6 +7,29 @@ import { rayBoxes, floorAt, clearLine } from '../../jelly-tactical/js/maps.js';
 const GUN_SND = { cassidy: 'pistol', reaper: 'heavy', hog: 'heavy', dva: 'smg', widow: 'smg', soldier: 'pulse', tracer: 'smg', ana: 'sniper' };
 export const VM_KIND = { rein: 'hammer', winston: 'tesla', dva: 'cannons', hog: 'scrap', zarya: 'particle', pharah: 'rpg', reaper: 'shotgun2', cassidy: 'revolver', soldier: 'rifle', junk: 'launcher', genji: 'shuriken', widow: 'sniper', tracer: 'pistols', mercy: 'staff', ana: 'biorifle', lucio: 'sonic', moira: 'hands' };
 
+// 바퀴 폭탄 한 걸음. 벽 속에 들어가면 어느 쪽으로도 못 움직이므로 마지막 안전한 자리로 되돌린다
+const inSolid = (map, x, y, z) => rayBoxes(map, { x, y, z }, { x: 0, y: 1, z: 0 }, 0.02) === 0;
+export function tireStep(map, T, fx, fz, spd, jump, dt) {
+  for (const [ax, d] of [['x', fx * spd], ['z', fz * spd]]) {
+    if (!d) continue;
+    const dir = { x: ax === 'x' ? Math.sign(d) : 0, y: 0, z: ax === 'z' ? Math.sign(d) : 0 };
+    if (rayBoxes(map, { x: T.x, y: T.y + 0.7, z: T.z }, dir, Math.abs(d) + 0.75) >= Math.abs(d) + 0.75) T[ax] += d;
+  }
+  const fl = floorAt(map, T.x, T.z, T.y + 0.7, 0.3);
+  if (T.y <= fl + 0.02 && jump) T.vy = 9.5;
+  T.vy -= 21 * dt;
+  if (T.vy > 0 && rayBoxes(map, { x: T.x, y: T.y + 0.7, z: T.z }, { x: 0, y: 1, z: 0 }, T.vy * dt + 0.6) < T.vy * dt + 0.6) T.vy = 0; // 천장에 머리를 박지 않게
+  T.y += T.vy * dt;
+  if (T.y <= fl) { T.y = fl; T.vy = 0; }
+  if (inSolid(map, T.x, T.y + 0.7, T.z)) { if (T.safe) { T.x = T.safe.x; T.y = T.safe.y; T.z = T.safe.z; T.vy = 0; } }
+  else T.safe = { x: T.x, y: T.y, z: T.z };
+}
+// 바퀴가 처음 놓일 자리: 앞이 막혔으면(벽에 붙어 썼으면) 내 발밑
+export function tireStart(map, pos, flat) {
+  const clear = rayBoxes(map, { x: pos.x, y: pos.y + 0.7, z: pos.z }, { x: flat.x, y: 0, z: flat.z }, 1.8) >= 1.8;
+  return clear ? { x: pos.x + flat.x, y: pos.y, z: pos.z + flat.z } : { x: pos.x, y: pos.y, z: pos.z };
+}
+
 export function makeKit(h, G) {
   const st = { mag: (h.p.alt || h.p).mag || 0, reloadEnd: 0, next: 0, nextS: 0, latch: false, latchS: false, beamT: 0, tgt: null, tgtS: null, beams: [], fuel: 1, dj: true, scopeAt: 0, acc: new Map(), hist: [], blinks: 3, blinkT: 0, mode: null };
   const K = { st, h };
@@ -161,7 +184,7 @@ export function makeKit(h, G) {
     if (st.tire) { if (slot === 'q') K.tireBoom(); return; } // 바퀴를 모는 동안은 다른 기술을 못 쓴다
     if (slot === 'q') {
       if ((G.ps?.[4] ?? 0) < 100) { G.sfx('cd'); return; }
-      if (h.id === 'junk') { abil('q'); st.tire = { x: me.pos.x + flat.x, y: me.pos.y, z: me.pos.z + flat.z, vy: 0, until: now + 8000, sendT: 0, armed: false }; G.sfx('rocket'); G.toast('🛞 마우스로 방향 · S 천천히 · Space 점프 · 클릭이나 Q 로 펑!'); return; }
+      if (h.id === 'junk') { abil('q'); st.tire = { ...tireStart(G.map, me.pos, flat), vy: 0, until: now + 8000, sendT: 0, armed: false }; G.sfx('rocket'); G.toast('🛞 마우스로 방향 · S 천천히 · Space 점프 · 클릭이나 Q 로 펑!'); return; }
       if (h.id === 'ana') { const t = G.findTarget({ range: 45, arc: 0.93, lock: 'ally' }); if (!t) { G.toast('💉 나노 강화제: 아군을 조준하고 Q'); return; } return abil('q', { to: t.id }); }
       if (h.id === 'dva' && !G.has('pilot')) { const fly = st.mode === 'boost'; abil('q', { fly }); if (fly) st.mode = null; return; } // 부스터 중이면 날려 보내고, 아니면 그 자리 자폭
       abil('q');
@@ -243,15 +266,7 @@ export function makeKit(h, G) {
       if (!me.alive) st.tire = null;
       else {
         const spd = (G.keys.has('KeyS') ? 7 : 16) * dt;
-        for (const [ax, d] of [['x', flat.x * spd], ['z', flat.z * spd]]) {
-          if (!d) continue;
-          const dir = { x: ax === 'x' ? Math.sign(d) : 0, y: 0, z: ax === 'z' ? Math.sign(d) : 0 };
-          if (rayBoxes(G.map, { x: T.x, y: T.y + 0.7, z: T.z }, dir, Math.abs(d) + 0.75) >= Math.abs(d) + 0.75) T[ax] += d;
-        }
-        const fl = floorAt(G.map, T.x, T.z, T.y + 0.7, 0.3);
-        if (T.y <= fl + 0.02 && G.keys.has('Space')) T.vy = 9.5;
-        T.vy -= 21 * dt; T.y += T.vy * dt;
-        if (T.y <= fl) { T.y = fl; T.vy = 0; }
+        tireStep(G.map, T, flat.x, flat.z, spd, G.keys.has('Space'), dt);
         if ((T.sendT -= dt) <= 0) { T.sendT = 0.05; G.send({ t: 'tire', p: [T.x, T.y, T.z], yaw: me.yaw }); }
         if (!G.mouseL) T.armed = true;
         if ((T.armed && G.mouseL) || now >= T.until) K.tireBoom();

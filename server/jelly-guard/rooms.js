@@ -633,7 +633,7 @@ export class GuardRooms extends BaseRooms {
       // 지속 궁극기 (서버가 피해를 낸다)
       if (p.fx.blossom > now) { if ((p.tk = (p.tk || 0) + dt) >= 0.1) { p.tk = 0; for (const t of r.players) if (t.alive && t.team !== p.team && d3(t.pos, p.pos) < 8 && this.canSee(r, eyeOf(p), t)) this.damage(r, t, 17, p, now, { a: 'q', steal: 0.3 }); } }
       if (p.fx.hogult > now) {
-        if ((p.tk = (p.tk || 0) + dt) >= 0.1) { p.tk = 0; const f = fwd(p.yaw); for (const t of r.players) { if (!t.alive || t.team === p.team) continue; const dx = t.pos.x - p.pos.x, dz = t.pos.z - p.pos.z, L = Math.hypot(dx, dz); if (L > 15 || (dx * f.x + dz * f.z) / (L || 1) < 0.8 || !this.canSee(r, eyeOf(p), t)) continue; this.damage(r, t, 16 * (1 - L / 25), p, now, { a: 'q' }); this.knock(r, t, [f.x * 6, 1.5, f.z * 6]); } }
+        if ((p.tk = (p.tk || 0) + dt) >= 0.1) { p.tk = 0; this.hogBlast(r, p, now); }
       }
       if (p.fx.coal > now) {
         if ((p.tk = (p.tk || 0) + dt) >= 0.1) {
@@ -717,6 +717,18 @@ export class GuardRooms extends BaseRooms {
     }
   }
   // 펑펑 바퀴 폭탄 (궁극기 피해라 궁 게이지는 안 찬다)
+  // 돼지우리 한 번: 앞의 적을 때리고 밀어낸다. 방벽 뒤의 적은 피해도 밀림도 없고 방벽이 대신 맞는다
+  hogBlast(r, p, now) {
+    const f = fwd(p.yaw);
+    for (const t of r.players) {
+      if (!t.alive || t.team === p.team) continue;
+      const dx = t.pos.x - p.pos.x, dz = t.pos.z - p.pos.z, L = Math.hypot(dx, dz);
+      if (L > 15 || (dx * f.x + dz * f.z) / (L || 1) < 0.8 || !this.canSee(r, eyeOf(p), t)) continue;
+      const bl = blockBy(r.g.ents, eyeOf(p), chest(t), p.team);
+      if (bl) { this.hurtEnt(r, bl.e, 16 * (1 - L / 25), p); continue; }
+      this.damage(r, t, 16 * (1 - L / 25), p, now, { a: 'q' }); this.knock(r, t, [f.x * 6, 1.5, f.z * 6]);
+    }
+  }
   tireBoom(r, e, now) {
     this.removeEnt(r, e);
     const p = { x: e.x, y: e.y + 0.8, z: e.z };
