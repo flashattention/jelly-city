@@ -10,6 +10,7 @@ export const LOOK_PARTS = {
   wings: { label: '🪽 날개', options: ['기본 (날 때만)', '반짝 투명', '나비 날개', '천사 깃털', '박쥐 날개', '꼬마 날개', '무지개 날개', '접은 날개', '잠자리 날개', '용 날개', '구름 날개', '불꽃 날개'] },
   ears: { label: '🐻 귀', options: ['둥근 귀', '토끼 귀', '고양이 귀', '꼬마 귀', '늘어진 강아지 귀', '하트 귀', '왕 큰 귀', '유니콘 뿔'] },
   tail: { label: '🍭 꼬리', options: ['없음', '동글 꼬리', '하트 꼬리', '고양이 꼬리', '여우 꼬리', '번개 꼬리', '악마 꼬리', '별 꼬리'] },
+  booster: { label: '🚀 부스터', options: ['🔥 기본 불꽃', '💙 푸른 불꽃', '💜 보랏빛 불꽃', '🌈 무지개', '⭐ 별가루', '💗 하트', '🫧 비눗방울', '⚡ 번개', '☁️ 구름', '🌸 꽃잎'] }, // 모양은 booster.js
 };
 
 export const LOOK_COLORS = {
@@ -20,7 +21,7 @@ export const LOOK_COLORS = {
 
 export const SKIN_COLORS = ['#8a5634', '#6d4c41', '#a1887f', '#3e2723', '#c0794a', '#ff9fb2', '#7ec8a9', '#9fa8ff', '#ffd54f', '#90caf9', '#b39ddb', '#ef9a9a', '#80cbc4', '#bcaaa4', '#455a64', '#f5f5f5'];
 
-export const DEFAULT_LOOK = { eyes: 0, pupil: '#1d1410', nose: 0, mouth: 0, antenna: 0, wings: 0, ears: 0, tail: 0, belly: 'auto', cheek: '#ff9fb2', hat: 0, face: 0, outfit: 0, extra: 0 };
+export const DEFAULT_LOOK = { eyes: 0, pupil: '#1d1410', nose: 0, mouth: 0, antenna: 0, wings: 0, ears: 0, tail: 0, booster: 0, belly: 'auto', cheek: '#ff9fb2', hat: 0, face: 0, outfit: 0, extra: 0 };
 
 // 옷 · 모자 꾸미기 (모든 게임에서 보인다 · 젤리시티에서 같은 자리 장비를 끼면 장비가 먼저)
 //   [이름, 곰돌이 모양 이름(:색)] · 뒤에만 덧붙인다 (저장된 번호가 바뀌지 않게)

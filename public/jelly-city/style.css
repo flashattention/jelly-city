@@ -297,6 +297,8 @@ kbd { display: inline-block; background: #fff; color: #4a3428; border: 1px solid
 .creator { display: grid; grid-template-columns: minmax(240px, 1fr) 1.3fr; gap: 14px; text-align: left; }
 #create-preview { height: min(52vh, 460px); border-radius: 22px; background: radial-gradient(circle at 50% 35%, #fff, #ffe9f0 60%, #ffd8c2); cursor: grab; overflow: hidden; }
 #create-preview canvas { width: 100%; height: 100%; display: block; }
+#create-preview { position: relative; }
+#create-preview .pv-spin { position: absolute; left: 10px; bottom: 10px; z-index: 1; padding: 6px 12px; font-size: 13px; width: auto; margin: 0; background: rgba(255,255,255,.85); color: #4a3428; border: 1px solid rgba(74,52,40,.2); }
 .creator-side { display: flex; flex-direction: column; min-height: 0; max-height: min(52vh, 460px); }
 #create-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 #create-tabs button { border: 0; background: rgba(74,52,40,.08); color: #4a3428; padding: 7px 12px; border-radius: 12px; font-family: 'Jua'; font-size: 14px; cursor: pointer; }

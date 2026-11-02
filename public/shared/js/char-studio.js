@@ -1,12 +1,15 @@
 // 캐릭터 만들기 · 꾸미기 (메인 화면 · 젤리시티가 같이 쓴다): 3D 미리보기 + 탭(기본 · 색 · 얼굴 · 악세서리)
 import * as THREE from 'three';
 import { Roach, GUMMY_COLORS } from './roach.js';
+import { Booster } from './booster.js';
+import { store } from './account.js';
 import { LOOK_PARTS, LOOK_COLORS, SKIN_COLORS, DEFAULT_LOOK, BASIC_ACC, COSTUME } from './look.js';
 import { PERSONALITIES } from '../../jelly-city/js/data.js';
 import { ITEMS } from '../../jelly-city/js/items.js';
 
 export const DEFAULT_CHAR_KEY = 'jelly.char'; // 메인 화면에서 고른 대표 캐릭터 (모든 게임의 기본)
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const SPIN_KEY = 'jelly.studio.spin'; // 미리보기 자동 회전 (이 브라우저에 기억)
 const SLOT_NAMES = { head: '🎩 머리', face: '👓 얼굴', body: '👕 몸', acc: '🎒 장신구' };
 export const starterVis = (starter) => Object.values(starter || {}).map((id) => ITEMS[id]?.vis).filter(Boolean);
 // 젤리 모드에서는 젤리 색을 먼저, 바퀴 모드에서는 원래 피부색
@@ -69,7 +72,7 @@ export class Creator {
   // 서버에 보낼 값
   profile() { const d = this.draft; return { name: (d.name || '').trim(), gender: d.gender, age: d.age, personality: d.personality, color: d.color, look: d.look }; }
   renderTabs() {
-    const all = Roach.style === 'roach' ? { basic: '📝 기본', body: '🎨 몸·날개', face: '😊 얼굴', antenna: '📡 더듬이', wear: '👒 옷·모자', acc: '🎀 악세서리' } : { basic: '📝 기본', body: '🎨 젤리 색·날개', face: '😊 얼굴', wear: '👒 옷·모자', acc: '🎀 악세서리' };
+    const all = Roach.style === 'roach' ? { basic: '📝 기본', body: '🎨 몸·날개', face: '😊 얼굴', antenna: '📡 더듬이', wear: '👒 옷·모자', booster: '🚀 부스터', acc: '🎀 악세서리' } : { basic: '📝 기본', body: '🎨 젤리 색·날개', face: '😊 얼굴', wear: '👒 옷·모자', booster: '🚀 부스터', acc: '🎀 악세서리' };
     const tabs = this.edit ? Object.fromEntries(Object.entries(all).filter(([k]) => k !== 'basic' && k !== 'acc')) : all;
     const { tabs: tabsEl, body } = this.els;
     tabsEl.innerHTML = Object.entries(tabs).map(([k, v]) => `<button class="${k === this.tab ? 'active' : ''}" data-tab="${k}">${v}</button>`).join('');
@@ -91,6 +94,8 @@ export class Creator {
     } else if (this.tab === 'wear') {
       html = Object.entries(COSTUME).map(([k, C]) => `<div class="opt-row"><div class="opt-label">${C.label}</div><div class="chips">${C.items.map(([name], i) => `<button class="chip ${(d.look[k] | 0) === i ? 'sel' : ''}" data-look="${k}" data-v="${i}">${esc(name)}</button>`).join('')}</div></div>`).join('')
         + '<p class="hint">모든 게임에서 보여요 · 젤리시티에서 같은 자리 장비를 끼면 장비가 먼저 보여요</p>';
+    } else if (this.tab === 'booster') {
+      html = chips('booster', LOOK_PARTS.booster) + '<p class="hint">드림 러너에서 가속할 때 등 뒤로 뿜어요 · 같은 방 친구들에게도 보여요</p>';
     } else if (this.tab === 'antenna') {
       html = chips('antenna', LOOK_PARTS.antenna);
     } else {
@@ -111,6 +116,10 @@ export class Creator {
     if (ag) ag.oninput = (e) => { d.age = +e.target.value; body.querySelector('#c-age-v').textContent = d.age; this.updatePreview(); };
     if (ps) ps.onchange = (e) => { d.personality = e.target.value; };
     this.zoom = this.tab === 'face' || this.tab === 'antenna' ? 1 : 0; // 얼굴 탭에서는 얼굴이 잘 보이도록 가까이
+    // 보여 줄 쪽으로 한 번 돌려 준다: 얼굴 탭은 앞, 부스터 탭은 등 (자동 회전을 꺼도)
+    const face = this.zoom ? 0 : this.tab === 'booster' ? Math.PI + 0.55 : null;
+    if (this.pv && this.lastTab !== this.tab) this.pv.aim = face;
+    this.lastTab = this.tab;
   }
   startPreview() {
     const el = this.els.preview;
@@ -126,12 +135,19 @@ export class Creator {
       const cam = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
       this.pv = { r, scene, cam, rotY: 0.3, drag: null };
       const c = r.domElement;
-      c.addEventListener('pointerdown', (e) => { this.pv.drag = e.clientX; c.setPointerCapture(e.pointerId); });
+      c.addEventListener('pointerdown', (e) => { this.pv.aim = null; this.pv.drag = e.clientX; c.setPointerCapture(e.pointerId); });
       c.addEventListener('pointermove', (e) => { if (this.pv.drag != null) { this.pv.rotY += (e.clientX - this.pv.drag) * 0.012; this.pv.drag = e.clientX; } });
       c.addEventListener('pointerup', () => { this.pv.drag = null; });
     }
     el.innerHTML = '';
     el.appendChild(this.pv.r.domElement);
+    // 자동 회전 켜기 · 끄기
+    this.spin = store.get(SPIN_KEY) !== '0';
+    const sb = document.createElement('button');
+    sb.type = 'button'; sb.className = 'btn ghost mini pv-spin';
+    const label = () => { sb.textContent = this.spin ? '🔄 자동 회전 켬' : '⏸️ 자동 회전 끔'; };
+    sb.onclick = () => { this.spin = !this.spin; store.set(SPIN_KEY, this.spin ? '1' : '0'); label(); };
+    label(); el.appendChild(sb);
     this.zoom = 0; this.zoomK = 0;
     this.updatePreview();
     if (this.pvOn) return;
@@ -144,12 +160,16 @@ export class Creator {
       this.zoomK += (this.zoom - this.zoomK) * Math.min(1, dt * 5);
       const z = this.zoomK;
       if (this.pv.drag == null) {
-        if (this.zoom) { const want = 0.35 * Math.sin(now / 1400); const d = ((want - this.pv.rotY) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI; this.pv.rotY += d * Math.min(1, dt * 4); }
-        else this.pv.rotY += dt * 0.5;
+        // 켬: 얼굴 · 부스터 탭은 그쪽을 보며 살랑, 나머지는 빙글. 끔: 탭을 바꿀 때 한 번 돌려 주고 그 뒤로는 드래그한 자리에 가만히
+        const turnTo = (want, k) => { const d = ((want - this.pv.rotY) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI; this.pv.rotY += d * Math.min(1, dt * k); return Math.abs(d); };
+        const facing = this.zoom ? 0 : this.tab === 'booster' ? Math.PI + 0.55 : null;
+        if (this.spin) { if (facing != null) turnTo(facing + 0.35 * Math.sin(now / 1400), 4); else this.pv.rotY += dt * 0.5; }
+        else if (this.pv.aim != null && turnTo(this.pv.aim, 4) < 0.01) this.pv.aim = null;
       }
       this.pv.cam.position.set(0, 1.45 + z * 0.6, 5.4 - z * 1.9);
       this.pv.cam.lookAt(0, 1.0 + z * 0.95, 0);
       if (this.pvRoach) { this.pvRoach.root.rotation.y = this.pv.rotY; this.pvRoach.update(dt, 0); if (Math.random() < 0.003) this.pvRoach.wave(); }
+      this.pv.booster?.update(dt, this.tab === 'booster' ? 1 : 0, now / 1000);
       this.pv.r.render(this.pv.scene, this.pv.cam);
       requestAnimationFrame(loop);
     };
@@ -162,5 +182,7 @@ export class Creator {
     if (this.pvRoach) this.pv.scene.remove(this.pvRoach.root);
     this.pvRoach = new Roach({ own: true, seed: d.name, color: d.color, age: d.age, gender: d.gender, look: d.look, accessories: this.edit ? d.accessories || starterVis(d.starter) : starterVis(d.starter) });
     this.pv.scene.add(this.pvRoach.root);
+    this.pv.booster ||= new Booster(this.pv.scene);
+    this.pv.booster.attach(this.pvRoach); this.pv.booster.setStyle(d.look.booster);
   }
 }
