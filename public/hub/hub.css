@@ -200,9 +200,9 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 
 /* 젤리 아레나 */
 .card.arena .art { background: radial-gradient(circle at 20% 80%, #4cc3ff66, transparent 42%), radial-gradient(circle at 80% 20%, #ff5a7a66, transparent 42%), #2f6b45; }
-.arena .alane { position: absolute; left: -10%; right: -10%; top: 50%; height: 26px; background: #e6cd99; transform: rotate(-24deg); box-shadow: 0 0 0 4px #d8bd8688; }
-.arena .aheart { position: absolute; font-size: 40px; filter: drop-shadow(0 3px 5px rgba(0,0,0,.45)); animation: wob 2.2s ease-in-out infinite; }
-.arena .aheart.b { left: 8%; bottom: 8%; } .arena .aheart.r { right: 8%; top: 8%; animation-delay: -1.1s; }
+.arena .alane { position: absolute; left: -10%; right: -10%; top: 62px; height: 20px; background: #e6cd99; transform: rotate(-24deg); box-shadow: 0 0 0 4px #d8bd8688; }
+.arena .aheart { position: absolute; font-size: 34px; filter: drop-shadow(0 3px 5px rgba(0,0,0,.45)); animation: wob 2.2s ease-in-out infinite; }
+.arena .aheart.b { left: 7%; top: 74px; } .arena .aheart.r { right: 30%; top: 8px; animation-delay: -1.1s; }
 .arena .achamp { position: absolute; font-style: normal; font-size: 26px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
 .arena .new { position: absolute; right: 14px; top: 12px; padding: 4px 12px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-size: 13px; }
 
