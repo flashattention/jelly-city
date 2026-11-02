@@ -1,4 +1,4 @@
-// 젤리수호대 영웅 16명 (돌격 5 · 공격 7 · 지원 4). 서버(판정 · 쿨타임 · 궁극기)와 화면이 같이 쓴다
+// 젤리수호대 영웅 17명 (돌격 5 · 공격 8 · 지원 4). 서버(판정 · 쿨타임 · 궁극기)와 화면이 같이 쓴다
 //   공격 종류: hit(즉발 사격) · proj(투사체, PROJ 표) · melee(근접 부채꼴) · beam(대상 고정 줄기)
 //   기술 칸: s(우클릭) · shift · e · q(궁극기)
 export const ROLES = { tank: { name: '돌격', icon: '🛡️', color: '#7cc4ff' }, dps: { name: '공격', icon: '⚔️', color: '#ff7a8a' }, sup: { name: '지원', icon: '✚', color: '#9be7a7' } };
@@ -25,6 +25,11 @@ export const PROJ = {
   sonic: { speed: 50, grav: 0, dmg: 18, splash: 0, r: 0, life: 1, size: 0.13, color: '#a6ff5e', trail: '#e6ffd0', head: 2 },
   orb: { speed: 8, grav: 0, dmg: 0, splash: 0, r: 0, life: 7, size: 0.4, color: '#d38bff', trail: '#f2deff', make: 'orb' },
   pulsebomb: { dmg: 0, splash: 350, r: 3.2, kb: 3, self: 0.1 },
+  // bounce: 벽 · 바닥에서 튕기는 횟수 (사람에 맞거나 시간이 다 되면 터진다)
+  frag: { speed: 27, grav: 0.85, dmg: 20, splash: 65, r: 2.6, kb: 3, self: 0.2, life: 1.5, size: 0.2, color: '#8a9a5b', trail: '#e8d9a0', bounce: 4, burst: true },
+  jmine: { speed: 22, grav: 0.75, dmg: 0, splash: 60, r: 4, kb: 13, self: 0, selfKb: true, life: 3, size: 0.26, color: '#ffb43a', trail: '#ffe2a8', burst: true },
+  jtrap: { speed: 16, grav: 1, dmg: 0, splash: 0, r: 0, life: 3, size: 0.22, color: '#c9c9d6', trail: '#8a8a99', make: 'jtrap' },
+  tire: { dmg: 0, splash: 520, r: 7, kb: 9 },
 };
 
 // 영웅
@@ -73,6 +78,12 @@ export const HEROES = [
     shift: { name: '점프 추진기', icon: '⏫', cd: 10, desc: '하늘 높이 솟구쳐요' },
     e: { name: '충격탄', icon: '🌬️', cd: 8, desc: '맞은 곳의 적(과 나)을 멀리 날려요' },
     q: { name: '포화', icon: '🎇', desc: '공중에 멈춰 작은 로켓을 퍼부어요' } },
+  { id: 'junk', name: '펑펑', role: 'dps', emoji: '💣', color: '#e8a13c', hp: 225, speed: 1, ult: 2100, held: 'rpg', acc: ['goggles'],
+    motto: '펑! 펑! 펑! 다 날려 버리자!', desc: '튕기는 수류탄으로 골목을 채우는 폭탄광 젤리. 쓰러지면 수류탄을 흩뿌려요',
+    p: { type: 'proj', k: 'frag', name: '통통 수류탄', rate: 0.72, mag: 5, reload: 1.5, auto: true },
+    shift: { name: '충격 지뢰', icon: '🧨', cd: 7, desc: '던지고 다시 누르면 바로 터져요. 맞은 적과 나를 멀리 날려요 (지뢰 점프!)' },
+    e: { name: '끈끈 덫', icon: '🪤', cd: 10, desc: '밟은 적에게 피해를 주고 1.5초 동안 묶어요 (하나만 깔려요)' },
+    q: { name: '바퀴 폭탄', icon: '🛞', desc: '폭탄 바퀴를 직접 몰아요 (벽 넘기 Space · 클릭이나 Q 로 펑!). 그동안 내 몸은 무방비' } },
   { id: 'reaper', name: '스르륵', role: 'dps', emoji: '💀', color: '#4a4356', hp: 250, speed: 1, ult: 2000, held: 'shotgun', acc: ['hoodie:#2b2733', 'mask'],
     motto: '죽어라… 죽어라… 죽어라!', desc: '그림자 속 쌍산탄총 젤리. 준 피해만큼 체력 회복',
     p: { type: 'hit', name: '헬파이어 샷건', dmg: 6, pellets: 20, rate: 0.5, mag: 8, reload: 1.5, spread: 0, pspread: 0.11, near: 10, far: 20, head: 2, auto: true, steal: 0.3 },

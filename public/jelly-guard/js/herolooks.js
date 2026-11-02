@@ -212,6 +212,17 @@ const LOOKS = {
   },
 };
 // 투구 · 후드 · 두건을 쓰는 영웅은 곰돌이 귀를 숨긴다 (머리 위로 삐져나오지 않게)
+LOOKS.junk = (b) => {
+  // 펑펑: 그을린 고글 · 삐죽 머리 · 수류탄 띠 · 등에 맨 바퀴
+  const hair = toon('#ffb43a'), dark = toon('#3a2f28'), lens = toon('#9fe8ff'), olive = toon('#6f7f45'), tire = toon('#23232b');
+  p(b.head, G.box, dark, 0, 0.14, 0.42, 0.62, 0.1, 0.14);
+  both((s) => p(b.head, G.sph, lens, s * 0.17, 0.14, 0.48, 0.13, 0.13, 0.07));
+  for (let i = -2; i <= 2; i++) p(b.head, G.box, hair, i * 0.11, 0.54 - Math.abs(i) * 0.03, 0, 0.09, 0.26, 0.2, 0, 0, i * 0.2);
+  p(b.torso, G.box, dark, 0, 1.08, 0, 0.1, 0.72, 0.6, 0, 0, 0.75);
+  for (let i = 0; i < 3; i++) p(b.torso, G.sph, olive, -0.2 + i * 0.2, 0.86 + i * 0.2, 0.46, 0.08, 0.09, 0.08);
+  p(b.torso, G.sph, tire, 0, 1.12, -0.56, 0.42, 0.42, 0.13);
+  p(b.torso, G.sph, hair, 0, 1.12, -0.62, 0.16, 0.16, 0.09);
+};
 const NO_EARS = new Set(['rein', 'pharah', 'genji', 'reaper', 'ana']);
 export function dressHero(bear, id) {
   const f = LOOKS[id]; if (!f) return false;

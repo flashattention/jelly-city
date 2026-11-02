@@ -5,7 +5,7 @@ import { PROJ } from './heroes.js';
 import { rayBoxes, floorAt, clearLine } from '../../jelly-tactical/js/maps.js';
 
 const GUN_SND = { cassidy: 'pistol', reaper: 'heavy', hog: 'heavy', dva: 'smg', widow: 'smg', soldier: 'pulse', tracer: 'smg', ana: 'sniper' };
-export const VM_KIND = { rein: 'hammer', winston: 'tesla', dva: 'cannons', hog: 'scrap', zarya: 'particle', pharah: 'rpg', reaper: 'shotgun2', cassidy: 'revolver', soldier: 'rifle', genji: 'shuriken', widow: 'sniper', tracer: 'pistols', mercy: 'staff', ana: 'biorifle', lucio: 'sonic', moira: 'hands' };
+export const VM_KIND = { rein: 'hammer', winston: 'tesla', dva: 'cannons', hog: 'scrap', zarya: 'particle', pharah: 'rpg', reaper: 'shotgun2', cassidy: 'revolver', soldier: 'rifle', junk: 'launcher', genji: 'shuriken', widow: 'sniper', tracer: 'pistols', mercy: 'staff', ana: 'biorifle', lucio: 'sonic', moira: 'hands' };
 
 export function makeKit(h, G) {
   const st = { mag: (h.p.alt || h.p).mag || 0, reloadEnd: 0, next: 0, nextS: 0, latch: false, latchS: false, beamT: 0, tgt: null, tgtS: null, beams: [], fuel: 1, dj: true, scopeAt: 0, acc: new Map(), hist: [], blinks: 3, blinkT: 0, mode: null };
@@ -18,12 +18,12 @@ export function makeKit(h, G) {
   const abil = (s, extra = {}) => G.send({ t: 'abil', s, ...extra });
   const reloading = () => st.reloadEnd > now0();
   K.reload = () => { const sp = magSpec(); if (!sp.mag || reloading() || st.mag >= sp.mag) return; st.reloadEnd = now0() + (sp.reload || 1.4) * 1000; G.vm.reload(sp.reload || 1.4); G.sfx('reload'); };
-  K.spawned = () => { st.mag = magSpec().mag || 0; st.reloadEnd = 0; st.mode = null; st.fuel = 1; st.blinks = 3; st.hist = []; st.acc.clear(); };
+  K.spawned = () => { st.tire = null; st.mag = magSpec().mag || 0; st.reloadEnd = 0; st.mode = null; st.fuel = 1; st.blinks = 3; st.hist = []; st.acc.clear(); };
   K.vmKind = () => G.has('blade') || G.has('deflect') ? 'sword' : G.has('primal') ? 'paws' : h.id === 'dva' && G.has('pilot') ? 'pilot' : h.id === 'mercy' && st.gun ? 'pilot' : VM_KIND[h.id];
   // 토닥: 휠로 지팡이(치유 · 강화) ↔ 딱총
   K.wheel = () => { if (h.id !== 'mercy' || busy()) return; st.gun = !st.gun; st.tgt = st.tgtS = null; st.beams = []; st.beamsS = []; G.sfx('pick'); G.toast(st.gun ? '🔫 딱총 (휠로 지팡이)' : '🪄 지팡이 (휠로 딱총)'); };
   // 지금 쏠 수 없는 상태 (기절 · 망령화 · 방벽 들고 · 돌진 …)
-  const busy = () => !!st.aim || G.has('stun') || G.has('sleep') || G.has('ghost') || G.has('blossom') || G.has('hogult') || G.has('coal') || st.mode === 'charge' || st.mode === 'tp' || st.mode === 'recall' || st.mode === 'grap' || st.mode === 'ga' || (h.id === 'rein' && G.mouseR) || (h.id === 'dva' && G.mouseR && !G.has('pilot')) || G.has('deflect');
+  const busy = () => !!st.aim || !!st.tire || G.has('stun') || G.has('sleep') || G.has('ghost') || G.has('blossom') || G.has('hogult') || G.has('coal') || st.mode === 'charge' || st.mode === 'tp' || st.mode === 'recall' || st.mode === 'grap' || st.mode === 'ga' || (h.id === 'rein' && G.mouseR) || (h.id === 'dva' && G.mouseR && !G.has('pilot')) || G.has('deflect');
 
   // ---------- 기본 공격 ----------
   function fireHit(sp, a, now, opt = {}) {
@@ -39,7 +39,7 @@ export function makeKit(h, G) {
     if (sp.mag) { if (st.mag <= 0) { if (!st.latch) G.sfx('dry'); st.latch = true; K.reload(); return; } st.mag -= sp.burst ? Math.min(st.mag, sp.burst) : 1; }
     st.next = now + sp.rate * 1000;
     const n = sp.burst || 1;
-    for (let i = 0; i < n; i++) setTimeout(() => { if (!G.me.alive) return; G.fireProj(sp.k, { a, i }); G.vm.kick(0.35); G.sfx(sp.k === 'rocket' ? 'rocket' : sp.k === 'shuri' ? 'shuri' : 'laser', null, 0.7); }, i * (sp.burstGap || 0) * 1000);
+    for (let i = 0; i < n; i++) setTimeout(() => { if (!G.me.alive) return; G.fireProj(sp.k, { a, i }); G.vm.kick(0.35); G.sfx(sp.k === 'rocket' ? 'rocket' : sp.k === 'frag' ? 'throw' : sp.k === 'shuri' ? 'shuri' : 'laser', null, 0.7); }, i * (sp.burstGap || 0) * 1000);
     if (sp.mag && st.mag <= 0) setTimeout(K.reload, (n * (sp.burstGap || 0) + 0.2) * 1000);
   }
   function beamTick(now, k, list, snd) {
@@ -158,8 +158,10 @@ export function makeKit(h, G) {
   K.abil = (slot, now) => {
     if (G.has('stun') || G.has('sleep')) return;
     const me = G.me, f = G.fwd(), flat = new THREE.Vector3(f.x, 0, f.z).normalize();
+    if (st.tire) { if (slot === 'q') K.tireBoom(); return; } // 바퀴를 모는 동안은 다른 기술을 못 쓴다
     if (slot === 'q') {
       if ((G.ps?.[4] ?? 0) < 100) { G.sfx('cd'); return; }
+      if (h.id === 'junk') { abil('q'); st.tire = { x: me.pos.x + flat.x, y: me.pos.y, z: me.pos.z + flat.z, vy: 0, until: now + 8000, sendT: 0, armed: false }; G.sfx('rocket'); G.toast('🛞 마우스로 방향 · S 천천히 · Space 점프 · 클릭이나 Q 로 펑!'); return; }
       if (h.id === 'ana') { const t = G.findTarget({ range: 45, arc: 0.93, lock: 'ally' }); if (!t) { G.toast('💉 나노 강화제: 아군을 조준하고 Q'); return; } return abil('q', { to: t.id }); }
       if (h.id === 'dva' && !G.has('pilot')) { const fly = st.mode === 'boost'; abil('q', { fly }); if (fly) st.mode = null; return; } // 부스터 중이면 날려 보내고, 아니면 그 자리 자폭
       abil('q');
@@ -181,6 +183,8 @@ export function makeKit(h, G) {
       case 'hog.e': if (!useCd('e', sp.cd)) return; abil('e'); G.sfx('heal'); return;
       case 'zarya.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); G.sfx('abil'); return;
       case 'zarya.e': { if (!useCd('e', sp.cd)) return; const t = G.findTarget({ range: 30, arc: 0.95, lock: 'ally' }); abil('e', { to: t?.id }); G.sfx('abil'); return; }
+      case 'junk.shift': if (G.detonate('jmine')) return; if (!useCd('shift', sp.cd)) return; abil('shift'); G.fireProj('jmine', { a: 'shift' }); G.sfx('throw'); return;
+      case 'junk.e': if (!useCd('e', sp.cd)) return; abil('e'); G.fireProj('jtrap', { a: 'e' }); G.sfx('throw'); return;
       case 'pharah.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); me.vel.y = 17; me.onGround = false; st.mode = 'jet'; st.until = now + 400; G.sfx('rocket'); return;
       case 'pharah.e': if (!useCd('e', sp.cd)) return; abil('e'); G.fireProj('conc', { a: 'e' }); G.sfx('throw'); return;
       case 'reaper.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); st.mag = h.p.mag; G.sfx('abil'); return;
@@ -233,6 +237,26 @@ export function makeKit(h, G) {
     if (G.has('deadeye')) inp.speedMul *= 0.35;
     if (G.has('blade')) inp.speedMul *= 1.2;
     if (G.has('primal')) { inp.speedMul *= 1.25; inp.jumpV = 10; }
+    // 바퀴 폭탄: 몸은 멈춰 있고, 바퀴가 보는 쪽으로 저절로 구른다 (S 천천히 · Space 점프 · 클릭 펑)
+    if (st.tire) {
+      const T = st.tire; inp.f = 0; inp.s = 0; inp.jump = false;
+      if (!me.alive) st.tire = null;
+      else {
+        const spd = (G.keys.has('KeyS') ? 7 : 16) * dt;
+        for (const [ax, d] of [['x', flat.x * spd], ['z', flat.z * spd]]) {
+          if (!d) continue;
+          const dir = { x: ax === 'x' ? Math.sign(d) : 0, y: 0, z: ax === 'z' ? Math.sign(d) : 0 };
+          if (rayBoxes(G.map, { x: T.x, y: T.y + 0.7, z: T.z }, dir, Math.abs(d) + 0.75) >= Math.abs(d) + 0.75) T[ax] += d;
+        }
+        const fl = floorAt(G.map, T.x, T.z, T.y + 0.7, 0.3);
+        if (T.y <= fl + 0.02 && G.keys.has('Space')) T.vy = 9.5;
+        T.vy -= 21 * dt; T.y += T.vy * dt;
+        if (T.y <= fl) { T.y = fl; T.vy = 0; }
+        if ((T.sendT -= dt) <= 0) { T.sendT = 0.05; G.send({ t: 'tire', p: [T.x, T.y, T.z], yaw: me.yaw }); }
+        if (!G.mouseL) T.armed = true;
+        if ((T.armed && G.mouseL) || now >= T.until) K.tireBoom();
+      }
+    }
     // 점프 팩: 날아가는 동안 빠르기를 지키고(공중에서 걷기 빠르기로 줄지 않게) 보는 쪽으로 조금씩 꺾는다
     if (h.id === 'winston' && st.mode === 'leap' && !me.onGround) {
       inp.keepVel = true;
@@ -365,7 +389,9 @@ export function makeKit(h, G) {
     if (h.id === 'mercy') return st.gun ? { big: st.mag, small: '/ 20 딱총' } : { big: '🪄', small: '지팡이 · 휠 = 딱총' };
     return { big: reloading() ? '…' : st.mag, small: sp.mag ? `/ ${sp.mag}` : '' };
   };
+  K.tireBoom = () => { if (!st.tire) return; st.tire = null; G.send({ t: 'tireboom' }); };
   K.extra = () => {
+    if (st.tire) return { bar: Math.max(0, (st.tire.until - performance.now()) / 8000), label: '🛞 바퀴 폭탄' };
     if (h.id === 'pharah') return { bar: st.fuel, label: '연료' };
     if (h.id === 'tracer') return { pips: st.blinks, label: '점멸' };
     if (h.id === 'widow' && G.mouseR) return { bar: Math.min(1, (performance.now() - st.scopeAt) / (h.p.scoped.charge * 1000)), label: '충전' };

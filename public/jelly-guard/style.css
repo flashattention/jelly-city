@@ -78,6 +78,7 @@
 @keyframes pop { 0% { transform: translate(-50%, -50%) scale(1.4); opacity: 0; } 12% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 82% { opacity: 1; } 100% { opacity: 0; } }
 #death { position: fixed; left: 50%; top: 36%; transform: translate(-50%, -50%); z-index: 6; text-align: center; font-family: 'Jua', sans-serif; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,.7); }
 #death-by { font-size: 28px; } #death-t { font-size: 64px; color: #ffd84d; }
+#lockhint { position: fixed; left: 50%; bottom: 150px; transform: translateX(-50%); z-index: 7; padding: 9px 18px; border-radius: 999px; background: rgba(20,8,50,.8); color: #fff; font-size: 15px; pointer-events: none; white-space: nowrap; }
 #lockmsg { position: fixed; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center; background: rgba(10,4,30,.45); }
 #lockmsg .card b { font-family: 'Jua', sans-serif; font-size: 22px; display: block; margin-top: 8px; }
 .logo.small { font-size: 46px; }
