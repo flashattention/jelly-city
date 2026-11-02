@@ -100,7 +100,7 @@ export class Runner {
     this.items = []; this.eff = { rocket: 0, shield: 0, cloud: 0, magnet: 0, ghost: 0, slow: 0 }; this.rocketK = 0; this.cloudY = 0; this.lastGroundY = 0;
     // 팀전: 마지막으로 안전하게 밟은 곳 · 부활 뒤 멈춤 · 무적
     this.safe = { s, x, y: 0 }; this.frozen = 0; this.invul = 0;
-    Object.assign(this, { s, x, y: 0, boost: 0, vx: 0, vy: 0, knock: 0, onGround: true, jumps: 0, coyote: 0, jbuf: 0, slideT: 0, flipT: 0, shoveT: 0, alive: true, dead: null, stars: 0, plat: null, t: 0 });
+    Object.assign(this, { s, x, y: 0, boost: 0, vx: 0, vy: 0, knock: 0, onGround: true, jumps: 0, coyote: 0, jbuf: 0, slideBuf: 0, slideT: 0, flipT: 0, shoveT: 0, alive: true, dead: null, stars: 0, plat: null, t: 0 });
     this.bear.inner.rotation.set(0, 0, 0); this.bear.root.scale.setScalar(1); this.bear.root.visible = true;
   }
   get v() { return speedAt(this.s) * (this.speedK || 1) * (1 + BOOST * this.boost) * (1 + 0.8 * this.rocketK) * (this.eff.slow > 0 ? 0.6 : 1); }
@@ -130,11 +130,12 @@ export class Runner {
     if (input.jump) this.jbuf = 0.12;
     this.jbuf -= dt; this.coyote -= dt;
     if (this.jbuf > 0) {
-      if (this.onGround || this.coyote > 0) { this.vy = JUMP; this.jumps = 1; this.onGround = false; this.coyote = 0; this.jbuf = 0; this.slideT = 0; fx?.('jump'); }
-      else if (this.jumps < 2) { this.vy = JUMP2; this.jumps = 2; this.jbuf = 0; this.flipT = FLIP_T; fx?.('jump2'); }
+      if (this.onGround || this.coyote > 0) { this.vy = JUMP; this.jumps = 1; this.onGround = false; this.coyote = 0; this.jbuf = 0; this.slideT = 0; this.slideBuf = 0; fx?.('jump'); }
+      else if (this.jumps < 2) { this.vy = JUMP2; this.jumps = 2; this.jbuf = 0; this.slideBuf = 0; this.flipT = FLIP_T; fx?.('jump2'); }
     }
-    // 숙이기 (공중에서 누르면 빨리 내려온다)
-    if (input.slide) { if (this.onGround) { if (this.slideT <= 0) fx?.('slide'); this.slideT = 0.75; } else this.vy = Math.min(this.vy, -14); }
+    // 숙이기 (공중에서 누르면 빨리 내려오고, 착지하는 순간 숙인다)
+    if (input.slide) { if (this.onGround) { if (this.slideT <= 0) fx?.('slide'); this.slideT = 0.75; } else { this.vy = Math.min(this.vy, -14); this.slideBuf = 0.45; } }
+    this.slideBuf = Math.max(0, this.slideBuf - dt);
     if (input.slideHeld && this.onGround && this.slideT > 0) this.slideT = Math.max(this.slideT, 0.15);
     this.slideT -= dt;
     // 떨어짐
@@ -161,6 +162,8 @@ export class Runner {
       if (w.y - this.y < 1.3 || this.eff.ghost > 0 || this.eff.shield > 0 || this.invul > 0) { /* 1.3m 아래 턱은 훌쩍 올라선다 (유령 · 방어막이면 어떤 턱이든) */ if (w.y - this.y >= 1.3 && this.eff.ghost <= 0 && this.invul <= 0) { this.eff.shield = 0; fx?.('shieldbreak'); } this.y = w.y; this.vy = Math.max(0, this.vy); this.onGround = true; this.jumps = 0; }
       else return this.die('벽에 쾅! 부딪혔어요', track);
     }
+    // 공중에서 S 를 눌렀거나 누르고 있었으면 착지하면서 바로 숙인다 (안 그러면 입력이 씹힌 것처럼 느껴진다)
+    if (!was && this.onGround && (this.slideBuf > 0 || input.slideHeld)) { if (this.slideT <= 0) fx?.('slide'); this.slideT = 0.75; this.slideBuf = 0; }
     // 장애물
     const o = this.eff.ghost > 0 || this.invul > 0 ? null : track.hit(this.s, this.x, this.y, this.h);
     if (o && this.eff.shield > 0) { this.eff.shield = 0; track.breakOne(o); fx?.('shieldbreak'); }
