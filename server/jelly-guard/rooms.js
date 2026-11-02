@@ -12,6 +12,7 @@ const ASSAULT_SEC = Number(process.env.WATCH_SEC) || 4 * 60, BONUS_SEC = 120, CO
 const CAP_SOLO = Number(process.env.WATCH_CAP) || 21, CTRL_CAP = 9, CTRL_WIN = 85; // 점령 시간(초) · 쟁탈전 100% 까지 초
 const CAP_MUL = [0, 1, 1.5, 1.85, 2.1, 2.3, 2.45];
 const ULT_X = Number(process.env.WATCH_ULTX) || 1; // 점검용: 궁극기 빨리 채우기
+const RUSHERS = new Set(['rein', 'winston', 'genji', 'reaper', 'hog', 'dva', 'tracer', 'zarya']), NO_HOP = new Set(['pharah', 'mercy']); // 파고드는 영웅 · 뛰면 안 되는 영웅
 const BOT_NAMES = ['젤리봇 딸기', '젤리봇 소다', '젤리봇 푸딩', '젤리봇 망고', '젤리봇 민트', '젤리봇 라임', '젤리봇 자두', '젤리봇 복숭아', '젤리봇 포도', '젤리봇 레몬', '젤리봇 체리', '젤리봇 키위'];
 // 영웅마다 쏠 수 있는 투사체
 const PKINDS = { rein: ['fire'], dva: ['mini'], zarya: ['egren', 'grav'], pharah: ['rocket', 'conc', 'barrage'], hog: ['hook'], soldier: ['helix'], genji: ['shuri'], cassidy: ['flash'], widow: ['mine'], tracer: ['pulse'], mercy: ['bolt'], ana: ['sleep', 'biotic'], lucio: ['sonic'], moira: [], junk: ['frag', 'jmine', 'jtrap'] };
@@ -396,7 +397,7 @@ export class GuardRooms extends BaseRooms {
       const pilotCall = c.hero === 'dva' && c.pilot;
       if (c.ult < h.ult - 1) return;
       if (!this.ultEffect(r, c, h, m, now)) return;
-      c.ult = 0;
+      c.ult = this.ultLeft(c, h, pilotCall);
       this.toRoom(r, { t: 'fx', k: 'ult', by: c.id, h: c.hero, pilot: pilotCall, team: c.team, p: [c.pos.x, c.pos.y, c.pos.z], yaw: c.yaw });
       return;
     }
@@ -520,7 +521,9 @@ export class GuardRooms extends BaseRooms {
   addEnt(r, e) { e.id = r.g.eid++; e.yaw = e.yaw || 0; r.g.ents.push(e); return e; }
 
   // ---------- 피해 · 치유 · 처치 ----------
-  charge(p, n) { const g = p.room?.g; if (!p.hero || (g && g.phase !== 'play' && g.phase !== 'setup')) return; if (p.fx.valk || p.fx.blossom || p.fx.hogult || p.fx.barrage || p.fx.blade || p.fx.coal || p.fx.visor || p.fx.primal) { const now = Date.now(); if (Object.keys(p.fx).some((k) => ['valk', 'blossom', 'hogult', 'barrage', 'blade', 'coal', 'visor', 'primal'].includes(k) && p.fx[k] > now)) return; } p.ult = Math.min(heroById(p.hero).ult, p.ult + n); }
+  // 궁극기를 쓴 뒤 남는 게이지: 뿅뿅은 자폭하면 일부를 돌려받아 로봇을 더 빨리 다시 부른다
+  ultLeft(c, h, pilotCall) { return c.hero === 'dva' && !pilotCall ? h.ult * h.pilot.refund : 0; }
+  charge(p, n) { if (p.pilot) n *= heroById(p.hero).pilot.ultK; const g = p.room?.g; if (!p.hero || (g && g.phase !== 'play' && g.phase !== 'setup')) return; if (p.fx.valk || p.fx.blossom || p.fx.hogult || p.fx.barrage || p.fx.blade || p.fx.coal || p.fx.visor || p.fx.primal) { const now = Date.now(); if (Object.keys(p.fx).some((k) => ['valk', 'blossom', 'hogult', 'barrage', 'blade', 'coal', 'visor', 'primal'].includes(k) && p.fx[k] > now)) return; } p.ult = Math.min(heroById(p.hero).ult, p.ult + n); }
   damage(r, t, amt, by, now, o = {}) {
     if (!t.alive || amt <= 0 || r.g?.phase === 'over') return 0;
     if (t.fx.invuln > now) return 0;
@@ -553,7 +556,7 @@ export class GuardRooms extends BaseRooms {
     if (t.hp <= 0) {
       if (t.hero === 'dva' && !t.pilot) { t.pilot = true; t.hp = this.maxHp(t); t.mtxOn = false; this.toRoom(r, { t: 'form', id: t.id, pilot: true, eject: true }); this.charge(t, 300); return dealt; }
       this.kill(r, t, by, o.a, o.head, now);
-    } else if (t.bot && by && by !== t) { t.target = by; t.react = Math.min(t.react, 0.25); }
+    } else if (t.bot && by && by !== t) { t.target = by; t.react = Math.min(t.react, 0.25); t.hitAt = now; }
     return dealt;
   }
   heal(r, t, amt, by, now) {
@@ -629,7 +632,7 @@ export class GuardRooms extends BaseRooms {
       if (p.hero === 'moira' && now - (p.sprayAt || 0) > 400) p.res = Math.min(100, p.res + 14 * dt);
       if (p.hero === 'tracer' && p.blinks < 3) { if (!p.blinkT) p.blinkT = now; if (now - p.blinkT >= 3000) { p.blinks++; p.blinkT = p.blinks < 3 ? now : 0; } }
       if (p.hero === 'tracer') { if (!p.hist.length || now - p.hist[p.hist.length - 1].t > 200) p.hist.push({ t: now, hp: p.hp }); while (p.hist.length && now - p.hist[0].t > 3200) p.hist.shift(); }
-      this.charge(p, ULT_PASSIVE * ULT_X * dt * (g.phase === 'play' ? 1 : 0));
+      this.charge(p, ULT_PASSIVE * ULT_X * dt * (g.phase === 'play' ? 1 : 0) * (p.pilot ? heroById(p.hero).pilot.passiveK : 1));
       // 지속 궁극기 (서버가 피해를 낸다)
       if (p.fx.blossom > now) { if ((p.tk = (p.tk || 0) + dt) >= 0.1) { p.tk = 0; for (const t of r.players) if (t.alive && t.team !== p.team && d3(t.pos, p.pos) < 8 && this.canSee(r, eyeOf(p), t)) this.damage(r, t, 17, p, now, { a: 'q', steal: 0.3 }); } }
       if (p.fx.hogult > now) {
@@ -871,11 +874,13 @@ export class GuardRooms extends BaseRooms {
     if (b.kv && b.kv.until > now) { const nx = b.pos.x + b.kv.x * dt, nz = b.pos.z + b.kv.z * dt; if (clearLine(map, { ...b.pos, y: b.pos.y + 0.6 }, { x: nx, y: b.pos.y + 0.6, z: nz })) { b.pos.x = nx; b.pos.z = nz; } }
     const eye = eyeOf(b), spec = b.pilot ? h.pilot.p : h.p, sup = h.role === 'sup';
     // 보이는 적 중 가장 가까운 (방벽 뒤는 방벽을 친다)
-    let tgt = null, td = sup ? 30 : 45;
+    // 가까울수록 · 약할수록 · 지원가일수록, 때리던 대상을 더 쫓는다 (실력이 좋으면 약한 적을 더 잘 노린다)
+    let tgt = null, td = sup ? 30 : 45, best = 1e9;
     for (const p of r.players) {
       if (p.team === b.team || !p.alive || p.fx.ghost > now) continue;
-      const d = d3(b.pos, p.pos);
-      if (d < td && this.canSee(r, eye, p)) { td = d; tgt = p; }
+      const d = d3(b.pos, p.pos); if (d >= (sup ? 30 : 45)) continue;
+      const score = d - (1 - p.hp / this.maxHp(p)) * 10 * b.skill - (heroById(p.hero).role === 'sup' ? 3 * b.skill : 0) - (p === b.target ? 5 : 0);
+      if (score < best && this.canSee(r, eye, p)) { best = score; td = d; tgt = p; }
     }
     // 지원가: 체력이 깎인 아군
     let ally = null;
@@ -904,10 +909,10 @@ export class GuardRooms extends BaseRooms {
     const speed = 5.2 * h.speed * (b.fx.spd > now ? b.spdK || 1 : 1) * (b.fx.blossom > now ? 0.6 : 1) * (b.fx.blade > now ? 1.2 : 1);
     if (b.fx.grav > now) { /* 끌려가는 중 */ }
     else if (tgt && !healBeam && !(sup && ally)) {
-      b.strafeT = (b.strafeT || 0) - dt;
-      if (b.strafeT <= 0) { b.strafeT = 0.5 + Math.random() * 1.1; b.strafe = (Math.random() - 0.5) * 2; }
-      const closer = td > range ? 1 : td < range * 0.5 && spec.type !== 'melee' ? -0.6 : 0;
-      this.botStep(r, b, closer, b.strafe * 0.7, speed, dt); moving = true;
+      moving = this.botFight(r, b, h, spec, tgt, td, range, speed, nav, dt, now);
+    } else if (b.tactic === 'retreat' && now < b.tacticT && b.retreatTo?.alive) { // 안 보여도 아군에게 마저 간다
+      if (d3(b.pos, b.retreatTo.pos) > 5) { this.botWalkTo(r, b, nav, b.retreatTo.pos, speed, dt); moving = true; }
+    } else if (now < (b.holdT || 0)) { // 숨은 자리에서 잠깐 기다렸다 나간다
     } else if (healBeam || (sup && ally)) {
       const d = d3(b.pos, ally.pos); if (d > 7) { this.botWalkTo(r, b, nav, ally.pos, speed, dt); moving = true; }
     } else {
@@ -933,6 +938,75 @@ export class GuardRooms extends BaseRooms {
     b.st = [b.pos.x, b.pos.y, b.pos.z, b.yaw, b.pitch || 0, (moving ? 1 : 0) | (b.beamTo ? 2 : 0)];
     b.beamAtSend = b.beamTo;
   }
+  // ---------- 대치 전술 ----------
+  // 몇 초마다 역할 · 체력 · 거리 · 수적 상황을 보고 다음 행동을 고른다
+  botPickTactic(r, b, h, spec, tgt, td, range, now) {
+    const hp = b.hp / this.maxHp(b), rush = spec.type === 'melee' || RUSHERS.has(b.hero);
+    const mates = r.players.filter((p) => p !== b && p.alive && p.team === b.team && d3(p.pos, b.pos) < 14).length, foes = r.players.filter((p) => p.alive && p.team !== b.team && d3(p.pos, b.pos) < 14).length;
+    const weak = tgt.hp / this.maxHp(tgt) < 0.4, healer = r.players.find((p) => p !== b && p.alive && p.team === b.team && heroById(p.hero).role === 'sup');
+    const w = { strafe: 3, push: rush ? 4 : 1, flank: rush ? 3 : 1.5, kite: rush ? 0 : 2, cover: rush ? 0.5 : 2 };
+    if (weak) { w.push += 5; w.cover = 0; w.kite = 0; } // 다 잡은 적은 끝까지
+    if (hp < 0.35 && !weak) { w.push = 0; w.flank = 0; w.cover += 5; w.kite += rush ? 2 : 3; w.retreat = healer ? 7 : 0; }
+    if (foes > mates + 1) { w.push *= 0.3; w.flank *= 0.3; w.cover += 3; w.retreat = (w.retreat || 0) + (healer ? 2 : 0); }
+    if (td > range * 1.4) { w.push += 3; w.flank += 1; w.kite = 0; }
+    // 수비는 거점을 비우지 않는다: 멀리 돌아가거나 물러나지 않고 그 자리에서 싸운다
+    const g = r.g, pt = this.objPt(r);
+    if (g.mode === 'assault' && b.team === g.def && d3(b.pos, pt) < pt.r + 7) { w.strafe += 4; w.flank *= 0.2; w.kite *= 0.3; w.cover *= 0.3; if (w.retreat) w.retreat *= 0.3; if (d3(tgt.pos, pt) > pt.r + 10) w.push *= 0.2; }
+    let k = Math.random() * Object.values(w).reduce((a, v) => a + v, 0), pick = 'strafe';
+    for (const [name, v] of Object.entries(w)) { k -= v; if (k <= 0) { pick = name; break; } }
+    b.tactic = pick; b.tacticT = now + rnd(1400, 3600) * (pick === 'retreat' ? 1.3 : 1); b.path = null; b.coverAt = null; b.orbit = Math.random() < 0.5 ? 1 : -1; b.retreatTo = pick === 'retreat' ? healer : null;
+    if (pick === 'cover') { b.coverAt = this.botFindCover(r, b, tgt, this.nav(r.g.map)); if (!b.coverAt) b.tactic = 'kite'; }
+  }
+  // 근처에서 이 적이 못 보는 자리
+  botFindCover(r, b, tgt, nav) {
+    const eye = eyeOf(tgt); let best = null, bd = 1e9;
+    for (let i = 0; i < 14; i++) {
+      const n = nav.nodes[Math.floor(Math.random() * nav.nodes.length)], d = Math.hypot(n.x - b.pos.x, n.z - b.pos.z);
+      if (d > 16 || d >= bd || Math.abs(n.f - b.pos.y) > 3) continue;
+      if (!clearLine(r.g.map, { x: n.x, y: n.f + 1.3, z: n.z }, eye)) { best = n; bd = d; }
+    }
+    return best;
+  }
+  botFight(r, b, h, spec, tgt, td, range, speed, nav, dt, now) {
+    if (now >= (b.tacticT || 0)) this.botPickTactic(r, b, h, spec, tgt, td, range, now);
+    // 방금 맞았으면 방향을 틀고 가끔 뛴다
+    const hit = now - (b.hitAt || 0) < 120;
+    if (hit && Math.random() < 0.35) { b.strafe = -(b.strafe || 1) || 1; b.strafeT = rnd(300, 800) / 1000; if (Math.random() < 0.3 * b.skill + 0.1) this.botHop(r, b); }
+    b.strafeT = (b.strafeT || 0) - dt;
+    if (b.strafeT <= 0) { b.strafeT = 0.35 + Math.random() * 1.1; b.strafe = (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random() * 0.5); if (Math.random() < 0.08) this.botHop(r, b); }
+    const hold = td > range ? 1 : td < range * 0.5 && spec.type !== 'melee' ? -0.6 : 0;
+    switch (b.tactic) {
+      case 'push': // 파고들기
+        if (Math.random() < dt * 0.5) this.botHop(r, b);
+        if (!this.botStep(r, b, 1, b.strafe * 0.35, speed, dt)) b.strafe = -b.strafe;
+        return true;
+      case 'flank': { // 옆으로 크게 돌아 들어가기
+        const ok = this.botStep(r, b, td > range * 1.2 ? 0.45 : td < range * 0.6 ? -0.2 : 0.1, b.orbit, speed, dt);
+        if (!ok) { b.orbit = -b.orbit; if (td > range) this.botWalkTo(r, b, nav, tgt.pos, speed, dt); }
+        return true;
+      }
+      case 'kite': // 쏘면서 물러나기
+        if (!this.botStep(r, b, td < range * 1.5 ? -0.9 : 0, b.strafe * 0.6, speed, dt)) { b.strafe = -b.strafe; b.tacticT = 0; }
+        return true;
+      case 'cover': { // 엄폐물 뒤로
+        const c = b.coverAt; if (!c) { b.tacticT = 0; return false; }
+        if (Math.hypot(c.x - b.pos.x, c.z - b.pos.z) < 1.2) { b.tacticT = 0; b.holdT = now + rnd(500, 1800); return false; }
+        this.botWalkTo(r, b, nav, { x: c.x, y: c.f, z: c.z }, speed, dt); b.holdT = now + rnd(500, 1800);
+        return true;
+      }
+      case 'retreat': // 지원가 쪽으로 물러나기
+        if (!b.retreatTo?.alive || d3(b.pos, b.retreatTo.pos) < 5) { b.tacticT = 0; return false; }
+        this.botWalkTo(r, b, nav, b.retreatTo.pos, speed, dt);
+        return true;
+      default: // 거리 맞추며 좌우로 흔들기
+        if (!this.botStep(r, b, hold, b.strafe, speed, dt)) b.strafe = -b.strafe;
+        return true;
+    }
+  }
+  botHop(r, b) {
+    if (NO_HOP.has(b.hero) || (b.vy || 0) !== 0 || b.pos.y > floorAt(r.g.map, b.pos.x, b.pos.z, b.pos.y + 0.8, 0.15) + 0.05) return;
+    b.vy = 6.5; b.pos.y += 0.06;
+  }
   botWalkTo(r, b, nav, to, speed, dt) {
     if (!b.path || !b.path.length || (b.repath = (b.repath || 0) - dt) <= 0) { b.repath = 1.5; b.path = this.pathTo(nav, nav.near(b.pos), nav.near(to)) || []; }
     const n = b.path[0]; if (!n) return;
@@ -944,8 +1018,9 @@ export class GuardRooms extends BaseRooms {
     const fx = -Math.sin(b.yaw), fz = -Math.cos(b.yaw), rx = Math.cos(b.yaw), rz = -Math.sin(b.yaw);
     let vx = fx * f + rx * s, vz = fz * f + rz * s; const L = Math.hypot(vx, vz); if (L < 0.05) return; vx /= Math.max(1, L); vz /= Math.max(1, L);
     const nx = b.pos.x + vx * speed * dt, nz = b.pos.z + vz * speed * dt;
-    if (clearLine(r.g.map, { x: b.pos.x, y: b.pos.y + 0.6, z: b.pos.z }, { x: nx + vx * 0.6, y: b.pos.y + 0.6, z: nz + vz * 0.6 }) && Math.abs(floorAt(r.g.map, nx, nz, b.pos.y + 0.8, 0.15) - b.pos.y) < 0.8) { b.pos.x = nx; b.pos.z = nz; }
     b.path = null;
+    if (clearLine(r.g.map, { x: b.pos.x, y: b.pos.y + 0.6, z: b.pos.z }, { x: nx + vx * 0.6, y: b.pos.y + 0.6, z: nz + vz * 0.6 }) && Math.abs(floorAt(r.g.map, nx, nz, b.pos.y + 0.8, 0.15) - b.pos.y) < 0.8) { b.pos.x = nx; b.pos.z = nz; return true; }
+    return false; // 벽이나 낭떠러지에 막혔다
   }
   botAttack(r, b, h, spec, tgt, td, dt, now) {
     const eye = eyeOf(b), aimP = chest(tgt);
@@ -1037,7 +1112,8 @@ export class GuardRooms extends BaseRooms {
         return;
       } else if (b.hero === 'widow' || b.hero === 'soldier' || b.hero === 'moira' || b.hero === 'mercy' || b.hero === 'lucio' || b.hero === 'winston' || b.hero === 'reaper' || b.hero === 'hog' || b.hero === 'rein' || b.hero === 'genji' || b.hero === 'dva' || b.hero === 'ana') {
         if (b.hero === 'dva' && b.pilot) { /* 아래에서 */ }
-        if (this.ultEffect(r, b, h, fake, now)) { b.ult = 0; this.toRoom(r, { t: 'fx', k: 'ult', by: b.id, h: b.hero, team: b.team, p: [b.pos.x, b.pos.y, b.pos.z], yaw: b.yaw }); return; }
+        const pilotCall = b.hero === 'dva' && b.pilot;
+        if (this.ultEffect(r, b, h, fake, now)) { b.ult = this.ultLeft(b, h, pilotCall); this.toRoom(r, { t: 'fx', k: 'ult', by: b.id, h: b.hero, team: b.team, p: [b.pos.x, b.pos.y, b.pos.z], yaw: b.yaw }); return; }
       }
     }
     // 방어 · 이동기
