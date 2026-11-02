@@ -200,10 +200,12 @@
         </div>
       </div>
       <div id="start-error" class="hidden"></div>
+      <button id="pn-btn" type="button" style="display:block;margin:10px auto 0;padding:6px 14px;border:1px solid rgba(255,255,255,.3);border-radius:10px;background:rgba(255,255,255,.12);color:inherit;font:inherit;cursor:pointer">📜 패치노트</button>
       <div id="llm-status"></div>
     </div>
   </div>
 
+  <script type="module">import { openPatchNotes } from '/shared/js/patchnotes.js'; document.getElementById('pn-btn').onclick = () => openPatchNotes();</script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

@@ -4,6 +4,7 @@ import { account, store } from './account.js';
 import { DEFAULT_CHAR_KEY, charLook } from './char-studio.js';
 import { localChars, LOCAL_MAX, isLocal, updateLocal } from './local-chars.js';
 import { Chat } from './chat.js';
+import { openPatchNotes } from './patchnotes.js';
 
 const $ = (id) => document.getElementById(id);
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -68,7 +69,7 @@ export class Shell {
       <div id="title-opts"></div>
       <div class="btns" id="play-btns">${(o.buttons || []).map((b) => `<button id="${b.id}" class="btn big ${b.cls || ''}">${b.label}</button>`).join('')}<button id="multi-btn" class="btn big alt">${o.multiLabel || '👥 같이 하기'} <small>최대 ${o.max || 8}명</small></button></div>
       <div class="row code-row"><input id="code-in" maxlength="6" placeholder="초대 코드 6자리" autocomplete="off" /><button id="code-btn" class="btn alt">🎟️ 코드로 참가</button></div>
-      <div class="row2" id="title-row2">${(o.extraRow || []).map((b, i) => `<button class="btn ghost" data-extra="${i}">${b.label}</button>`).join('')}<a href="/" class="btn ghost">🏠 메인으로</a></div>
+      <div class="row2" id="title-row2">${(o.extraRow || []).map((b, i) => `<button class="btn ghost" data-extra="${i}">${b.label}</button>`).join('')}<button class="btn ghost" id="pn-btn">📜 패치노트</button><a href="/" class="btn ghost">🏠 메인으로</a></div>
       <div class="keys">${o.keysHelp || ''}</div>
       <div id="err"></div>
     </div></div>
@@ -138,6 +139,7 @@ export class Shell {
     $('code-in2').onkeydown = (e) => { if (e.key === 'Enter') $('code-btn2').click(); };
     $('quick-btn').onclick = () => this.send({ t: 'quick', opts: this.pickOpts?.() });
     $('create-btn').onclick = () => this.send({ t: 'create', name: $('room-name').value, opts: this.pickOpts?.() });
+    $('pn-btn').onclick = () => openPatchNotes();
     $('lobby-back').onclick = () => { this.multi = false; this.show('title'); };
     $('leave-btn').onclick = () => { this.send({ t: 'leave' }); this.room = null; this.afterLeave(); };
     $('start-btn').onclick = () => this.send({ t: 'start' });

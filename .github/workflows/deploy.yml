@@ -20,6 +20,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: 패치노트 검사
+        run: node tools/patchnotes.mjs --check
       - name: 문법 검사
         run: for f in server/*.js server/*/*.js public/*/js/*.js public/hub/*.js; do node --check "$f" || exit 1; done
       - name: 서버 기동 테스트
@@ -28,6 +30,7 @@ jobs:
           for i in $(seq 1 30); do curl -sf localhost:8123/healthz && break; sleep 1; done
           curl -sf localhost:8123/api/status
           curl -sf localhost:8123/ > /dev/null
+          curl -sf localhost:8123/shared/patchnotes.json > /dev/null
           curl -sf localhost:8123/jelly-city/ > /dev/null
           curl -sf localhost:8123/dream-runner/ > /dev/null
           curl -sf localhost:8123/jelly-drift/ > /dev/null
@@ -61,6 +64,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 패치노트를 커밋 기록에서 만든다
+      - name: 패치노트에 새 커밋 추가
+        run: node tools/patchnotes.mjs && node tools/patchnotes.mjs --check
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - run: flyctl deploy --remote-only
         env:
