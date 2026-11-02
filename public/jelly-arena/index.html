@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>젤리 아레나</title>
+  <meta name="description" content="탑 · 미드 · 정글 · 바텀 · 서폿! 챔피언 20명으로 젤리 심장을 부수는 5 대 5 전략 배틀" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/css/shell.css" />
+  <link rel="stylesheet" href="../shared/css/party.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <canvas id="ov"></canvas>
+  <!-- 챔피언 고르기 -->
+  <div id="pick" class="hidden">
+    <div class="p-top"><h2>⚔️ 챔피언 고르기</h2><b id="p-time">35</b></div>
+    <div class="p-body">
+      <div class="p-team" id="p-team"></div>
+      <div class="p-mid">
+        <div class="seg" id="p-filter"></div>
+        <div id="p-grid"></div>
+      </div>
+      <div class="p-detail">
+        <div id="p-prev"></div>
+        <div id="p-info"></div>
+        <div class="p-roles"><span>내 자리</span><div class="seg" id="p-roles"></div></div>
+        <button id="p-lock" class="btn big" disabled>확정하기</button>
+      </div>
+    </div>
+  </div>
+  <!-- 경기 중 -->
+  <div id="hud" class="hidden">
+    <div id="h-score"><span class="b"><b id="s-kb">0</b> <small>🗼<i id="s-tb">0</i></small></span><span id="s-time">0:00</span><span class="r"><small>🗼<i id="s-tr">0</i></small> <b id="s-kr">0</b></span></div>
+    <div id="h-me"><span id="s-kda">0/0/0</span><span id="s-cs">🌾 0</span></div>
+    <div id="h-epic"></div>
+    <div class="hud-r"><button id="b-help" title="조작법">❔</button><button id="b-mute" title="소리 (M)">🔊</button><button id="b-lock" title="카메라 고정 (Y)">🔒</button><button id="b-quit" title="그만하기">✕</button></div>
+    <div id="feed"></div>
+    <div id="banner" class="hidden"></div>
+    <div id="dead" class="hidden"><b>💤 쉬는 중</b><span id="dead-t">10</span><small>B 로 상점을 열 수 있어요</small></div>
+    <!-- 아래 조작판 -->
+    <div id="bar">
+      <div id="b-face"><span id="b-emoji"></span><i id="b-lv">1</i></div>
+      <div id="b-mid">
+        <div id="b-skills"></div>
+        <div class="bars"><div class="hp"><i id="hp-s"></i><i id="hp-f"></i><span id="hp-t"></span></div><div class="mp"><i id="mp-f"></i><span id="mp-t"></span></div><div class="xp"><i id="xp-f"></i></div></div>
+      </div>
+      <div id="b-right">
+        <div id="b-items"></div>
+        <button id="b-shop" title="상점 (B)">🛒 <b id="b-gold">500</b></button>
+      </div>
+      <div id="b-stats"></div>
+    </div>
+    <canvas id="mini" width="440" height="440"></canvas>
+    <div id="tip" class="hidden"></div>
+  </div>
+  <!-- 상점 -->
+  <div id="shop" class="hidden"><div class="card wide">
+    <div class="sh-top"><h2>🛒 상점</h2><span class="gold">💰 <b id="sh-gold">0</b></span><button id="sh-close" class="btn ghost">닫기 (B)</button></div>
+    <div id="sh-note" class="note"></div>
+    <div class="seg" id="sh-tabs"></div>
+    <div id="sh-list"></div>
+    <div class="sh-rec"><b>⭐ 추천 순서</b><span id="sh-rec"></span></div>
+    <div class="sh-mine"><b>내 아이템</b> <small>(눌러서 판매 · 값의 70%)</small><div id="sh-mine"></div></div>
+  </div></div>
+  <!-- 점수판 -->
+  <div id="board" class="hidden"><div class="card wide"><div id="bd-top"></div><div id="bd-list"></div></div></div>
+  <!-- 조작법 -->
+  <div id="help" class="hidden"><div class="card wide">
+    <h2>🎮 젤리 아레나 하는 법</h2>
+    <div class="howto">
+      <div><b>🎯 이기는 법</b><p>상대 기지의 <b>젤리 심장</b>을 부수면 이겨요. 길마다 있는 <b>포탑</b> 3개와 <b>수문</b>, 심장 지킴이 2개를 차례로 부숴야 심장을 칠 수 있어요. 포탑은 꼬마 없이 치면 피해가 크게 줄어요.</p></div>
+      <div><b>💰 강해지는 법</b><p>꼬마를 <b>마지막 한 대</b>로 잡으면 금화(CS)! 기지로 돌아가 <b>B</b>로 아이템을 사요. 레벨이 오르면 기술 위 <b>＋</b> 나 <b>Alt+Q/W/E/R</b> 로 기술을 배워요. R 은 5 · 9 · 13 레벨에 배워요.</p></div>
+      <div><b>🌲 정글</b><p>길 사이 숲엔 몬스터가 있어요. <b>왕꿀벌</b>(3분)은 팀 전체를 영구히, <b>거대 곰팡이왕</b>(8분)은 2분 동안 크게 강하게 해 줘요. 정글러는 <b>F 강타</b>로 마지막 한 방을!</p></div>
+    </div>
+    <div class="keys"><b>우클릭</b> 이동 · 공격 | <b>Q W E R</b> 기술 (누르면 범위가 보이고, 떼면 발사) | <b>D F</b> 주문 | <b>A</b> + 클릭 공격 이동 | <b>S</b> 멈춤 | <b>1</b> 물약 · <b>4</b> 와드 | <b>B</b> 상점 | <b>Tab</b> 점수판 | <b>Y</b> 카메라 고정 · <b>Space</b> 내 위치 · 휠 확대 | <b>Enter</b> 채팅</div>
+    <div class="row2"><button id="help-close" class="btn big">알겠어요!</button></div>
+  </div></div>
+  <!-- 결과 -->
+  <div id="over" class="screen hidden"><div class="card wide">
+    <h2 id="ov-title"></h2>
+    <div id="ov-sub" class="sub"></div>
+    <div id="ov-list"></div>
+    <div class="row2"><button id="again-btn" class="btn big">🔁 한 판 더</button><button id="ov-home" class="btn ghost">처음으로</button></div>
+  </div></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
