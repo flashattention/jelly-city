@@ -24,10 +24,15 @@ const Q1PATHS = [ // 소다 쪽 위 숲 (이것을 미드 · 강 기준으로 �
   [[-68, 24], [-50, 22]], [[-50, 22], [-26, 12]], [[-26, 12], [-16, -2], [-20, -20]], [[-50, 22], [-44, 40]],
 ];
 const CLEARINGS = [[-40, -10, 7], [-26, 12, 6.5], [-50, 22, 6.5]];
+// 자리마다 [위쪽 숲, 아래쪽 숲] 몬스터가 다르다 (한 팀 숲에 여섯 종류, 상대 숲은 똑같이 대칭)
 export const CAMP_SPOTS = [
-  { id: 'wolves', at: [-40, -10] }, { id: 'frogs', at: [-26, 12] }, { id: 'golem', at: [-50, 22] },
+  { ids: ['wolves', 'crab'], at: [-40, -10] }, { ids: ['frogs', 'bats'], at: [-26, 12] }, { ids: ['golem', 'snail'], at: [-50, 22] },
 ];
-export const EPICS = [{ id: 'bee', at: [-34, -34], r: 10 }, { id: 'mold', at: [34, 34], r: 10 }];
+// 강의 큰 몬스터 둘: 아래쪽은 벌레왕(네 종류가 번갈아, 나중엔 태고 거북) · 위쪽은 곰팡이왕
+export const EPICS = [{ id: 'bee', slot: 'bug', at: [-34, -34], r: 10 }, { id: 'mold', slot: 'mold', at: [34, 34], r: 10 }];
+export const BUGS = ['bee', 'moth', 'beetle', 'firefly'], BUG_SOUL = 3, ELDER_AT = 900;
+export const RIVER = [{ id: 'duck', at: [-18, -18], river: true }, { id: 'duck', at: [18, 18], river: true }];
+export const TOWER_RANGE = 12;
 const expand = (p) => [p, p.map(flipMid), p.map(mirror), p.map(flipMid).map(mirror)];
 const CORRIDORS = [
   ...Object.values(LANES).map((pts) => ({ pts, r: 7.5 })),
@@ -93,15 +98,25 @@ const STRUCT = [
 ];
 export const STRUCTS = [...STRUCT.map((s) => ({ ...s, team: 'blue' })), ...STRUCT.map((s) => ({ ...s, at: mirror(s.at), team: 'red' }))];
 export const BUSHES = (() => { const q = [[-60, -2, 4.5], [-60, 30, 4], [-22, 26, 4], [-6, -6, 0], [-18, -30, 4.5]].filter((b) => b[2]); return [...q, ...q.map(([x, z, r]) => { const [a, b] = flipMid([x, z]); return [a, b, r]; }), ...q.map(([x, z, r]) => { const [a, b] = mirror([x, z]); return [a, b, r]; }), ...q.map(([x, z, r]) => { const [a, b] = mirror(flipMid([x, z])); return [a, b, r]; })]; })();
-export const CAMPS = CAMP_SPOTS.flatMap((c) => { const pts = expand([c.at]).map(([[x, z]], i) => ({ id: c.id, at: [x, z], side: i < 2 ? 'blue' : 'red' })); return pts; });
+export const CAMPS = CAMP_SPOTS.flatMap((c) => expand([c.at]).map(([[x, z]], i) => ({ id: c.ids[i % 2], at: [x, z], side: i < 2 ? 'blue' : 'red' })));
 
 // ---------- 정글 몬스터 (시간이 갈수록 강해진다) ----------
 export const MONS = {
-  wolves: { name: '솜사탕 늑대', emoji: '🐺', big: { hp: 620, ad: 28 }, small: { hp: 190, ad: 12, n: 2 }, gold: 75, xp: 130, respawn: 110, color: '#d9c7ff' },
-  frogs: { name: '젤리 개구리', emoji: '🐸', big: { hp: 680, ad: 24 }, small: { hp: 150, ad: 9, n: 3 }, gold: 80, xp: 135, respawn: 110, color: '#7ce08a' },
-  golem: { name: '설탕 골렘', emoji: '🗿', big: { hp: 900, ad: 34 }, small: { hp: 300, ad: 14, n: 1 }, gold: 95, xp: 150, respawn: 120, color: '#e8d6b0' },
-  bee: { name: '왕꿀벌', emoji: '🐝', epic: true, big: { hp: 3000, ad: 70 }, gold: 150, xp: 300, respawn: 240, first: 180, color: '#ffd23f', buff: '🍯 꿀의 힘: 팀 전체 공격력 · 주문력 +12% (경기 끝까지 겹쳐요)' },
-  mold: { name: '거대 곰팡이왕', emoji: '🍄', epic: true, big: { hp: 7000, ad: 130 }, gold: 300, xp: 500, respawn: 300, first: 480, color: '#b48aff', buff: '🍄 곰팡이왕의 축복: 2분 동안 공격력 · 주문력 +30, 함께 달리는 꼬마들이 튼튼해져요' },
+  wolves: { name: '솜사탕 늑대', emoji: '🐺', big: { hp: 620, ad: 28 }, small: { hp: 190, ad: 12, n: 2 }, gold: 75, xp: 130, respawn: 110, color: '#d9c7ff', as: 0.85, ms: 7 },
+  frogs: { name: '젤리 개구리', emoji: '🐸', big: { hp: 680, ad: 24 }, small: { hp: 150, ad: 9, n: 3 }, gold: 80, xp: 135, respawn: 110, color: '#7ce08a', on: { slow: 0.2, slowT: 1 } },
+  golem: { name: '설탕 골렘', emoji: '🗿', big: { hp: 900, ad: 34 }, small: { hp: 300, ad: 14, n: 1 }, gold: 95, xp: 150, respawn: 120, color: '#e8d6b0', as: 0.5, ar: 28 },
+  crab: { name: '사탕 집게게', emoji: '🦀', big: { hp: 640, ad: 30 }, small: { hp: 170, ad: 11, n: 2 }, gold: 78, xp: 132, respawn: 110, color: '#ff8a70', ar: 34, as: 0.65 },
+  bats: { name: '초코 박쥐 떼', emoji: '🦇', big: { hp: 460, ad: 20 }, small: { hp: 130, ad: 10, n: 4 }, gold: 82, xp: 135, respawn: 110, color: '#7a5a8c', as: 1.05, ms: 8, fly: 1.7 },
+  snail: { name: '캐러멜 달팽이', emoji: '🐌', big: { hp: 1250, ad: 40 }, gold: 95, xp: 150, respawn: 120, color: '#e3b070', as: 0.45, ms: 3.5, ar: 40, on: { slow: 0.35, slowT: 1.5 } },
+  duck: { name: '퐁당 오리', emoji: '🦆', peace: true, big: { hp: 260, ad: 0 }, gold: 45, xp: 70, respawn: 150, first: 150, color: '#fff2a8', ms: 5.2, desc: '안 싸우고 도망쳐요. 잡으면 체력 · 마나가 차고 잠깐 빨라져요' },
+  // 벌레왕 넷: 다음에 무엇이 나올지 위에 보여요. 한 팀이 셋을 잡으면 왕관을 써요
+  bee: { name: '왕꿀벌', emoji: '🐝', epic: true, slot: 'bug', fly: 1.3, big: { hp: 3000, ad: 70 }, gold: 150, xp: 300, respawn: 240, first: 180, color: '#ffd23f', stack: 'bee', buff: '🍯 꿀의 힘: 팀 전체 공격력 · 주문력 +8% (경기 끝까지)', boss: { name: '독침 소나기', r: 4.2, cd: 6, delay: 1, dmg: 110, on: { slow: 0.3, slowT: 1.5 } } },
+  moth: { name: '달빛 나방', emoji: '🦋', epic: true, slot: 'bug', fly: 1.5, big: { hp: 2700, ad: 60 }, gold: 150, xp: 300, respawn: 240, first: 180, color: '#cfd8ff', stack: 'moth', buff: '🌙 달가루: 팀 전체 재사용 대기 8% 줄어요 (경기 끝까지)', boss: { name: '잠 가루', r: 5, cd: 7, delay: 1.1, dmg: 80, on: { silence: 1.5, slow: 0.25, slowT: 1.5 } } },
+  beetle: { name: '강철 장수벌레', emoji: '🪲', epic: true, slot: 'bug', big: { hp: 3400, ad: 80 }, gold: 150, xp: 300, respawn: 240, first: 180, color: '#4f6d8f', ar: 45, stack: 'beetle', buff: '🛡️ 강철 등딱지: 팀 전체 방어력 · 마법 저항 +10 (경기 끝까지)', boss: { name: '뿔 내려찍기', r: 3.6, cd: 7, delay: 1, dmg: 130, on: { stun: 0.8 } } },
+  firefly: { name: '불꽃 반딧불이', emoji: '🔥', epic: true, slot: 'bug', fly: 1.2, big: { hp: 2800, ad: 66 }, gold: 150, xp: 300, respawn: 240, first: 180, color: '#ffb347', stack: 'firefly', buff: '✨ 불꽃 꼬리: 팀 전체 이동 속도 +0.25, 초당 체력 회복 +2 (경기 끝까지)', boss: { name: '불꽃 터뜨리기', r: 4.6, cd: 6, delay: 0.9, dmg: 120 } },
+  // 큰 보스 · 맨 나중의 보스
+  mold: { name: '거대 곰팡이왕', emoji: '🍄', epic: true, slot: 'mold', big: { hp: 7000, ad: 130 }, gold: 300, xp: 500, respawn: 300, first: 480, color: '#b48aff', ar: 30, buff: '🍄 곰팡이왕의 축복: 2분 동안 공격력 · 주문력 +30, 함께 달리는 꼬마들이 튼튼해져요', boss: { name: '포자 구름', r: 6, cd: 6, delay: 1.2, dmg: 170, on: { slow: 0.45, slowT: 2 } } },
+  turtle: { name: '태고의 별 거북', emoji: '🐢', epic: true, slot: 'bug', big: { hp: 5200, ad: 170 }, gold: 350, xp: 600, respawn: 360, first: 900, color: '#6fb8a8', ar: 50, ms: 4.5, buff: '🌟 별가루: 2분 30초 동안 챔피언을 때리면 별가루가 타오르고, 체력 15% 아래면 바로 쓰러뜨려요', boss: { name: '땅 울리기', r: 8, cd: 7, delay: 1.3, dmg: 220, on: { knock: 0.7 } } },
 };
 
 // ---------- 레벨 ----------

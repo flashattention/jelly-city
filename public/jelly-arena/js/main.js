@@ -5,13 +5,13 @@ import { Shell, esc } from '../../shared/js/shell.js';
 import { store } from '../../shared/js/account.js';
 import { makeSound, confetti } from '../../shared/js/party.js';
 import { Roach } from '../../shared/js/roach.js';
-import { SIZE, CHAMPS, champById, ROLES, ROLE_IDS, ITEMS, BUILD, SPELLS, MONS, TEAMS, STRUCTS, R_LEVELS, FOUNTAIN, findPath } from './data.js';
+import { SIZE, CHAMPS, champById, ROLES, ROLE_IDS, ITEMS, BUILD, SPELLS, MONS, TEAMS, STRUCTS, R_LEVELS, FOUNTAIN, TOWER_RANGE, findPath } from './data.js';
 import { buildWorld, makeStruct, TC } from './world.js';
 
 const $ = (id) => document.getElementById(id);
 const S = makeSound('jellyarena');
 const touch = matchMedia('(pointer: coarse)').matches;
-const LV_KEY = 'jellyarena.level', PICK_KEY = 'jellyarena.pick', FIRST_KEY = 'jellyarena.seen', QUICK_KEY = 'jellyarena.quick';
+const LV_KEY = 'jellyarena.level', PICK_KEY = 'jellyarena.pick', FIRST_KEY = 'jellyarena.seen', QUICK_KEY = 'jellyarena.quick', CAM_KEY = 'jellyarena.cam';
 const game = window.arena = {
   mode: 'title', team: 'blue', me: null, myUnit: 0, roster: new Map(), level: store.get(LV_KEY) || 'normal', T: 0, sb: null, views: new Map(), shop: 'all',
   quick: store.get(QUICK_KEY) === '1', pred: null, pings: [], shake: 0, zoomT: 1, locked: true, zoom: 1, focus: new THREE.Vector3(-66, 0, 66), mouse: { x: 0, y: 0, in: false }, hover: null, aim: null, amove: false, picks: [], myPick: null, myRole: null,
@@ -25,7 +25,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1)); renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(36, 1, 1, 400);
-game.camera = camera; // 점검용
+game.camera = camera; game.scene = scene; // 점검용
 function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); const d = Math.min(2, devicePixelRatio || 1); ov.width = innerWidth * d; ov.height = innerHeight * d; ctx.setTransform(d, 0, 0, d, 0, 0); }
 addEventListener('resize', resize); resize();
 const W = buildWorld(scene);
@@ -49,17 +49,68 @@ function makeMinion(team, type) {
   if (type === 'super') { const h = new THREE.Mesh(G.cone, mat('#ffd76a')); h.position.y = 1.9; h.scale.setScalar(1.8); g.add(h); }
   g.userData.s = s; return g;
 }
+// 몬스터마다 모양이 다르다: 몸 · 얼굴 · 팔다리를 기본 도형으로 조립한다
 function makeMon(mid, big) {
-  const d = MONS[mid], g = new THREE.Group(), c = d.color, s = d.epic ? (mid === 'mold' ? 3 : 2.5) : big ? 1.35 : 0.8;
-  const body = new THREE.Mesh(G.sph, mat(c)); body.scale.set(0.85 * s, 0.75 * s, 0.95 * s); body.position.y = 0.78 * s; g.add(body); g.userData.body = body;
-  for (const x of [-1, 1]) { const e = new THREE.Mesh(G.eye, black); e.scale.setScalar(s); e.position.set(x * 0.3 * s, 1.02 * s, 0.76 * s); g.add(e); }
-  if (mid === 'wolves') for (const x of [-1, 1]) { const ear = new THREE.Mesh(G.cone, mat(c)); ear.scale.setScalar(s); ear.position.set(x * 0.42 * s, 1.5 * s, 0.1); g.add(ear); }
-  if (mid === 'frogs') for (const x of [-1, 1]) { const b = new THREE.Mesh(G.sph, mat(c)); b.scale.setScalar(0.28 * s); b.position.set(x * 0.36 * s, 1.34 * s, 0.4 * s); g.add(b); }
-  if (mid === 'golem') for (const x of [-1, 1]) { const a = new THREE.Mesh(G.box, mat('#c9b48a')); a.scale.set(0.45 * s, 0.9 * s, 0.45 * s); a.position.set(x * 1 * s, 0.7 * s, 0); g.add(a); }
-  if (mid === 'bee') { body.material = mat('#ffd23f'); for (let i = -1; i <= 1; i++) { const st = new THREE.Mesh(G.sph, black); st.scale.set(0.87 * s, 0.14 * s, 0.97 * s); st.position.y = 0.78 * s; st.rotation.x = 1.3; st.position.z = i * 0.34 * s; g.add(st); } g.userData.wings = [-1, 1].map((x) => { const w = new THREE.Mesh(G.sph, new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55 })); w.scale.set(0.9 * s, 0.1 * s, 0.45 * s); w.position.set(x * 0.95 * s, 1.5 * s, -0.2 * s); g.add(w); return w; }); body.position.y = 1.2 * s; }
-  if (mid === 'mold') { const cap = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10, 0, 6.3, 0, 1.7), mat('#8a5cd6')); cap.scale.set(1.5 * s, 1 * s, 1.5 * s); cap.position.y = 1.2 * s; g.add(cap); for (let i = 0; i < 6; i++) { const a = i * 1.05, dot = new THREE.Mesh(G.sph, mat('#ffe9ff')); dot.scale.setScalar(0.17 * s); dot.position.set(Math.cos(a) * 0.95 * s, 1.75 * s, Math.sin(a) * 0.95 * s); g.add(dot); } }
-  g.userData.s = s; return g;
+  const d = MONS[mid], g = new THREE.Group(), c = d.color, s = d.epic ? ({ mold: 3, turtle: 3.1, beetle: 2.6 }[mid] || 2.4) : mid === 'snail' ? 1.6 : big ? 1.35 : 0.8;
+  const add = (geo, m, x, y, z, sx = 1, sy = sx, sz = sx, rx = 0, ry = 0, rz = 0, to = g) => { const o = new THREE.Mesh(geo, m); o.position.set(x * s, y * s, z * s); o.scale.set(sx * s, sy * s, sz * s); o.rotation.set(rx, ry, rz); to.add(o); return o; };
+  const body = (sx, sy, sz, y, z = 0, m = mat(c)) => { const o = add(G.sph, m, 0, y, z, sx, sy, sz); g.userData.body = o; return o; };
+  const eyes = (x, y, z, k = 1) => { for (const q of [-1, 1]) add(G.eye, black, q * x, y, z, k); };
+  const legs = (n, x, y, z0, dz, m = mat('#3a3040'), L = 0.5) => { for (let i = 0; i < n; i++) for (const q of [-1, 1]) add(G.box, m, q * x, y, z0 + i * dz, L, 0.09, 0.09, 0, 0, q * -0.5); };
+  const wings = (m, w, h, x, y, z, rest = 0) => { g.userData.wings = [-1, 1].map((q) => { const p = new THREE.Group(); p.position.set(q * x * s, y * s, z * s); g.add(p); add(G.sph, m, q * w * 0.5, 0, 0, w * 0.5, 0.04, h, 0, 0, 0, p); p.userData.q = q; p.userData.rest = rest; return p; }); };
+  const shine = (col) => new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false });
+  const glow = (col) => new THREE.MeshBasicMaterial({ color: col });
+  if (mid === 'wolves') {
+    body(0.55, 0.5, 0.95, 0.72); add(G.sph, mat(c), 0, 1.02, 0.85, 0.45); add(G.cone, mat('#f2e6ff'), 0, 0.92, 1.3, 0.55, 0.9, 0.55, 1.57); eyes(0.2, 1.14, 1.16);
+    for (const q of [-1, 1]) { add(G.cone, mat(c), q * 0.26, 1.5, 0.8, 0.75, 1.1, 0.75); for (const z of [-0.55, 0.55]) add(G.box, mat(c), q * 0.32, 0.25, z, 0.2, 0.5, 0.2); }
+    add(G.sph, mat('#f2e6ff'), 0, 1.05, -1.05, 0.28, 0.28, 0.6, 0.7);
+  } else if (mid === 'frogs') {
+    body(1, 0.58, 0.9, 0.55); add(G.box, black, 0, 0.5, 0.86, 0.95, 0.06, 0.06); for (const q of [-1, 1]) { add(G.sph, mat(c), q * 0.48, 1.08, 0.42, 0.3); add(G.eye, black, q * 0.5, 1.14, 0.68, 1); add(G.sph, mat('#5ab86c'), q * 0.9, 0.2, -0.25, 0.42, 0.2, 0.62); add(G.sph, mat('#5ab86c'), q * 0.72, 0.14, 0.72, 0.28, 0.13, 0.36); }
+  } else if (mid === 'golem') {
+    const r = mat(c, { flatShading: true }), r2 = mat('#c9b48a', { flatShading: true }); const ico = new THREE.IcosahedronGeometry(1, 0);
+    g.userData.body = add(ico, r, 0, 0.95, 0, 0.82, 0.8, 0.7); add(ico, r2, 0, 1.72, 0.15, 0.42, 0.38, 0.4); eyes(0.15, 1.78, 0.5, 0.9);
+    for (const q of [-1, 1]) { add(ico, r2, q * 0.98, 1.05, 0.1, 0.36); add(ico, r, q * 1.08, 0.48, 0.2, 0.42, 0.5, 0.42); add(ico, r2, q * 0.38, 0.22, 0, 0.32, 0.26, 0.32); }
+  } else if (mid === 'crab') {
+    body(1, 0.42, 0.72, 0.62); legs(3, 1.05, 0.36, -0.45, 0.4, mat('#d9654e'), 0.72);
+    for (const q of [-1, 1]) { add(G.box, mat('#ffb3a0'), q * 0.28, 1.05, 0.5, 0.06, 0.4, 0.06); add(G.sph, mat('#ffffff'), q * 0.28, 1.28, 0.5, 0.13); add(G.eye, black, q * 0.28, 1.3, 0.6, 0.55); add(G.sph, mat('#ff6a50'), q * 1.15, 0.78, 0.72, 0.42, 0.3, 0.46); add(G.cone, mat('#ffd2c6'), q * 1.02, 0.84, 1.12, 0.55, 0.8, 0.55, 1.57); add(G.cone, mat('#ffd2c6'), q * 1.3, 0.8, 1.12, 0.55, 0.8, 0.55, 1.57); }
+  } else if (mid === 'bats') {
+    body(0.42, 0.42, 0.42, 0.9); eyes(0.15, 1, 0.34, 0.7); for (const q of [-1, 1]) add(G.cone, mat(c), q * 0.2, 1.38, 0, 0.5, 0.75, 0.5); add(G.cone, mat('#ffffff'), 0.07, 0.75, 0.38, 0.12, 0.25, 0.12, 3.14); add(G.cone, mat('#ffffff'), -0.07, 0.75, 0.38, 0.12, 0.25, 0.12, 3.14);
+    wings(mat('#4e3a5c'), 1.25, 0.5, 0.3, 0.95, 0, 0.25);
+  } else if (mid === 'snail') {
+    body(0.55, 0.32, 1.15, 0.32, 0.1); add(G.sph, mat(c), 0, 0.72, 1.05, 0.34); eyes(0.14, 0.82, 1.32, 0.9);
+    for (const q of [-1, 1]) { add(G.box, mat(c), q * 0.17, 1.2, 1.12, 0.05, 0.5, 0.05, 0.2); add(G.sph, mat('#fff1d0'), q * 0.17, 1.46, 1.17, 0.07); }
+    const tor = (r, y, z, m) => add(new THREE.TorusGeometry(r, r * 0.42, 8, 18), m, 0, y, z, 1, 1, 1, 0, 1.57, 0);
+    tor(0.62, 1, -0.2, mat('#a85f2e')); tor(0.38, 1, -0.2, mat('#d68a48')); add(G.sph, mat('#f3c07a'), 0, 1, -0.2, 0.2);
+  } else if (mid === 'duck') {
+    body(0.55, 0.45, 0.7, 0.45); add(G.sph, mat(c), 0, 0.95, 0.45, 0.33); eyes(0.14, 1.02, 0.7); add(G.sph, mat('#ff9d3f'), 0, 0.9, 0.8, 0.17, 0.07, 0.2); add(G.cone, mat(c), 0, 0.68, -0.72, 0.8, 0.8, 0.8, -1); for (const q of [-1, 1]) add(G.sph, mat('#ffe680'), q * 0.52, 0.5, -0.05, 0.1, 0.25, 0.4);
+  } else if (mid === 'bee') {
+    body(0.72, 0.68, 0.98, 0.9, 0, mat('#ffd23f')); for (const z of [-0.42, 0, 0.4]) add(G.sph, black, 0, 0.9, z, 0.73 * Math.cos(z), 0.69 * Math.cos(z), 0.13); add(G.sph, mat('#ffcb2e'), 0, 1.05, 0.95, 0.42); eyes(0.2, 1.15, 1.26, 1.2); add(G.cone, black, 0, 0.88, -1.1, 0.75, 1, 0.75, -1.57);
+    for (const q of [-1, 1]) add(G.box, black, q * 0.2, 1.55, 1, 0.04, 0.5, 0.04, 0.4, 0, q * -0.4);
+    wings(shine('#ffffff'), 1.1, 0.42, 0.35, 1.45, -0.15, 0.35);
+  } else if (mid === 'moth') {
+    body(0.3, 0.3, 0.85, 1, 0, mat('#efeaff')); add(G.sph, mat('#ffffff'), 0, 1.08, 0.78, 0.3); eyes(0.16, 1.16, 0.98, 1); for (const q of [-1, 1]) add(G.cone, mat('#fff3b0'), q * 0.2, 1.42, 0.92, 0.4, 1, 0.4, 0.4, 0, q * -0.5);
+    wings(shine('#bfc9ff'), 1.7, 0.85, 0.2, 1.1, 0, 0.15); for (const p of g.userData.wings) { add(G.sph, glow('#fff3b0'), p.userData.q * 1.05, 0.05, 0.25, 0.22, 0.03, 0.22, 0, 0, 0, p); add(G.sph, glow('#7f8cff'), p.userData.q * 0.65, 0.05, -0.3, 0.15, 0.03, 0.15, 0, 0, 0, p); }
+  } else if (mid === 'beetle') {
+    const m = mat(c, { emissive: '#16283c' }); body(0.98, 0.62, 1.15, 0.72, -0.1, m); add(G.box, black, 0, 1.12, -0.15, 0.04, 0.05, 1.8); add(G.sph, mat('#2f445c'), 0, 0.68, 1, 0.46, 0.4, 0.4); eyes(0.26, 0.76, 1.3, 1.1); legs(3, 1.05, 0.28, -0.6, 0.55, mat('#26364a'), 0.8);
+    add(G.cone, mat('#8fb2d4'), 0, 1.1, 1.55, 1.1, 1.6, 1.1, 1.2); add(G.cone, mat('#8fb2d4'), 0, 1.55, 1.05, 0.7, 1, 0.7, 0.6);
+  } else if (mid === 'firefly') {
+    add(G.sph, mat('#5a3a2a'), 0, 1, 0.3, 0.42, 0.42, 0.62); add(G.sph, mat('#ffcf6b'), 0, 1.1, 0.85, 0.32); eyes(0.15, 1.18, 1.1, 1); const tail = add(G.sph, glow('#ffb347'), 0, 0.95, -0.6, 0.55, 0.52, 0.72); g.userData.body = tail; g.userData.glow = tail; for (const q of [-1, 1]) add(G.box, mat('#5a3a2a'), q * 0.14, 1.5, 0.95, 0.03, 0.45, 0.03, 0.5, 0, q * -0.45);
+    wings(shine('#ffe7b0'), 1, 0.36, 0.3, 1.32, 0.15, 0.4);
+  } else if (mid === 'mold') {
+    add(new THREE.CylinderGeometry(0.42, 0.62, 1, 12), mat('#efe3d0'), 0, 0.55, 0, 1); eyes(0.2, 0.72, 0.42, 1.4);
+    const cap = add(new THREE.SphereGeometry(1, 18, 10, 0, 6.3, 0, 1.65), mat('#8a5cd6'), 0, 0.95, 0, 1.3, 0.95, 1.3); g.userData.body = cap;
+    for (let i = 0; i < 9; i++) { const a = i * 0.7, r = i % 3 === 0 ? 0.42 : 0.98; add(G.sph, glow('#ffe9ff'), Math.cos(a) * r, 0.95 + Math.sqrt(Math.max(0, 1 - (r / 1.3) ** 2)) * 0.95, Math.sin(a) * r, i % 3 === 0 ? 0.17 : 0.13); }
+    for (const [x, z, k] of [[0.95, 0.7, 0.3], [-1, 0.5, 0.36], [0.75, -0.9, 0.42], [-0.7, -0.95, 0.28]]) { add(new THREE.CylinderGeometry(0.12, 0.18, 1, 8), mat('#efe3d0'), x, 0.5 * k, z, k * 1.2, k, k * 1.2); add(new THREE.SphereGeometry(1, 10, 6, 0, 6.3, 0, 1.6), mat('#b48aff'), x, k * 0.9, z, k * 0.75, k * 0.55, k * 0.75); }
+  } else if (mid === 'turtle') {
+    const shell = add(new THREE.SphereGeometry(1, 18, 10, 0, 6.3, 0, 1.6), mat('#3f7f78', { flatShading: true }), 0, 0.45, -0.05, 1.25, 0.95, 1.4); g.userData.body = shell; add(new THREE.CylinderGeometry(1.28, 1.2, 0.18, 18), mat('#d9c98e'), 0, 0.45, -0.05, 1, 1, 1.12);
+    add(G.sph, mat(c), 0, 0.72, 1.45, 0.42, 0.38, 0.5); eyes(0.2, 0.84, 1.8, 1.2); for (const qx of [-1, 1]) for (const qz of [-1, 1]) add(G.sph, mat(c), qx * 1, 0.25, qz * 0.9, 0.34, 0.26, 0.44);
+    const star = new THREE.OctahedronGeometry(1, 0), ge = glow('#fff3a0'); add(star, ge, 0, 1.55, -0.05, 0.28); for (let i = 0; i < 6; i++) { const a = i * 1.047; add(star, ge, Math.cos(a) * 0.8, 1.14, -0.05 + Math.sin(a) * 0.92, 0.14); }
+  } else { body(0.85, 0.75, 0.95, 0.78); eyes(0.3, 1.02, 0.76, 1); }
+  g.userData.s = s; g.userData.flyY = (d.fly || 0) * (d.epic ? s * 0.5 : 1);
+  if (g.userData.body) { g.userData.by = g.userData.body.position.y; g.userData.bsy = g.userData.body.scale.y; }
+  if (d.boss || mid === 'firefly') { const a = ringOf(c, 0.55); a.scale.setScalar(s * 1.05); a.position.y = 0.06 - g.userData.flyY; g.add(a); }
+  return g;
 }
+game.makeMon = makeMon; // 점검용
 function makeChampView(u, r) {
   const def = champById(r.champ);
   const bear = new Roach({ own: true, seed: r.name, color: def.color, age: 25, look: { ...(r.look || {}), hat: 0, face: 0, outfit: 0, extra: 0 }, accessories: def.acc || [] });
@@ -115,11 +166,14 @@ function feed(html, team) { const d = document.createElement('div'); d.className
 const view = (id) => game.views.get(id);
 function onSnapshot(m) {
   game.T = m.T;
+  // 스냅샷 간격을 재서 그 시간 동안 일정한 속도로 움직인다
+  const nowS = performance.now(); if (game.snapAt) game.snapD = Math.max(70, Math.min(220, (game.snapD || 100) * 0.8 + (nowS - game.snapAt) * 0.2)); game.snapAt = nowS;
+  const myFace = nowS < (game.faceUntil || 0);
   const seen = new Set();
   for (const u of m.u) {
     const v = viewFor(u); if (!v) continue;
-    seen.add(u[0]); v.tx = u[3]; v.tz = u[4]; v.hp = u[5]; v.max = u[6]; v.u = u;
-    if (u[1] === 0) { v.mp = u[7]; v.mpMax = u[8]; v.lv = u[9]; v.f = u[10]; v.sh = u[11]; v.tface = u[12]; v.o.visible = true; v.ring.visible = true; }
+    seen.add(u[0]); v.tx = u[3]; v.tz = u[4]; v.hp = u[5]; v.max = u[6]; v.u = u; v.iT = nowS; v.iP = 0;
+    if (u[1] === 0) { v.mp = u[7]; v.mpMax = u[8]; v.lv = u[9]; v.f = u[10]; v.sh = u[11]; if (!(u[0] === game.myUnit && (myFace || game.pred))) v.tface = u[12]; v.o.visible = true; v.ring.visible = true; }
     else if (u[1] === 1) { v.tface = u[8]; }
     else if (u[1] === 3) { v.tface = u[9]; }
     else if (u[1] === 2) { v.invuln = !!u[9]; v.lastHp = u[5]; }
@@ -133,7 +187,7 @@ function onEvent(e) {
     case 'cast': { const v = view(e.id); if (v?.bear) v.bear.cast?.(); if (v) { v.faceHold = 0.35; v.tface = v.face = Math.atan2(e.x - v.x, e.z - v.z); } break; }
     case 'shot': addShot(e); if (near(e.x, e.z) > 0.2) S.sfx('zap'); break;
     case 'pop': { const s = shots.get(e.id); if (s) { scene.remove(s.m); shots.delete(e.id); } spark(e.x, 1.2, e.z, e.col, 2.2, 0.25); break; }
-    case 'aoe': { const f = ringFx(e.x, e.z, e.r, e.col, e.d, 0.12); f.kind = 'charge'; break; }
+    case 'aoe': { const f = ringFx(e.x, e.z, e.r, e.col, e.d, 0.12); f.kind = 'charge'; if (e.boss) { floatText(e.x, 3.6, e.z, `⚠️ ${e.boss}`, '#ffd76a', true); if (near(e.x, e.z) > 0.2) S.sfx('boss'); const v = view(e.id); if (v) v.lunge = 0.14; } break; }
     case 'boom': boom(e.x, e.z, e.r, e.col); if (near(e.x, e.z) > 0.2) S.sfx('boom'); break;
     case 'nova': boom(e.x, e.z, e.r, e.col); if (near(e.x, e.z) > 0.2) S.sfx('boom'); break;
     case 'cone': { const a = Math.atan2(e.fx, e.fz); for (let i = -2; i <= 2; i++) for (let d = 2; d <= e.r; d += 2.2) { const b = a + i * Math.acos(e.arc) / 2.2, f = spark(e.x + Math.sin(b) * d, 1, e.z + Math.cos(b) * d, e.col, 2.1, 0.3 + d * 0.012); f.delay = d * 0.012; } break; }
@@ -143,7 +197,7 @@ function onEvent(e) {
     case 'blink': if (Math.hypot(e.x - (view(game.myUnit)?.x ?? 1e9), e.z - (view(game.myUnit)?.z ?? 1e9)) < 2) { game.pred = null; const mv = view(game.myUnit); mv.x = mv.tx = e.tx; mv.z = mv.tz = e.tz; } spark(e.x, 1, e.z, e.col, 3, 0.35); spark(e.tx, 1, e.tz, e.col, 3, 0.35); { for (let i = 0; i < 5; i++) { const k = i / 5; spark(e.x + (e.tx - e.x) * k, 1, e.z + (e.tz - e.z) * k, e.col, 1.4, 0.3); } } if (near(e.x, e.z) > 0.2) S.sfx('zap'); break;
     case 'hit': { const a = view(e.id), b = view(e.to); if (b) { spark(b.x, 1.2, b.z, e.col, 3.5, 0.3); grow(b.x, b.z, 1.8, e.col, 0.3); } if (a?.bear) a.bear.attack('melee'); break; }
     case 'buff': { const v = view(e.id); if (v) { grow(v.x, v.z, 2.2, e.col, 0.5); if (e.ic) floatText(v.x, 3, v.z, e.ic, '#fff', true); } break; }
-    case 'cc': { const v = view(e.to); if (v) { floatText(v.x, 3.2, v.z, e.c === 'stun' ? '💫' : e.c === 'knock' ? '🌀' : '🌿', '#fff', true); if (e.c === 'knock') v.airT = e.d; } break; }
+    case 'cc': { const v = view(e.to); if (v) { floatText(v.x, 3.2, v.z, e.c === 'stun' ? '💫' : e.c === 'knock' ? '🌀' : e.c === 'star' ? '🌟' : '🌿', '#fff', true); if (e.c === 'knock') v.airT = e.d; } break; }
     case 'smite': spark(e.x, 3, e.z, '#ffe066', 7, 0.3); grow(e.x, e.z, 3, '#ffe066', 0.3); S.sfx('zap'); break;
     case 'ignite': { const v = view(e.to); if (v) { spark(v.x, 1.5, v.z, '#ff7a3c', 3, 0.5); floatText(v.x, 3, v.z, '🔥', '#fff', true); } break; }
     case 'dmg': { const v = view(e.to); if (!v) break; if (e.ty !== 'heal') { v.hurtT = 0.13; if (v.bear) v.bear.hurt?.(); } const mine = e.by === game.myUnit || e.to === game.myUnit; if (!mine && e.ty !== 'heal') break; floatText(v.x + (Math.random() - 0.5), v.k === 0 ? 2.7 : 1.9, v.z, e.ty === 'heal' ? `+${e.n}` : `${e.n}${e.crit ? '!' : ''}`, e.ty === 'heal' ? '#7fe08a' : e.to === game.myUnit ? '#ff6b6b' : e.ty === 'magic' ? '#c79bff' : e.ty === 'true' ? '#ffffff' : '#ffb36b', e.crit); if (e.to === game.myUnit && e.n > 20) S.sfx('hurt'); break; }
@@ -172,7 +226,7 @@ function onEvent(e) {
       banner(ours ? `😱 우리 ${nm}이 무너졌어요` : `🎉 적 ${nm} 파괴!`, `${e.by}`, 2200); feed(`🗼 ${esc(nm)} 파괴`, e.team === 'blue' ? 'red' : 'blue'); break;
     }
     case 'epic': { const ours = e.team === game.team; banner(`${e.icon} ${ours ? '우리 팀이' : '상대 팀이'} ${e.name} 처치!`, e.buff, 3600); feed(`${e.icon} ${TEAMS[e.team].name} 처치`, e.team); S.sfx('boss'); break; }
-    case 'epicUp': banner(`${e.icon} ${e.name} 등장!`, '강가에 나타났어요', 2200); S.sfx('boss'); break;
+    case 'epicUp': banner(`${e.icon} ${e.name} 등장!`, '강가에 나타났어요. 잡으면 팀 전체가 강해져요', 2600); S.sfx('boss'); break;
     case 'ping': { const c = e.c === 'danger' ? '#ff5a7a' : '#7fe08a'; ringFx(e.x, e.z, 3, c, 1.6, 0.12); game.pings.push({ x: e.x, z: e.z, c, at: performance.now() }); S.sfx('tick'); feed(`📍 ${esc(e.by)}`, game.team); break; }
     case 'recap': if (e.id === game.myUnit) $('recap').innerHTML = e.list.map((l) => `<div><span>${esc(l.name)}</span><b>${l.phys + l.magic + l.tru}</b></div>`).join(''); break;
     case 'over': break;
@@ -248,7 +302,8 @@ function onMe(m) {
   if (ss !== game.statSig) { game.statSig = ss; $('b-stats').innerHTML = [['⚔️', m.st.ad, '공격력'], ['🔮', m.st.ap, '주문력'], ['🛡️', m.st.ar, '방어력'], ['🌀', m.st.mr, '마법 저항'], ['⚡', m.st.as, '공격 속도'], ['👟', m.st.ms, '이동 속도']].map(([a, b, n]) => `<span title="${n}">${a} ${b}</span>`).join(''); }
   $('n-pot').textContent = m.pot; $('n-ward').textContent = m.wards;
   $('dead').classList.toggle('hidden', m.alive); if (!m.alive) { $('dead-t').textContent = m.resp; game.pred = null; }
-  if (m.tg) game.pred = null; // 공격 대상을 쫓는 동안은 서버 길을 따른다
+  // 공격 대상을 쫓는 동안은 서버 길을 따른다. 단, 방금 낸 이동 명령이 아직 서버에 안 닿았을 수 있으니 바로 지우지 않는다
+  if (m.tg && game.pred && !game.pred.chase && performance.now() - game.pred.at > 350) game.pred = null;
   renderTarget();
   if (!$('shop').classList.contains('hidden') && (performance.now() - meT > 400)) { meT = performance.now(); renderShop(); }
 }
@@ -264,7 +319,7 @@ function onScore(m) {
   game.sb = m;
   $('s-kb').textContent = m.kills.blue; $('s-kr').textContent = m.kills.red; $('s-tb').textContent = m.towers.blue; $('s-tr').textContent = m.towers.red;
   const mine = m.list.find((x) => x.id === game.myUnit); if (mine) { $('s-kda').textContent = `⚔️ ${mine.k}/${mine.d}/${mine.a}`; $('s-cs').textContent = `🌾 ${mine.cs}`; }
-  $('h-epic').innerHTML = m.camps.map((c) => `<span>${MONS[c.id].emoji} ${c.up ? '등장!' : `${Math.floor(c.inS / 60)}:${String(c.inS % 60).padStart(2, '0')}`}</span>`).join('') + (m.honey[game.team] ? `<span>🍯×${m.honey[game.team]}</span>` : '') + (m.mold[game.team] ? '<span>🍄 축복</span>' : '');
+  $('h-epic').innerHTML = m.camps.map((c) => `<span>${MONS[c.id].emoji} ${c.up ? '등장!' : `${Math.floor(c.inS / 60)}:${String(c.inS % 60).padStart(2, '0')}`}</span>`).join('') + m.buffs[game.team].map((b) => `<span class="buf">${b.ic}${b.n ? `×${b.n}` : ''}${b.s ? ` ${Math.floor(b.s / 60)}:${String(b.s % 60).padStart(2, '0')}` : ''}</span>`).join('');
   if (!$('board').classList.contains('hidden')) renderBoard();
 }
 function row(x) { const c = champById(x.champ); return `<div class="bd-row${x.id === game.myUnit ? ' me' : ''}${x.alive ? '' : ' dead'}"><span>${ROLES[x.role]?.icon || ''}</span><span>${c.emoji}</span><span>${esc(x.name)}${x.alive ? '' : ` (${x.resp})`}</span><span>${x.lv}</span><span>${x.k}/${x.d}/${x.a}</span><span>🌾${x.cs}</span><span>${x.items.map((i) => ITEMS[i].icon).join(' ')}</span></div>`; }
@@ -304,7 +359,7 @@ function unitUnder(mx, my, friendly = false) {
   for (const v of game.views.values()) {
     if (v.ward) continue;
     const isFoe = v.team !== game.team; if (!friendly && !isFoe) continue; if (friendly && (v.k !== 0)) continue; if (champOnly && v.k !== 0) continue;
-    const y = v.k === 0 ? 1.1 : v.k === 2 ? 2.5 : 0.8, s = toScreen(v.o.position.x, y, v.o.position.z), R = (v.k === 0 ? (champOnly ? 70 : 36) : v.k === 2 ? 50 : v.k === 3 ? (v.big ? 36 : 22) * (MONS[v.mid]?.epic ? 1.9 : 1) : 20) / game.zoom, d = Math.hypot(s.x - mx, s.y - my);
+    const y = v.k === 0 ? 1.1 : v.k === 2 ? 2.5 : 0.8 + (v.o.userData.flyY || 0), s = toScreen(v.o.position.x, y, v.o.position.z), R = (v.k === 0 ? (champOnly ? 70 : 36) : v.k === 2 ? 50 : v.k === 3 ? (v.big ? 36 : 22) * (MONS[v.mid]?.epic ? 1.9 : 1) : 20) / game.zoom, d = Math.hypot(s.x - mx, s.y - my);
     if (d < R && d - (v.k === 0 ? 4 : 0) < bd) { bd = d - (v.k === 0 ? 4 : 0); best = v; }
   }
   return best;
@@ -312,12 +367,15 @@ function unitUnder(mx, my, friendly = false) {
 function mouseGround() { return groundAt(game.mouse.x, game.mouse.y) || { x: 0, z: 0 }; }
 function moveOrAttack(mx, my, marker = true) {
   const u = unitUnder(mx, my);
-  if (u && !(u.k === 2 && u.invuln)) { shell.send({ t: 'atk', id: u.id }); ringPing(u.o.position.x, u.o.position.z, '#ff5a7a'); return; }
+  if (u && !(u.k === 2 && u.invuln)) { shell.send({ t: 'atk', id: u.id }); ringPing(u.o.position.x, u.o.position.z, '#ff5a7a'); predictChase(u); return; }
   const g = groundAt(mx, my); if (!g) return;
   shell.send({ t: 'mv', x: g.x, z: g.z }); predict(g.x, g.z); if (marker) ringPing(g.x, g.z, '#7fe08a');
 }
 // 내 곰돌이는 서버 답을 기다리지 않고 바로 움직인다 (클릭이 씹힌 느낌 없게). 어긋나면 서버 쪽으로 맞춘다
 function predict(x, z) { const me = view(game.myUnit); if (!me || !game.me?.alive || me.f & 3 || me.f & 32) return; const p = findPath(me.x, me.z, x, z); game.pred = p.length ? { path: p, at: performance.now() } : null; }
+// 공격 클릭: 먼 대상이면 서버 답을 기다리지 않고 그쪽으로 걷기 시작, 가까우면 바로 돌아본다
+function predictChase(u) { const me = view(game.myUnit); if (!me || !game.me?.alive || me.f & 3 || me.f & 32) return; faceTo(me, u.x, u.z); const reach = (game.me.st.range || 2) + (u.k === 2 ? 1.6 : 0.6); if (Math.hypot(u.x - me.x, u.z - me.z) <= reach) { game.pred = null; return; } const p = findPath(me.x, me.z, u.x, u.z); game.pred = p.length ? { path: p, at: performance.now(), chase: u.id, reach } : null; }
+function faceTo(me, x, z) { me.tface = Math.atan2(x - me.x, z - me.z); game.faceUntil = performance.now() + 260; }
 function ringPing(x, z, c) { const f = ringFx(x, z, 1, c, 0.35, 0); f.kind = 'shrink'; }
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 // 화면 밀기는 커서가 진짜 게임 화면 위에 있을 때만 (미니맵 · 조작판 위에서는 안 밀린다)
@@ -361,6 +419,7 @@ function castAt(s, auto) {
     if (m.sil) return refuse(s, '침묵 중이에요');
   } else if ((m.cds[s] || 0) > 0.3) return refuse(s, `${Math.ceil(m.cds[s])}초 남았어요`);
   S.sfx('swish');
+  { const v = view(game.myUnit), a = mouseGround(); if (v && !(game.def?.skills[s]?.kind === 'buff') && KEYS_SK.includes(s)) faceTo(v, a.x, a.z); }
   let g = mouseGround(), id = 0;
   const me = view(game.myUnit);
   const spec = KEYS_SK.includes(s) ? game.def.skills[s] : null;
@@ -388,7 +447,7 @@ addEventListener('keydown', (e) => {
     case 'KeyB': toggleShop(); break;
     case 'Digit1': shell.send({ t: 'potion' }); break;
     case 'Digit4': { const g = mouseGround(); shell.send({ t: 'ward', x: g.x, z: g.z }); break; }
-    case 'KeyY': setLock(!game.locked); break;
+    case 'KeyY': setLock(!game.locked, true); break;
     case 'KeyM': muteBtn(); break;
     case 'Space': { e.preventDefault(); const me = view(game.myUnit); if (me) game.focus.set(me.x, 0, me.z); break; }
     case 'Escape': if (!$('shop').classList.contains('hidden')) toggleShop(false); else if (!$('help').classList.contains('hidden')) $('help').classList.add('hidden'); game.aim = null; game.amove = false; document.body.style.cursor = ''; break;
@@ -400,19 +459,57 @@ addEventListener('keyup', (e) => {
   const sk = { KeyQ: 'q', KeyW: 'w', KeyE: 'e', KeyR: 'r' }[e.code];
   if (sk && game.aim === sk && !game.aimCancel) { castAt(sk); game.aim = null; }
 });
-function setLock(v) { game.locked = v; $('b-lock').textContent = v ? '🔒' : '🔓'; }
-$('b-lock').onclick = () => setLock(!game.locked);
+function setLock(v, keep) { game.locked = v; $('b-lock').textContent = v ? '🔒' : '🔓'; if (keep) store.set(CAM_KEY, v ? '1' : '0'); }
+$('b-lock').onclick = () => setLock(!game.locked, true);
 function muteBtn() { S.toggleMute(); $('b-mute').textContent = S.sound.muted ? '🔇' : '🔊'; shell.syncSound?.(); }
 $('b-mute').onclick = muteBtn; $('b-mute').textContent = S.sound.muted ? '🔇' : '🔊';
 $('b-help').onclick = () => $('help').classList.toggle('hidden'); $('help-close').onclick = () => $('help').classList.add('hidden');
 addEventListener('beforeunload', (e) => { if (game.mode === 'play') { e.preventDefault(); e.returnValue = ''; } }); // 실수로 탭을 닫지 않게
-$('b-quit').onclick = () => { if (confirm('경기를 그만둘까요? (내 자리는 봇이 이어 가요)')) { shell.send({ t: 'leave' }); toTitle(); } };
+$('b-quit').onclick = () => { if (isLocked()) document.exitPointerLock(); if (confirm('경기를 그만둘까요? (내 자리는 봇이 이어 가요)')) { shell.send({ t: 'leave' }); toTitle(); } };
 // 미니맵: 왼쪽 클릭 = 그쪽 보기 · 오른쪽 클릭 = 이동
 const miniPos = (e) => { const r = mini.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * SIZE * 2 - SIZE, z: ((e.clientY - r.top) / r.height) * SIZE * 2 - SIZE }; };
 mini.addEventListener('contextmenu', (e) => e.preventDefault());
 mini.addEventListener('pointerdown', (e) => { const p = miniPos(e); if (e.button === 2) { shell.send({ t: 'mv', x: p.x, z: p.z }); return; } setLock(false); game.focus.set(p.x, 0, p.z); game.miniDrag = true; });
 mini.addEventListener('pointermove', (e) => { if (game.miniDrag) { const p = miniPos(e); game.focus.set(p.x, 0, p.z); } });
 addEventListener('pointerup', () => { game.miniDrag = false; });
+
+// ---------- 마우스 가두기: 경기 중에는 커서가 게임 화면 밖으로 못 나간다 ----------
+//   브라우저에는 커서를 창 안에 묶는 기능이 없어서, 진짜 커서를 잠그고(Pointer Lock) 직접 그린 커서를 움직인다.
+//   잠겨 있는 동안 마우스 입력은 모두 캔버스로만 오므로, 내 커서 아래 요소로 다시 보내 평소 코드가 그대로 돌게 한다
+const vcur = $('vcur'), vm = { x: innerWidth / 2, y: innerHeight / 2, hov: null, down: {} };
+const isLocked = () => document.pointerLockElement === canvas;
+function lockMouse(x, y) { if (touch || game.mode !== 'play' || isLocked() || !canvas.requestPointerLock) return; if (x != null) { vm.x = x; vm.y = y; } try { canvas.requestPointerLock()?.catch?.(() => {}); } catch { /* 잠시 뒤 다음 클릭에 다시 */ } }
+const paintCur = () => { vcur.style.transform = `translate(${vm.x}px, ${vm.y}px)`; };
+const fireAt = (el, type, Ctor, src, extra) => el.dispatchEvent(new Ctor(type, { bubbles: type !== 'mouseenter' && type !== 'mouseleave', cancelable: true, composed: true, view: window, clientX: vm.x, clientY: vm.y, screenX: vm.x, screenY: vm.y, button: src.button ?? 0, buttons: src.buttons ?? 0, altKey: src.altKey, ctrlKey: src.ctrlKey, shiftKey: src.shiftKey, metaKey: src.metaKey, movementX: src.movementX || 0, movementY: src.movementY || 0, pointerId: 1, pointerType: 'mouse', isPrimary: true, ...extra }));
+const underCur = () => document.elementFromPoint(vm.x, vm.y) || canvas;
+const hoverBox = (el) => el?.closest?.('button, .it, .ch');
+function hoverTo(el, src) {
+  const old = vm.hov; if (el === old) return; vm.hov = el;
+  if (old?.isConnected) { fireAt(old, 'mouseout', MouseEvent, src, { relatedTarget: el }); for (let n = old; n && !n.contains(el); n = n.parentElement) fireAt(n, 'mouseleave', MouseEvent, src, { relatedTarget: el }); }
+  fireAt(el, 'mouseover', MouseEvent, src, { relatedTarget: old }); for (let n = el; n && !n.contains(old); n = n.parentElement) fireAt(n, 'mouseenter', MouseEvent, src, { relatedTarget: old });
+  hoverBox(old)?.classList.remove('vh'); hoverBox(el)?.classList.add('vh');
+}
+const REDIR = {
+  mousemove(e) { vm.x = Math.max(0, Math.min(innerWidth - 1, vm.x + e.movementX)); vm.y = Math.max(0, Math.min(innerHeight - 1, vm.y + e.movementY)); paintCur(); const el = underCur(); hoverTo(el, e); fireAt(el, 'pointermove', PointerEvent, e); fireAt(el, 'mousemove', MouseEvent, e); },
+  mousedown(e) { const el = underCur(); hoverTo(el, e); vm.down[e.button] = el; fireAt(el, 'pointerdown', PointerEvent, e); fireAt(el, 'mousedown', MouseEvent, e); },
+  mouseup(e) { const el = underCur(), d = vm.down[e.button]; vm.down[e.button] = null; fireAt(el, 'pointerup', PointerEvent, e); fireAt(el, 'mouseup', MouseEvent, e); if (e.button === 0 && d) { const c = d.contains(el) ? d : el.contains(d) ? el : null; if (c) fireAt(c, 'click', MouseEvent, e); } if (e.button === 2) fireAt(el, 'contextmenu', MouseEvent, e); },
+  wheel(e) { const el = underCur(); if (el === canvas) { fireAt(el, 'wheel', WheelEvent, e, { deltaY: e.deltaY, deltaMode: e.deltaMode }); return; } for (let n = el; n && n !== document.body; n = n.parentElement) if (n.scrollHeight > n.clientHeight && getComputedStyle(n).overflowY !== 'visible') { n.scrollTop += e.deltaMode ? e.deltaY * 30 : e.deltaY; break; } },
+};
+for (const t of ['pointermove', 'pointerdown', 'pointerup', 'mousemove', 'mousedown', 'mouseup', 'click', 'auxclick', 'dblclick', 'contextmenu', 'wheel']) addEventListener(t, (e) => {
+  if (!e.isTrusted || !isLocked()) return;
+  e.stopImmediatePropagation(); if (t === 'contextmenu' || t === 'wheel') e.preventDefault();
+  REDIR[t]?.(e);
+}, { capture: true, passive: false });
+// 잠기지 않았을 때 경기 화면을 누르면 잠근다 (누른 것은 그대로 동작한다)
+addEventListener('mousedown', (e) => { if (!e.isTrusted || isLocked() || game.mode !== 'play') return; vm.down[e.button] = e.target; lockMouse(e.clientX, e.clientY); }, true);
+function syncLockUi() {
+  const on = isLocked(); vcur.classList.toggle('hidden', !on); $('mhint').classList.toggle('hidden', on || touch || game.mode !== 'play');
+  if (on) { paintCur(); vm.hov = null; if (!game.lockTold) { game.lockTold = true; feed('🖱️ 마우스가 화면 안에 갇혔어요 · Esc 로 풀어요'); } return; }
+  hoverBox(vm.hov)?.classList.remove('vh'); vm.hov = null; game.rdown = false; game.drag = false; game.miniDrag = false;
+  if (game.mode === 'play') { game.aim = null; game.amove = false; }
+}
+document.addEventListener('pointerlockchange', syncLockUi); document.addEventListener('pointerlockerror', syncLockUi);
+addEventListener('resize', () => { vm.x = Math.min(vm.x, innerWidth - 1); vm.y = Math.min(vm.y, innerHeight - 1); });
 
 // ---------- 챔피언 고르기 ----------
 let pv = null;
@@ -466,7 +563,7 @@ function startMatch(m) {
   for (const v of [...game.views.values()]) dropView(v);
   for (const s of structViews) { s.alive = true; s.o.visible = true; }
   game.mode = 'play'; game.me = null; game.sb = null; $('pick').classList.add('hidden'); $('hud').classList.remove('hidden'); W.fog.visible = true;
-  const f = FOUNTAIN[game.team]; game.focus.set(f[0], 0, f[1]); setLock(true); game.zoom = game.zoomT = 1; game.pred = null; game.pings = []; game.itemSig = game.statSig = null; $('recap').innerHTML = '';
+  const f = FOUNTAIN[game.team]; game.focus.set(f[0], 0, f[1]); setLock(store.get(CAM_KEY) !== '0'); lockMouse(); game.zoom = game.zoomT = 1; game.pred = null; game.pings = []; game.itemSig = game.statSig = null; $('recap').innerHTML = '';
   if (game.def) buildBar(game.def);
   const r = ROLES[mine?.role]; banner(`${game.def?.emoji || ''} ${game.def?.name || ''} · ${r?.icon || ''} ${r?.name || ''}`, '꼬마가 곧 나와요. 기지에서 B 로 아이템을 사고 출발!', 3500);
   S.sfx('start'); S.startMusic?.();
@@ -534,8 +631,8 @@ const thinRing = (c, op) => { const m = new THREE.Mesh(new THREE.RingGeometry(0.
 const atkRing = thinRing('#7fe08a', 0.75), towerRing = thinRing('#ff5a7a', 0.45), tgtRing = ringOf('#ff3b5c', 1); tgtRing.visible = false; scene.add(tgtRing);
 function updateRings(me, now) {
   atkRing.visible = !!me && (game.amove || keys.has('KeyC')); if (atkRing.visible) { atkRing.position.set(me.x, 0.14, me.z); atkRing.scale.setScalar(game.me?.st.range || 3); }
-  let near = null, bd = 22; if (me) for (const s of structViews) if (s.alive && s.k === 'tower' && s.team !== game.team) { const d = Math.hypot(s.at[0] - me.x, s.at[1] - me.z); if (d < bd) { bd = d; near = s; } }
-  towerRing.visible = !!near; if (near) { towerRing.position.set(near.at[0], 0.14, near.at[1]); towerRing.scale.setScalar(15); towerRing.material.opacity = (game.towerOnMe > now ? 0.95 : 0.4) * Math.min(1, (22 - bd) / 4); }
+  let near = null, bd = TOWER_RANGE + 7; if (me) for (const s of structViews) if (s.alive && s.k === 'tower' && s.team !== game.team) { const d = Math.hypot(s.at[0] - me.x, s.at[1] - me.z); if (d < bd) { bd = d; near = s; } }
+  towerRing.visible = !!near; if (near) { towerRing.position.set(near.at[0], 0.14, near.at[1]); towerRing.scale.setScalar(TOWER_RANGE); towerRing.material.opacity = (game.towerOnMe > now ? 0.95 : 0.4) * Math.min(1, (TOWER_RANGE + 7 - bd) / 4); }
   const t = view(game.me?.tg); tgtRing.visible = !!t && t.k !== 2; if (tgtRing.visible) { tgtRing.position.set(t.x, 0.11, t.z); tgtRing.scale.setScalar((t.k === 0 ? 1.45 : t.k === 3 ? (t.o.userData.s || 1) * 1.05 : 0.95)); tgtRing.rotation.z = now / 300; }
 }
 function updateAim(me) {
@@ -574,6 +671,7 @@ function drawMini() {
     else if (v.ward) { x.fillStyle = '#ffffff'; x.fillRect(P(v.x) - 3, P(v.z) - 3, 6, 6); }
   }
   x.font = '22px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  if (game.sb?.camps) for (const c of game.sb.camps) { x.globalAlpha = c.up ? 1 : 0.45; x.fillText(MONS[c.id].emoji, P(c.x), P(c.z)); } x.globalAlpha = 1;
   for (const v of game.views.values()) if (v.k === 0) { x.fillStyle = v.id === game.myUnit ? '#ffe066' : TC[v.team]; x.beginPath(); x.arc(P(v.x), P(v.z), 15, 0, 7); x.fill(); x.fillStyle = '#000'; x.fillText(v.def.emoji, P(v.x), P(v.z) + 1); }
   const nowP = performance.now(); game.pings = game.pings.filter((p) => nowP - p.at < 3000);
   for (const p of game.pings) { const q = (nowP - p.at) / 3000; x.strokeStyle = p.c; x.lineWidth = 5; x.globalAlpha = 1 - q; x.beginPath(); x.arc(P(p.x), P(p.z), 12 + ((nowP - p.at) % 900) / 18, 0, 7); x.stroke(); x.globalAlpha = 1; }
@@ -634,14 +732,18 @@ function frame(now) {
     let predicted = false;
     if (v.id === game.myUnit) {
       const P = game.pred;
-      if (P && (moved > 4 || v.f & 3 || v.f & 32 || (now - P.at > 450 && !(v.f & 128)))) game.pred = null; // 서버와 많이 어긋남 · 기절 · 돌진 · 서버가 안 움직임
+      if (P && (moved > 4 || v.f & 3 || v.f & 32 || (now - P.at > 600 && !(v.f & 128)) || (P.chase && now - P.at > 450))) game.pred = null; // 서버와 많이 어긋남 · 기절 · 돌진 · 서버가 안 움직임 · 쫓기는 잠깐만
+      else if (P?.chase && (() => { const t = view(P.chase); return !t || Math.hypot(t.x - v.x, t.z - v.z) <= P.reach; })()) game.pred = null;
       else if (P?.path.length) {
         predicted = true; let st = (game.me?.st.ms || 68) / 10 * dt;
         while (st > 0 && P.path.length) { const [px, pz] = P.path[0], ax = px - v.x, az = pz - v.z, L = Math.hypot(ax, az); if (L <= st) { v.x = px; v.z = pz; st -= L; P.path.shift(); continue; } v.x += (ax / L) * st; v.z += (az / L) * st; v.tface = Math.atan2(ax, az); st = 0; }
         if (!P.path.length) game.predEnd = now;
       }
     }
-    if (!predicted && !(v.id === game.myUnit && now - (game.predEnd || -1e9) < 260 && moved < 2.5)) { if (moved > 14) { v.x = v.tx; v.z = v.tz; } else { v.x += dx * k; v.z += dz * k; } }
+    if (!predicted && !(v.id === game.myUnit && now - (game.predEnd || -1e9) < 260 && moved < 2.5)) {
+      if (moved > 14) { v.x = v.tx; v.z = v.tz; }
+      else { const q = Math.min(1, (now - (v.iT ?? now)) / ((game.snapD || 100) * 1.08)), p = Math.min(q, v.iP || 0), a = p >= 1 ? 1 : (q - p) / (1 - p); v.x += dx * a; v.z += dz * a; v.iP = q; }
+    } else v.iP = 0;
     v.faceHold = Math.max(0, (v.faceHold || 0) - dt);
     let d = (v.tface ?? v.face) - v.face; d = Math.atan2(Math.sin(d), Math.cos(d)); v.face += d * Math.min(1, dt * (predicted ? 22 : 12));
     v.hurtT = Math.max(0, v.hurtT - dt); v.lunge = Math.max(0, (v.lunge || 0) - dt);
@@ -653,9 +755,10 @@ function frame(now) {
       v.o.visible = !(v.f & 8 && v.team !== game.team);
       if (v.dashT > 0) { v.dashT -= dt; spark(v.x, 1, v.z, v.dashCol, 1.5, 0.25); }
     } else {
-      const lg = v.lunge > 0 ? Math.sin((v.lunge / 0.14) * Math.PI) * 0.55 : 0; v.o.position.set(v.x + Math.sin(v.face) * lg, 0, v.z + Math.cos(v.face) * lg); v.o.rotation.y = v.face; v.o.scale.setScalar(1 + v.hurtT * 1.2);
-      if (v.o.userData.body) { const s = v.o.userData.s || 1, b = Math.sin(now / 130 + v.id) * 0.06; v.o.userData.body.position.y = (v.mid === 'bee' ? 1.2 : 0.74) * s * (1 + b * 0.5); v.o.userData.body.scale.y = (v.mid ? 0.75 : 0.78) * s * (1 + b); }
-      if (v.o.userData.wings) v.o.userData.wings.forEach((w, i) => { w.rotation.z = Math.sin(now / 28) * 0.5 * (i ? 1 : -1); });
+      const U = v.o.userData, lg = v.lunge > 0 ? Math.sin((v.lunge / 0.14) * Math.PI) * 0.55 : 0; v.o.position.set(v.x + Math.sin(v.face) * lg, U.flyY ? U.flyY + Math.sin(now / 320 + v.id) * 0.18 : 0, v.z + Math.cos(v.face) * lg); v.o.rotation.y = v.face; v.o.scale.setScalar(1 + v.hurtT * (v.mid && MONS[v.mid]?.epic ? 0.25 : 1.2));
+      if (U.body && U.by != null) { const b = Math.sin(now / 130 + v.id) * 0.04; U.body.position.y = U.by * (1 + b * 0.5); U.body.scale.y = U.bsy * (1 + b); } else if (U.body) { const s = U.s || 1, b = Math.sin(now / 130 + v.id) * 0.06; U.body.position.y = 0.74 * s * (1 + b * 0.5); U.body.scale.y = 0.78 * s * (1 + b); }
+      if (U.wings) for (const w of U.wings) w.rotation.z = (w.userData.rest + Math.sin(now / (v.mid === 'moth' ? 150 : 34)) * 0.55) * w.userData.q;
+      if (U.glow) U.glow.material.color.setHSL(0.09, 1, 0.6 + Math.sin(now / 240) * 0.12);
     }
   }
   for (const s of structViews) { const g = s.o.userData.gem; if (!g) continue; g.rotation.y = now / 700; g.position.y = s.o.userData.top + Math.sin(now / 500 + s.at[0]) * 0.18; }
@@ -680,7 +783,7 @@ function frame(now) {
   // 카메라
   const me = view(game.myUnit);
   if (game.mode === 'play') {
-    if (game.locked && me) { game.focus.x += (me.x - game.focus.x) * Math.min(1, dt * 7); game.focus.z += (me.z - game.focus.z) * Math.min(1, dt * 7); }
+    if (game.locked && me) { game.focus.x += (me.x - game.focus.x) * Math.min(1, dt * 12); game.focus.z += (me.z - game.focus.z) * Math.min(1, dt * 12); }
     else if (!game.locked) {
       const m = game.mouse, sp = 42 * dt, E = 14; let dx = 0, dz = 0;
       if (m.in) { if (m.x < E) dx = -1; if (m.x > innerWidth - E) dx = 1; if (m.y < E) dz = -1; if (m.y > innerHeight - E) dz = 1; }
@@ -697,6 +800,8 @@ function frame(now) {
     hoverRing.visible = !!game.hover && game.hover.k !== 2;
     if (hoverRing.visible) { hoverRing.position.set(game.hover.x, 0.1, game.hover.z); hoverRing.scale.setScalar((game.hover.k === 0 ? 1.5 : game.hover.k === 3 ? (game.hover.o.userData.s || 1) * 1.05 : 0.95) * (1 + Math.sin(now / 120) * 0.05)); }
     canvas.style.cursor = game.amove ? 'crosshair' : game.hover ? 'pointer' : 'default';
+    if (isLocked()) { const cls = game.amove || game.aim ? 'aim' : game.hover ? 'atk' : ''; if (vcur.dataset.c !== cls) { vcur.dataset.c = cls; } }
+    else if ($('mhint').classList.contains('hidden') && !touch && performance.now() - (game.hintT || 0) > 500) { game.hintT = performance.now(); syncLockUi(); }
     if ((fogT -= dt) <= 0) { fogT = 0.2; drawFog(); }
     if ((miniT -= dt) <= 0) { miniT = 0.1; drawMini(); }
     // 꾹 누르면 계속 이동
@@ -706,6 +811,8 @@ function frame(now) {
     titleA += dt * 0.06; const r = 40;
     camera.position.set(Math.cos(titleA) * r, 34, Math.sin(titleA) * r + 34); camera.lookAt(Math.cos(titleA) * r * 0.6, 0, Math.sin(titleA) * r * 0.6);
   }
+  if (game.mode !== 'play' && isLocked()) document.exitPointerLock();
+  if (game.mode !== 'play' && !$('mhint').classList.contains('hidden')) $('mhint').classList.add('hidden');
   drawOverlay(dt);
   renderer.render(scene, camera);
 }

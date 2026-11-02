@@ -1,10 +1,10 @@
 // 젤리 아레나 시뮬레이션: 화면 · 네트워크 없이 경기 전체를 계산한다 (서버가 돌리고, 시험 때는 빠르게 돌린다)
 //   new Arena(players) → tick(dt) 를 반복 · cmd(id, m) 로 명령 · take(team) 로 그 팀에게 보낼 사건 · snapshot(team) 으로 그 팀이 보는 모습
-import { LANES, BASE, FOUNTAIN, STRUCTS, CAMPS, EPICS, MONS, BUSHES, MAX_LEVEL, XP_NEED, R_LEVELS, champById, SPELLS, SPELL_OF_ROLE, ITEMS, BUILD, SKILL_ORDER, findPath, blocked, clear, CHAMPS } from '../../public/jelly-arena/js/data.js';
+import { LANES, BASE, FOUNTAIN, STRUCTS, CAMPS, EPICS, RIVER, BUGS, BUG_SOUL, ELDER_AT, TOWER_RANGE, MONS, BUSHES, MAX_LEVEL, XP_NEED, R_LEVELS, champById, SPELLS, SPELL_OF_ROLE, ITEMS, BUILD, SKILL_ORDER, findPath, blocked, clear, CHAMPS } from '../../public/jelly-arena/js/data.js';
 
 const ME = { melee: { hp: 460, ad: 19, range: 2.2, ar: 10, mr: 0, as: 0.62, ms: 5.6, gold: 21, xp: 34 }, caster: { hp: 300, ad: 30, range: 8.5, ar: 0, mr: 0, as: 0.55, ms: 5.6, gold: 15, xp: 26, proj: 1 }, siege: { hp: 900, ad: 56, range: 10, ar: 30, mr: 0, as: 0.38, ms: 5.6, gold: 48, xp: 60, proj: 1 }, super: { hp: 2000, ad: 120, range: 2.6, ar: 60, mr: 30, as: 0.62, ms: 6.2, gold: 60, xp: 80 } };
 const STRUCT_HP = { 1: 2600, 2: 3000, 3: 3400, 4: 2600 }, GATE_HP = 2400, HEART_HP = 5200;
-const WAVE_EVERY = 30, FIRST_WAVE = 25, CAMP_FIRST = 60, TOWER_RANGE = 15;
+const WAVE_EVERY = 30, FIRST_WAVE = 25, CAMP_FIRST = 60;
 const VISION = { champ: 16, minion: 10, tower: 17, gate: 12, heart: 22, ward: 12, mon: 0 };
 const OTHER = { blue: 'red', red: 'blue' };
 const d2 = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -15,11 +15,13 @@ export class Arena {
     this.t = 0; this.next = 1; this.units = []; this.shots = []; this.aoes = []; this.zones = []; this.over = null;
     this.ev = { blue: [], red: [] }; this.R = o.rand || Math.random;
     this.waveAt = FIRST_WAVE; this.waveN = 0; this.vis = { blue: new Set(), red: new Set() }; this.visT = 0; this.gates = { blue: {}, red: {} }; this.towerDead = { blue: {}, red: {} };
-    this.teamBuff = { blue: { honey: 0, moldUntil: 0 }, red: { honey: 0, moldUntil: 0 } }; this.kills = { blue: 0, red: 0 }; this.towers = { blue: 0, red: 0 }; this.epicN = { blue: 0, red: 0 };
+    const buffs = () => ({ stack: { bee: 0, moth: 0, beetle: 0, firefly: 0 }, soul: false, moldUntil: 0, elderUntil: 0 }); this.teamBuff = { blue: buffs(), red: buffs() }; this.kills = { blue: 0, red: 0 }; this.towers = { blue: 0, red: 0 }; this.epicN = { blue: 0, red: 0 };
     this.champs = players.map((p) => this.makeChamp(p));
     for (const s of STRUCTS) this.makeStruct(s);
     this.camps = CAMPS.map((c, i) => ({ i, ...c, def: MONS[c.id], at2: c.at, nextAt: CAMP_FIRST, mons: [] }));
-    this.camps.push(...EPICS.map((e, i) => ({ i: 100 + i, id: e.id, at: e.at, def: MONS[e.id], nextAt: MONS[e.id].first, mons: [], epic: true })));
+    this.camps.push(...EPICS.map((e, i) => ({ i: 100 + i, id: e.id, slot: e.slot, at: e.at, def: MONS[e.id], nextAt: MONS[e.id].first, mons: [], epic: true })));
+    this.camps.push(...RIVER.map((e, i) => ({ i: 200 + i, id: e.id, river: true, at: e.at, def: MONS[e.id], nextAt: MONS[e.id].first, mons: [] })));
+    const bug = this.camps.find((c) => c.slot === 'bug'); this.setBug(bug, BUGS[Math.floor(this.R() * BUGS.length)]);
     this.refreshVision();
   }
   // ---------- 만들기 ----------
@@ -44,7 +46,12 @@ export class Arena {
     for (const id of u.items) add(ITEMS[id].add);
     for (const b of u.buffs) add(b.stats);
     const tb = this.teamBuff[u.team];
-    if (tb.honey) { s.ad *= 1 + 0.12 * tb.honey; s.ap *= 1 + 0.12 * tb.honey; }
+    const st = tb.stack;
+    if (st.bee) { s.ad *= 1 + 0.08 * st.bee; s.ap *= 1 + 0.08 * st.bee; }
+    if (st.moth) s.haste += 0.08 * st.moth;
+    if (st.beetle) { s.ar += 10 * st.beetle; s.mr += 10 * st.beetle; }
+    if (st.firefly) { s.ms += 0.25 * st.firefly; s.reg += 2 * st.firefly; }
+    if (tb.soul) { s.ad *= 1.1; s.ap *= 1.1; s.ms += 0.4; }
     if (tb.moldUntil > this.t) { s.ad += 30; s.ap += 30; }
     const pv = u.def.passive;
     if (pv.kind === 'rage' && u.hp != null) s.ad *= 1 + pv.v * (1 - u.hp / s.hp);
@@ -244,7 +251,7 @@ export class Arena {
     t.hp -= dmg; t.lastHit = this.t;
     if (t.kind === 'champ') { const log = (t.dmgLog ||= []); const name = src.kind === 'champ' ? src.name : src.kind === 'tower' ? '포탑' : src.kind === 'minion' ? '꼬마' : src.kind === 'mon' ? '몬스터' : '건물'; const last = log[log.length - 1]; if (last && last.name === name && last.ty === type && this.t - last.at < 3) { last.n += dmg; last.at = this.t; } else log.push({ name, ty: type, n: dmg, at: this.t }); if (log.length > 14) log.shift(); }
     if (src.kind === 'champ') {
-      src.lastCombat = this.t; src.revealT = this.t + 1.5; if (t.kind === 'champ') { src.dealt += dmg; t.hitBy.set(src.id, this.t); t.lastCombat = this.t; }
+      src.lastCombat = this.t; src.revealT = this.t + 1.5; if (t.kind === 'champ') { src.dealt += dmg; t.hitBy.set(src.id, this.t); t.lastCombat = this.t; if ((o.basic || o.skill) && !o.tick) { src.aggAt = this.t; src.aggOn = t; } }
       if (o.basic && sp.lifesteal) this.heal(src, src, dmg * sp.lifesteal);
       if (src.fx.stealth) { src.fx.stealth = 0; }
     }
@@ -253,8 +260,15 @@ export class Arena {
     if (t.kind === 'mon' && !t.aggro) t.aggro = src;
     if (t.kind === 'mon') t.aggro = t.aggro?.alive ? t.aggro : src;
     if (t.kind === 'minion' && src.kind === 'champ') t.lastHitChamp = src;
+    if (t.kind === 'champ' && src.kind === 'champ' && (o.basic || o.skill) && !o.tick && t.alive && this.teamBuff[src.team].elderUntil > this.t) this.starDust(src, t);
     if (t.hp <= 0) this.die(t, src);
     return dmg;
+  }
+  // 태고 거북의 별가루: 타오르다가 체력이 낮으면 바로 쓰러진다
+  starDust(src, t) {
+    if (t.hp > 0 && t.hp / t.s.hp < 0.15) { t.hp = 0; this.emit(null, { k: 'boom', x: t.x, z: t.z, r: 3, col: '#fff3a0' }); return; }
+    if ((t.starT || 0) > this.t) return;
+    t.starT = this.t + 3; t.dots.push({ dps: 15 + src.level * 3, until: this.t + 3, by: src, tick: 0 }); this.emit(null, { k: 'cc', to: t.id, c: 'star', d: 3 });
   }
   emitDamage(src, t, n, ty, crit) {
     const e = { k: 'dmg', to: t.id, n: Math.round(n), ty, crit: crit ? 1 : 0, by: src.id };
@@ -297,8 +311,8 @@ export class Arena {
       case 'mon': {
         const def = t.camp.def;
         if (t.big) {
-          if (killer) { killer.cs += def.epic ? 4 : 4; this.give(killer, def.gold, t); this.giveXp(killer, def.xp); if (def.epic) this.epicKill(killer.team, t.camp); }
           t.camp.nextAt = this.t + def.respawn;
+          if (killer) { killer.cs += 4; this.give(killer, def.gold, t); this.giveXp(killer, def.xp); if (def.epic) this.epicKill(killer.team, t.camp); if (def.peace) { this.heal(killer, killer, killer.s.hp * 0.15); killer.mp = Math.min(killer.s.mp, killer.mp + killer.s.mp * 0.2); killer.buffs.push({ stats: { ms: 1.5 }, until: this.t + 3 }); this.emit(killer.team, { k: 'buff', id: killer.id, col: def.color, d: 1, ic: def.emoji }); } }
         } else if (killer) { killer.cs++; this.give(killer, 12, t); this.giveXp(killer, 22); }
         if (t.camp.mons.every((m) => m === t || !m.alive)) t.camp.mons = [];
         break;
@@ -316,10 +330,19 @@ export class Arena {
   epicKill(team, camp) {
     this.epicN[team]++;
     const tb = this.teamBuff[team];
-    if (camp.id === 'bee') tb.honey++;
+    const def = camp.def;
+    if (def.stack) tb.stack[def.stack]++;
     if (camp.id === 'mold') tb.moldUntil = this.t + 120;
-    this.emit(null, { k: 'epic', id: camp.id, team, name: camp.def.name, icon: camp.def.emoji, buff: camp.def.buff });
+    if (camp.id === 'turtle') { tb.elderUntil = this.t + 150; for (const c of this.champs) if (c.team === team && c.alive) this.heal(c, c, c.s.hp * 0.25); }
+    this.emit(null, { k: 'epic', id: camp.id, team, name: def.name, icon: def.emoji, buff: def.buff });
+    if (def.stack && !tb.soul && BUGS.reduce((n, b) => n + tb.stack[b], 0) >= BUG_SOUL) { tb.soul = true; this.emit(null, { k: 'epic', id: 'soul', team, name: '벌레왕의 왕관', icon: '👑', buff: '👑 벌레왕의 왕관: 경기 끝까지 공격력 · 주문력 +10%, 이동 속도 +0.4' }); }
+    if (camp.slot === 'bug') {
+      // 왕관이 나왔거나 충분히 늦으면 태고 거북, 아니면 다른 벌레왕이 나온다
+      const late = this.t + def.respawn >= ELDER_AT || this.teamBuff.blue.soul || this.teamBuff.red.soul;
+      this.setBug(camp, late ? 'turtle' : BUGS.filter((b) => b !== camp.id)[Math.floor(this.R() * (BUGS.length - 1))]);
+    }
   }
+  setBug(camp, id) { camp.id = id; camp.def = MONS[id]; }
   give(c, n, at) { c.gold += n; this.emit(c.team, { k: 'gold', id: c.id, n, x: at.x, z: at.z }); }
   giveXp(c, n) {
     if (c.level >= MAX_LEVEL) return;
@@ -435,6 +458,7 @@ export class Arena {
     for (const q of this.units) {
       if (!q.alive || q.team === u.team || !this.canSee(u.team, q)) continue;
       if (q.kind === 'ward' || q.kind === 'mon') continue; // 몬스터는 직접 눌러야 때린다
+      if (q.kind === 'champ' && (this.enemyTowerNear(u) || this.enemyTowerNear(u, q.x, q.z))) continue; // 저절로 때려서 적 포탑을 끌어오지 않게 (챔피언을 직접 누르면 때린다)
       const d = d2(u, q); if (d > r + q.r) continue;
       if (!this.attackable(q)) continue;
       const score = d + (q.kind === 'champ' ? -3 : q.kind === 'minion' ? 0 : 4);
@@ -512,7 +536,7 @@ export class Arena {
     for (const z of this.zones) {
       if (z.follow) { if (!z.follow.alive) { z.until = 0; continue; } z.x = z.follow.x; z.z = z.follow.z; }
       z.tick -= dt;
-      if (z.tick <= 0) { z.tick = 0.5; const p = z.pack; for (const t of this.units) { if (t.team === z.team || !t.alive || !this.hitable(t) || Math.hypot(t.x - z.x, t.z - z.z) > z.r + t.r) continue; if (z.tickDmg > 0) this.deal(p.src, t, z.tickDmg, p.type, { skill: true, on: p.sk.on }); else this.applyOn(p.src, t, p.sk.on); } }
+      if (z.tick <= 0) { z.tick = 0.5; const p = z.pack; for (const t of this.units) { if (t.team === z.team || !t.alive || !this.hitable(t) || Math.hypot(t.x - z.x, t.z - z.z) > z.r + t.r) continue; if (z.tickDmg > 0) this.deal(p.src, t, z.tickDmg, p.type, { skill: true, tick: true, on: p.sk.on }); else this.applyOn(p.src, t, p.sk.on); } }
     }
     this.zones = this.zones.filter((z) => z.until > this.t);
   }
@@ -539,11 +563,10 @@ export class Arena {
   // ---------- 건물 ----------
   towerTick(t, dt) {
     if ((t.reload -= dt) > 0) return;
-    // 아군 챔피언을 때린 적 챔피언 → 꼬마 → 챔피언 순
+    // 사거리 안의 우리 챔피언을 방금 직접 때린 적 챔피언 → 꼬마 → 챔피언 순
     const near = this.units.filter((q) => q.alive && q.team !== t.team && (q.kind === 'champ' || q.kind === 'minion') && d2(q, t) < TOWER_RANGE && this.canSee(t.team, q));
     if (!near.length) return;
-    const allies = this.champs.filter((c) => c.team === t.team && c.alive && d2(c, t) < TOWER_RANGE + 4);
-    const agg = near.find((q) => q.kind === 'champ' && (q.lastCombat || -9) > this.t - 1 && allies.some((a) => a.hitBy.get(q.id) > this.t - 2));
+    const agg = near.find((q) => q.kind === 'champ' && (q.aggAt || -9) > this.t - 1.5 && q.aggOn?.alive && d2(q.aggOn, t) < TOWER_RANGE);
     // 꼬마가 사거리 안에 있으면 꼬마 먼저. 때리던 꼬마가 살아 있으면 계속, 챔피언은 꼬마가 없거나 우리 챔피언을 때렸을 때만
     const minions = near.filter((q) => q.kind === 'minion');
     const pick = agg || (t.cur?.kind === 'minion' && t.cur.alive && near.includes(t.cur) ? t.cur : null) || minions.sort((a, b) => d2(a, t) - d2(b, t))[0] || near.sort((a, b) => d2(a, t) - d2(b, t))[0];
@@ -616,7 +639,7 @@ export class Arena {
   // ---------- 정글 ----------
   spawnCamp(c) {
     const d = c.def, g = this.t / 60, k = 1 + g * 0.09;
-    const mk = (big, ox, oz, s) => { const hp = s.hp * k; const m = this.unit({ kind: 'mon', team: 'neutral', camp: c, big, mid: c.id, x: c.at[0] + ox, z: c.at[1] + oz, hx: c.at[0] + ox, hz: c.at[1] + oz, hp, max: hp, ad: s.ad * (1 + g * 0.05), ar: 15 + g * 2, mr: 10 + g, as: 0.7, ms: 6, range: d.epic ? 4 : 2.4, r: d.epic ? 2.4 : big ? 1.2 : 0.7, reload: 0, target: null }); c.mons.push(m); return m; };
+    const mk = (big, ox, oz, s) => { const hp = s.hp * k; const m = this.unit({ kind: 'mon', team: 'neutral', camp: c, big, mid: c.id, x: c.at[0] + ox, z: c.at[1] + oz, hx: c.at[0] + ox, hz: c.at[1] + oz, hp, max: hp, ad: s.ad * (1 + g * 0.05), ar: (d.ar ?? 15) + g * 2, mr: 10 + g, as: d.as ?? 0.7, ms: d.ms ?? 6, range: d.epic ? 4 : 2.4, r: d.epic ? 2.4 : big ? 1.2 : 0.7, reload: 0, target: null, bossT: 3 }); c.mons.push(m); return m; };
     mk(true, 0, 0, d.big);
     if (d.small) for (let i = 0; i < d.small.n; i++) { const a = (i / d.small.n) * 6.28 + 0.6; mk(false, Math.cos(a) * 2.6, Math.sin(a) * 2.6, d.small); }
     if (d.epic) this.emit(null, { k: 'epicUp', id: c.id, name: d.name, icon: d.emoji });
@@ -630,9 +653,21 @@ export class Arena {
     // 한 마리를 건드리면 같은 무리 모두 달려든다
     if (!t) { const m = u.camp.mons.find((q) => q.aggro?.alive); if (m) t = u.aggro = m.aggro; }
     if (t && (!t.alive || homeD > 16 || d2(t, u) > 18)) { u.aggro = null; t = null; u.returning = true; for (const m of u.camp.mons) m.aggro = null; }
+    const def = u.camp.def;
+    if (t && def.peace) { // 오리는 싸우지 않고 도망친다
+      const dx = u.x - t.x, dz = u.z - t.z, L = Math.hypot(dx, dz) || 1;
+      this.stepTo(u, u.x + (dx / L) * 3, u.z + (dz / L) * 3, dt);
+      return;
+    }
     if (t) {
+      // 큰 몬스터의 패턴: 바닥에 먼저 표시되니 피할 수 있다
+      if (def.boss && (u.bossT -= dt) <= 0) {
+        const b = def.boss; u.bossT = b.cd;
+        this.aoes.push({ x: t.x, z: t.z, at: this.t + b.delay, r: b.r, team: 'neutral', pack: { src: u, dmg: b.dmg * (1 + this.t / 60 * 0.05), type: 'magic', sk: { on: b.on, color: def.color } } });
+        this.emit(null, { k: 'aoe', x: t.x, z: t.z, r: b.r, d: b.delay, col: def.color, team: 'neutral', id: u.id, boss: b.name });
+      }
       const d = d2(u, t);
-      if (d <= u.range + t.r) { if (u.reload <= 0) { u.reload = 1 / u.as; this.emitSeen(u, { k: 'matk', id: u.id, to: t.id, r: 0 }); this.deal(u, t, u.ad, 'phys', {}); } }
+      if (d <= u.range + t.r) { if (u.reload <= 0) { u.reload = 1 / u.as; this.emitSeen(u, { k: 'matk', id: u.id, to: t.id, r: 0 }); this.deal(u, t, u.ad, 'phys', { on: def.on }); } }
       else this.stepTo(u, t.x, t.z, dt);
       return;
     }
@@ -713,9 +748,29 @@ export class Arena {
     const tgt = en.filter((e) => !this.enemyTowerNear(c, e.x, e.z) || al.length >= 1 || e.hp / e.s.hp < 0.25).sort((a, b) => a.hp - b.hp)[0];
     if (tgt && d2(tgt, c) < 14) this.botCast(c, tgt); else if (al[0]) this.botCast(c, null);
     const late = this.t > 720;
+    if (!tgt && hpK > 0.5) { const obj = this.botObjective(c); if (obj) return this.hitMonster(c, obj); }
     if (c.role === 'jungle') return this.botJungle(c, tgt, al);
     if (c.role === 'sup') return this.botSupport(c, tgt, al);
     return this.botLane(c, tgt, al, late);
+  }
+  // 큰 몬스터는 팀이 모여서 잡는다: 정글 · 서폿에 가까운 둘을 더해 넷이 간다 (8초마다 다시 정함)
+  botObjective(c) {
+    const T = (this.call ||= { blue: { at: -9 }, red: { at: -9 } })[c.team];
+    if (this.t - T.at > 8) {
+      T.at = this.t; T.camp = null; T.ids = new Set();
+      const bots = this.champs.filter((q) => q.team === c.team && q.alive && q.bot), lv = bots.reduce((a, q) => a + q.level, 0) / (bots.length || 1);
+      const camp = this.camps.filter((k) => k.epic && k.mons.length && k.mons.some((m) => m.alive) && lv >= (k.id === 'turtle' ? 11 : k.slot === 'mold' ? 9 : 5)).sort((a, b) => (b.slot === 'mold') - (a.slot === 'mold'))[0];
+      if (camp && bots.length >= 3) { const dist = (q) => Math.hypot(q.x - camp.at[0], q.z - camp.at[1]) + (q.role === 'jungle' || q.role === 'sup' ? -200 : 0); T.camp = camp; T.ids = new Set(bots.sort((a, b) => dist(a) - dist(b)).slice(0, 4).map((q) => q.id)); }
+    }
+    if (!T.camp || !T.ids.has(c.id) || !T.camp.mons.length) return null;
+    return T.camp;
+  }
+  hitMonster(c, camp) {
+    const m = camp.mons.filter((q) => q.alive).sort((a, b) => (a.big ? 1 : 0) - (b.big ? 1 : 0))[0]; if (!m) return;
+    if (d2(m, c) >= c.s.range + 6) return this.go(c, m.x, m.z);
+    if (c.spell === 'smite' && c.cds.f <= 0 && m.big && m.hp < 450 + 40 * c.level) this.useSpell(c, 'f', m.x, m.z, m.id);
+    for (const s of ['q', 'w', 'e']) { const sk = this.spec(c, s); if (c.rank[s] > 0 && c.cds[s] <= 0 && c.mp > c.s.mp * 0.3 && sk.kind !== 'ally' && sk.kind !== 'blink') { this.cast(c, s, m.x, m.z, m.id); break; } }
+    return this.attack(c, m);
   }
   // 라인: 꼬마 뒤에서 막타 · 견제, 밀리면 포탑 근처로, 후반엔 약한 길로
   botLane(c, tgt, al, late) {
@@ -760,20 +815,10 @@ export class Arena {
     const fight = this.champs.filter((e) => e.team !== c.team && e.alive && this.canSee(c.team, e) && e.hp / e.s.hp < 0.6 && d2(e, c) < 45 && !this.enemyTowerNear(c, e.x, e.z) && this.champs.some((a) => a !== c && a.team === c.team && a.alive && d2(a, e) < 14)).sort((a, b) => d2(a, c) - d2(b, c))[0];
     if (fight) return this.go(c, fight.x, fight.z);
     // 큰 몬스터: 우리가 강하면
-    const epic = this.camps.find((k) => k.epic && k.mons.length && k.mons[0].alive && c.level >= (k.id === 'bee' ? 6 : 11) && d2(c, { x: k.at[0], z: k.at[1] }) < 80 && c.hp / c.s.hp > 0.55);
-    const camps = this.camps.filter((k) => !k.epic && k.mons.length && (k.side === c.team || this.t > 300));
+    const epic = this.camps.find((k) => k.epic && k.mons.length && k.mons[0].alive && c.level >= (k.id === 'turtle' ? 13 : k.slot === 'mold' ? 11 : 6) && d2(c, { x: k.at[0], z: k.at[1] }) < 80 && c.hp / c.s.hp > 0.55);
+    const camps = this.camps.filter((k) => !k.epic && !k.river && k.mons.length && (k.side === c.team || this.t > 300));
     const pick = (epic && this.t > 170) ? epic : camps.sort((a, b) => Math.hypot(a.at[0] - c.x, a.at[1] - c.z) - Math.hypot(b.at[0] - c.x, b.at[1] - c.z))[0];
-    if (pick) {
-      const m = pick.mons.filter((q) => q.alive).sort((a, b) => (a.big ? 1 : 0) - (b.big ? 1 : 0))[0];
-      if (m) {
-        if (d2(m, c) < c.s.range + 6) {
-          if (c.spell === 'smite' && c.cds.f <= 0 && m.big && m.hp < 450 + 40 * c.level) this.useSpell(c, 'f', m.x, m.z, m.id);
-          for (const s of ['q', 'w', 'e']) { const sk = this.spec(c, s); if (c.rank[s] > 0 && c.cds[s] <= 0 && c.mp > c.s.mp * 0.3 && sk.kind !== 'ally' && sk.kind !== 'blink') { this.cast(c, s, m.x, m.z, m.id); break; } }
-          return this.attack(c, m);
-        }
-        return this.go(c, m.x, m.z);
-      }
-    }
+    if (pick?.mons.some((q) => q.alive)) return this.hitMonster(c, pick);
     // 잡을 게 없으면 강가로
     const rv = c.team === 'blue' ? [-14, -14] : [14, 14];
     if (Math.hypot(rv[0] - c.x, rv[1] - c.z) > 6) this.go(c, rv[0], rv[1]);
@@ -803,8 +848,17 @@ export class Arena {
     return { id: u.id, gold: Math.floor(u.gold), lv: u.level, xp: Math.round(u.xp), need: XP_NEED[u.level - 1] || 1, pts: u.pts, rank: u.rank, cds, items: u.items, pot: u.potions, potT: +u.potT.toFixed(1), wards: u.wards, alive: u.alive, resp: u.alive ? 0 : Math.ceil(u.respawnAt - this.t), base: this.inBase(u) || !u.alive, spell: u.spell, st: { ad: Math.round(s.ad), ap: Math.round(s.ap), ar: Math.round(s.ar), mr: Math.round(s.mr), as: +s.as.toFixed(2), ms: +(s.moveSpeed * 10).toFixed(0), range: +s.range.toFixed(1), crit: Math.round(s.crit * 100), haste: Math.round(s.haste * 100), ls: Math.round(s.lifesteal * 100) }, cc: this.isCC(u) ? 1 : 0, sh: Math.round(u.shields.reduce((a, b) => a + b.v, 0)), atk: +Math.max(0, Math.min(1, u.attackT * u.s.as)).toFixed(2), tg: u.target?.alive ? u.target.id : 0, q: u.castQ?.s || null, sil: (u.fx.silT || 0) > this.t ? 1 : 0 };
   }
   score() {
-    return { time: Math.floor(this.t), kills: this.kills, towers: this.towers, epics: this.epicN, honey: { blue: this.teamBuff.blue.honey, red: this.teamBuff.red.honey }, mold: { blue: this.teamBuff.blue.moldUntil > this.t, red: this.teamBuff.red.moldUntil > this.t }, list: this.champs.map((c) => ({ id: c.id, pid: c.pid, name: c.name, team: c.team, champ: c.def.id, role: c.role, lv: c.level, k: c.k, d: c.de, a: c.a, cs: c.cs, items: c.items, alive: c.alive, resp: c.alive ? 0 : Math.ceil(c.respawnAt - this.t), bot: c.bot, dealt: Math.round(c.dealt) })),
-      camps: this.camps.filter((k) => k.epic).map((k) => ({ id: k.id, up: !!k.mons.length, inS: k.mons.length ? 0 : Math.max(0, Math.ceil(k.nextAt - this.t)) })) };
+    return { time: Math.floor(this.t), kills: this.kills, towers: this.towers, epics: this.epicN, buffs: { blue: this.buffIcons('blue'), red: this.buffIcons('red') }, list: this.champs.map((c) => ({ id: c.id, pid: c.pid, name: c.name, team: c.team, champ: c.def.id, role: c.role, lv: c.level, k: c.k, d: c.de, a: c.a, cs: c.cs, items: c.items, alive: c.alive, resp: c.alive ? 0 : Math.ceil(c.respawnAt - this.t), bot: c.bot, dealt: Math.round(c.dealt) })),
+      camps: this.camps.filter((k) => k.epic).map((k) => ({ id: k.id, x: k.at[0], z: k.at[1], up: !!k.mons.length, inS: k.mons.length ? 0 : Math.max(0, Math.ceil(k.nextAt - this.t)) })) };
+  }
+  // 그 팀이 가진 강화 (점수판 · 위쪽 표시)
+  buffIcons(team) {
+    const b = this.teamBuff[team], left = (u) => Math.max(0, Math.ceil(u - this.t)), out = [];
+    for (const id of BUGS) if (b.stack[id]) out.push({ ic: MONS[id].emoji, n: b.stack[id] });
+    if (b.soul) out.push({ ic: '👑' });
+    if (b.moldUntil > this.t) out.push({ ic: '🍄', s: left(b.moldUntil) });
+    if (b.elderUntil > this.t) out.push({ ic: '🌟', s: left(b.elderUntil) });
+    return out;
   }
 }
 function setTimeoutLike(a, d, f) { a.later(d, f); }

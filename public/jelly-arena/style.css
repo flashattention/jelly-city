@@ -5,6 +5,14 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1c2a24; use
 .hidden { display: none !important; }
 #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; font-family: 'Jua', sans-serif; color: #fff; }
 #hud button { pointer-events: auto; cursor: pointer; }
+/* 직접 그리는 커서 */
+#vcur { position: fixed; left: 0; top: 0; z-index: 99; pointer-events: none; overflow: visible; will-change: transform; }
+#vcur .arrow { fill: #fff; stroke: #1c2a24; stroke-width: 1.6; stroke-linejoin: round; }
+#vcur .cross { display: none; fill: none; stroke: #ff5a7a; stroke-width: 2.2; stroke-linecap: round; }
+#vcur[data-c="atk"] .arrow { fill: #ff5a7a; stroke: #fff; }
+#vcur[data-c="aim"] .arrow { display: none; } #vcur[data-c="aim"] .cross { display: inline; }
+#mhint { position: absolute; top: 112px; left: 50%; transform: translateX(-50%); padding: 6px 14px; border-radius: 999px; background: rgba(0,0,0,.72); font-size: 14px; white-space: nowrap; }
+#hud button.vh { filter: brightness(1.25); } .it.vh { background: rgba(255,255,255,.17); } .ch.vh { background: rgba(255,255,255,.16); }
 /* 위 점수 */
 #h-score { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; padding: 5px 16px; border-radius: 12px; background: rgba(15,18,30,.78); font-size: 22px; box-shadow: 0 2px 10px rgba(0,0,0,.35); white-space: nowrap; }
 #h-score .b b { color: #4cc3ff; } #h-score .r b { color: #ff5a7a; }
