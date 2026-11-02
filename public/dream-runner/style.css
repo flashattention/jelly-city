@@ -145,7 +145,10 @@ kbd.wide { min-width: 64px; }
 .seg button { border: 0; border-radius: 999px; padding: 8px 16px; font-family: 'Jua', sans-serif; font-size: 15px; background: transparent; color: var(--soft); }
 .seg button.on { background: #fff; color: #2b1d5c; }
 .seg button:disabled { cursor: default; }
-#mode-pick { display: flex; width: fit-content; }
+#mode-pick, #diff-pick { display: flex; width: fit-content; max-width: 100%; }
+#diff-pick, #room-diff, #board-diff { flex-wrap: wrap; justify-content: center; border-radius: 22px; }
+#diff-pick button, #room-diff button, #board-diff button { padding: 7px 11px; font-size: 14px; }
+@media (max-width: 520px) { #diff-pick button, #room-diff button, #board-diff button { padding: 6px 8px; font-size: 13px; } }
 /* 아이템 칸 */
 #itembar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; z-index: 4; pointer-events: none; }
 #itembar .slot { width: 62px; height: 62px; border-radius: 18px; background: rgba(20,8,50,.55); border: 2px solid rgba(255,255,255,.35); display: flex; align-items: center; justify-content: center; font-size: 34px; }

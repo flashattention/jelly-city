@@ -3,6 +3,10 @@
 import * as THREE from 'three';
 import { bakeStatic, toon } from '../../shared/js/utils.js';
 import { KITS } from './kits.js';
+
+const PLACE_AHEAD = 30; // 풍경 자리에서 이만큼 앞까지 길이 만들어진 뒤에 놓는다 (가장 큰 옆 풍경보다 넉넉하게)
+const CLEAR_H = 3.2;    // 발판 위로 이 높이까지는 비워 둔다 (달리고 뛰는 공간)
+const BOX = new THREE.Box3();
 import { DEATH_Y } from './track.js';
 
 const UNDER_Y = DEATH_Y + 3;
@@ -174,7 +178,9 @@ export class Env {
   }
 
   // 발판 하나가 생길 때: 그 구간에 테마의 풍경 조각을 놓는다 (꾸미기라서 무작위여도 된다)
-  decorate(s0, s1, x, w, y, th) {
+  //   큰 풍경은 앞뒤 발판까지 닿을 수 있어서, 그 구간의 길이 다 만들어진 뒤에 자리를 보고 놓는다
+  decorate(s0, s1, x, w, y, th, track) {
+    this.pending = (this.pending || []).filter((q) => { if (q.s + PLACE_AHEAD >= s0) return true; this.spawn(q.name, q.k, q.s, q.x, q.w, q.y, q.th, track); return false; });
     for (const name of th.kits) {
       const k = KITS[name];
       if (!k) continue;
@@ -182,13 +188,18 @@ export class Env {
       let at = this.next[name] ?? s0 - R() * step;
       if (at < s0 - step) at = s0 - R() * step;
       while (at < s1) {
-        if (at >= s0 - 2) this.spawn(name, k, at, x, w, y, th);
+        if (at >= s0 - 2) this.pending.push({ name, k, s: at, x, w, y, th });
         at += step * (0.7 + R() * 0.9);
       }
       this.next[name] = at;
     }
   }
-  spawn(name, k, s, x, w, y, th) {
+  // 그 자리에 놓으면 발판 위 곰돌이가 달리는 공간과 겹치나 (b = 풍경 크기, 원점 기준)
+  blocks(track, b, s, px, py) {
+    const m = 0.8, x0 = px + b.min.x - m, x1 = px + b.max.x + m, s0 = s - b.max.z - m, s1 = s - b.min.z + m, y0 = py + b.min.y, y1 = py + b.max.y;
+    return (track?.plats || []).some((p) => { const a = p.mv ? p.mv.amp : 0; return s1 > p.s0 && s0 < p.s1 && x1 > p.cx - p.w / 2 - a && x0 < p.cx + p.w / 2 + a && y0 < p.y + CLEAR_H && y1 > p.y - 0.3; });
+  }
+  spawn(name, k, s, x, w, y, th, track) {
     const r = { next: R, range: (a, b) => a + (b - a) * R(), int: (a, b) => Math.floor(a + (b - a + 1) * R()), pick: (a) => a[Math.floor(R() * a.length)], chance: (p) => R() < p };
     const P = { ...th.P, a: th.P?.a, l: th.P?.l };
     let o = k.build(r, P, w);
@@ -207,6 +218,13 @@ export class Env {
     else if (place === 'over') { px = x; py = y; }
     else if (place === 'drift') { px = x + side * r.range(w / 2 + 2.5, w / 2 + 9); py = y + r.range(0.5, 5); }
     if (!o.userData.anim && !o.userData.baked) { const b = bakeStatic(o); b.userData.baked = true; o = b; }
+    // 옆 풍경: 길과 겹치면 반대쪽 · 더 먼 곳으로 옮기고, 그래도 겹치면 놓지 않는다
+    if (place === 'side' || place === 'drift') {
+      const box = BOX.setFromObject(o), off = px - x, far = Math.max(box.max.x - box.min.x, 4);
+      const spot = [off, -off, off + Math.sign(off) * far, -off - Math.sign(off) * far].find((d) => !this.blocks(track, box, s, x + d, py));
+      if (spot === undefined) { this.dispose(o); return; }
+      px = x + spot;
+    }
     o.position.set(px, py, this.origin0 - s);
     o.userData.y0 = py;
     o.userData.s = s; o.userData.place = place;
@@ -215,7 +233,7 @@ export class Env {
   }
   get origin0() { return this.originRef ? this.originRef.origin : 0; }
   shift(k) { for (const o of this.objs) o.position.z += k; }
-  clear() { for (const o of this.objs) this.dispose(o); this.objs = []; for (const k of Object.keys(this.next)) delete this.next[k]; }
+  clear() { this.pending = []; for (const o of this.objs) this.dispose(o); this.objs = []; for (const k of Object.keys(this.next)) delete this.next[k]; }
   dispose(o) { this.root.remove(o); if (o.userData.baked) o.traverse((c) => c.geometry?.dispose()); }
 
   update(dt, t, camera, ps, px, py) {

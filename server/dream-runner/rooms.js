@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { BaseRooms } from '../shared/rooms.js';
+import { diffOf } from '../../public/dream-runner/js/diff.js';
 
 const MAX = 12;
 const SNAP_HZ = 15;
@@ -38,7 +39,7 @@ export class DreamRooms {
   }
   send(c, m) { if (c.ws.readyState === 1) c.ws.send(JSON.stringify(m)); }
   toRoom(room, m, except) { const s = JSON.stringify(m); for (const p of room.players) if (p !== except && p.ws.readyState === 1) p.ws.send(s); }
-  roomInfo(r) { return { id: r.id, name: r.name, n: r.players.length, max: MAX, state: r.state === 'pause' ? 'run' : r.state, host: r.host?.name || '', mode: r.mode, team: !!r.team }; }
+  roomInfo(r) { return { id: r.id, name: r.name, n: r.players.length, max: MAX, state: r.state === 'pause' ? 'run' : r.state, host: r.host?.name || '', mode: r.mode, diff: r.diff, team: !!r.team }; }
   list() { return [...this.rooms.values()].map((r) => this.roomInfo(r)); }
   members(r) { return r.players.map((p) => ({ id: p.id, name: p.name, color: p.color, look: p.look, acc: p.acc, host: p === r.host, dead: p.dead, result: p.result, team: p.team })); }
   roomUpdate(r) { this.toRoom(r, { t: 'room', room: this.roomInfo(r), you: null, members: this.members(r) }); }
@@ -60,7 +61,7 @@ export class DreamRooms {
       case 'list': return this.send(c, { t: 'rooms', rooms: this.list() });
       case 'create': {
         this.leave(c);
-        const r = { id: this.newCode(), name: clean(m.name, 20) || `${c.name}의 꿈`, players: [], host: c, state: 'wait', seed: 0, startAt: 0, mode: m.mode === 'item' ? 'item' : 'speed', team: false };
+        const r = { id: this.newCode(), name: clean(m.name, 20) || `${c.name}의 꿈`, players: [], host: c, state: 'wait', seed: 0, startAt: 0, mode: m.mode === 'item' ? 'item' : 'speed', diff: diffOf(m.diff), team: false };
         this.rooms.set(r.id, r);
         return this.join(c, r);
       }
@@ -74,7 +75,7 @@ export class DreamRooms {
         // 기다리는 방 중 사람이 가장 많은 곳, 없으면 새 방
         const r = [...this.rooms.values()].filter((x) => x.state === 'wait' && x.players.length < MAX).sort((a, b) => b.players.length - a.players.length)[0];
         if (r) return this.join(c, r);
-        return this.handle(c, { t: 'create', name: '' });
+        return this.handle(c, { t: 'create', name: '', mode: m.mode, diff: m.diff });
       }
       case 'leave': return this.leave(c, true);
       case 'chat': return this.chat(c, m);
@@ -85,7 +86,7 @@ export class DreamRooms {
         for (const p of r.players) { p.dead = false; p.st = null; p.result = null; }
         // 팀전: 한 팀이 비어 있으면 번갈아 나눈다
         if (r.team && r.players.length > 1 && new Set(r.players.map((p) => p.team)).size < 2) r.players.forEach((p, i) => { p.team = i % 2 ? 'blue' : 'red'; });
-        this.toRoom(r, { t: 'start', seed: r.seed, in: COUNTDOWN, members: this.members(r), mode: r.mode, team: !!r.team, dur: TEAM_DUR });
+        this.toRoom(r, { t: 'start', seed: r.seed, in: COUNTDOWN, members: this.members(r), mode: r.mode, diff: r.diff, team: !!r.team, dur: TEAM_DUR });
         return this.broadcastList();
       }
       case 'st': {
@@ -127,6 +128,14 @@ export class DreamRooms {
         const r = c.room;
         if (!r || r.host !== c || r.state !== 'wait') return;
         r.mode = m.mode === 'item' ? 'item' : 'speed';
+        this.roomUpdate(r); this.broadcastList();
+        return;
+      }
+      case 'diff': {
+        // 난이도도 방장이 기다리는 동안 바꾼다
+        const r = c.room;
+        if (!r || r.host !== c || r.state !== 'wait') return;
+        r.diff = diffOf(m.diff);
         this.roomUpdate(r); this.broadcastList();
         return;
       }
@@ -224,7 +233,7 @@ export class DreamRooms {
       if (r.state !== 'run' && r.state !== 'pause') continue;
       this.toRoom(r, { t: 'maint' });
       const players = r.state === 'pause' ? [...r.players.map((p) => this.slotOf(p)), ...r.slots.values()] : r.players.map((p) => this.slotOf(p));
-      rooms.push({ id: r.id, name: r.name, mode: r.mode, team: r.team, seed: r.seed, elapsed: r.state === 'pause' ? r.elapsed : now - r.startAt, host: r.host?.tok, chat: r.chat || [], players });
+      rooms.push({ id: r.id, name: r.name, mode: r.mode, diff: r.diff, team: r.team, seed: r.seed, elapsed: r.state === 'pause' ? r.elapsed : now - r.startAt, host: r.host?.tok, chat: r.chat || [], players });
     }
     if (!rooms.length || !this.dataDir) return 0;
     try { fs.writeFileSync(path.join(this.dataDir, PAUSE_FILE), JSON.stringify({ at: now, rooms })); } catch (e) { console.error('드림 러너 방 저장 실패', e.message); }
@@ -238,7 +247,7 @@ export class DreamRooms {
     if (!d?.rooms || Date.now() - d.at > PAUSE_MAX) return;
     for (const x of d.rooms) {
       if (this.rooms.has(x.id) || !Array.isArray(x.players)) continue;
-      const r = { id: x.id, name: x.name, players: [], host: null, hostTok: x.host, state: 'pause', seed: x.seed, startAt: 0, elapsed: x.elapsed, mode: x.mode, team: !!x.team, chat: x.chat || [], slots: new Map(), deadline: Date.now() + PAUSE_MAX, firstBack: 0 };
+      const r = { id: x.id, name: x.name, players: [], host: null, hostTok: x.host, state: 'pause', seed: x.seed, startAt: 0, elapsed: x.elapsed, mode: x.mode, diff: diffOf(x.diff), team: !!x.team, chat: x.chat || [], slots: new Map(), deadline: Date.now() + PAUSE_MAX, firstBack: 0 };
       for (const p of x.players) { r.slots.set(p.tok, p); this.nextPid = Math.max(this.nextPid, p.id + 1); }
       this.rooms.set(r.id, r);
     }

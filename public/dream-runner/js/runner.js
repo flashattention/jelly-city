@@ -103,7 +103,7 @@ export class Runner {
     Object.assign(this, { s, x, y: 0, boost: 0, vx: 0, vy: 0, knock: 0, onGround: true, jumps: 0, coyote: 0, jbuf: 0, slideT: 0, flipT: 0, shoveT: 0, alive: true, dead: null, stars: 0, plat: null, t: 0 });
     this.bear.inner.rotation.set(0, 0, 0); this.bear.root.scale.setScalar(1); this.bear.root.visible = true;
   }
-  get v() { return speedAt(this.s) * (1 + BOOST * this.boost) * (1 + 0.8 * this.rocketK) * (this.eff.slow > 0 ? 0.6 : 1); }
+  get v() { return speedAt(this.s) * (this.speedK || 1) * (1 + BOOST * this.boost) * (1 + 0.8 * this.rocketK) * (this.eff.slow > 0 ? 0.6 : 1); }
   get h() { return this.slideT > 0 ? H_SLIDE : H_STAND; }
 
   // input: { dir(-1~1), jump(눌림), slide(눌림), slideHeld, boost(누르는 중) }
@@ -149,7 +149,7 @@ export class Runner {
       if (!was) { fx?.('land'); this.bear.jumpSquash = 1; }
       this.lastGroundY = g.y;
       if (!g.mv && this.s > g.s0 + 0.5 && this.s < g.s1 - 0.5) this.safe = { s: this.s, x: Math.max(g.cx - g.w / 2 + 0.6, Math.min(g.cx + g.w / 2 - 0.6, this.x)), y: g.y };
-      if (g.mv) this.x += g.dx; // 움직이는 발판에 실려 간다
+      if (g.mv && !this.substep) this.x += g.dx; // 움직이는 발판에 실려 간다 (한 프레임에 한 번만)
     }
     // 구름발판: 떨어지지 않고 마지막 발판 높이에 떠 있는다
     if (!this.onGround && this.eff.cloud > 0 && this.vy <= 0 && this.y <= this.cloudY) { this.y = this.cloudY; this.vy = 0; this.onGround = true; this.jumps = 0; }
@@ -256,7 +256,7 @@ export class Ghost {
   update(dt, origin) {
     // 받은 뒤 지난 시간만큼 앞으로 (모두 같은 속도 규칙이라 잘 맞는다)
     const lag = Math.min(0.3, (performance.now() - this.at) / 1000);
-    const want = this.ts + (this.alive ? speedAt(this.ts) * (this.f & 16 ? 1 + BOOST : 1) * lag : 0);
+    const want = this.ts + (this.alive ? speedAt(this.ts) * (this.speedK || 1) * (this.f & 16 ? 1 + BOOST : 1) * lag : 0);
     this.s += (want - this.s) * Math.min(1, dt * 12); if (Math.abs(want - this.s) > 8) this.s = want;
     this.x += (this.tx - this.x) * Math.min(1, dt * 12);
     this.y += (this.ty - this.y) * Math.min(1, dt * 14);

@@ -10,9 +10,10 @@ import { Runner, Ghost } from './runner.js';
 import { THEMES } from './themes.js';
 import { sfx, setMusic, unlock, toggleMute, sound } from './music.js';
 import { ITEMS } from './items.js';
+import { DIFFS, diffOf } from './diff.js';
 
 const $ = (id) => document.getElementById(id);
-const MODE_KEY = 'dreamrunner.mode';
+const MODE_KEY = 'dreamrunner.mode', DIFF_KEY = 'dreamrunner.diff';
 const CHAR_KEY = 'dreamrunner.char', NICK_KEY = 'dreamrunner.nick', ANON_KEY = 'dreamrunner.anon';
 // 비로그인: 이 브라우저의 임시 아이디 (순위표에서 내 기록을 찾는 데만 쓴다)
 function anonId() {
@@ -218,17 +219,25 @@ game.pickMode = store.get(MODE_KEY) === 'item' ? 'item' : 'speed';
 segSet('mode-pick', game.pickMode);
 for (const b of $('mode-pick').children) b.onclick = () => { game.pickMode = b.dataset.m; store.set(MODE_KEY, game.pickMode); segSet('mode-pick', game.pickMode); };
 for (const b of $('room-mode').children) b.onclick = () => net.send({ t: 'mode', mode: b.dataset.m });
+// 난이도: 길은 같고 빠르기만 다르다 (이지 · 노멀 · 하드 · 익스트림)
+const diffName = (d) => DIFFS[diffOf(d)].name;
+for (const id of ['diff-pick', 'room-diff', 'board-diff']) $(id).innerHTML = Object.entries(DIFFS).map(([k, d]) => `<button data-m="${k}">${d.name}</button>`).join('');
+game.pickDiff = diffOf(store.get(DIFF_KEY));
+segSet('diff-pick', game.pickDiff);
+for (const b of $('diff-pick').children) b.onclick = () => { game.pickDiff = b.dataset.m; store.set(DIFF_KEY, game.pickDiff); segSet('diff-pick', game.pickDiff); };
+for (const b of $('room-diff').children) b.onclick = () => net.send({ t: 'diff', diff: b.dataset.m });
+for (const b of $('board-diff').children) b.onclick = async () => { game.boardDiff = b.dataset.m; segSet('board-diff', game.boardDiff); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff)); };
 for (const b of $('room-team').children) b.onclick = () => net.send({ t: 'team', on: b.dataset.t === '1' });
 $('team-btn').onclick = () => net.send({ t: 'switch' });
 game.boardMode = 'speed';
-for (const b of $('board-mode').children) b.onclick = async () => { game.boardMode = b.dataset.m; segSet('board-mode', game.boardMode); renderBoard($('board-list'), await loadBoard(game.boardMode)); };
-$('board-btn').onclick = async () => { game.boardMode = game.pickMode; segSet('board-mode', game.boardMode); show('board'); renderBoard($('board-list'), await loadBoard(game.boardMode)); };
+for (const b of $('board-mode').children) b.onclick = async () => { game.boardMode = b.dataset.m; segSet('board-mode', game.boardMode); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff)); };
+$('board-btn').onclick = async () => { game.boardMode = game.pickMode; game.boardDiff = game.pickDiff; segSet('board-mode', game.boardMode); segSet('board-diff', game.boardDiff); show('board'); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff)); };
 $('board-close').onclick = () => show('title');
 $('home-btn').onclick = () => { if (game.multi) { net.send({ t: 'leave' }); game.multi = false; } toTitle(); };
 $('again-btn').onclick = () => { if (game.multi) { leaveRun(); show('room'); } else startSolo(); };
 
 // ---------- 순위표 ----------
-async function loadBoard(mode = 'speed') { try { return await account.api(`/api/dream/board?mode=${mode}` + (logged() ? '' : `&anon=${anonId()}`)); } catch { return { top: [] }; } }
+async function loadBoard(mode = 'speed', diff = 'easy') { try { return await account.api(`/api/dream/board?mode=${mode}&diff=${diff}` + (logged() ? '' : `&anon=${anonId()}`)); } catch { return { top: [] }; } }
 function renderBoard(el, d, hl) {
   const top = d.top || [], me = d.me;
   const myId = me?.id;
@@ -239,8 +248,9 @@ function renderBoard(el, d, hl) {
 }
 
 // ---------- 시작 · 끝 ----------
-function newRun(seed, itemMode = false) {
+function newRun(seed, itemMode = false, diff = 'easy') {
   game.itemMode = itemMode;
+  game.diff = diffOf(diff); runner.speedK = DIFFS[game.diff].k;
   game.seed = seed;
   for (const g of game.ghosts.values()) g.remove();
   game.ghosts.clear();
@@ -259,7 +269,7 @@ function newRun(seed, itemMode = false) {
 }
 function startSolo() {
   game.multi = false; game.team = false; $('teambar').classList.add('hidden');
-  newRun((Math.random() * 2 ** 31) | 0, game.pickMode === 'item');
+  newRun((Math.random() * 2 ** 31) | 0, game.pickMode === 'item', game.pickDiff);
   countdown(3000);
 }
 function countdown(ms) {
@@ -295,7 +305,7 @@ function score() { return Math.floor(runner.s) + runner.stars * 10; }
 async function died(why) {
   sfx(why.includes('떨어') ? 'die' : 'bonk');
   game.mode = 'dead'; game.deadT = 0; game.why = why;
-  const rec = { dist: Math.floor(runner.s), stars: runner.stars, themes: game.dreamsSeen, time: game.runT, name: game.profile.name, color: game.profile.color, mode: game.itemMode ? 'item' : 'speed' };
+  const rec = { dist: Math.floor(runner.s), stars: runner.stars, themes: game.dreamsSeen, time: game.runT, name: game.profile.name, color: game.profile.color, mode: game.itemMode ? 'item' : 'speed', diff: game.diff };
   if (game.multi) net.send({ t: 'dead', dist: rec.dist, stars: rec.stars, why });
   game.rec = rec;
   if (!logged()) { game.submitted = { anonPending: true }; return; } // 비로그인: 탈락 화면에서 임시 닉네임을 정해 남긴다
@@ -324,8 +334,8 @@ async function showOver() {
   if (r?.newBest) sfx('best');
   $('again-btn').textContent = game.multi ? '👥 방으로 돌아가기' : '🔁 다시 달리기';
   $('ov-board-title').classList.remove('hidden'); $('ov-board').classList.remove('hidden');
-  $('ov-board-title').textContent = `🏆 ${modeName(game.itemMode ? 'item' : 'speed')} 최고 기록`;
-  renderBoard($('ov-board'), r?.top ? r : await loadBoard(game.itemMode ? 'item' : 'speed'), true);
+  $('ov-board-title').textContent = `🏆 ${diffName(game.diff)} · ${modeName(game.itemMode ? 'item' : 'speed')} 최고 기록`;
+  renderBoard($('ov-board'), r?.top ? r : await loadBoard(game.itemMode ? 'item' : 'speed', game.diff), true);
 }
 
 $('ov-save-btn').onclick = async () => {
@@ -440,7 +450,7 @@ function renderRooms(list) {
   el.innerHTML = '';
   for (const r of list) {
     const d = document.createElement('div'); d.className = 'room';
-    d.innerHTML = `<span class="nm">${esc(r.name)}</span><span class="meta">${r.team ? '👥 팀전 · ' : ''}${modeName(r.mode)} · 👑 ${esc(r.host)} · ${r.n}/${r.max}</span><span class="tag ${r.state === 'run' ? 'run' : ''}">${r.state === 'run' ? '달리는 중' : '기다리는 중'}</span>`;
+    d.innerHTML = `<span class="nm">${esc(r.name)}</span><span class="meta">${r.team ? '👥 팀전 · ' : ''}${diffName(r.diff)} · ${modeName(r.mode)} · 👑 ${esc(r.host)} · ${r.n}/${r.max}</span><span class="tag ${r.state === 'run' ? 'run' : ''}">${r.state === 'run' ? '달리는 중' : '기다리는 중'}</span>`;
     const b = document.createElement('button'); b.className = 'btn'; b.textContent = '들어가기';
     b.disabled = r.state === 'run' || r.n >= r.max;
     b.onclick = () => net.send({ t: 'join', id: r.id });
@@ -451,7 +461,7 @@ function renderRoom(rank) {
   const r = game.room; if (!r) return;
   $('room-title').textContent = `🌙 ${r.name}`;
   $('code-txt').textContent = r.id;
-  segSet('room-mode', r.mode || 'speed');
+  segSet('room-mode', r.mode || 'speed'); segSet('room-diff', diffOf(r.diff));
   const me = game.members.find((m) => m.id === game.myId);
   const host = !!me?.host;
   for (const b of $('room-team').children) { b.classList.toggle('on', (b.dataset.t === '1') === !!r.team); b.disabled = !host; }
@@ -474,7 +484,7 @@ function renderRoom(rank) {
     el.appendChild(d);
   }
   $('start-btn').classList.toggle('hidden', !host);
-  for (const b of $('room-mode').children) b.disabled = !host; // 모드는 방장이 정한다
+  for (const b of [...$('room-mode').children, ...$('room-diff').children]) b.disabled = !host; // 모드 · 난이도는 방장이 정한다
   $('room-hint').textContent = host ? `${game.members.length}명이 모였어요. 준비되면 출발을 눌러요! (혼자서도 시작할 수 있어요)` : '방장이 출발을 누르면 다 같이 달려요 🌙';
   if (rank) {
     $('room-rank').classList.remove('hidden');
@@ -504,8 +514,8 @@ net.on('start', (m) => {
   game.team = !!m.team;
   game.myTeam = m.members.find((x) => x.id === game.myId)?.team;
   game.endAt = performance.now() + m.in + (m.dur || 180) * 1000; game.respawnT = 0;
-  newRun(m.seed, m.mode === 'item');
-  for (const mem of m.members) if (mem.id !== game.myId) game.ghosts.set(mem.id, new Ghost(scene, game.team ? { ...mem, teamColor: TEAMS[mem.team]?.color } : mem));
+  newRun(m.seed, m.mode === 'item', m.diff);
+  for (const mem of m.members) if (mem.id !== game.myId) { const g = new Ghost(scene, game.team ? { ...mem, teamColor: TEAMS[mem.team]?.color } : mem); g.speedK = runner.speedK; game.ghosts.set(mem.id, g); }
   $('teambar').classList.toggle('hidden', !game.team);
   game.alive = m.members.length;
   countdown(m.in);
@@ -565,8 +575,8 @@ net.on('finish', (m) => {
   const show2 = () => { showOver().then(() => { $('ov-room').classList.remove('hidden'); $('ov-room').innerHTML = '<h3>🏁 이번 판 순위</h3>' + m.rank.map((e) => `<div class="brow${e.id === game.myId ? ' me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.name)}</span><span class="sc">${e.dist.toLocaleString()}m<small>⭐${e.stars}</small></span></div>`).join(''); renderRoom(m.rank); }); };
   if (game.mode === 'dead' && game.deadT < 1.4) setTimeout(show2, (1.4 - game.deadT) * 1000); else show2();
 });
-$('quick-btn').onclick = () => net.send({ t: 'quick' });
-$('create-btn').onclick = () => net.send({ t: 'create', name: $('room-name').value, mode: game.pickMode });
+$('quick-btn').onclick = () => net.send({ t: 'quick', mode: game.pickMode, diff: game.pickDiff });
+$('create-btn').onclick = () => net.send({ t: 'create', name: $('room-name').value, mode: game.pickMode, diff: game.pickDiff });
 $('lobby-back').onclick = () => { game.multi = false; show('title'); };
 $('leave-btn').onclick = () => { net.send({ t: 'leave' }); game.room = null; $('ov-room').classList.add('hidden'); afterLeave(); };
 // 방에서 나온 뒤: 로그인했으면 방 목록, 아니면 처음 화면
@@ -642,7 +652,14 @@ function frame() {
     }
     if (game.mode === 'run') {
       game.runT += dt;
-      const why = runner.update(dt, input, track, onFx);
+      // 빠를 때는 잘게 나눠 움직인다 (한 프레임에 장애물을 뛰어넘어 버리지 않게)
+      const steps = Math.min(8, Math.max(1, Math.ceil(runner.v * dt / 0.6)));
+      let why = null;
+      for (let i = 0; i < steps && !why; i++) {
+        runner.substep = i; why = runner.update(dt / steps, input, track, onFx);
+        input.jump = input.slide = false; // 누른 순간은 첫 조각에서만
+      }
+      runner.substep = 0;
       if (input.item && runner.alive) useItem();
       if (why) { if (game.team) teamDown(why); else died(why); }
       if (game.team && !runner.alive) { game.respawnT -= dt; if (game.respawnT <= 0) { runner.respawn(track); sfx('use_shield'); } }
@@ -699,7 +716,7 @@ function followCamera(dt) {
   const s = w ? w.s : runner.s, x = w ? w.x : runner.x, y = w ? w.y : runner.y;
   const z = track.origin - s;
   const k = 1 - Math.exp(-dt * 7);
-  const v = w ? speedAt(s) : runner.v;
+  const v = w ? speedAt(s) * (runner.speedK || 1) : runner.v;
   const dead = game.mode === 'dead' && !w;
   const cx = x * 0.85, cy = Math.max(y, -6) + 3.3;
   camera.position.x += (cx - camera.position.x) * k;
@@ -707,7 +724,7 @@ function followCamera(dt) {
   camera.position.z = dead ? camera.position.z : z + 7.4;
   camLook.set(x, Math.max(y, -8) + 1.2, z - 9);
   camera.lookAt(camLook);
-  const fov = 60 + (v - V0) * 0.55;
+  const fov = Math.min(88, 60 + (v - V0) * 0.55); // 아주 빠른 난이도에서 화면이 지나치게 벌어지지 않게
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * k; camera.updateProjectionMatrix(); }
 }
 // 달리는 중 생기는 일 (소리 · 아이템 칸)
