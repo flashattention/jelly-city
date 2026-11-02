@@ -3,7 +3,8 @@ import { account, store } from '/shared/js/account.js';
 import { Creator, thumbOf, DEFAULT_CHAR_KEY } from '/shared/js/char-studio.js';
 import { localChars, addLocal, updateLocal, removeLocal, LOCAL_MAX } from '/shared/js/local-chars.js';
 import { openSens } from '/shared/js/sens.js';
-import { openPatchNotes } from '/shared/js/patchnotes.js';
+import { openPatchNotes, showWhatsNew } from '/shared/js/patchnotes.js';
+import { refreshBoard } from '/hub/board.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -37,6 +38,7 @@ async function boot() {
   if (!logged() && q.has('autostart') && status.devLogin) { try { await account.login({ dev: q.get('name') || '젤리' }); } catch (e) { err(e.message); } } // 점검용
   render();
   if (q.has('create')) openStudio(); // 로그인 안 해도 이 기기에 만든다
+  else if (!back) showWhatsNew(); // 들어올 때 그동안 바뀐 것을 가운데에 보여 준다
 }
 function render() {
   const on = logged();
@@ -55,7 +57,7 @@ function render() {
     $('dev-box').classList.toggle('hidden', !status.devLogin);
     if (status.googleClientId) account.googleButton($('g-btn'), status.googleClientId, () => { render(); if (q.has('create')) openStudio(); }, (e) => err(e.message)).catch(() => err('구글 로그인 버튼을 불러오지 못했어요'));
   }
-  renderChars();
+  renderChars(); refreshBoard();
 }
 $('pw').oninput = () => { store.set('roachcity.pw', $('pw').value); err(''); };
 $('guest-btn').onclick = async () => { try { await account.login({ guest: true }); render(); if (q.has('create')) openStudio(); } catch (e) { err(e.message); } };
