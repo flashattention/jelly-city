@@ -2,6 +2,7 @@
 //   → 같은 방 사람들은 모두 같은 길을 달린다. 꿈(테마)은 거리로 정해서(약 20초 분량) 모두 같은 자리에서 바뀐다
 //   좌표: s = 달린 거리(앞), x = 좌우(오른쪽 +), y = 높이. 화면에는 z = origin - s 로 그린다
 import * as THREE from 'three';
+import { isPhone } from '../../shared/js/perf.js';
 import { RNG } from '../../shared/js/utils.js';
 import { THEMES } from './themes.js';
 import { glow, starG } from './kits.js';
@@ -11,7 +12,7 @@ export const V0 = 13, VMAX = 30;
 export const speedAt = (s) => Math.min(VMAX, V0 + Math.max(0, s) / 220); // 달릴수록 빨라진다
 export const DREAM_SEC = 20;
 export const DEATH_Y = -16;       // 이 아래로 떨어지면 탈락
-const AHEAD = 280, BEHIND = 40;
+const AHEAD = isPhone ? 190 : 280, BEHIND = 40; // 휴대폰은 앞을 덜 만들어 그리기 횟수를 줄인다
 
 // ---------- 발판 무늬 (윗면 텍스처) ----------
 const texCache = new Map();
@@ -180,10 +181,10 @@ export class Track {
     const m = new THREE.Group();
     const body = new THREE.Mesh(starG(), STAR_M); body.scale.setScalar(0.42);
     const rim = new THREE.Mesh(starG(), STAR_RIM); rim.scale.setScalar(0.42 * 1.16);
-    const halo = new THREE.Sprite(STAR_HALO); halo.scale.setScalar(1.5);
-    m.add(halo, rim, body);
+    m.add(rim, body);
+    if (!isPhone) { const halo = new THREE.Sprite(STAR_HALO); halo.scale.setScalar(1.5); m.add(halo); }
     const g = this.ground(s, x, y);
-    if (g && y - g.y < 3) { const sh = new THREE.Mesh(G_SHADOW, SHADOW_M); sh.rotation.x = -Math.PI / 2; sh.position.y = g.y + 0.04 - y; sh.scale.setScalar(0.42); m.add(sh); m.userData.shadow = sh; }
+    if (!isPhone && g && y - g.y < 3) { const sh = new THREE.Mesh(G_SHADOW, SHADOW_M); sh.rotation.x = -Math.PI / 2; sh.position.y = g.y + 0.04 - y; sh.scale.setScalar(0.42); m.add(sh); m.userData.shadow = sh; }
     m.position.set(x, y, this.z(s)); m.userData.s = s;
     this.root.add(m);
     this.stars.push({ s, x, y, mesh: m, got: false });

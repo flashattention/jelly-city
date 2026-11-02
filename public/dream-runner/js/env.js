@@ -1,6 +1,7 @@
 // 꿈의 분위기: 하늘 · 안개 · 빛 · 떨어지면 빠지는 아래(용암·바다·구름…) · 떠다니는 알갱이 · 풍경 놓기
 // 꿈이 바뀌면 2~3초 동안 부드럽게 다음 꿈의 색으로 물든다
 import * as THREE from 'three';
+import { isPhone } from '../../shared/js/perf.js';
 import { bakeStatic, toon } from '../../shared/js/utils.js';
 import { KITS } from './kits.js';
 
@@ -200,6 +201,7 @@ export class Env {
     return (track?.plats || []).some((p) => { const a = p.mv ? p.mv.amp : 0; return s1 > p.s0 && s0 < p.s1 && x1 > p.cx - p.w / 2 - a && x0 < p.cx + p.w / 2 + a && y0 < p.y + CLEAR_H && y1 > p.y - 0.3; });
   }
   spawn(name, k, s, x, w, y, th, track) {
+    if (isPhone && (this.skipN = (this.skipN || 0) + 1) % 2) return; // 휴대폰은 옆 풍경을 절반만
     const r = { next: R, range: (a, b) => a + (b - a) * R(), int: (a, b) => Math.floor(a + (b - a + 1) * R()), pick: (a) => a[Math.floor(R() * a.length)], chance: (p) => R() < p };
     const P = { ...th.P, a: th.P?.a, l: th.P?.l };
     let o = k.build(r, P, w);

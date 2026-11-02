@@ -1,6 +1,7 @@
 // 젤리 아레나: 5 대 5 라인 전략 배틀. 서버(sim.js)가 다 계산하고, 여기서는 보이는 모습을 그리고 명령을 보낸다
 //   우클릭 이동 · 공격 | Q W E R 기술(누르면 범위, 떼면 발사) | D F 주문 | A 공격 이동 | B 상점 | Tab 점수판 | Y 카메라 고정
 import * as THREE from 'three';
+import { isPhone, autoRes } from '../../shared/js/perf.js';
 import { Shell, esc } from '../../shared/js/shell.js';
 import { store } from '../../shared/js/account.js';
 import { makeSound, confetti } from '../../shared/js/party.js';
@@ -21,12 +22,12 @@ const HELD = { sword: 'sword', axe: 'halberd', club: 'rod', dagger: 'knife', sta
 
 // ---------- 그리기 준비 ----------
 const canvas = $('c'), ov = $('ov'), ctx = ov.getContext('2d');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1)); renderer.outputColorSpace = THREE.SRGBColorSpace;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isPhone });
+autoRes(renderer, 2); renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(36, 1, 1, 400);
 game.camera = camera; game.scene = scene; // 점검용
-function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); const d = Math.min(2, devicePixelRatio || 1); ov.width = innerWidth * d; ov.height = innerHeight * d; ctx.setTransform(d, 0, 0, d, 0, 0); }
+function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); const d = Math.min(isPhone ? 1.5 : 2, devicePixelRatio || 1); ov.width = innerWidth * d; ov.height = innerHeight * d; ctx.setTransform(d, 0, 0, d, 0, 0); }
 addEventListener('resize', resize); resize();
 const W = buildWorld(scene);
 const miniBg = (() => { const c = document.createElement('canvas'); c.width = c.height = 440; c.getContext('2d').drawImage(W.gc, 0, 0, 440, 440); return c; })();

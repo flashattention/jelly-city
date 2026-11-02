@@ -1,6 +1,7 @@
 // 젤리드리프트: 꿈나라 트랙을 곰돌이 카트로 달린다 (혼자: AI 5대 · 타임어택 · 같이: 최대 12명, 스피드전/아이템전 · 개인전/팀전)
 import '../../shared/js/renamed.js'; // 옛 이름으로 저장된 값 옮기기 (맨 먼저)
 import * as THREE from 'three';
+import { isPhone, autoRes } from '../../shared/js/perf.js';
 import { account, store } from '../../shared/js/account.js';
 import { Shell, esc, TEAMS } from '../../shared/js/shell.js';
 import { Env } from '../../dream-runner/js/env.js';
@@ -17,8 +18,8 @@ const BOT_COLORS = ['#ff8fb1', '#7cd8ff', '#ffd27a', '#ffb36b', '#9be7a7', '#c39
 const MODE_KEY = 'jellydrift.mode', TRACK_KEY = 'jellydrift.track', ANON_KEY = 'dreamrunner.anon';
 
 // ---------- 3D ----------
-const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: !isPhone, powerPreference: 'high-performance' });
+autoRes(renderer, 2);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(68, 1, 0.1, 1800);

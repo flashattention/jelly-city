@@ -1,6 +1,7 @@
 // 젤리수호대: 영웅 16명이 겨루는 팀 슈팅 (점령전 · 쟁탈전 · 6 대 6 · 봇)
 import '../../shared/js/renamed.js'; // 옛 이름으로 저장된 값 옮기기 (맨 먼저)
 import * as THREE from 'three';
+import { isPhone, autoRes } from '../../shared/js/perf.js';
 import { openSens, sensOf } from '../../shared/js/sens.js';
 import { store } from '../../shared/js/account.js';
 import { Shell, esc, TEAMS } from '../../shared/js/shell.js';
@@ -22,8 +23,8 @@ const BEAM_COL = { mercy: '#ffd400', winston: '#9fe8ff', zarya: '#ff8fd0', moira
 const MERCY_HEAL = '#ffd400', MERCY_BOOST = '#1f7bff'; // 토닥 치유(진한 노랑) · 강화(진한 파랑)
 
 // ---------- 3D ----------
-const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: !isPhone, powerPreference: 'high-performance' });
+autoRes(renderer, 2);
 renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.autoClear = false;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(78, 1, 0.05, 900);

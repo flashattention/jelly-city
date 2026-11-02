@@ -2,6 +2,7 @@
 //   숨는 쪽: 3인칭 · 🎨 칠하기(붓 · 지우개 · 스포이드 · 부위 채우기 · 무늬 도장) · 자세 4가지 · 위장도 계기판
 //   술래: 1인칭 물감총(포물선 물감 · 맞은 자리에 자국 · 물감통 12발이 조금씩 참) · 움직이는 젤리는 반짝이 흔적
 import * as THREE from 'three';
+import { isPhone, autoRes } from '../../shared/js/perf.js';
 import { store } from '../../shared/js/account.js';
 import { Shell, esc } from '../../shared/js/shell.js';
 import { faceHtml, makeSound, confetti, rankIcon } from '../../shared/js/party.js';
@@ -22,8 +23,8 @@ const game = window.hide = {
 
 // ---------- 그리기 준비 ----------
 const canvas = $('c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1)); renderer.outputColorSpace = THREE.SRGBColorSpace;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isPhone });
+autoRes(renderer, 2); renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(66, 1, 0.05, 400); camera.rotation.order = 'YXZ';
 scene.add(new THREE.HemisphereLight('#ffffff', '#b7a3c9', 1.35));

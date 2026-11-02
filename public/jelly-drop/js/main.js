@@ -2,6 +2,7 @@
 //   젤리 비행선 → 뛰어내리기(F) → 낙하산 → 착지 → 줍기(E) → 싸우기 → 줄어드는 젤리 자기장 → 마지막 한 명 '마지막 곰젤리!'
 import '../../shared/js/renamed.js'; // 옛 이름으로 저장된 값 옮기기 (맨 먼저)
 import * as THREE from 'three';
+import { isPhone, autoRes } from '../../shared/js/perf.js';
 import { store } from '../../shared/js/account.js';
 import { openSens, sensOf } from '../../shared/js/sens.js';
 import { Shell, esc } from '../../shared/js/shell.js';
@@ -24,8 +25,8 @@ const PICK_KEY = 'jellydrop.pick';
 let MAP = getBgMap('island');
 
 // ---------- 3D ----------
-const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(1.75, window.devicePixelRatio || 1));
+const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: !isPhone, powerPreference: 'high-performance' });
+autoRes(renderer, 1.75);
 renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.autoClear = false;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, 1, 0.05, 1400);

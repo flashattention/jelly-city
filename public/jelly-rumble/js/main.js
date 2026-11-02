@@ -2,6 +2,7 @@
 //   내 몸은 이 화면이 움직이고(phys.js), 다른 곰돌이는 서버가 보내는 위치를 부드럽게 따라간다
 import '../../shared/js/renamed.js'; // 옛 이름으로 저장된 값 옮기기 (맨 먼저)
 import * as THREE from 'three';
+import { isPhone, autoRes } from '../../shared/js/perf.js';
 import { Shell, esc } from '../../shared/js/shell.js';
 import { makeBear, poseBear } from '../../dream-runner/js/runner.js';
 import { sfx, setMusic, stopMusic, unlock, toggleMute, sound } from '../../dream-runner/js/music.js';
@@ -14,8 +15,8 @@ const FILLS = [8, 12, 16, 20];
 
 // ---------- 그리기 준비 ----------
 const canvas = $('c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isPhone });
+autoRes(renderer, 2);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(68, 1, 0.1, 1200);

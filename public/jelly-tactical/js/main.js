@@ -1,6 +1,7 @@
 // 젤리택티컬: 곰돌이 젤리들의 팀 슈팅 (연습전: 봇과 · 같이: 최대 12명, 팀 데스매치 / 개인전)
 import '../../shared/js/renamed.js'; // 옛 이름으로 저장된 값 옮기기 (맨 먼저)
 import * as THREE from 'three';
+import { isPhone, autoRes } from '../../shared/js/perf.js';
 import { openSens, sensOf } from '../../shared/js/sens.js';
 import { store } from '../../shared/js/account.js';
 import { Shell, esc, TEAMS } from '../../shared/js/shell.js';
@@ -17,8 +18,8 @@ const LOAD_KEY = 'jellytactical.loadout', PICK_KEY = 'jellytactical.pick';
 const coarse = matchMedia('(pointer: coarse)').matches;
 
 // ---------- 3D ----------
-const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: !isPhone, powerPreference: 'high-performance' });
+autoRes(renderer, 2);
 renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.autoClear = false;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, 1, 0.05, 900);

@@ -1,6 +1,7 @@
 // 드림 러너: 잠든 곰돌이가 꿈속을 끝없이 달린다
 //   혼자 달리기 · 같이 달리기(방, 최대 12명: 같은 길 · 같은 꿈 · 서로 밀치기) · 최고 기록 순위표
 import * as THREE from 'three';
+import { isPhone, autoRes } from '../../shared/js/perf.js';
 import { account, store } from '../../shared/js/account.js';
 import { localChars, LOCAL_MAX } from '../../shared/js/local-chars.js';
 import { Chat } from '../../shared/js/chat.js';
@@ -25,8 +26,8 @@ function anonId() {
 const logged = () => !!account.session && !!account.user;
 
 // ---------- 3D ----------
-const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: !isPhone, powerPreference: 'high-performance' });
+autoRes(renderer, 2);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 1600);
@@ -46,7 +47,7 @@ const game = window.dream = {
   profile: { name: '꿈꾸는 곰돌이', color: '#8a5634' },
   titleT: 0, deadT: 0, submitted: null, sendT: 0, bumpT: 0,
 };
-game.runner = runner; game.track = track; game.env = env; window.__THEMES = THEMES; // 점검용 (콘솔에서 dream.runner 등)
+game.runner = runner; game.track = track; game.env = env; game.scene = scene; game.renderer = renderer; window.__THEMES = THEMES; // 점검용 (콘솔에서 dream.runner 등)
 
 // ---------- 입력 ----------
 const keys = new Set();
@@ -245,7 +246,7 @@ async function renderMyStats() {
   const el = $('my-stats'); let d;
   try { d = await account.api('/api/dream/me' + (logged() ? '' : `?anon=${anonId()}`)); } catch { el.innerHTML = ''; return; }
   const cell = (r) => (r ? `<b>${r.rank.toLocaleString()}위</b><small>${r.score.toLocaleString()}점 · ${r.of.toLocaleString()}명 중</small>` : '<small>기록 없음</small>');
-  el.innerHTML = `<div class="ms-top"><div><small>내가 달린 판수</small><b>${d.runs.toLocaleString()}판</b></div><div><small>달린 시간</small><b>${playTime(d.time)}</b></div></div>
+  el.innerHTML = `<div class="ms-top"><div><small>내가 달린 판수</small><b>${d.runs.toLocaleString()}판</b></div><div><small>달린 시간</small><b>${playTime(d.time)}</b></div></div><small class="ms-note">판수와 시간은 2026년 11월 2일 패치부터 세요 (그 전 기록은 남아 있지 않아요)</small>
     <div class="ms-table"><div class="ms-row ms-head"><span>난이도</span><span>판수 · 시간</span><span>⚡ 스피드전</span><span>🎁 아이템전</span></div>${Object.entries(DIFFS).map(([k, x]) => { const r = d.diffs[k]; return `<div class="ms-row"><span>${esc(x.name)}</span><span><b>${r.runs.toLocaleString()}판</b><small>${playTime(r.time)}</small></span><span>${cell(r.speed)}</span><span>${cell(r.item)}</span></div>`; }).join('')}</div>`;
 }
 // 달린 판수 · 시간 올리기 (한 판에 한 번, 서버 점검 중이면 다시 시도). 나갈 때는 페이지가 닫혀도 전해지게 한다

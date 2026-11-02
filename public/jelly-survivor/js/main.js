@@ -1,6 +1,7 @@
 // 젤리 서바이버 (충치균 대습격): 곰돌이는 걷기만 · 무기는 저절로 · 레벨업마다 3개 중 하나
 //   혼자 하기는 이 화면이 sim.js 를 돌리고, 같이 하기는 서버가 돌린 결과(스냅샷)를 그린다. 그리는 쪽은 둘 다 같은 스냅샷 모양
 import * as THREE from 'three';
+import { isPhone, autoRes } from '../../shared/js/perf.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { account, store } from '../../shared/js/account.js';
 import { Shell, esc } from '../../shared/js/shell.js';
@@ -18,8 +19,8 @@ const game = window.surv = {
 };
 
 // ---------- 3D ----------
-const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(1.75, devicePixelRatio || 1));
+const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: !isPhone, powerPreference: 'high-performance' });
+autoRes(renderer, 1.75);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#ffd9ec');
@@ -351,6 +352,7 @@ function render(dt, interp) {
 
 // ---------- 입력: WASD · 방향키 · 터치 조이스틱 ----------
 const keys = new Set();
+if (isPhone) document.getElementById('help').textContent = '화면을 끌어서 이동 · 공격은 저절로 · 레벨업은 카드를 눌러요';
 let joy = null;
 addEventListener('keydown', (e) => {
   if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;

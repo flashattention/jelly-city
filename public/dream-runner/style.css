@@ -111,7 +111,7 @@ h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 #touch > div { display: flex; gap: 12px; align-items: flex-end; pointer-events: auto; }
 #touch button { width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); background: rgba(20,8,50,.4); color: #fff; font-size: 26px; touch-action: none; }
 #touch button.big { width: 80px; height: 80px; }
-@media (max-width: 520px) { .btns { grid-template-columns: 1fr; } #h-score { font-size: 32px; } #h-dream { font-size: 14px; } }
+@media (max-width: 520px) { .btns { grid-template-columns: 1fr; } #h-score { font-size: 32px; } #h-dream { font-size: 14px; } .hud-c { top: 84px; } }
 
 /* 초대 코드 */
 .code-row { margin-top: 12px; }

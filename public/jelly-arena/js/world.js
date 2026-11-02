@@ -1,5 +1,6 @@
 // 젤리 아레나 맵 그리기: 바닥 무늬 · 숲 · 강 · 수풀 · 포탑 · 수문 · 젤리 심장
 import * as THREE from 'three';
+import { isPhone } from '../../shared/js/perf.js';
 import { SIZE, N, CELL, GRID, LANES, BASE, BUSHES, STRUCTS, FOUNTAIN, TEAMS, CAMPS, EPICS } from './data.js';
 
 const toon = (c, o = {}) => new THREE.MeshLambertMaterial({ color: c, ...o });
@@ -35,9 +36,9 @@ function gumTrees(scene) {
   let seed = 11; const R = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
   const spots = [];
   // 맵 바깥도 숲이 이어진다 (가장자리가 잘려 보이지 않게)
-  for (let i = 0; i < 1100; i++) { const x = (R() * 2 - 1) * (SIZE + 42), z = (R() * 2 - 1) * (SIZE + 42); if (Math.abs(x) > SIZE + 1 || Math.abs(z) > SIZE + 1) spots.push([x, z, 1 + R() * 1.1, R()]); }
+  for (let i = 0; i < (isPhone ? 400 : 1100); i++) { const x = (R() * 2 - 1) * (SIZE + 42), z = (R() * 2 - 1) * (SIZE + 42); if (Math.abs(x) > SIZE + 1 || Math.abs(z) > SIZE + 1) spots.push([x, z, 1 + R() * 1.1, R()]); }
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { if (!GRID[j * N + i]) continue; if (near(i, j) ? R() < 0.62 : R() < 0.16) spots.push([-SIZE + (i + 0.5 + (R() - 0.5) * 0.5) * CELL, -SIZE + (j + 0.5 + (R() - 0.5) * 0.5) * CELL, 0.7 + R() * 0.7, R()]); }
-  const top = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1.25, 1), toon('#ffffff', { flatShading: true }), spots.length), trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.28, 0.42, 1.8, 6), toon('#7a5a3f'), spots.length), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), col = new THREE.Color();
+  const top = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1.25, isPhone ? 0 : 1), toon('#ffffff', { flatShading: true }), spots.length), trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.28, 0.42, 1.8, 6), toon('#7a5a3f'), spots.length), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), col = new THREE.Color();
   const pal = ['#3f9d5a', '#4cae66', '#2f8a58', '#6fbf5f', '#3a9a7a', '#7cc06a', '#ff9fc4', '#c79bff'];
   spots.forEach(([x, z, s, r], i) => {
     M.compose(new THREE.Vector3(x, 1.8 * s + 0.9, z), Q.setFromEuler(new THREE.Euler(0, r * 6, 0)), new THREE.Vector3(s, s * 1.15, s)); top.setMatrixAt(i, M);
