@@ -29,8 +29,8 @@ function parseJson(text) {
   }
 }
 
-export async function complete(messages, { json = true, schema = null, temperature = 0.9, max_tokens = 300 } = {}) {
-  const body = { model: MODEL, messages, temperature, max_tokens };
+export async function complete(messages, { json = true, schema = null, temperature = 0.9, max_tokens = 300, model = MODEL } = {}) {
+  const body = { model, messages, temperature, max_tokens };
   if (json) body.response_format = schema ? { type: 'json_schema', json_schema: { name: 'out', strict: true, schema } } : { type: 'json_object' };
   const res = await fetch(`${BASE_URL}/chat/completions`, {
     method: 'POST',
