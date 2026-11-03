@@ -48,7 +48,7 @@ export class Board {
   hiddenFor(it, sub, admin) { return it.hidden && !admin && it.sub !== sub; }
   card(p, sub, admin) {
     const { up, down } = tally(p.votes), hide = this.hiddenFor(p, sub, admin);
-    return { id: p.id, title: hide ? '🚫 신고가 많아 가려진 글이에요' : p.title, name: p.name, at: p.at, up, down, my: p.votes[sub] || 0, comments: p.comments.length, hidden: !!p.hidden, mine: !!sub && p.sub === sub };
+    return { id: p.id, title: hide ? '🚫 신고가 많아 가려진 글이에요' : p.title, name: p.name, at: p.at, up, down, my: p.votes[sub] || 0, comments: p.comments.length, hidden: !!p.hidden, mine: !!sub && p.sub === sub, reported: !!p.reports[sub] };
   }
   list(sort, page, sub, admin) {
     const all = [...this.posts];
@@ -58,7 +58,7 @@ export class Board {
   }
   detail(id, sub, admin) {
     const p = this.find(id), hide = this.hiddenFor(p, sub, admin);
-    return { ...this.card(p, sub, admin), body: hide ? '' : p.body, admin: !!admin, comments: p.comments.map((c) => { const { up, down } = tally(c.votes), h = this.hiddenFor(c, sub, admin); return { id: c.id, name: c.name, at: c.at, text: h ? '🚫 신고가 많아 가려진 댓글이에요' : c.text, up, down, my: c.votes[sub] || 0, hidden: !!c.hidden, mine: !!sub && c.sub === sub }; }) };
+    return { ...this.card(p, sub, admin), body: hide ? '' : p.body, admin: !!admin, comments: p.comments.map((c) => { const { up, down } = tally(c.votes), h = this.hiddenFor(c, sub, admin); return { id: c.id, name: c.name, at: c.at, text: h ? '🚫 신고가 많아 가려진 댓글이에요' : c.text, up, down, my: c.votes[sub] || 0, hidden: !!c.hidden, mine: !!sub && c.sub === sub, reported: !!c.reports[sub] }; }) };
   }
   // AI 를 부르기 전에 걸러서 쓸데없는 호출을 막는다
   checkWrite(sub, b, now = Date.now()) {
@@ -100,6 +100,7 @@ export class Board {
   }
   report(sub, guest, id, cid) {
     const it = this.item(id, cid); if (it.sub === sub) throw new Error('내 글은 신고할 수 없어요');
+    if (it.reports[sub]) throw new Error('이미 신고했어요');
     it.reports[sub] = guest ? 0.5 : 1;
     if (Object.values(it.reports).reduce((a, v) => a + v, 0) >= HIDE_AT) it.hidden = true;
     this.dirty = true;

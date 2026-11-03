@@ -234,7 +234,7 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .bd-text { margin: 12px 0; font-size: 15px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; } .bd-text.small { margin: 4px 0; font-size: 14px; }
 .bd-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .bd-votes { display: flex; gap: 6px; } .bd-votes button, .bd-tools button { padding: 3px 10px; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; background: rgba(255,255,255,.08); color: var(--ink); font-size: 13px; cursor: pointer; } .bd-votes i { font-style: normal; } .bd-votes button.on { background: var(--gold); color: #2b1d5c; } .bd-votes button.on.bad { background: #ff8fa8; }
-.bd-tools { display: flex; gap: 6px; } .bd-tools button { border-color: transparent; background: none; color: var(--soft); font-size: 12px; }
+.bd-tools { display: flex; gap: 6px; } .bd-tools button { border-color: transparent; background: none; color: var(--soft); font-size: 12px; } .bd-tools button:disabled { opacity: .55; cursor: default; }
 .bd-c { padding: 9px 0; border-top: 1px solid rgba(255,255,255,.1); }
 .bd-form { display: flex; align-items: flex-end; gap: 8px; margin-top: 12px; } .bd-form.end { justify-content: flex-end; } .bd-body textarea { flex: 1; width: 100%; box-sizing: border-box; padding: 9px 12px; border: 2px solid rgba(255,255,255,.2); border-radius: 12px; background: rgba(255,255,255,.1); color: var(--ink); font: inherit; font-size: 15px; resize: vertical; outline: none; } .bd-body input { box-sizing: border-box; width: 100%; margin: 8px 0; border-radius: 12px; }
 @media (max-width: 560px) { .bd-row { flex-direction: column; align-items: stretch; gap: 3px; } .bd-meta { gap: 8px; } }
