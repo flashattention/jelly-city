@@ -11,6 +11,7 @@ const SELECT_MS = 25000, SETUP_ASSAULT = 20000, SETUP_CONTROL = 12000;
 const ASSAULT_SEC = Number(process.env.WATCH_SEC) || 4 * 60, BONUS_SEC = 120, CONTROL_LIMIT = 8 * 60;
 const CAP_SOLO = Number(process.env.WATCH_CAP) || 21, CTRL_CAP = 9, CTRL_WIN = 85; // 점령 시간(초) · 쟁탈전 100% 까지 초
 const CAP_MUL = [0, 1, 1.5, 1.85, 2.1, 2.3, 2.45];
+const CLIP_TYPES = new Set(['snap', 'ps', 'fire', 'boom', 'proj', 'fx', 'form', 'spawn', 'kill']), CLIP_KEEP = 12500; // 최고의 장면에 담는 것 · 길이(ms)
 const ULT_X = Number(process.env.WATCH_ULTX) || 1; // 점검용: 궁극기 빨리 채우기
 const RUSHERS = new Set(['rein', 'winston', 'genji', 'reaper', 'hog', 'dva', 'tracer', 'zarya']), NO_HOP = new Set(['pharah', 'mercy']); // 파고드는 영웅 · 뛰면 안 되는 영웅
 const BOT_NAMES = ['젤리봇 딸기', '젤리봇 소다', '젤리봇 푸딩', '젤리봇 망고', '젤리봇 민트', '젤리봇 라임', '젤리봇 자두', '젤리봇 복숭아', '젤리봇 포도', '젤리봇 레몬', '젤리봇 체리', '젤리봇 키위'];
@@ -111,15 +112,38 @@ export class GuardRooms extends BaseRooms {
     g.endAt = now + (g.mode === 'assault' ? ASSAULT_SEC : CONTROL_LIMIT) * 1000;
     this.toRoom(r, { t: 'phase', ph: 'play', ms: g.endAt - now });
   }
+  // ---------- 최고의 장면: 경기 동안 방에 보낸 것을 잠깐 모아 두었다가, 가장 멋진 순간만 잘라 낸다 ----------
+  toRoom(r, m, except) { this.record(r, m); super.toRoom(r, m, except); }
+  record(r, m) {
+    const g = r.g; if (!g || g.phase !== 'play' || !CLIP_TYPES.has(m.t)) return;
+    if (m.t === 'snap' && (g.clipN = (g.clipN || 0) + 1) % 2) return; // 움직임은 10Hz 면 충분하다
+    const now = Date.now(), buf = (g.clipBuf ||= []); buf.push([now, JSON.stringify(m)]);
+    while (buf.length && now - buf[0][0] > CLIP_KEEP) buf.shift();
+  }
+  // 처치 점수: 짧은 시간에 여럿을 잡을수록 크게 오른다. 끝난 뒤 조금 더 담으려고 잘라 내기를 잠깐 미룬다
+  noteKill(r, by, a, now) {
+    const g = r.g; if (!g || g.phase !== 'play' || !by?.hero) return;
+    by.killAts = (by.killAts || []).filter((t) => now - t < 8000); by.killAts.push(now);
+    const n = by.killAts.length, score = n * n * 100 + (a === 'q' ? 120 : 0) + 20;
+    if (score > (g.potg?.score || 0) && score > (g.potgWait?.score || 0)) g.potgWait = { id: by.id, score, n, first: by.killAts[0], at: now + 2200 };
+  }
+  cutClip(r, now) {
+    const g = r.g, w = g.potgWait; g.potgWait = null; if (!w) return;
+    const from = Math.max(w.first - 3500, now - CLIP_KEEP), msgs = (g.clipBuf || []).filter(([t]) => t >= from); if (msgs.length < 10) return;
+    g.potg = { id: w.id, score: w.score, n: w.n, ms: now - msgs[0][0], msgs: msgs.map(([t, s]) => [t - msgs[0][0], s]), players: r.players.map((p) => ({ id: p.id, name: p.name, team: p.team, hero: p.hero, bot: !!p.bot, look: p.look })) };
+  }
   finishWatch(r, winner, why) {
     const g = r.g; if (!g || g.phase === 'over') return;
+    if (g.potgWait) this.cutClip(r, Date.now());
     g.phase = 'over'; g.winner = winner; g.overAt = Date.now();
     const stats = r.players.map((p) => ({ id: p.id, name: p.name, team: p.team, hero: p.hero, k: p.k, fb: p.fb, d: p.d, dmg: Math.round(p.dmg), heal: Math.round(p.heal), obj: Math.round(p.obj), bot: !!p.bot }));
     const score = (s) => s.k * 400 + s.fb * 150 + s.dmg + s.heal * 1.1 + s.obj * 25 - s.d * 250 + (s.team === winner ? 600 : 0);
     const mvp = [...stats].sort((a, b) => score(b) - score(a))[0];
     g.result = { winner, why, stats, mvp: mvp?.id, map: g.info.id, mode: g.mode, atk: g.atk, pct: g.pct };
+    // 승리 장면 → 최고의 장면 → 최고의 플레이어 → 결과표 (화면이 끝 신호를 받기 전에 장면이 도착해 있어야 한다)
+    if (g.potg) { const { score, ...clip } = g.potg; this.toRoom(r, { t: 'potg', ...clip }); }
     this.toRoom(r, { t: 'phase', ph: 'over', winner, why, mvp: mvp?.id, stats });
-    setTimeout(() => { if (r.g === g && r.state === 'run') { r.g = null; this.end(r, g.result); } }, 11000);
+    setTimeout(() => { if (r.g === g && r.state === 'run') { r.g = null; this.end(r, g.result); } }, 11000 + (g.potg ? g.potg.ms + 500 : 0));
   }
   onLeave(r) {
     const g = r.g; if (!g) return;
@@ -182,6 +206,7 @@ export class GuardRooms extends BaseRooms {
         e.x = p.x; e.y = p.y; e.z = p.z; e.yaw = Number.isFinite(+m.yaw) ? +m.yaw : e.yaw; e.movedAt = now;
         return;
       }
+      case 'swingfx': { if (c.fx.blade > now && now - (c.swingFxAt || 0) > 500) { c.swingFxAt = now; this.toRoom(r, { t: 'fx', k: 'swing', by: c.id, blade: 1, yaw: c.yaw, p: [c.pos.x, c.pos.y, c.pos.z] }, c); } return; }
       case 'tireboom': { const e = r.g.ents.find((x) => x.k === 'tire' && x.owner === c); if (e) this.tireBoom(r, e, now); return; }
       case 'pboom': return this.onBoom(r, c, h, m, now);
       case 'beam': return this.onBeam(r, c, h, m, now);
@@ -572,7 +597,7 @@ export class GuardRooms extends BaseRooms {
     t.fx = {}; t.shieldOn = false; t.mtxOn = false; t.over = 0; t.prim = 0; t.bub = 0; t.hot = null; this.syncShield(r, t);
     if (t.pinT) { t.pinT.fx.stun = 0; t.pinT = null; }
     const assists = [...t.dmgBy.entries()].filter(([id, at]) => now - at < 6000 && id !== by?.id).map(([id]) => id);
-    if (by && by !== t) { by.k++; by.fb++; }
+    if (by && by !== t) { by.k++; by.fb++; this.noteKill(r, by, a, now); }
     for (const id of assists) { const p = r.players.find((q) => q.id === id); if (p) p.k++; }
     this.toRoom(r, { t: 'kill', by: by?.id ?? t.id, to: t.id, a: a || 'p', bh: by?.hero, th: t.hero, head: !!head, as: assists, ms: RESPAWN_MS });
     // 칼바람 질풍참: 처치에 함께했으면(마무리 · 6초 안에 피해를 준 도움) 다시 쓸 수 있다
@@ -588,6 +613,7 @@ export class GuardRooms extends BaseRooms {
 
   // ---------- 매 틱 ----------
   onTick(r, now) {
+    if (r.g?.potgWait && now >= r.g.potgWait.at) this.cutClip(r, now);
     const g = r.g; if (!g || now < r.startAt) return;
     const dt = 1 / this.o.hz;
     if (g.phase === 'select') { if (now >= g.until) this.toSetup(r, now); else return; }
@@ -1028,7 +1054,7 @@ export class GuardRooms extends BaseRooms {
     const moving = !!(tgt.st && tgt.st[5] & 1) || !tgt.bot;
     const pAcc = (base) => Math.max(0.06, Math.min(0.9, base)) * (0.55 + b.skill * 0.6) * (b.fx.visor > now ? 1.6 : 1) * (moving ? 0.9 : 1);
     if (b.fx.blade > now || (b.hero === 'winston' && b.fx.primal > now)) {
-      if (td < (b.fx.blade > now ? 6.5 : 5.5) && now >= b.fireT) { b.fireT = now + (b.fx.blade > now ? 800 : 600); this.toRoom(r, { t: 'fx', k: 'swing', by: b.id }); if (blocked) this.hurtEnt(r, blocked.e, 100, b); else this.damage(r, tgt, b.fx.blade > now ? 110 : 40, b, now, { a: b.fx.blade > now ? 'blade' : 'punch', melee: true, kb: b.fx.primal > now ? 11 : 0 }); }
+      if (td < (b.fx.blade > now ? 6.5 : 5.5) && now >= b.fireT) { b.fireT = now + (b.fx.blade > now ? 800 : 600); this.toRoom(r, { t: 'fx', k: 'swing', by: b.id, blade: b.fx.blade > now ? 1 : 0, yaw: b.yaw, p: [b.pos.x, b.pos.y, b.pos.z] }); if (blocked) this.hurtEnt(r, blocked.e, 100, b); else this.damage(r, tgt, b.fx.blade > now ? 110 : 40, b, now, { a: b.fx.blade > now ? 'blade' : 'punch', melee: true, kb: b.fx.primal > now ? 11 : 0 }); }
       return;
     }
     if (b.reloadT > 0) { b.reloadT -= dt; if (b.reloadT <= 0) b.mag = spec.mag; return; }

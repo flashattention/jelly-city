@@ -56,7 +56,7 @@ export class Player {
   push(map, axis) {
     for (const b of boxesIn(map, this.pos.x - 1, this.pos.z - 1, this.pos.x + 1, this.pos.z + 1)) {
       const top = b.y + b.h;
-      if (top <= this.pos.y + (this.onGround ? 0.55 : 0.25) || b.y >= this.pos.y + this.height || !this.inXZ(b)) continue; // 계단처럼 낮은 건 올라선다 (공중에선 아주 낮은 턱만)
+      if (top <= this.pos.y + (this.onGround ? 0.55 : this.airStep ?? 0.25) || b.y >= this.pos.y + this.height || !this.inXZ(b)) continue; // 계단처럼 낮은 건 올라선다 (공중에선 아주 낮은 턱만)
       if (axis === 'x') { const l = b.x - b.w / 2 - R, r = b.x + b.w / 2 + R; this.pos.x = this.pos.x - l < r - this.pos.x ? l : r; this.vel.x = 0; }
       else { const l = b.z - b.d / 2 - R, r = b.z + b.d / 2 + R; this.pos.z = this.pos.z - l < r - this.pos.z ? l : r; this.vel.z = 0; }
     }

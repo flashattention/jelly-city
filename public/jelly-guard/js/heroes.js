@@ -2,6 +2,9 @@
 //   공격 종류: hit(즉발 사격) · proj(투사체, PROJ 표) · melee(근접 부채꼴) · beam(대상 고정 줄기)
 //   기술 칸: s(우클릭) · shift · e · q(궁극기)
 export const ROLES = { tank: { name: '돌격', icon: '🛡️', color: '#7cc4ff' }, dps: { name: '공격', icon: '⚔️', color: '#ff7a8a' }, sup: { name: '지원', icon: '✚', color: '#9be7a7' } };
+// 점프: 중력 21 에서 v = √(2gh). 일반 0.98m · 칼바람 2단은 꼭대기에서 2.02m 더 (합 3m)
+const GRAVITY = 21, jumpV = (h) => Math.sqrt(2 * GRAVITY * h);
+export const JUMP_V = jumpV(0.98), DOUBLE_JUMP_V = jumpV(2.02), LEDGE_REACH = 0.45; // 공중에서 이만큼 낮은 턱은 올라선다 (낮은 점프로도 1.4m 상자에 오르게)
 export const BASE_SPEED = 5.6, RESPAWN_MS = 8000, ULT_PASSIVE = 5; // 궁극기: 1초에 5점 + 준 피해 · 치유 1당 1점
 
 // 투사체: speed(m/s) · grav(중력 배수) · dmg(직격 추가) · splash(폭발 최대, 직격 대상도 받는다) · r(폭발 반경) · kb(밀어내기) · self(자기 피해 배수) · life(초) · size · color

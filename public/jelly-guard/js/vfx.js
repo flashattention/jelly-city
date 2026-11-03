@@ -247,15 +247,96 @@ export function dmgNum(scene, p, n, head, heal) {
   sp.scale.set(1.1, 0.55, 1); sp.position.copy(p); sp.position.x += (Math.random() - 0.5) * 0.6; sp.renderOrder = 10; scene.add(sp);
   fx.push({ o: sp, t: 0.8, life: 0.8, v: new THREE.Vector3(0, 1.6, 0), g: 0, tex: true });
 }
+// ---------- 큰 이펙트 도구 ----------
+const addGlow = (c, op = 0.8) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+const PILLAR_G = new THREE.CylinderGeometry(1, 1, 1, 24, 1, true), SHARD_G = new THREE.TetrahedronGeometry(1);
+const keepGeo = new Set([PILLAR_G, SHARD_G]);
+// 불꽃 조각: 중력을 받아 떨어지는 작은 빛
+export function sparks(scene, p, color, n = 12, speed = 7, size = 0.22, life = 0.6) {
+  for (let i = 0; i < n; i++) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); s.scale.setScalar(size * (0.5 + Math.random())); s.position.copy(p); scene.add(s);
+    const a = Math.random() * 6.28, e = Math.random() * 1.2, v = speed * (0.4 + Math.random() * 0.8);
+    fx.push({ o: s, t: life * (0.6 + Math.random() * 0.6), life, v: new THREE.Vector3(Math.cos(a) * Math.cos(e) * v, Math.sin(e) * v, Math.sin(a) * Math.cos(e) * v), g: 16 });
+  }
+}
+// 빛기둥: 솟았다가 가늘어지며 사라진다
+export function pillar(scene, p, color, h = 8, r = 1.2, life = 0.7) {
+  const o = new THREE.Mesh(PILLAR_G, addGlow(color, 0.7)); o.position.set(p.x, p.y + h / 2, p.z); o.scale.set(r, h, r); scene.add(o);
+  fx.push({ o, t: life, life, tick: (k) => { const w = r * (1 - k * 0.8); o.scale.set(w, h * Math.min(1, k * 5), w); o.position.y = p.y + o.scale.y / 2; }, opacity: 0.3, keepGeo: true });
+}
+// 소용돌이: 빛 알갱이가 돌면서 올라간다
+export function spiral(scene, p, color, { r = 2, h = 4, n = 22, life = 0.9, turns = 2, size = 0.4 } = {}) {
+  for (let i = 0; i < n; i++) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); s.scale.setScalar(size); scene.add(s); const off = (i / n) * 6.28, d = (i / n) * 0.3;
+    const f = { o: s, t: life, life, tick: (k) => { const q = Math.max(0, k - d) / (1 - d), a = off + q * turns * 6.28; s.position.set(p.x + Math.cos(a) * r * (1 - q * 0.45), p.y + q * h, p.z + Math.sin(a) * r * (1 - q * 0.45)); } }; f.tick(0); fx.push(f);
+  }
+}
+// 파편: 돌멩이처럼 튀어 오른다
+export function shards(scene, p, color, n = 8, size = 0.28, speed = 8, life = 0.8) {
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.MeshToonMaterial({ color, transparent: true }), o = new THREE.Mesh(SHARD_G, m); o.position.copy(p); o.scale.setScalar(size * (0.5 + Math.random())); scene.add(o); const a = Math.random() * 6.28;
+    const f = { o, t: life, life, v: new THREE.Vector3(Math.cos(a) * speed * Math.random(), speed * (0.5 + Math.random() * 0.6), Math.sin(a) * speed * Math.random()), g: 20, keepGeo: true, spinX: (Math.random() - 0.5) * 14 }; f.tick = (k) => { o.rotation.x = k * f.spinX; o.rotation.z = k * f.spinX * 0.7; }; fx.push(f);
+  }
+}
+// 폭발 한 묶음: 섬광 + 충격파 고리 + 불꽃
+export function burst(scene, p, color, { r = 3, n = 14, ground = 0, flash = true, speed } = {}) {
+  if (flash) flashSphere(scene, p, color, r * 0.8, 0.32);
+  ring(scene, p, color, r * 1.5, 0.42, ground); ring(scene, p, '#ffffff', r * 0.9, 0.28, ground);
+  sparks(scene, p, color, n, speed ?? 3 + r * 1.6, 0.26, 0.6);
+}
+// 용: 밝은 맵에서도 하얗게 타지 않도록 색이 있는 불투명 몸통에 줄무늬 · 지느러미, 머리는 뿔 · 수염 · 눈을 조립한다
+const solid = (c) => new THREE.MeshBasicMaterial({ color: c, transparent: true });
+function makeDragon(color, n, big = 1) {
+  const g = new THREE.Group(), body = new THREE.InstancedMesh(SPH, solid('#ffffff'), n), fin = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 2.2, 5), solid('#e8ffc0'), Math.floor(n / 4)); body.frustumCulled = fin.frustumCulled = false; g.add(body, fin);
+  const c = new THREE.Color(color), dark = c.clone().multiplyScalar(0.55), light = c.clone().lerp(new THREE.Color('#ffffff'), 0.35);
+  for (let i = 0; i < n; i++) body.setColorAt(i, i % 6 < 2 ? dark : i % 6 < 4 ? c : light);
+  const head = new THREE.Group(), mats = { c: solid(color), d: solid(`#${dark.getHexString()}`), w: solid('#fffbe0'), k: solid('#10261a') }, CONE = new THREE.ConeGeometry(1, 1, 8), add = (geo, m, x, y, z, sx, sy, sz, rx = 0, rz = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.set(rx, 0, rz); head.add(o); return o; };
+  add(SPH, mats.c, 0, 0.02, 0, 0.42, 0.36, 0.5); add(BOX, mats.c, 0, 0.06, 0.58, 0.46, 0.2, 0.72); add(BOX, mats.d, 0, -0.17, 0.46, 0.38, 0.09, 0.6, 0.18); add(CONE, mats.w, -0.13, -0.06, 0.8, 0.05, 0.16, 0.05, Math.PI); add(CONE, mats.w, 0.13, -0.06, 0.8, 0.05, 0.16, 0.05, Math.PI);
+  for (const q of [-1, 1]) { add(CONE, mats.w, q * 0.2, 0.4, -0.32, 0.08, 0.85, 0.08, -0.9, q * -0.25); add(SPH, mats.w, q * 0.25, 0.2, 0.24, 0.1, 0.1, 0.1); add(SPH, mats.k, q * 0.28, 0.21, 0.31, 0.05, 0.05, 0.05); add(CONE, mats.c, q * 0.34, 0.02, -0.5, 0.05, 1, 0.05, -1.3, q * -0.5); add(BOX, mats.w, q * 0.22, 0.02, 0.98, 0.022, 0.022, 0.75); }
+  head.scale.setScalar(big * 1.4); g.add(head);
+  return { g, body, fin, head, n, big, cone: CONE, mats: Object.values(mats) };
+}
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _e = new THREE.Euler();
+function poseDragon(D, path, u, gap, opacity) {
+  for (let i = 0; i < D.n; i++) {
+    const q = path(u - i * gap), taper = (1 - i / D.n) ** 0.8, r = D.big * (0.3 * taper + 0.035);
+    _m4.compose(q, _q.identity(), _s.setScalar(r)); D.body.setMatrixAt(i, _m4);
+    if (i % 4 === 0) { const j = i / 4; if (j < D.fin.count) { _e.set(0, 0, Math.sin(i * 1.3) * 0.25); _m4.compose(_s.set(q.x, q.y + r * 1.15, q.z).clone(), _q.setFromEuler(_e), _s.set(r * 0.32, r * 0.42, r * 0.32)); D.fin.setMatrixAt(j, _m4); } }
+  }
+  D.body.instanceMatrix.needsUpdate = true; D.fin.instanceMatrix.needsUpdate = true; if (D.body.instanceColor) D.body.instanceColor.needsUpdate = false;
+  D.head.position.copy(path(u)); D.head.lookAt(path(u + 0.02));
+  D.body.material.opacity = opacity; D.fin.material.opacity = opacity; for (const m of D.mats) m.opacity = opacity;
+}
+const endDragon = (scene, D) => { scene.remove(D.g); D.body.material.dispose(); D.fin.material.dispose(); D.fin.geometry.dispose(); for (const m of D.mats) m.dispose(); D.body.dispose(); D.fin.dispose(); D.cone.dispose(); };
+// 용검 베기: 용이 몸을 흔들며 앞으로 쏘아 나가고, 지나간 자리에 초승달 빛이 남는다. near 는 1인칭 (카메라 앞을 가리지 않게 떨어져서 시작)
+export function dragonStrike(scene, from, yaw, color = '#7ee04a', { reach = 8, side = 1, near = false } = {}) {
+  const f = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)), rt = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw)), start = near ? 2.6 : 0.6, big = near ? 0.72 : 1;
+  const path = (u) => { const s = Math.max(-0.25, Math.min(1.2, u)), v = from.clone().addScaledVector(f, start + s * reach).addScaledVector(rt, Math.sin(s * Math.PI * 1.7) * 2.2 * side); v.y += (near ? 0.15 : 0) + Math.sin(s * Math.PI) * 0.9 + Math.sin(s * 9) * 0.16; return v; };
+  const D = makeDragon(color, 44, big); scene.add(D.g); const life = 0.62;
+  fx.push({ o: D.g, t: life, life, tick: (k) => { poseDragon(D, path, k * 1.3, 0.014, k < 0.72 ? 1 : Math.max(0, (1 - k) / 0.28)); if (Math.random() < 0.5) puff(scene, path(k * 1.3 - 0.1), color, 1, 0.28, 2, 0.3); }, end: () => endDragon(scene, D), keepGeo: true });
+  // 초승달 베기
+  const arc = new THREE.Mesh(new THREE.RingGeometry(3.4, 5.6, 36, 1, 0.45, Math.PI - 0.9), addGlow(color, 0.5)); arc.rotation.order = 'YXZ'; arc.rotation.y = yaw; arc.rotation.x = -Math.PI / 2; arc.position.copy(from).addScaledVector(f, 0.6); scene.add(arc);
+  fx.push({ o: arc, t: 0.26, life: 0.26, tick: (k) => { const q = 0.75 + k * 0.6; arc.scale.set(q, q, 1); }, opacity: 0.5 });
+  sparks(scene, from.clone().addScaledVector(f, start + reach * 0.6), color, 8, 6, 0.22, 0.45);
+}
+// 궁극기를 켤 때: 용이 몸을 감고 하늘로 솟구친다
+export function dragonRise(scene, p, color = '#7ee04a', { r = 2.2, h = 7, big = 1.3 } = {}) {
+  const path = (u) => { const s = Math.max(0, Math.min(1.25, u)), a = s * 6.28 * 2.1; return new THREE.Vector3(p.x + Math.cos(a) * r * (1 - s * 0.35), p.y + 0.4 + s * h, p.z + Math.sin(a) * r * (1 - s * 0.35)); };
+  const D = makeDragon(color, 70, big); scene.add(D.g); const life = 1.3;
+  fx.push({ o: D.g, t: life, life, tick: (k) => { poseDragon(D, path, k * 1.35, 0.011, k < 0.78 ? 1 : Math.max(0, (1 - k) / 0.22)); if (Math.random() < 0.4) puff(scene, path(k * 1.35 - 0.08), color, 1, 0.3, 1.5, 0.4); }, end: () => endDragon(scene, D), keepGeo: true });
+  ring(scene, p, color, 5.5, 0.6); sparks(scene, p.clone().setY(p.y + 1), color, 14, 7, 0.24, 0.8);
+}
 export function updateFx(dt, scene) {
+  for (let i = 0; fx.length > 700 && i < fx.length; i++) if (fx[i].t > 0.05) fx[i].t = 0.05; // 너무 많으면 오래된 것부터 끈다
   for (const f of fx) {
     f.t -= dt; const k = Math.max(0, f.t / f.life);
+    if (f.tick) f.tick(1 - k, dt);
     if (f.v) { f.o.position.addScaledVector(f.v, dt); f.v.y -= (f.g || 0) * dt; }
     if (f.grow) { const s = f.grow * (1 - k * 0.85); f.o.scale.set(s, s, s); }
     if (f.grow3) f.o.scale.setScalar(f.grow3 * (1.1 - k * 0.6));
-    if (f.o.material) f.o.material.opacity = (f.keep ? 0.9 : f.grow || f.grow3 ? 0.8 : 1) * k;
+    if (f.o.material) f.o.material.opacity = (f.opacity ?? (f.keep ? 0.9 : f.grow || f.grow3 ? 0.8 : 1)) * k;
   }
-  for (let i = fx.length - 1; i >= 0; i--) if (fx[i].t <= 0) { const o = fx[i].o; scene.remove(o); if (fx[i].tex) o.material.map.dispose(); o.material?.dispose?.(); if (o.geometry && o.geometry !== SPH && o.geometry !== CYL) o.geometry.dispose(); fx.splice(i, 1); }
+  for (let i = fx.length - 1; i >= 0; i--) if (fx[i].t <= 0) { const o = fx[i].o; scene.remove(o); fx[i].end?.(); if (fx[i].tex) o.material.map.dispose(); o.material?.dispose?.(); if (!fx[i].keepGeo && o.geometry && o.geometry !== SPH && o.geometry !== CYL) o.geometry.dispose(); fx.splice(i, 1); }
 }
 
 // 줄기 (치유 · 테슬라 · 입자포 · 흡수): 늘였다 줄이는 원기둥 하나

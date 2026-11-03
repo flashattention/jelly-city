@@ -9,9 +9,9 @@ import { rayBoxes, floorAt, clearLine } from '../../jelly-tactical/js/maps.js';
 import { buildMap } from '../../jelly-tactical/js/world.js';
 import { Player } from '../../jelly-tactical/js/fps.js';
 import { explosion, updateFx as updateBig } from '../../jelly-tactical/js/fx.js';
-import { HEROES, ROLES, heroById, PROJ, blockBy, RESPAWN_MS } from './heroes.js';
+import { HEROES, ROLES, heroById, PROJ, blockBy, RESPAWN_MS, LEDGE_REACH } from './heroes.js';
 import { WMAPS, wmapById, makeMap, openGates, inRoom } from './watchmaps.js';
-import { heroBear, dvaMech, Plate, HeroVM, EntViews, puff, ring, flashSphere, line, dmgNum, updateFx, beamMesh, setBeam, projMesh, trailPuff, glowTex, TEAM_COL } from './vfx.js';
+import { heroBear, dvaMech, Plate, HeroVM, EntViews, puff, ring, flashSphere, line, dmgNum, sparks, pillar, spiral, shards, burst, dragonStrike, dragonRise, updateFx, beamMesh, setBeam, projMesh, trailPuff, glowTex, TEAM_COL } from './vfx.js';
 import { makeKit } from './kits.js';
 import { sfx, unlock, toggleMute, sound, say } from './wsound.js';
 
@@ -32,7 +32,7 @@ camera.rotation.order = 'YXZ';
 function resize() { renderer.setSize(window.innerWidth, window.innerHeight, false); camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); }
 window.addEventListener('resize', resize); resize();
 
-const me = new Player();
+const me = new Player(); me.airStep = LEDGE_REACH;
 const vm = new HeroVM();
 const ents = new EntViews(scene);
 const pick0 = (() => { try { return JSON.parse(store.get(PICK_KEY) || '{}'); } catch { return {}; } })();
@@ -104,7 +104,7 @@ class Other {
       if (this.flags & (F.blossom | F.hogult)) b.root.rotation.y += this.flags & F.blossom ? t * 14 : 0;
     }
     const top = this.pos.y + (mech ? 2.7 : 2.2 * this.size);
-    const vis = myTeamOf(this) || this.seen || game.cut;
+    const vis = myTeamOf(this) || this.seen || game.cut || game.potg;
     this.plate.s.position.set(this.pos.x, top, this.pos.z); this.plate.s.visible = this.alive && vis && !game.cut;
     this.plate.draw(this.hp, this.max, this.temp, 0);
     this.feet.position.set(this.pos.x, this.pos.y + 0.04, this.pos.z); this.feet.visible = this.alive && !game.cut && (myTeamOf(this) || this.seen);
@@ -139,7 +139,7 @@ class Other {
       if (this.flags & F.blossom) for (let i = 0; i < 4; i++) puff(scene, c.clone().add(new THREE.Vector3(Math.cos(t * 9 + i * 1.6) * 3, 0, Math.sin(t * 9 + i * 1.6) * 3)), '#ff4a6a', 2, 0.5, 1, 0.3);
       if (this.flags & F.hogult) for (let i = 0; i < 3; i++) puff(scene, c.clone().add(new THREE.Vector3(-Math.sin(this.yaw) * (2 + i * 2) + (Math.random() - 0.5) * i, 0, -Math.cos(this.yaw) * (2 + i * 2) + (Math.random() - 0.5) * i)), '#d9a066', 2, 0.6, 2, 0.3);
       if (this.flags & F.valk) puff(scene, c.setY(c.y + 0.4), '#ffe48a', 3, 0.5, 2, 0.4);
-      if (this.flags & F.blade) puff(scene, this.hand(), '#b6ff8a', 2, 0.35, 1, 0.3);
+      if (this.flags & F.blade) { puff(scene, this.hand(), '#b6ff8a', 3, 0.45, 1.5, 0.35); ring(scene, this.pos, '#9dff6a', 1.6, 0.3, 0.08); }
       if (this.flags & F.ghost) puff(scene, c, '#3a3442', 4, 1, 1.4, 0.5);
       if (this.flags & F.poison) puff(scene, c, '#c47bff', 1, 0.5, 1, 0.5);
       if (this.flags & F.amp) ring(scene, this.pos, '#a6ff5e', 3, 0.4, 0.1);
@@ -325,14 +325,14 @@ function updateProjs(dt) {
 }
 function boomFx(k, p) {
   const P = PROJ[k] || {}, near = Math.max(0.1, 1 - p.distanceTo(camera.position) / 60);
-  if (k === 'nuke') { explosion(scene, p, 16); flashSphere(scene, p, '#ff9fcf', 22, 0.8); sfx('bigboom', null, 1); shake(1.4 * near + 0.3); return; }
-  if (k === 'tire') { explosion(scene, p, 7); flashSphere(scene, p, '#ffb43a', 8, 0.6); ring(scene, p, '#ffb43a', 8, 0.6, -p.y + 0.05); sfx('bigboom', null, near); shake(near * 1.2); return; }
-  if (k === 'pulsebomb') { explosion(scene, p, 4); flashSphere(scene, p, '#7cf0ff', 4, 0.4); sfx('boom', null, near); shake(near * 0.8); return; }
-  if (k === 'biotic') { flashSphere(scene, p, '#c8ff7a', P.r, 0.45); ring(scene, p, '#c8ff7a', P.r, 0.5, -p.y + 0.05); sfx('heal', null, near); return; }
-  if (k === 'grav') { flashSphere(scene, p, '#c79bff', 3, 0.5); sfx('boom', null, near * 0.6); return; }
-  if (k === 'flash') { flashSphere(scene, p, '#fff3a0', 3, 0.3); sfx('boom', null, near * 0.5); return; }
-  if (k === 'conc') { ring(scene, p, '#bfe6ff', 5, 0.4, 0); flashSphere(scene, p, '#dff2ff', 3, 0.3); sfx('boom', null, near * 0.7); return; }
-  if (P.r || P.splash) { flashSphere(scene, p, P.color, (P.r || 2) * 0.9, 0.35); puff(scene, p, '#ffd27a', 8, 0.5, 4, 0.5); puff(scene, p, '#8a8a9a', 5, 0.8, 1.5, 0.8); sfx('boom', null, near * (k === 'mini' || k === 'barrage' ? 0.35 : 0.8)); if (k === 'rocket' || k === 'helix') shake(near * 0.35); return; }
+  if (k === 'nuke') { explosion(scene, p, 16); flashSphere(scene, p, '#ff9fcf', 22, 0.8); burst(scene, p, '#ff7ac0', { r: 12, n: 40, flash: false, ground: -p.y + 0.1 }); pillar(scene, p, '#ffc0e0', 26, 6, 1); shards(scene, p, '#d9c7d2', 14, 0.5, 15, 1.2); sfx('bigboom', null, 1); shake(1.4 * near + 0.3); return; }
+  if (k === 'tire') { explosion(scene, p, 7); burst(scene, p, '#ffb43a', { r: 7, n: 26, ground: -p.y + 0.05 }); shards(scene, p, '#5a4a3a', 10, 0.35, 11, 1); sfx('bigboom', null, near); shake(near * 1.2); return; }
+  if (k === 'pulsebomb') { explosion(scene, p, 4); burst(scene, p, '#7cf0ff', { r: 4, n: 18 }); sfx('boom', null, near); shake(near * 0.8); return; }
+  if (k === 'biotic') { flashSphere(scene, p, '#c8ff7a', P.r, 0.45); ring(scene, p, '#c8ff7a', P.r, 0.5, -p.y + 0.05); spiral(scene, p.clone().setY(p.y - 0.5), '#d8ff9a', { r: P.r * 0.6, h: 3, n: 14, life: 0.6, size: 0.3 }); sfx('heal', null, near); return; }
+  if (k === 'grav') { spiral(scene, p, '#c79bff', { r: 3, h: 0.5, n: 26, life: 0.7, turns: 3, size: 0.5 }); flashSphere(scene, p, '#c79bff', 3, 0.5); sfx('boom', null, near * 0.6); return; }
+  if (k === 'flash') { flashSphere(scene, p, '#fff3a0', 3, 0.3); sparks(scene, p, '#fff3a0', 14, 8, 0.2, 0.4); sfx('boom', null, near * 0.5); return; }
+  if (k === 'conc') { burst(scene, p, '#bfe6ff', { r: 3.5, n: 12 }); sfx('boom', null, near * 0.7); return; }
+  if (P.r || P.splash) { burst(scene, p, P.color, { r: (P.r || 2) * 0.9, n: k === 'mini' ? 3 : 12 }); puff(scene, p, '#ffd27a', k === 'mini' ? 2 : 8, 0.5, 4, 0.5); puff(scene, p, '#8a8a9a', k === 'mini' ? 1 : 5, 0.8, 1.5, 0.8); sfx('boom', null, near * (k === 'mini' || k === 'barrage' ? 0.35 : 0.8)); if (k === 'rocket' || k === 'helix') shake(near * 0.35); return; }
   if (P.make === 'mine') puff(scene, p, '#c47bff', 6, 0.3, 1);
 }
 function send(m) { shell.send(m); }
@@ -341,6 +341,8 @@ function shake(k) { game.shake = Math.max(game.shake || 0, k); }
 function flash(col) { const f = $('flash'); f.style.background = col; f.style.transition = 'none'; f.style.opacity = '0.45'; requestAnimationFrame(() => requestAnimationFrame(() => { f.style.transition = 'opacity .35s'; f.style.opacity = '0'; })); }
 const h = () => game.h;
 const G = {
+  bladeFx() { const e = eye(); e.y -= 0.35; game.bladeSide = -(game.bladeSide || 1); dragonStrike(scene, e, me.yaw, '#7ee04a', { side: game.bladeSide, near: true }); shake(0.22); send({ t: 'swingfx' }); },
+  abilFx(s) { if (game.h) abilFx(game.h, s, me.pos, me.yaw, true); },
   me, vm, keys, cd: game.cd, send, sfx, say, has, hitscan, fireProj, melee, findTarget, coneTargets, eye, fwd, visible, flash, shake,
   get map() { return game.map; }, get ps() { return game.ps; }, get others() { return game.others; }, get mouseL() { return mouseL; }, get mouseR() { return mouseR; }, get jumpEdge() { return jumpEdge; },
   get gravAt() { return game.gravAt; }, set visor(v) { game.visor = v; }, get visor() { return game.visor; }, set jets(v) { game.jets = v; }, set grapLine(v) { game.grapLine = v; },
@@ -553,7 +555,7 @@ $('dex-back').onclick = () => shell.show('title');
 
 // ---------- 시작 · 메시지 ----------
 function start(m) {
-  game.mode = 'play'; game.phase = 'select'; game.cut = null; game.obj = null; game.ps = null; game.flags = 0;
+  game.mode = 'play'; game.phase = 'select'; game.cut = null; game.clip = null; game.obj = null; game.ps = null; game.flags = 0;
   for (const o of game.others.values()) o.remove();
   game.others.clear(); game.stats.clear(); ents.sync([], null);
   game.myId = shell.myId; game.atk = m.atk; game.mmode = m.mode;
@@ -719,12 +721,53 @@ shell.on('cap', (m) => {
 shell.on('toast', (m) => shell.toast(m.text, 1800));
 shell.on('gone', (m) => { game.others.get(m.id)?.remove(); game.others.delete(m.id); game.stats.delete(m.id); });
 
+// 궁극기 쓸 때의 큰 효과. 내 화면(1인칭)에서는 시야를 가리지 않게 앞쪽에 둔다
+function ultFx(hh, p, yaw, mine, pilotCall) {
+  const f = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)), at = mine ? p.clone().addScaledVector(f, 4) : p.clone(), up = at.clone().setY(at.y + 1);
+  switch (hh.id) {
+    case 'genji': dragonRise(scene, mine ? p.clone().addScaledVector(f, 5.5) : at, '#7ee04a', mine ? { r: 1.7, big: 1 } : {}); break;
+    case 'rein': burst(scene, up, '#ffb14a', { r: 4, n: 18, ground: -1 }); shards(scene, at, '#a08a6a', 12, 0.4, 10); break;
+    case 'winston': pillar(scene, at, '#9fe8ff', 9, 2.2); burst(scene, up, '#5fc8ff', { r: 4, n: 22, ground: -1 }); break;
+    case 'dva': if (pilotCall) { pillar(scene, at, '#ff9fcf', 16, 1.8, 0.8); sparks(scene, up, '#ffd0e8', 16, 7); } else { ring(scene, at, '#ff5a9f', 10, 1.2); ring(scene, at, '#ffffff', 6, 0.8); pillar(scene, at, '#ff5a9f', 7, 2.4, 0.6); } break;
+    case 'hog': spiral(scene, at, '#ffd27a', { r: 2, h: 3, n: 18 }); burst(scene, up, '#ffb14a', { r: 2.5, n: 12 }); break;
+    case 'zarya': spiral(scene, at, '#ff7ad9', { r: 2.6, h: 5, n: 24 }); flashSphere(scene, up, '#ff7ad9', 3, 0.5); break;
+    case 'pharah': burst(scene, up, '#ffd24a', { r: 3, n: 20, ground: -1 }); pillar(scene, at, '#ffe9a0', 8, 1.4); break;
+    case 'junk': burst(scene, up, '#ffb43a', { r: 2.6, n: 14 }); shards(scene, at, '#6a5a4a', 6, 0.3, 7); break;
+    case 'reaper': spiral(scene, at, '#ff3b5c', { r: 3.5, h: 2.5, n: 26, turns: 3 }); spiral(scene, at, '#3a2030', { r: 2.4, h: 2, n: 18, turns: -3, size: 0.7 }); ring(scene, at, '#ff3b5c', 8, 0.7); break;
+    case 'cassidy': ring(scene, at, '#ff6a3a', 4, 0.8); pillar(scene, at, '#ffb14a', 5, 0.9, 0.9); break;
+    case 'soldier': pillar(scene, at, '#7cd8ff', 6, 1, 0.7); ring(scene, at, '#7cd8ff', 4, 0.5); sparks(scene, up, '#bfeaff', 12, 5); break;
+    case 'widow': ring(scene, at, '#c07bff', 18, 1); ring(scene, at, '#ff6ad0', 10, 0.8); sparks(scene, up, '#e0b0ff', 12, 5); break;
+    case 'tracer': burst(scene, up, '#7cf0ff', { r: 2.5, n: 16 }); break;
+    case 'mercy': pillar(scene, at, '#ffe48a', 16, 2, 1.1); spiral(scene, at, '#fff3c0', { r: 2.2, h: 8, n: 28 }); sparks(scene, up, '#fff3c0', 18, 6); break;
+    case 'ana': spiral(scene, at, '#7cf0ff', { r: 1.6, h: 3.5, n: 18 }); ring(scene, at, '#c8ff7a', 4, 0.6); break;
+    case 'lucio': for (const [r, t] of [[8, 0.6], [14, 0.8], [20, 1]]) ring(scene, at, '#a6ff5e', r, t, 0.2); spiral(scene, at, '#d8ff9a', { r: 1.8, h: 6, n: 22 }); break;
+    case 'moira': pillar(scene, at, '#c07bff', 7, 1.2); spiral(scene, at, '#ffe48a', { r: 1.8, h: 4, n: 20 }); break;
+    default: burst(scene, up, hh.color, { r: 3, n: 16 });
+  }
+  if (mine) shake(0.35);
+}
+// 기술 쓸 때의 효과: 이동기 · 치유 · 방어 · 폭발 · 연막 묶음으로 나눈다
+const ABIL_KIND = { 'tracer.shift': 'blink', 'reaper.shift': 'smoke', 'reaper.e': 'smoke', 'moira.shift': 'blink', 'genji.shift': 'dash', 'genji.e': 'guard', 'rein.shift': 'dash', 'winston.shift': 'leap', 'winston.e': 'guard', 'dva.shift': 'dash', 'dva.e': 'shock', 'hog.shift': 'shock', 'hog.e': 'heal', 'zarya.shift': 'guard', 'zarya.e': 'guard', 'pharah.shift': 'leap', 'pharah.e': 'shock', 'junk.shift': 'shock', 'junk.e': 'shock', 'cassidy.shift': 'dash', 'cassidy.e': 'shock', 'soldier.shift': 'dash', 'soldier.e': 'heal', 'widow.shift': 'leap', 'widow.e': 'shock', 'tracer.e': 'shock', 'mercy.shift': 'blink', 'mercy.e': 'heal', 'ana.shift': 'shock', 'ana.e': 'shock', 'lucio.shift': 'shock', 'lucio.e': 'guard', 'lucio.s': 'wave', 'moira.e': 'shock', 'rein.e': 'shock' };
+function abilFx(hh, s, pos, yaw, mine, dst) {
+  const kind = ABIL_KIND[`${hh.id}.${s}`] || 'shock', col = hh.color, f = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)), c = pos.clone().setY(pos.y + 1), k = mine ? 0.6 : 1;
+  switch (kind) {
+    case 'dash': for (let i = 0; i < 6; i++) puff(scene, c.clone().addScaledVector(f, -i * 0.55 - (mine ? 1 : 0)), col, 2, 0.5 * k, 1.2, 0.35); ring(scene, pos, col, 2.5, 0.3); break;
+    case 'blink': if (!mine) flashSphere(scene, c, col, 1.6, 0.25); sparks(scene, c, col, 10, 5, 0.22, 0.4); if (dst) { const q = new THREE.Vector3(...dst).setY(dst[1] + 1); flashSphere(scene, q, col, 1.6, 0.3); line(scene, c, q, col, 0.18, 0.06); } break;
+    case 'smoke': if (!mine) puff(scene, c, '#3a3442', 14, 0.9, 1.6, 0.9); if (dst) puff(scene, new THREE.Vector3(...dst).setY(dst[1] + 1), '#4a4356', 14, 0.9, 1.6, 1.2); break;
+    case 'leap': ring(scene, pos, col, 3.5, 0.4); sparks(scene, pos.clone().setY(pos.y + 0.2), col, 12, 6, 0.26, 0.5); break;
+    case 'guard': if (!mine) flashSphere(scene, c, col, 1.8, 0.3); ring(scene, pos, col, 3, 0.45, 0.1); ring(scene, pos, '#ffffff', 1.8, 0.3, 0.9); break;
+    case 'heal': spiral(scene, pos, '#c8ff7a', { r: 1, h: 2.4, n: 12, life: 0.65, size: 0.28 }); ring(scene, pos, '#9cff9a', 2, 0.4); break;
+    case 'wave': { const q = c.clone().addScaledVector(f, 3); for (const [r, t] of [[3, 0.25], [5, 0.4]]) ring(scene, q.clone().setY(pos.y), '#a6ff5e', r, t, 1); sparks(scene, q, '#d8ff9a', 8, 6, 0.22, 0.35); break; }
+    default: if (!mine) burst(scene, c, col, { r: 1.5, n: 8 }); else sparks(scene, c.clone().addScaledVector(f, 1.5), col, 8, 4, 0.2, 0.35);
+  }
+}
 // 기술 · 궁극기 보이기
 function fxEvent(m) {
   const by = m.by === game.myId ? null : game.others.get(m.by), p = m.p ? new THREE.Vector3(...m.p) : by?.pos;
   const hh = m.h ? heroById(m.h) : null;
   if (m.k === 'ult') {
     const mineSide = m.team === game.team;
+    if (hh && p) ultFx(hh, p, m.yaw ?? by?.yaw ?? me.yaw, m.by === game.myId, m.pilot);
     if (m.by === game.myId) { sfx('ult'); say(hh?.motto); banner2(`${hh.q.icon} ${hh.q.name}!`); }
     else if (hh) {
       sfx(mineSide ? 'ult' : 'enemyult', null, 0.6);
@@ -739,18 +782,13 @@ function fxEvent(m) {
     return;
   }
   if (m.k === 'abil' && by && hh) {
-    const c = by.chest();
-    if (m.s === 'shift' && ['reaper', 'moira', 'tracer'].includes(hh.id)) puff(scene, c, hh.id === 'reaper' ? '#3a3442' : hh.id === 'moira' ? '#c07bff' : '#9fe8ff', 12, 0.6, 2);
-    else if (m.s === 'e' && hh.id === 'reaper' && m.dst) { puff(scene, c, '#3a3442', 14, 0.8, 1.5, 1); puff(scene, new THREE.Vector3(...m.dst).setY(m.dst[1] + 1), '#4a4356', 14, 0.8, 1.5, 1.2); }
-    else if (m.s === 's' && hh.id === 'lucio') ring(scene, by.pos.clone().addScaledVector(new THREE.Vector3(-Math.sin(by.yaw), 0, -Math.cos(by.yaw)), 3), '#a6ff5e', 5, 0.4, 1);
-    else if (m.s === 'e' && hh.id === 'hog') puff(scene, c, '#ffe0a0', 10, 0.4, 2);
-    else puff(scene, c, hh.color, 6, 0.4, 2);
+    abilFx(hh, m.s, by.pos, by.yaw, false, m.dst);
     const d = by.pos.distanceTo(me.pos); if (d < 40) sfx('abil', null, Math.max(0.1, 1 - d / 40) * 0.5);
     return;
   }
   if (m.k === 'slam' && p) { const q = p.clone().setY(p.y + 1); puff(scene, q, '#c9d2e3', m.wall ? 18 : 10, 0.5, 3); if (m.wall) ring(scene, p, '#ffd27a', 2.5, 0.4, 0.8); const d = p.distanceTo(me.pos); if (m.to === game.myId) { shake(1); banner2(m.wall ? '💥 벽에 박혔어요!' : '🐂 내동댕이쳐졌어요!'); } else if (d < 30) sfx('smash', null, Math.max(0.15, 1 - d / 30)); return; }
   if (m.k === 'land' && p) { ring(scene, p, '#8fd8ff', 4.5, 0.45); sfx('thud', null, 0.6); return; }
-  if (m.k === 'swing' && by) { by.bear?.attack('melee'); return; }
+  if (m.k === 'swing' && by) { by.bear?.attack('melee'); if (m.blade) { game.bladeSide = -(game.bladeSide || 1); dragonStrike(scene, by.pos.clone().setY(by.pos.y + 1.1), m.yaw ?? by.yaw, '#7ee04a', { side: game.bladeSide }); } return; }
   if (m.k === 'break') { const q = new THREE.Vector3(...m.p).setY(m.p[1] + 1.5); puff(scene, q, '#9fe8ff', 20, 0.5, 4); sfx('boom', null, 0.4); return; }
   if (m.k === 'rez') { const t = m.to === game.myId ? me.pos : game.others.get(m.to)?.pos; if (t) { flashSphere(scene, t.clone().setY(t.y + 1), '#ffe48a', 3, 0.8); puff(scene, t.clone().setY(t.y + 2), '#fff3c4', 20, 0.4, 3); } if (m.to === game.myId) banner2('✝️ 되살아났어요!'); sfx('ultready', null, 0.6); return; }
   if (m.k === 'nano') { const t = m.to === game.myId ? me.pos : game.others.get(m.to)?.pos; if (t) flashSphere(scene, t.clone().setY(t.y + 1), '#7cf0ff', 2.5, 0.6); if (m.to === game.myId) banner2('💉 나노 강화! 공격 ↑ 받는 피해 ↓'); return; }
@@ -889,8 +927,9 @@ function renderBoard() {
 
 // ---------- 승리 · 패배 컷신 ----------
 const EMOTES = ['ganbare', 'apt', 'heart', 'shuffle', 'slickback', 'creamcheese'];
-function cutscene(m) {
+function cutscene(m, resume) {
   const win = m.winner === game.team, draw = m.winner === 'draw';
+  game.overMsg = m;
   document.exitPointerLock?.(); game.mode = 'cut';
   for (const id of ['hud', 'death', 'lockmsg', 'lockhint', 'scoreboard', 'scope', 'select']) $(id).classList.add('hidden');
   // 이긴 팀(비기면 우리 팀)이 거점 앞에 줄을 서서 춤춘다
@@ -918,13 +957,56 @@ function cutscene(m) {
   $('cut-sub').textContent = `${wmapById(game.map.id).emoji} ${wmapById(game.map.id).name} · ${m.why || ''}`;
   $('cut-mvp').classList.add('hidden');
   const ms = m.stats?.find((s) => s.id === mvp);
+  // 최고의 장면이 있으면 승리 장면 다음에 먼저 보여 주고, 끝나면 여기로 돌아와 최고의 플레이어를 띄운다
+  const clip = game.clip; if (!resume && clip) { sfx(win || draw ? 'win' : 'lose'); say(draw ? '무승부' : win ? '승리!' : '패배', { pitch: win ? 1.4 : 0.9 }); game.potgT = setTimeout(() => { if (game.cut && game.clip === clip) startPotg(clip); }, 3200); return; }
   if (ms) setTimeout(() => {
     if (!game.cut) return;
     const x = heroById(ms.hero);
     $('cut-mvp').innerHTML = `<div class="mv-t">⭐ 최고의 플레이어</div><div class="mv-em" style="--hc:${x.color}">${x.emoji}</div><div class="mv-nm">${ms.bot ? '🤖 ' : ''}${esc(ms.name)}<small>${esc(x.name)}</small></div><div class="mv-st"><span>💥 ${ms.k}<small>처치</small></span><span>🔥 ${ms.dmg}<small>피해</small></span><span>💚 ${ms.heal}<small>치유</small></span><span>🏁 ${ms.obj}s<small>거점</small></span></div>`;
     $('cut-mvp').classList.remove('hidden'); sfx('cap');
-  }, 4200);
-  sfx(win || draw ? 'win' : 'lose'); say(draw ? '무승부' : win ? '승리!' : '패배', { pitch: win ? 1.4 : 0.9 });
+  }, resume ? 500 : 4200);
+  if (!resume) { sfx(win || draw ? 'win' : 'lose'); say(draw ? '무승부' : win ? '승리!' : '패배', { pitch: win ? 1.4 : 0.9 }); }
+}
+// ---------- 최고의 장면: 서버가 잘라 둔 경기 장면을 그대로 다시 재생한다 ----------
+shell.on('potg', (m) => { game.clip = m; });
+function startPotg(c) {
+  endCut(); $('cut').classList.add('hidden');
+  const star = c.players.find((p) => p.id === c.id); const realId = game.myId;
+  game.myId = -1; // 다시 보는 동안은 내 캐릭터도 다른 사람처럼 그린다 (내 화면 알림 · 점수는 건드리지 않는다)
+  let temp = null;
+  for (const p of c.players) {
+    let o = game.others.get(p.id);
+    if (!o) { o = new Other(p); game.others.set(p.id, o); if (p.id === realId) temp = o; }
+    if (p.hero) o.setHero(p.hero); o.bear?.playEmote(null); o.cutPos = null; o.alive = true; o.flags = 0;
+  }
+  const first = c.msgs.map(([, s]) => JSON.parse(s)).find((m) => m.t === 'snap'); if (first) for (const [id, ...st] of first.p) game.others.get(id)?.set(st, true);
+  game.potg = { c, t: 0, i: 0, realId, temp, msgs: c.msgs, end: c.ms / 1000 + 0.6, cam: null };
+  const h = heroById(star?.hero);
+  $('potg-t').textContent = '🎬 이번 경기 최고의 장면';
+  $('potg-n').innerHTML = `${h?.emoji || ''} <b>${esc(star?.name || '')}</b> <small>${esc(h?.name || '')}</small>`;
+  $('potg-k').textContent = c.n >= 2 ? `${c.n}연속 처치!` : '멋진 처치!';
+  $('potg').classList.remove('hidden');
+  if (camera.fov !== 62) { camera.fov = 62; camera.updateProjectionMatrix(); }
+}
+function updatePotg(dt) {
+  const P = game.potg; P.t += dt;
+  while (P.i < P.msgs.length && P.msgs[P.i][0] / 1000 <= P.t) { const m = JSON.parse(P.msgs[P.i++][1]); try { shell.net.handlers[m.t]?.(m); } catch (e) { console.warn('다시 보기', m.t, e); } }
+  // 주인공 등 뒤에서 따라간다 (벽에 막히면 당겨 온다)
+  const o = game.others.get(P.c.id);
+  if (o) {
+    const f = new THREE.Vector3(-Math.sin(o.yaw), 0, -Math.cos(o.yaw)), head = o.pos.clone().setY(o.pos.y + 1.6), back = rayBoxes(game.map, head, new THREE.Vector3(-f.x, 0.35, -f.z).normalize(), 4.6);
+    const want = head.clone().add(new THREE.Vector3(-f.x, 0.35, -f.z).normalize().multiplyScalar(Math.max(0.8, back - 0.3)));
+    P.cam = P.cam ? P.cam.lerp(want, Math.min(1, dt * 7)) : want.clone(); camera.position.copy(P.cam);
+    const look = head.clone().addScaledVector(f, 5).setY(head.y - 0.1); P.look = P.look ? P.look.lerp(look, Math.min(1, dt * 8)) : look; camera.lookAt(P.look);
+  }
+  if (P.t >= P.end) stopPotg(true);
+}
+function stopPotg(backToCut) {
+  const P = game.potg; if (!P) return;
+  game.potg = null; game.myId = P.realId; game.clip = null; $('potg').classList.add('hidden');
+  if (P.temp) { P.temp.remove(); game.others.delete(P.realId); }
+  ents.sync([], null);
+  if (backToCut && game.overMsg) { $('cut').classList.remove('hidden'); cutscene(game.overMsg, true); }
 }
 function updateCut(dt) {
   const c = game.cut; c.t += dt;
@@ -939,6 +1021,7 @@ function updateCut(dt) {
 
 // ---------- 결과 · 나가기 ----------
 function results(m) {
+  clearTimeout(game.potgT); stopPotg(false);
   game.mode = 'over';
   const win = m.winner === game.team, draw = m.winner === 'draw';
   $('ov-title').innerHTML = draw ? '🤝 무승부' : win ? '🏆 승리!' : '💧 패배';
@@ -953,7 +1036,7 @@ function results(m) {
 $('again-btn').onclick = () => { endCut(); game.mode = 'room'; shell.backToRoom(); };
 $('home-btn').onclick = () => quit();
 function endCut() { game.cut = null; for (const P of game.points) P.icon.visible = true; if (myBear) { scene.remove(myBear.root); myBear = null; } for (const o of game.others.values()) { o.bear?.playEmote(null); o.cutPos = null; } }
-function quit() { send({ t: 'leave' }); shell.room = null; toTitle(); }
+function quit() { clearTimeout(game.potgT); stopPotg(false); send({ t: 'leave' }); shell.room = null; toTitle(); }
 function toTitle() {
   endCut(); game.mode = 'title'; shell.multi = false; shell.playing = false; document.exitPointerLock?.();
   for (const id of ['hud', 'death', 'lockmsg', 'lockhint', 'scoreboard', 'scope', 'select', 'cut']) $(id).classList.add('hidden');
@@ -1073,6 +1156,10 @@ function frame() {
     sendT -= dt;
     if (sendT <= 0 && me.alive) { sendT = 0.05; shell.send({ t: 'st', p: [me.pos.x, me.pos.y, me.pos.z, me.yaw, me.pitch, (me.crouch > 0.5 ? 1 : 0) | (Math.hypot(me.vel.x, me.vel.z) > 1 ? 2 : 0)] }); }
     hud(now);
+  } else if (game.potg) {
+    for (const o of game.others.values()) o.update(dt, t);
+    updateProjs(dt); ents.update(dt);
+    updatePotg(dt);
   } else if (game.cut) {
     for (const o of game.others.values()) o.update(dt, t);
     updateCut(dt);

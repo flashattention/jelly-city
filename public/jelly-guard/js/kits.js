@@ -1,7 +1,7 @@
 // 젤리수호대 영웅 조작: 기본 공격 종류(즉발 · 투사체 · 근접 · 줄기 · 안개) + 영웅마다 우클릭 · Shift · E · Q
 //   G (main.js) 가 주는 것: me · send · hitscan · fireProj · melee · findTarget · coneTargets · has(상태) · vm · sfx · toast · ps(내 서버 상태)
 import * as THREE from 'three';
-import { PROJ } from './heroes.js';
+import { PROJ, JUMP_V, DOUBLE_JUMP_V } from './heroes.js';
 import { rayBoxes, floorAt, clearLine } from '../../jelly-tactical/js/maps.js';
 
 const GUN_SND = { cassidy: 'pistol', reaper: 'heavy', hog: 'heavy', dva: 'smg', widow: 'smg', soldier: 'pulse', tracer: 'smg', ana: 'sniper' };
@@ -38,7 +38,7 @@ export function makeKit(h, G) {
   const magSpec = () => (h.p.alt && !G.has('pilot') ? h.p.alt : spec()); // 탄창이 있는 무기 (토닥은 딱총)
   const cdLeft = (s) => Math.max(0, (G.cd[s] || 0) - now0());
   const useCd = (s, sec) => { if (cdLeft(s) > 0) { G.sfx('cd'); return false; } G.cd[s] = now0() + sec * 1000; return true; };
-  const abil = (s, extra = {}) => G.send({ t: 'abil', s, ...extra });
+  const abil = (s, extra = {}) => { G.send({ t: 'abil', s, ...extra }); G.abilFx?.(s); };
   const reloading = () => st.reloadEnd > now0();
   K.reload = () => { const sp = magSpec(); if (!sp.mag || reloading() || st.mag >= sp.mag) return; st.reloadEnd = now0() + (sp.reload || 1.4) * 1000; G.vm.reload(sp.reload || 1.4); G.sfx('reload'); };
   K.spawned = () => { st.tire = null; st.mag = magSpec().mag || 0; st.reloadEnd = 0; st.mode = null; st.fuel = 1; st.blinks = 3; st.hist = []; st.acc.clear(); };
@@ -92,7 +92,7 @@ export function makeKit(h, G) {
     if (!held) { st.latch = false; st.tgt = null; return; }
     if (busy() || reloading()) return;
     // 궁극기 · 변신 중 기본 공격
-    if (G.has('blade')) { if (now < st.next) return; st.next = now + 750; G.vm.swing(0.42); G.sfx('swing'); G.melee({ range: 7, arc: 0.3, a: 'blade', cleave: true }); return; }
+    if (G.has('blade')) { if (now < st.next) return; st.next = now + 750; G.vm.swing(0.42); G.sfx('swing'); G.bladeFx?.(); G.melee({ range: 7, arc: 0.3, a: 'blade', cleave: true }); return; }
     if (G.has('primal')) { if (now < st.next) return; st.next = now + 550; G.vm.swing(0.3); G.sfx('thud'); G.melee({ range: 5.5, arc: 0.4, a: 'punch', cleave: true }); return; }
     if (G.has('barrage')) return;
     if (h.id === 'cassidy' && G.has('deadeye')) { if (edge) K.deadeyeFire(); return; }
@@ -259,6 +259,7 @@ export function makeKit(h, G) {
     if (G.has('blossom')) inp.speedMul *= 0.6;
     if (G.has('deadeye')) inp.speedMul *= 0.35;
     if (G.has('blade')) inp.speedMul *= 1.2;
+    inp.jumpV = JUMP_V;
     if (G.has('primal')) { inp.speedMul *= 1.25; inp.jumpV = 10; }
     // 바퀴 폭탄: 몸은 멈춰 있고, 바퀴가 보는 쪽으로 저절로 구른다 (S 천천히 · Space 점프 · 클릭 펑)
     if (st.tire) {
@@ -355,7 +356,12 @@ export function makeKit(h, G) {
       } else if (st.climbing) {
         st.climbing = false;
         if (!wall && G.keys.has('Space')) { me.vel.y = Math.max(me.vel.y, 5.5); me.vel.x += flat.x * 3; me.vel.z += flat.z * 3; } // 벽 꼭대기: 앞으로 넘어간다
-      } else if (!me.onGround && G.jumpEdge && st.dj && !(wall && st.climb > 0)) { st.dj = false; me.vel.y = 7.6; G.sfx('jump'); G.puff(me.pos.clone(), '#b6ff8a', 6, 0.3, 1); }
+      } else if (!me.onGround && G.jumpEdge && st.dj && !(wall && st.climb > 0)) {
+        // 2단 점프: 위로 솟으면서 누르고 있는 쪽으로 방향도 바꾼다
+        st.dj = false; me.vel.y = DOUBLE_JUMP_V;
+        const fw = (inp.f || 0), si = (inp.s || 0), L = Math.hypot(fw, si); if (L > 0.1) { const rx = Math.cos(me.yaw), rz = -Math.sin(me.yaw), sp = Math.max(6.5, Math.hypot(me.vel.x, me.vel.z)); me.vel.x = (flat.x * fw + rx * si) / L * sp; me.vel.z = (flat.z * fw + rz * si) / L * sp; }
+        G.sfx('jump'); G.puff(me.pos.clone(), '#b6ff8a', 10, 0.35, 2);
+      }
     }
     if (h.id === 'mercy') {
       if (G.has('valk')) { inp.noGrav = true; me.vel.y = G.keys.has('Space') ? 5 : inp.crouch ? -5 : me.vel.y * 0.85; inp.crouch = false; inp.speedMul *= 1.25; inp.airCtl = 4; }
