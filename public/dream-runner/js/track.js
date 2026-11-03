@@ -35,13 +35,15 @@ function rimColor(th) {
   if (th.edge && contrast(th.edge, th.plat[0]) >= 2.2) return th.edge;
   return lum(th.plat[0]) < 0.3 ? mix(th.plat[0], '#ffffff', 0.72) : shade(th.plat[1], th.style === 'cloud' ? 0.75 : 0.5);
 }
-// 장애물 색: 하늘 · 바닥과 모두 구분되는 강조색 + 하늘과 반대 밝기의 바탕/외곽선
-const OB_ALT = ['#ff3b5c', '#ffb300', '#7c4dff', '#00c853'];
-function obColors(th) {
+// 장애물 색: 하늘 · 바닥과 모두 구분되는 강조색 + 둘 다에서 더 잘 보이는 쪽(어둡게/밝게)의 바탕 · 외곽선
+const OB_ALT = ['#ff3b5c', '#ffb300', '#7c4dff', '#00c853'], SPIKE_DARK = '#2b2b33', SPIKE_LIGHT_C = '#e8ebf2';
+export function obColors(th) {
   const sky = th.sky[1], cands = [th.edge, th.P?.a, ...OB_ALT].filter(Boolean);
   const acc = cands.find((c) => contrast(c, sky) >= 2 && contrast(c, th.plat[0]) >= 1.6) || cands.reduce((a, c) => (contrast(c, sky) > contrast(a, sky) ? c : a));
-  const bright = lum(sky) > 0.45;
-  return { acc, base: bright ? '#2a2a36' : '#ffffff', line: bright ? '#1a1a24' : '#ffffff' };
+  const seen = (c) => Math.min(contrast(c, sky), contrast(c, th.plat[0])), dark = seen('#1a1a24') >= seen('#ffffff');
+  // 고깔은 바닥에 서 있으니 몸통은 바닥과 구분되는 쪽으로 (하늘 쪽은 반대색 테두리가 맡는다)
+  const spikeDark = contrast(SPIKE_DARK, th.plat[0]) >= contrast(SPIKE_LIGHT_C, th.plat[0]);
+  return { acc, base: dark ? '#2a2a36' : '#ffffff', line: dark ? '#1a1a24' : '#ffffff', spikeDark };
 }
 export function topTexture(style, top, side, edge) {
   const a = top, b = shade(top, 0.86), d = shade(top, 0.7);
@@ -156,11 +158,12 @@ export class Track {
     const th = this.themeOf(this.dream);
     const g = new THREE.Group();
     const w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2;
-    const { acc, base, line } = obColors(th);
+    const { acc, base, line, spikeDark } = obColors(th);
     const outline = (mesh) => { const o = new THREE.Mesh(G_BOX, OUTLINE_M(line)); o.scale.copy(mesh.scale).addScalar(0.1); o.position.copy(mesh.position); g.add(o); };
     if (kind === 'spike') {
       const n = Math.max(1, Math.round(w / 0.7));
-      for (let i = 0; i < n; i++) { const c = new THREE.Mesh(G_SPIKE, line === '#ffffff' ? SPIKE_LIGHT : SPIKE_M); c.scale.set(0.32, h, 0.32); c.position.set(x0 + (i + 0.5) * (w / n) - cx, h / 2, 0); g.add(c); const t = new THREE.Mesh(G_PUFF, glow(acc)); t.scale.setScalar(0.08); t.position.set(c.position.x, h, 0); g.add(t); }
+      for (let i = 0; i < n; i++) { const c = new THREE.Mesh(G_SPIKE, spikeDark ? SPIKE_M : SPIKE_LIGHT); c.scale.set(0.32, h, 0.32); c.position.set(x0 + (i + 0.5) * (w / n) - cx, h / 2, 0); g.add(c); const o = new THREE.Mesh(G_SPIKE, OUTLINE_M(spikeDark ? '#ffffff' : '#1a1a24')); o.scale.set(0.39, h + 0.1, 0.39); o.position.copy(c.position); g.add(o); if (!isPhone) { const t = new THREE.Mesh(G_PUFF, glow(acc)); t.scale.setScalar(0.08); t.position.set(c.position.x, h, 0); g.add(t); } }
+      const mark = new THREE.Mesh(G_BOX, glow(acc)); mark.scale.set(w + 0.2, 0.03, 0.95); mark.position.y = 0.025; g.add(mark); // 바닥 띠: 빠르게 달려도 멀리서 보이게
     } else if (kind === 'bar') {
       // 숙여서 지나가는 가로대 (밑은 비어 있다)
       const beam = new THREE.Mesh(G_BOX, new THREE.MeshToonMaterial({ map: stripeTex(acc, base) })); beam.scale.set(w, h, depth); beam.position.y = h / 2; g.add(beam); outline(beam);
@@ -428,8 +431,8 @@ const G_EDGE = G_BOX;
 const G_PUFF = new THREE.SphereGeometry(1, 10, 8);
 const G_HANG = new THREE.ConeGeometry(1, 1, 7).rotateX(Math.PI);
 const G_SPIKE = new THREE.ConeGeometry(1, 1, 6);
-const SPIKE_M = new THREE.MeshToonMaterial({ color: '#2b2b33' });
-const SPIKE_LIGHT = new THREE.MeshToonMaterial({ color: '#d5dae3', emissive: '#30343c' }); // 어두운 꿈에서는 밝은 가시
+const SPIKE_M = new THREE.MeshToonMaterial({ color: SPIKE_DARK });
+const SPIKE_LIGHT = new THREE.MeshToonMaterial({ color: SPIKE_LIGHT_C, emissive: '#30343c' }); // 어두운 꿈에서는 밝은 가시
 const STAR_M = new THREE.MeshToonMaterial({ color: '#ffd23f', emissive: '#7a5200' });
 const STAR_RIM = new THREE.MeshBasicMaterial({ color: '#a8560a', side: THREE.BackSide });
 const STAR_HALO = new THREE.SpriteMaterial({ map: (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,240,170,.9)'); g.addColorStop(1, 'rgba(255,220,120,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })(), transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending });
