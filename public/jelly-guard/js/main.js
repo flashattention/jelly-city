@@ -11,7 +11,7 @@ import { Player } from '../../jelly-tactical/js/fps.js';
 import { explosion, updateFx as updateBig } from '../../jelly-tactical/js/fx.js';
 import { HEROES, ROLES, heroById, PROJ, blockBy, RESPAWN_MS, LEDGE_REACH } from './heroes.js';
 import { WMAPS, wmapById, makeMap, openGates, inRoom } from './watchmaps.js';
-import { heroBear, dvaMech, Plate, HeroVM, EntViews, puff, ring, flashSphere, line, dmgNum, sparks, pillar, spiral, shards, burst, dragonStrike, dragonRise, updateFx, beamMesh, setBeam, projMesh, trailPuff, glowTex, TEAM_COL } from './vfx.js';
+import { heroBear, dvaMech, Plate, HeroVM, EntViews, puff, ring, flashSphere, line, dmgNum, sparks, pillar, spiral, shards, burst, dragonStrike, dragonRise, twinDragons, updateFx, beamMesh, setBeam, projMesh, trailPuff, glowTex, TEAM_COL } from './vfx.js';
 import { makeKit } from './kits.js';
 import { sfx, unlock, toggleMute, sound, say } from './wsound.js';
 
@@ -579,6 +579,7 @@ const CROSS = {
   dva: '<path d="M-24-26A35 35 0 0 0-24 26M24-26A35 35 0 0 1 24 26" fill="none" stroke-width="2.6"/><circle r="2.5"/>',
   hog: '<circle r="34" fill="none" stroke-width="2"/><circle r="2.5"/>',
   zarya: '<circle r="14" fill="none" stroke-width="2"/><circle r="2"/>',
+  archer: '<path d="M0-16V-5M0 5V16M-16 0H-5M5 0H16" stroke-width="1.6"/><circle r="1.4"/>',
   junk: '<circle r="9" fill="none" stroke-width="1.6"/><path d="M0 12V19M-5 16H5" stroke-width="1.6"/><circle r="1.6"/>',
   pharah: '<path d="M0-16V-7M0 7V16M-16 0H-7M7 0H16" stroke-width="2"/><circle r="11" fill="none" stroke-width="1.2" opacity=".6"/>',
   reaper: '<circle r="30" fill="none" stroke-width="2"/><circle r="2"/>',
@@ -725,6 +726,7 @@ shell.on('gone', (m) => { game.others.get(m.id)?.remove(); game.others.delete(m.
 function ultFx(hh, p, yaw, mine, pilotCall) {
   const f = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)), at = mine ? p.clone().addScaledVector(f, 4) : p.clone(), up = at.clone().setY(at.y + 1);
   switch (hh.id) {
+    case 'archer': twinDragons(scene, p.clone().setY(p.y + 1.2), yaw, mine ? { start: 3 } : {}); if (!mine) burst(scene, up, '#7fe0ff', { r: 2, n: 10 }); break;
     case 'genji': dragonRise(scene, mine ? p.clone().addScaledVector(f, 5.5) : at, '#7ee04a', mine ? { r: 1.7, big: 1 } : {}); break;
     case 'rein': burst(scene, up, '#ffb14a', { r: 4, n: 18, ground: -1 }); shards(scene, at, '#a08a6a', 12, 0.4, 10); break;
     case 'winston': pillar(scene, at, '#9fe8ff', 9, 2.2); burst(scene, up, '#5fc8ff', { r: 4, n: 22, ground: -1 }); break;
@@ -747,7 +749,7 @@ function ultFx(hh, p, yaw, mine, pilotCall) {
   if (mine) shake(0.35);
 }
 // 기술 쓸 때의 효과: 이동기 · 치유 · 방어 · 폭발 · 연막 묶음으로 나눈다
-const ABIL_KIND = { 'tracer.shift': 'blink', 'reaper.shift': 'smoke', 'reaper.e': 'smoke', 'moira.shift': 'blink', 'genji.shift': 'dash', 'genji.e': 'guard', 'rein.shift': 'dash', 'winston.shift': 'leap', 'winston.e': 'guard', 'dva.shift': 'dash', 'dva.e': 'shock', 'hog.shift': 'shock', 'hog.e': 'heal', 'zarya.shift': 'guard', 'zarya.e': 'guard', 'pharah.shift': 'leap', 'pharah.e': 'shock', 'junk.shift': 'shock', 'junk.e': 'shock', 'cassidy.shift': 'dash', 'cassidy.e': 'shock', 'soldier.shift': 'dash', 'soldier.e': 'heal', 'widow.shift': 'leap', 'widow.e': 'shock', 'tracer.e': 'shock', 'mercy.shift': 'blink', 'mercy.e': 'heal', 'ana.shift': 'shock', 'ana.e': 'shock', 'lucio.shift': 'shock', 'lucio.e': 'guard', 'lucio.s': 'wave', 'moira.e': 'shock', 'rein.e': 'shock' };
+const ABIL_KIND = { 'archer.shift': 'heal2', 'archer.e': 'shock', 'tracer.shift': 'blink', 'reaper.shift': 'smoke', 'reaper.e': 'smoke', 'moira.shift': 'blink', 'genji.shift': 'dash', 'genji.e': 'guard', 'rein.shift': 'dash', 'winston.shift': 'leap', 'winston.e': 'guard', 'dva.shift': 'dash', 'dva.e': 'shock', 'hog.shift': 'shock', 'hog.e': 'heal', 'zarya.shift': 'guard', 'zarya.e': 'guard', 'pharah.shift': 'leap', 'pharah.e': 'shock', 'junk.shift': 'shock', 'junk.e': 'shock', 'cassidy.shift': 'dash', 'cassidy.e': 'shock', 'soldier.shift': 'dash', 'soldier.e': 'heal', 'widow.shift': 'leap', 'widow.e': 'shock', 'tracer.e': 'shock', 'mercy.shift': 'blink', 'mercy.e': 'heal', 'ana.shift': 'shock', 'ana.e': 'shock', 'lucio.shift': 'shock', 'lucio.e': 'guard', 'lucio.s': 'wave', 'moira.e': 'shock', 'rein.e': 'shock' };
 function abilFx(hh, s, pos, yaw, mine, dst) {
   const kind = ABIL_KIND[`${hh.id}.${s}`] || 'shock', col = hh.color, f = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)), c = pos.clone().setY(pos.y + 1), k = mine ? 0.6 : 1;
   switch (kind) {
@@ -757,6 +759,7 @@ function abilFx(hh, s, pos, yaw, mine, dst) {
     case 'leap': ring(scene, pos, col, 3.5, 0.4); sparks(scene, pos.clone().setY(pos.y + 0.2), col, 12, 6, 0.26, 0.5); break;
     case 'guard': if (!mine) flashSphere(scene, c, col, 1.8, 0.3); ring(scene, pos, col, 3, 0.45, 0.1); ring(scene, pos, '#ffffff', 1.8, 0.3, 0.9); break;
     case 'heal': spiral(scene, pos, '#c8ff7a', { r: 1, h: 2.4, n: 12, life: 0.65, size: 0.28 }); ring(scene, pos, '#9cff9a', 2, 0.4); break;
+    case 'heal2': spiral(scene, pos, '#8fd4ff', { r: 0.9, h: 2.2, n: 12, life: 0.55, size: 0.26 }); break;
     case 'wave': { const q = c.clone().addScaledVector(f, 3); for (const [r, t] of [[3, 0.25], [5, 0.4]]) ring(scene, q.clone().setY(pos.y), '#a6ff5e', r, t, 1); sparks(scene, q, '#d8ff9a', 8, 6, 0.22, 0.35); break; }
     default: if (!mine) burst(scene, c, col, { r: 1.5, n: 8 }); else sparks(scene, c.clone().addScaledVector(f, 1.5), col, 8, 4, 0.2, 0.35);
   }

@@ -1,11 +1,11 @@
 // 젤리수호대 영웅 조작: 기본 공격 종류(즉발 · 투사체 · 근접 · 줄기 · 안개) + 영웅마다 우클릭 · Shift · E · Q
 //   G (main.js) 가 주는 것: me · send · hitscan · fireProj · melee · findTarget · coneTargets · has(상태) · vm · sfx · toast · ps(내 서버 상태)
 import * as THREE from 'three';
-import { PROJ, JUMP_V, DOUBLE_JUMP_V } from './heroes.js';
+import { PROJ, JUMP_V, DOUBLE_JUMP_V, LUNGE_V } from './heroes.js';
 import { rayBoxes, floorAt, clearLine } from '../../jelly-tactical/js/maps.js';
 
 const GUN_SND = { cassidy: 'pistol', reaper: 'heavy', hog: 'heavy', dva: 'smg', widow: 'smg', soldier: 'pulse', tracer: 'smg', ana: 'sniper' };
-export const VM_KIND = { rein: 'hammer', winston: 'tesla', dva: 'cannons', hog: 'scrap', zarya: 'particle', pharah: 'rpg', reaper: 'shotgun2', cassidy: 'revolver', soldier: 'rifle', junk: 'launcher', genji: 'shuriken', widow: 'sniper', tracer: 'pistols', mercy: 'staff', ana: 'biorifle', lucio: 'sonic', moira: 'hands' };
+export const VM_KIND = { rein: 'hammer', winston: 'tesla', dva: 'cannons', hog: 'scrap', zarya: 'particle', pharah: 'rpg', reaper: 'shotgun2', cassidy: 'revolver', soldier: 'rifle', junk: 'launcher', archer: 'bow', genji: 'shuriken', widow: 'sniper', tracer: 'pistols', mercy: 'staff', ana: 'biorifle', lucio: 'sonic', moira: 'hands' };
 
 // 바퀴 폭탄 한 걸음. 벽 속에 들어가면 어느 쪽으로도 못 움직이므로 마지막 안전한 자리로 되돌린다
 const inSolid = (map, x, y, z) => rayBoxes(map, { x, y, z }, { x: 0, y: 1, z: 0 }, 0.02) === 0;
@@ -89,6 +89,7 @@ export function makeKit(h, G) {
   K.primary = (now, held, edge) => {
     st.beams = [];
     if (st.aim === 'tp') { if (edge) K.confirmTp(now); return; }
+    if (h.id === 'archer') return K.bow(now, held);
     if (!held) { st.latch = false; st.tgt = null; return; }
     if (busy() || reloading()) return;
     // 궁극기 · 변신 중 기본 공격
@@ -177,6 +178,20 @@ export function makeKit(h, G) {
     G.sfx('gun', 'sniper'); G.vm.kick(1); G.say('탕!');
   };
 
+  // 활: 누르고 있으면 당기고, 떼면 쏜다. 끝까지 당겨야 제 위력 (돌풍 화살은 누르는 동안 빠르게)
+  K.bow = (now, held) => {
+    if (busy()) { st.drawAt = 0; return; }
+    if (st.storm > 0) {
+      if (now > st.stormEnd) { st.storm = 0; st.bowWait = true; return; }
+      if (held && now >= st.next) { st.storm--; st.next = now + 170; G.fireProj('storm', { a: 'shift' }); G.vm.kick(0.6); G.sfx('swing'); if (st.storm <= 0) st.bowWait = true; }
+      return;
+    }
+    if (st.bowWait) { if (!held) st.bowWait = false; return; } // 돌풍을 다 쏜 뒤 손을 떼기 전에는 당기지 않는다
+    if (held) { if (now >= st.next && !st.drawAt) { st.drawAt = now; G.sfx('tick'); } return; }
+    if (!st.drawAt) return;
+    const k = Math.min(1, (now - st.drawAt) / 750); st.drawAt = 0; st.next = now + 260;
+    G.fireProj(k >= 0.95 ? 'arrow' : 'arrowq', { a: 'p' }); G.vm.kick(k >= 0.95 ? 0.9 : 0.35); G.sfx('swing');
+  };
   // ---------- Shift · E · Q ----------
   K.abil = (slot, now) => {
     if (G.has('stun') || G.has('sleep')) return;
@@ -206,6 +221,8 @@ export function makeKit(h, G) {
       case 'hog.e': if (!useCd('e', sp.cd)) return; abil('e'); G.sfx('heal'); return;
       case 'zarya.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); G.sfx('abil'); return;
       case 'zarya.e': { if (!useCd('e', sp.cd)) return; const t = G.findTarget({ range: 30, arc: 0.95, lock: 'ally' }); abil('e', { to: t?.id }); G.sfx('abil'); return; }
+      case 'archer.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); st.storm = 5; st.stormEnd = now + 6000; st.drawAt = 0; st.next = 0; G.sfx('abil'); return;
+      case 'archer.e': if (!useCd('e', sp.cd)) return; abil('e'); G.fireProj('echo', { a: 'e' }); G.sfx('throw'); return;
       case 'junk.shift': if (G.detonate('jmine')) return; if (!useCd('shift', sp.cd)) return; abil('shift'); G.fireProj('jmine', { a: 'shift' }); G.sfx('throw'); return;
       case 'junk.e': if (!useCd('e', sp.cd)) return; abil('e'); G.fireProj('jtrap', { a: 'e' }); G.sfx('throw'); return;
       case 'pharah.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); me.vel.y = 17; me.onGround = false; st.mode = 'jet'; st.until = now + 400; G.sfx('rocket'); return;
@@ -345,10 +362,11 @@ export function makeKit(h, G) {
       inp.airCtl = 2.4;
     }
     if (h.id === 'widow' && st.grapJump) { if (me.onGround || now > st.grapJump) st.grapJump = 0; else if (G.jumpEdge) { st.grapJump = 0; const fw = flat.clone(); me.vel.x += fw.x * 5; me.vel.z += fw.z * 5; me.vel.y = 8.5; G.sfx('jump'); G.puff(me.pos.clone(), '#9466e0', 6, 0.3, 1); } }
-    if (h.id === 'genji') {
+    if (h.id === 'archer' && st.drawAt) inp.speedMul *= 0.7;
+    if (h.id === 'genji' || h.id === 'archer') {
       // 벽 타기: 벽을 보고 Space 를 누르고 있으면 기어오른다 (땅에 닿을 때마다 1.4초). 꼭대기에 닿으면 훌쩍 넘어간다
       const wall = [0.35, 1.2].some((y) => { const a = me.pos.clone(); a.y += y; return !clearLine(G.map, a, a.clone().addScaledVector(flat, 0.75)); });
-      if (me.onGround) { st.dj = true; st.climb = 1.4; }
+      if (me.onGround) { st.dj = true; st.climb = h.id === 'archer' ? 0.9 : 1.4; }
       if (!me.onGround && G.keys.has('Space') && wall && st.climb > 0 && !st.mode) {
         if (!st.climbing) G.sfx('jump');
         st.climbing = true; st.climb -= dt; me.vel.y = 6.5; me.vel.x *= 0.5; me.vel.z *= 0.5;
@@ -358,8 +376,9 @@ export function makeKit(h, G) {
         if (!wall && G.keys.has('Space')) { me.vel.y = Math.max(me.vel.y, 5.5); me.vel.x += flat.x * 3; me.vel.z += flat.z * 3; } // 벽 꼭대기: 앞으로 넘어간다
       } else if (!me.onGround && G.jumpEdge && st.dj && !(wall && st.climb > 0)) {
         // 2단 점프: 위로 솟으면서 누르고 있는 쪽으로 방향도 바꾼다
-        st.dj = false; me.vel.y = DOUBLE_JUMP_V;
-        const fw = (inp.f || 0), si = (inp.s || 0), L = Math.hypot(fw, si); if (L > 0.1) { const rx = Math.cos(me.yaw), rz = -Math.sin(me.yaw), sp = Math.max(6.5, Math.hypot(me.vel.x, me.vel.z)); me.vel.x = (flat.x * fw + rx * si) / L * sp; me.vel.z = (flat.z * fw + rz * si) / L * sp; }
+        // 슝슝은 낮게 멀리 도약한다
+        st.dj = false; const lunge = h.id === 'archer'; me.vel.y = lunge ? LUNGE_V : DOUBLE_JUMP_V;
+        const fw = (inp.f || (lunge ? 1 : 0)), si = (inp.s || 0), L = Math.hypot(fw, si); if (L > 0.1) { const rx = Math.cos(me.yaw), rz = -Math.sin(me.yaw), sp = Math.max(lunge ? 11 : 6.5, Math.hypot(me.vel.x, me.vel.z)); me.vel.x = (flat.x * fw + rx * si) / L * sp; me.vel.z = (flat.z * fw + rz * si) / L * sp; }
         G.sfx('jump'); G.puff(me.pos.clone(), '#b6ff8a', 10, 0.35, 2);
       }
     }
@@ -405,6 +424,7 @@ export function makeKit(h, G) {
     if (h.id === 'rein') return { big: Math.round(G.ps?.[8] ?? 1200), small: '방벽' };
     if (h.id === 'moira') return { big: Math.round(G.ps?.[8] ?? 100), small: '생체 자원' };
     if (h.id === 'zarya') return { big: `${Math.round(G.ps?.[6] ?? 0)}%`, small: '에너지' };
+    if (h.id === 'archer' && !st.drawAt && !(st.storm > 0)) return { big: '∞', small: '화살' };
     if (h.id === 'dva' && !G.has('pilot')) return { big: '∞', small: `매트릭스 ${Math.round(G.ps?.[8] ?? 300) / 3 | 0}%` };
     if (sp.type === 'beam' || sp.type === 'melee') return { big: '∞', small: sp.name };
     if (h.id === 'mercy') return st.gun ? { big: st.mag, small: '/ 20 딱총' } : { big: '🪄', small: '지팡이 · 휠 = 딱총' };
@@ -415,6 +435,8 @@ export function makeKit(h, G) {
     if (st.tire) return { bar: Math.max(0, (st.tire.until - performance.now()) / 8000), label: '🛞 바퀴 폭탄' };
     if (h.id === 'pharah') return { bar: st.fuel, label: '연료' };
     if (h.id === 'tracer') return { pips: st.blinks, label: '점멸' };
+    if (h.id === 'archer' && st.storm > 0) return { big: `${st.storm}`, small: '돌풍 화살' };
+    if (h.id === 'archer' && st.drawAt) return { bar: Math.min(1, (performance.now() - st.drawAt) / 750), label: '당기는 중' };
     if (h.id === 'widow' && G.mouseR) return { bar: Math.min(1, (performance.now() - st.scopeAt) / (h.p.scoped.charge * 1000)), label: '충전' };
     if (h.id === 'lucio') return { label: G.has('songheal') ? '🎵 치유 곡' : '🎵 속도 곡' };
     return null;

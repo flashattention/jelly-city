@@ -16,7 +16,7 @@ const ULT_X = Number(process.env.WATCH_ULTX) || 1; // 점검용: 궁극기 빨�
 const RUSHERS = new Set(['rein', 'winston', 'genji', 'reaper', 'hog', 'dva', 'tracer', 'zarya']), NO_HOP = new Set(['pharah', 'mercy']); // 파고드는 영웅 · 뛰면 안 되는 영웅
 const BOT_NAMES = ['젤리봇 딸기', '젤리봇 소다', '젤리봇 푸딩', '젤리봇 망고', '젤리봇 민트', '젤리봇 라임', '젤리봇 자두', '젤리봇 복숭아', '젤리봇 포도', '젤리봇 레몬', '젤리봇 체리', '젤리봇 키위'];
 // 영웅마다 쏠 수 있는 투사체
-const PKINDS = { rein: ['fire'], dva: ['mini'], zarya: ['egren', 'grav'], pharah: ['rocket', 'conc', 'barrage'], hog: ['hook'], soldier: ['helix'], genji: ['shuri'], cassidy: ['flash'], widow: ['mine'], tracer: ['pulse'], mercy: ['bolt'], ana: ['sleep', 'biotic'], lucio: ['sonic'], moira: [], junk: ['frag', 'jmine', 'jtrap'] };
+const PKINDS = { rein: ['fire'], dva: ['mini'], zarya: ['egren', 'grav'], pharah: ['rocket', 'conc', 'barrage'], hog: ['hook'], soldier: ['helix'], genji: ['shuri'], cassidy: ['flash'], widow: ['mine'], tracer: ['pulse'], mercy: ['bolt'], ana: ['sleep', 'biotic'], lucio: ['sonic'], moira: [], junk: ['frag', 'jmine', 'jtrap'], archer: ['arrow', 'arrowq', 'storm', 'echo'] };
 // 상태 이상 → 화면에 보내는 비트
 const F = { stun: 1, sleep: 2, invuln: 4, nano: 8, boost: 16, matrix: 32, deflect: 64, grav: 128, anti: 256, hboost: 512, primal: 1024, pilot: 2048, valk: 4096, bub: 8192, reveal: 16384, blossom: 32768, hogult: 65536, blade: 131072, barrage: 262144, deadeye: 524288, coal: 1 << 20, ghost: 1 << 21, spd: 1 << 22, amp: 1 << 23, visor: 1 << 24, breath: 1 << 25, songheal: 1 << 26, poison: 1 << 27, shield: 1 << 28, down: 1 << 29 };
 const d2 = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -340,6 +340,7 @@ export class GuardRooms extends BaseRooms {
     }
     if (P.make === 'grav') this.addEnt(r, { k: 'grav', team: c.team, owner: c, x: p.x, y: p.y, z: p.z, until: now + 4000, r: 6.5 });
     if (P.make === 'jtrap') { for (const e of g.ents.filter((e) => e.k === 'jtrap' && e.owner === c)) this.removeEnt(r, e); this.addEnt(r, { k: 'jtrap', team: c.team, owner: c, x: p.x, y: p.y, z: p.z, until: now + 60000 }); }
+    if (P.make === 'echo') { for (const e of g.ents.filter((e) => e.k === 'echo' && e.owner === c)) this.removeEnt(r, e); this.addEnt(r, { k: 'echo', team: c.team, owner: c, x: p.x, y: floorAt(g.map, p.x, p.z, p.y + 0.5), z: p.z, until: now + 6000 }); }
     if (P.make === 'mine') { for (const e of g.ents.filter((e) => e.k === 'mine' && e.owner === c)) this.removeEnt(r, e); this.addEnt(r, { k: 'mine', team: c.team, owner: c, x: p.x, y: p.y, z: p.z, until: now + 90000 }); }
   }
   // 펄스 폭탄: 붙은 곳(사람이면 따라다님) → 1초 뒤 펑
@@ -450,6 +451,7 @@ export class GuardRooms extends BaseRooms {
       if (slot === 'e') { const t = r.players.find((p) => p.id === +m.to && p.team === c.team && p.alive); this.bubble(t && d3(t.pos, c.pos) < 32 ? t : c, c, now); }
     }
     if (id === 'pharah') { if (slot === 'e') tok('conc'); }
+    if (id === 'archer') { if (slot === 'shift') tok('storm', 5); if (slot === 'e') tok('echo'); }
     if (id === 'junk') { if (slot === 'shift') tok('jmine'); if (slot === 'e') tok('jtrap'); }
     if (id === 'reaper') { if (slot === 'shift') { c.fx.invuln = now + 3000; c.fx.ghost = now + 3000; } }
     if (id === 'cassidy') { if (slot === 'e') tok('flash'); }
@@ -490,6 +492,7 @@ export class GuardRooms extends BaseRooms {
       case 'hog': c.fx.hogult = now + 6000; return true;
       case 'zarya': tok('grav'); return true;
       case 'pharah': c.fx.barrage = now + 3000; tok('barrage', 60); return true;
+      case 'archer': { const f2 = fwd(c.yaw); this.addEnt(r, { k: 'twin', team: c.team, owner: c, x: c.pos.x, y: c.pos.y + 1, z: c.pos.z, sx: c.pos.x, sz: c.pos.z, fx: f2.x, fz: f2.z, until: now + 3500 }); return true; }
       case 'junk': { const f2 = fwd(c.yaw); this.addEnt(r, { k: 'tire', team: c.team, owner: c, x: c.pos.x + f2.x, y: c.pos.y, z: c.pos.z + f2.z, yaw: c.yaw, until: now + 8500, movedAt: now }); return true; }
       case 'reaper': c.fx.blossom = now + 3000; return true;
       case 'cassidy': c.fx.deadeye = now + 7000; c.deadAt = now; c.deadDone = new Set(); return true;
@@ -699,6 +702,8 @@ export class GuardRooms extends BaseRooms {
       }
       if (e.k === 'pulse' && e.on) { if (e.on.alive) { e.x = e.on.pos.x; e.y = e.on.pos.y + 1.1; e.z = e.on.pos.z; } else e.on = null; }
       if (e.k === 'field') for (const t of r.players) if (t.alive && t.team === e.team && d3(t.pos, e) < e.r) this.heal(r, t, 40 * dt, e.owner, now);
+      if (e.k === 'echo') for (const t of r.players) if (t.alive && t.team !== e.team && d2(t.pos, e) < 10) t.fx.reveal = Math.max(t.fx.reveal || 0, now + 300);
+      if (e.k === 'twin') this.twinTick(r, e, now, dt);
       if (e.k === 'grav') {
         for (const t of r.players) {
           if (!t.alive || t.team === e.team || t.fx.invuln > now || d3(chest(t), e) > e.r) continue;
@@ -746,6 +751,18 @@ export class GuardRooms extends BaseRooms {
     }
   }
   // 펑펑 바퀴 폭탄 (궁극기 피해라 궁 게이지는 안 찬다)
+  // 쌍둥이 용: 벽을 무시하고 곧게 날아간다. 머리에서 뒤로 16m 안의 적이 초당 300 피해를 받는다 (서 있으면 약 270)
+  twinTick(r, e, now, dt) {
+    e.x += e.fx * 20 * dt; e.z += e.fz * 20 * dt;
+    if ((e.tk = (e.tk || 0) + dt) < 0.1) return; e.tk = 0;
+    const head = Math.hypot(e.x - e.sx, e.z - e.sz);
+    for (const t of r.players) {
+      if (!t.alive || t.team === e.team || Math.abs(t.pos.y - e.y) > 6) continue;
+      const dx = t.pos.x - e.sx, dz = t.pos.z - e.sz, along = dx * e.fx + dz * e.fz, off = Math.abs(dx * -e.fz + dz * e.fx);
+      if (along > head + 1 || along < head - 16 || along < 0 || off > 3.4) continue;
+      this.damage(r, t, 30, e.owner, now, { a: 'q' });
+    }
+  }
   // 돼지우리 한 번: 앞의 적을 때리고 밀어낸다. 방벽 뒤의 적은 피해도 밀림도 없고 방벽이 대신 맞는다
   hogBlast(r, p, now) {
     const f = fwd(p.yaw);
@@ -1168,6 +1185,8 @@ export class GuardRooms extends BaseRooms {
     if (b.hero === 'ana' && cdOk('shift') && tgt && td < 14 && Math.random() < 0.5) { use('shift'); this.botShot(r, b, 'sleep', tgt, now); return; }
     if (b.hero === 'dva' && !b.pilot && cdOk('e') && tgt && td < 20) { use('e'); for (let i = 0; i < 6; i++) setTimeout(() => this.botShot(r, b, 'mini', tgt, Date.now()), i * 120); return; }
     if (b.hero === 'hog' && cdOk('shift') && tgt && td < 16 && td > 5) { use('shift'); this.botShot(r, b, 'hook', tgt, now); return; }
+    if (b.hero === 'archer' && cdOk('shift') && tgt && td < 26) { use('shift'); for (let i = 0; i < 5; i++) setTimeout(() => { if (r.g && b.alive && tgt.alive) this.botShot(r, b, 'storm', tgt, Date.now()); }, i * 170); return; }
+    if (b.hero === 'archer' && cdOk('e') && tgt && td < 30) { use('e'); for (const e of r.g.ents.filter((e) => e.k === 'echo' && e.owner === b)) this.removeEnt(r, e); this.addEnt(r, { k: 'echo', team: b.team, owner: b, x: tgt.pos.x, y: tgt.pos.y + 0.05, z: tgt.pos.z, until: now + 6000 }); return; }
     if (b.hero === 'junk' && cdOk('shift') && tgt && td < 10) { use('shift'); this.botShot(r, b, 'jmine', tgt, now); return; }
     if (b.hero === 'junk' && cdOk('e') && tgt && td < 22) { use('e'); for (const e of r.g.ents.filter((e) => e.k === 'jtrap' && e.owner === b)) this.removeEnt(r, e); this.addEnt(r, { k: 'jtrap', team: b.team, owner: b, x: b.pos.x, y: b.pos.y + 0.05, z: b.pos.z, until: now + 60000 }); return; }
     if (b.hero === 'pharah' && cdOk('e') && tgt && td < 8) { use('e'); this.botShot(r, b, 'conc', tgt, now); return; }

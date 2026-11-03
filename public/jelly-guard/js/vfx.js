@@ -143,6 +143,7 @@ export class HeroVM {
         this.guard = add(new THREE.RingGeometry(0.3, 0.33, 48)); this.guard.position.set(0, -0.1, -0.9);
         this.guard.add(new THREE.Mesh(new THREE.CircleGeometry(0.3, 48), mat(0.07)));
         break; }
+      case 'bow': { const b = new THREE.Group(); b.position.set(0.34, -0.24, -0.72); b.rotation.set(0, 0, -0.3); b.scale.setScalar(0.62); g.add(b); const arc = new THREE.Mesh(new THREE.TorusGeometry(0.52, 0.022, 8, 28, Math.PI), toon('#2f4f7a')); arc.rotation.z = -Math.PI / 2; b.add(arc); for (const s of [-1, 1]) part(b, SPH, gold, 0, s * 0.52, 0, 0.035, 0.05, 0.035); part(b, BOX, toon('#f2f2f2'), -0.12, 0, 0, 0.006, 1.02, 0.006); part(b, CYL, toon('#d9c7a0'), 0.1, 0, -0.1, 0.012, 0.9, 0.012, Math.PI / 2); part(b, SPH, glowM('#8fd4ff'), 0.1, 0, -0.56, 0.035, 0.035, 0.07); pawAt(0.28, -0.08, -0.25, 1); mz(0.1, -0.2, -1); break; }
       case 'sniper': part(g, BOX, toon('#5b3f8f'), 0.24, -0.24, -0.55, 0.08, 0.12, 0.8); part(g, CYL, dark, 0.24, -0.2, -1.05, 0.025, 0.4, 0.025, Math.PI / 2); part(g, CYL, dark, 0.24, -0.13, -0.5, 0.04, 0.28, 0.04, Math.PI / 2); part(g, SPH, glowM('#ff6bd6'), 0.24, -0.13, -0.66, 0.03, 0.03, 0.03); pawAt(0.24, -0.34, -0.34); pawAt(0.22, -0.3, -0.75); mz(0.24, -0.2, -1.26); break;
       case 'pistols': for (const s of [-1, 1]) { part(g, BOX, toon('#ffa04a'), s * 0.26, -0.22, -0.45, 0.06, 0.08, 0.24); part(g, BOX, glowM('#9fe8ff'), s * 0.26, -0.18, -0.45, 0.065, 0.02, 0.2); part(g, BOX, dark, s * 0.26, -0.28, -0.38, 0.05, 0.1, 0.05); pawAt(s * 0.26, -0.3, -0.36); mz(s * 0.26, -0.21, -0.58); } break;
       case 'staff': { const s = new THREE.Group(); s.position.set(0.3, -0.36, -0.55); s.rotation.set(-1.15, 0, 0.12); g.add(s); part(s, CYL, toon('#ffffff'), 0, 0.2, 0, 0.022, 1.0, 0.022); part(s, SPH, gold, 0, 0.72, 0, 0.06, 0.06, 0.06); part(s, BOX, gold, 0.07, 0.68, 0, 0.12, 0.03, 0.015, 0, 0, 0.5); part(s, BOX, gold, -0.07, 0.68, 0, 0.12, 0.03, 0.015, 0, 0, -0.5); this.tip = part(s, SPH, glowM('#ffe48a', 0.8), 0, 0.78, 0, 0.05, 0.05, 0.05); pawAt(0.3, -0.38, -0.42); } mz(0.32, -0.12, -0.95); break;
@@ -285,7 +286,8 @@ export function burst(scene, p, color, { r = 3, n = 14, ground = 0, flash = true
   sparks(scene, p, color, n, speed ?? 3 + r * 1.6, 0.26, 0.6);
 }
 // 용: 밝은 맵에서도 하얗게 타지 않도록 색이 있는 불투명 몸통에 줄무늬 · 지느러미, 머리는 뿔 · 수염 · 눈을 조립한다
-const solid = (c) => new THREE.MeshBasicMaterial({ color: c, transparent: true });
+let xrayNext = false; // 벽 너머로도 보이는 용
+const solid = (c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, depthTest: !xrayNext });
 function makeDragon(color, n, big = 1) {
   const g = new THREE.Group(), body = new THREE.InstancedMesh(SPH, solid('#ffffff'), n), fin = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 2.2, 5), solid('#e8ffc0'), Math.floor(n / 4)); body.frustumCulled = fin.frustumCulled = false; g.add(body, fin);
   const c = new THREE.Color(color), dark = c.clone().multiplyScalar(0.55), light = c.clone().lerp(new THREE.Color('#ffffff'), 0.35);
@@ -318,6 +320,17 @@ export function dragonStrike(scene, from, yaw, color = '#7ee04a', { reach = 8, s
   const arc = new THREE.Mesh(new THREE.RingGeometry(3.4, 5.6, 36, 1, 0.45, Math.PI - 0.9), addGlow(color, 0.5)); arc.rotation.order = 'YXZ'; arc.rotation.y = yaw; arc.rotation.x = -Math.PI / 2; arc.position.copy(from).addScaledVector(f, 0.6); scene.add(arc);
   fx.push({ o: arc, t: 0.26, life: 0.26, tick: (k) => { const q = 0.75 + k * 0.6; arc.scale.set(q, q, 1); }, opacity: 0.5 });
   sparks(scene, from.clone().addScaledVector(f, start + reach * 0.6), color, 8, 6, 0.22, 0.45);
+}
+// 쌍둥이 용: 서로를 감으며 벽을 뚫고 곧게 날아간다 (서버 판정과 같은 빠르기 · 거리). 벽에 가려도 보인다
+export function twinDragons(scene, from, yaw, { len = 70, life = 3.5, start = 0, cols = ['#3fa0ff', '#7fe0ff'] } = {}) {
+  const f = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)), rt = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+  cols.forEach((col, i) => {
+    const ph = i * Math.PI, path = (u) => { const d = start + Math.max(0, u) * len, a = d * 0.42 + ph; return from.clone().addScaledVector(f, d).addScaledVector(rt, Math.cos(a) * 1.9); };
+    const pathY = (u) => { const v = path(u), d = start + Math.max(0, u) * len; v.y += 0.4 + Math.sin(d * 0.42 + ph) * 1.5; return v; };
+    xrayNext = true; const D = makeDragon(col, 120, 1.55); xrayNext = false; D.g.traverse((o) => { o.renderOrder = 6; }); scene.add(D.g);
+    fx.push({ o: D.g, t: life, life, tick: (k) => { poseDragon(D, pathY, k, 0.0028, k < 0.9 ? 1 : Math.max(0, (1 - k) / 0.1)); if (Math.random() < 0.55) puff(scene, pathY(k - 0.015), col, 1, 0.5, 2.2, 0.55); }, end: () => endDragon(scene, D), keepGeo: true });
+  });
+  ring(scene, from.clone().setY(from.y - 1), cols[0], 4, 0.5); sparks(scene, from.clone().addScaledVector(f, start + 1), cols[1], 16, 8, 0.26, 0.6);
 }
 // 궁극기를 켤 때: 용이 몸을 감고 하늘로 솟구친다
 export function dragonRise(scene, p, color = '#7ee04a', { r = 2.2, h = 7, big = 1.3 } = {}) {
@@ -380,6 +393,7 @@ export class EntViews {
     }
     if (k === 'dome') { const dt = hexTex().clone(); dt.repeat.set(8, 3); dt.needsUpdate = true; const m = new THREE.MeshBasicMaterial({ color: col, map: dt, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }); const s = new THREE.Mesh(new THREE.SphereGeometry(5, 32, 18, 0, Math.PI * 2, 0, Math.PI / 2), m); o.add(s); part(o, CYL, toon('#d8dde6'), 0, 0.2, 0, 0.25, 0.4, 0.25); return { o, mat: m }; }
     if (k === 'field') { const r = new THREE.Mesh(new THREE.RingGeometry(4.6, 5, 48), glowM('#7cff9a', 0.6)); r.rotation.x = -Math.PI / 2; r.position.y = 0.06; o.add(r); const c = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 2.4, 40, 1, true), new THREE.MeshBasicMaterial({ color: '#7cff9a', transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false })); c.position.y = 1.2; o.add(c); part(o, CYL, toon('#ffffff'), 0, 0.25, 0, 0.18, 0.5, 0.18); part(o, SPH, glowM('#9cff9a'), 0, 0.6, 0, 0.12, 0.12, 0.12); return { o, spin: c }; }
+    if (k === 'echo') { part(o, CYL, toon('#efe2c0'), 0, 0.3, 0, 0.02, 0.6, 0.02); const s = new THREE.Mesh(new THREE.RingGeometry(9.7, 10, 56), glowM('#ffd76a', 0.45)); s.rotation.x = -Math.PI / 2; s.position.y = 0.08; o.add(s); part(o, SPH, glowM('#ffd76a'), 0, 0.62, 0, 0.09, 0.09, 0.09); return { o }; }
     if (k === 'mine') { part(o, SPH, toon('#9466e0'), 0, 0.12, 0, 0.22, 0.14, 0.22); part(o, SPH, glowM(team === myTeam ? '#c79bff' : '#ff6aa8'), 0, 0.2, 0, 0.08, 0.08, 0.08); return { o }; }
     if (k === 'jtrap') { const c = team === myTeam ? '#7cd8ff' : '#ff6a8a'; part(o, CYL, toon('#6a6f7a'), 0, 0.04, 0, 0.42, 0.06, 0.42); for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; part(o, BOX, toon('#c9ced8'), Math.cos(a) * 0.36, 0.14, Math.sin(a) * 0.36, 0.05, 0.18, 0.05); } part(o, SPH, glowM(c), 0, 0.1, 0, 0.07, 0.07, 0.07); return { o }; }
     if (k === 'tire') { const r = new THREE.Group(); r.position.y = 0.72; o.add(r); part(r, CYL, toon('#23232b'), 0, 0, 0, 0.72, 0.62, 0.72, 0, 0, Math.PI / 2); part(r, CYL, toon('#ffb43a'), 0, 0, 0, 0.42, 0.66, 0.42, 0, 0, Math.PI / 2); for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2; part(r, SPH, toon('#ffb43a'), 0, Math.sin(a) * 0.36, Math.cos(a) * 0.36, 0.14, 0.14, 0.14); } part(r, SPH, toon('#6f7f45'), 0, 0, 0, 0.3, 0.3, 0.3); const l = part(o, SPH, glowM(team === myTeam ? '#7cd8ff' : '#ff3b6b', 0), 0, 0.72, 0, 0.95, 0.95, 0.95); return { o, roll: r, blink: l }; }
@@ -413,6 +427,7 @@ export function projMesh(k) {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: P.color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   s.scale.setScalar(P.size * 4); g.add(s);
   if (k === 'rocket' || k === 'helix' || k === 'barrage' || k === 'mini') { const b = part(g, CYL, toon(k === 'mini' ? '#ff9fcf' : '#dfe8f5'), 0, 0, 0, P.size * 0.45, P.size * 2.4, P.size * 0.45); b.rotation.x = Math.PI / 2; g.userData.orient = true; }
+  else if (k === 'arrow' || k === 'arrowq' || k === 'storm' || k === 'echo') { const b = part(g, CYL, toon('#efe2c0'), 0, 0, 0, 0.016, 0.8, 0.016); b.rotation.x = Math.PI / 2; part(g, SPH, glowM(P.color), 0, 0, 0.4, 0.04, 0.04, 0.08); g.userData.orient = true; }
   else if (k === 'shuri') { const b = part(g, BOX, toon('#e6eef5'), 0, 0, 0, 0.22, 0.02, 0.22, 0, Math.PI / 4); g.userData.spin = b; }
   else if (k === 'fire') { s.scale.set(3.4, 1.6, 1); s.material.color.set('#ff8a3c'); const s2 = s.clone(); s2.material = s.material.clone(); s2.material.color.set('#ffe08a'); s2.scale.set(1.8, 0.9, 1); g.add(s2); }
   else if (k === 'hook') { part(g, BOX, toon('#9aa0ab'), 0, 0, 0, 0.3, 0.3, 0.12); }

@@ -1,10 +1,10 @@
-// 젤리수호대 영웅 17명 (돌격 5 · 공격 8 · 지원 4). 서버(판정 · 쿨타임 · 궁극기)와 화면이 같이 쓴다
+// 젤리수호대 영웅 18명 (돌격 5 · 공격 9 · 지원 4). 서버(판정 · 쿨타임 · 궁극기)와 화면이 같이 쓴다
 //   공격 종류: hit(즉발 사격) · proj(투사체, PROJ 표) · melee(근접 부채꼴) · beam(대상 고정 줄기)
 //   기술 칸: s(우클릭) · shift · e · q(궁극기)
 export const ROLES = { tank: { name: '돌격', icon: '🛡️', color: '#7cc4ff' }, dps: { name: '공격', icon: '⚔️', color: '#ff7a8a' }, sup: { name: '지원', icon: '✚', color: '#9be7a7' } };
 // 점프: 중력 21 에서 v = √(2gh). 일반 0.98m · 칼바람 2단은 꼭대기에서 2.02m 더 (합 3m)
 const GRAVITY = 21, jumpV = (h) => Math.sqrt(2 * GRAVITY * h);
-export const JUMP_V = jumpV(0.98), DOUBLE_JUMP_V = jumpV(2.02), LEDGE_REACH = 0.45; // 공중에서 이만큼 낮은 턱은 올라선다 (낮은 점프로도 1.4m 상자에 오르게)
+export const JUMP_V = jumpV(0.98), DOUBLE_JUMP_V = jumpV(2.02), LUNGE_V = jumpV(1.2), LEDGE_REACH = 0.45; // 공중에서 이만큼 낮은 턱은 올라선다 (낮은 점프로도 1.4m 상자에 오르게)
 export const BASE_SPEED = 5.6, RESPAWN_MS = 8000, ULT_PASSIVE = 5; // 궁극기: 1초에 5점 + 준 피해 · 치유 1당 1점
 
 // 투사체: speed(m/s) · grav(중력 배수) · dmg(직격 추가) · splash(폭발 최대, 직격 대상도 받는다) · r(폭발 반경) · kb(밀어내기) · self(자기 피해 배수) · life(초) · size · color
@@ -29,6 +29,10 @@ export const PROJ = {
   orb: { speed: 8, grav: 0, dmg: 0, splash: 0, r: 0, life: 7, size: 0.4, color: '#d38bff', trail: '#f2deff', make: 'orb' },
   pulsebomb: { dmg: 0, splash: 350, r: 3.2, kb: 3, self: 0.1 },
   // bounce: 벽 · 바닥에서 튕기는 횟수 (사람에 맞거나 시간이 다 되면 터진다)
+  arrow: { speed: 85, grav: 0.22, dmg: 120, head: 2, splash: 0, r: 0, life: 1.6, size: 0.1, color: '#8fd4ff', trail: '#d8f0ff' },
+  arrowq: { speed: 45, grav: 0.75, dmg: 35, head: 2, splash: 0, r: 0, life: 1.6, size: 0.08, color: '#bfe4ff', trail: '#eaf6ff' },
+  storm: { speed: 70, grav: 0.3, dmg: 55, head: 2, splash: 0, r: 0, life: 1.4, size: 0.09, color: '#5fc8ff', trail: '#c8ecff' },
+  echo: { speed: 45, grav: 0.3, dmg: 0, splash: 0, r: 0, life: 2, size: 0.12, color: '#ffd76a', trail: '#fff0b0', make: 'echo' },
   frag: { speed: 27, grav: 0.85, dmg: 20, splash: 65, r: 2.6, kb: 3, self: 0.2, life: 1.5, size: 0.2, color: '#8a9a5b', trail: '#e8d9a0', bounce: 4, burst: true },
   jmine: { speed: 22, grav: 0.75, dmg: 0, splash: 60, r: 4, kb: 13, self: 0, selfKb: true, life: 3, size: 0.26, color: '#ffb43a', trail: '#ffe2a8', burst: true },
   jtrap: { speed: 16, grav: 1, dmg: 0, splash: 0, r: 0, life: 3, size: 0.22, color: '#c9c9d6', trail: '#8a8a99', make: 'jtrap' },
@@ -87,6 +91,12 @@ export const HEROES = [
     shift: { name: '충격 지뢰', icon: '🧨', cd: 7, desc: '던지고 다시 누르면 바로 터져요. 맞은 적과 나를 멀리 날려요 (지뢰 점프!)' },
     e: { name: '끈끈 덫', icon: '🪤', cd: 10, desc: '밟은 적에게 피해를 주고 1.5초 동안 묶어요 (하나만 깔려요)' },
     q: { name: '바퀴 폭탄', icon: '🛞', desc: '폭탄 바퀴를 직접 몰아요 (벽 넘기 Space · 클릭이나 Q 로 펑!). 그동안 내 몸은 무방비' } },
+  { id: 'archer', name: '슝슝', role: 'dps', emoji: '🏹', color: '#4f86c6', hp: 250, speed: 1, ult: 1900, held: 'bow', acc: [],
+    motto: '두 마리 용아, 가라!', desc: '벽을 타고 활을 쏘는 궁수 젤리. 벽 너머까지 용을 날려 보내요',
+    p: { type: 'proj', k: 'arrow', name: '용뿔 활', rate: 1, mag: 0, alt: { k: 'arrowq', rate: 0.25 } },
+    shift: { name: '돌풍 화살', icon: '🌬️', cd: 9, desc: '다음 5발을 충전 없이 빠르게 쏴요' },
+    e: { name: '메아리 화살', icon: '📡', cd: 12, desc: '꽂힌 자리 둘레의 적을 6초 동안 벽 너머로 보여 줘요' },
+    q: { name: '쌍둥이 용', icon: '🐲', desc: '용 두 마리가 벽을 뚫고 곧게 날아가며 닿는 적에게 큰 피해를 줘요' } },
   { id: 'reaper', name: '스르륵', role: 'dps', emoji: '💀', color: '#4a4356', hp: 250, speed: 1, ult: 2000, held: 'shotgun', acc: ['hoodie:#2b2733', 'mask'],
     motto: '죽어라… 죽어라… 죽어라!', desc: '그림자 속 쌍산탄총 젤리. 준 피해만큼 체력 회복',
     p: { type: 'hit', name: '헬파이어 샷건', dmg: 6, pellets: 20, rate: 0.5, mag: 8, reload: 1.5, spread: 0, pspread: 0.11, near: 10, far: 20, head: 2, auto: true, steal: 0.3 },

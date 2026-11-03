@@ -212,6 +212,14 @@ const LOOKS = {
   },
 };
 // 투구 · 후드 · 두건을 쓰는 영웅은 곰돌이 귀를 숨긴다 (머리 위로 삐져나오지 않게)
+LOOKS.archer = (b) => {
+  // 슝슝: 올린 머리 · 이마 띠 · 한쪽 어깨 천 · 등에 맨 화살통
+  const hair = toon('#20262f'), band = toon('#e8eef5'), cloth = toon('#2f4f7a'), wood = toon('#8a6a4a'), feather = toon('#ffd76a');
+  p(b.head, G.sph, hair, 0, 0.3, -0.06, 0.46, 0.26, 0.42); p(b.head, G.sph, hair, 0, 0.6, -0.12, 0.13, 0.15, 0.13); p(b.head, G.box, band, 0, 0.62, -0.12, 0.2, 0.05, 0.2);
+  p(b.head, G.box, band, 0, 0.2, 0.42, 0.66, 0.08, 0.1);
+  p(b.torso, G.box, cloth, 0, 1.1, 0, 0.12, 0.8, 0.62, 0, 0, -0.7); p(b.torso, G.box, band, 0, 0.72, 0, 0.72, 0.1, 0.62);
+  p(b.torso, G.box, wood, 0.2, 1.12, -0.42, 0.2, 0.72, 0.16, 0, 0, -0.35); for (let i = -1; i <= 1; i++) p(b.torso, G.box, feather, 0.36 + i * 0.05, 1.56, -0.42 + i * 0.03, 0.03, 0.22, 0.03, 0, 0, -0.35);
+};
 LOOKS.junk = (b) => {
   // 펑펑: 그을린 고글 · 삐죽 머리 · 수류탄 띠 · 등에 맨 바퀴
   const hair = toon('#ffb43a'), dark = toon('#3a2f28'), lens = toon('#9fe8ff'), olive = toon('#6f7f45'), tire = toon('#23232b');
