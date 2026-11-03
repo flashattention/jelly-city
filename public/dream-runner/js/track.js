@@ -36,14 +36,12 @@ function rimColor(th) {
   return lum(th.plat[0]) < 0.3 ? mix(th.plat[0], '#ffffff', 0.72) : shade(th.plat[1], th.style === 'cloud' ? 0.75 : 0.5);
 }
 // 장애물 색: 하늘 · 바닥과 모두 구분되는 강조색 + 둘 다에서 더 잘 보이는 쪽(어둡게/밝게)의 바탕 · 외곽선
-const OB_ALT = ['#ff3b5c', '#ffb300', '#7c4dff', '#00c853'], SPIKE_DARK = '#2b2b33', SPIKE_LIGHT_C = '#e8ebf2';
+const OB_ALT = ['#ff3b5c', '#ffb300', '#7c4dff', '#00c853'];
 export function obColors(th) {
-  const sky = th.sky[1], cands = [th.edge, th.P?.a, ...OB_ALT].filter(Boolean);
-  const acc = cands.find((c) => contrast(c, sky) >= 2 && contrast(c, th.plat[0]) >= 1.6) || cands.reduce((a, c) => (contrast(c, sky) > contrast(a, sky) ? c : a));
-  const seen = (c) => Math.min(contrast(c, sky), contrast(c, th.plat[0])), dark = seen('#1a1a24') >= seen('#ffffff');
-  // 고깔은 바닥에 서 있으니 몸통은 바닥과 구분되는 쪽으로 (하늘 쪽은 반대색 테두리가 맡는다)
-  const spikeDark = contrast(SPIKE_DARK, th.plat[0]) >= contrast(SPIKE_LIGHT_C, th.plat[0]);
-  return { acc, base: dark ? '#2a2a36' : '#ffffff', line: dark ? '#1a1a24' : '#ffffff', spikeDark };
+  const sky = th.sky[1], cands = [th.edge, th.P?.a, ...OB_ALT].filter(Boolean), seen = (c) => Math.min(contrast(c, sky), contrast(c, th.plat[0]));
+  const acc = cands.find((c) => contrast(c, sky) >= 2 && contrast(c, th.plat[0]) >= 1.6) || cands.reduce((a, c) => (seen(c) > seen(a) ? c : a));
+  const dark = seen('#1a1a24') >= seen('#ffffff');
+  return { acc, base: dark ? '#2a2a36' : '#ffffff', line: dark ? '#1a1a24' : '#ffffff' };
 }
 export function topTexture(style, top, side, edge) {
   const a = top, b = shade(top, 0.86), d = shade(top, 0.7);
@@ -158,13 +156,9 @@ export class Track {
     const th = this.themeOf(this.dream);
     const g = new THREE.Group();
     const w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2;
-    const { acc, base, line, spikeDark } = obColors(th);
+    const { acc, base, line } = obColors(th);
     const outline = (mesh) => { const o = new THREE.Mesh(G_BOX, OUTLINE_M(line)); o.scale.copy(mesh.scale).addScalar(0.1); o.position.copy(mesh.position); g.add(o); };
-    if (kind === 'spike') {
-      const n = Math.max(1, Math.round(w / 0.7));
-      for (let i = 0; i < n; i++) { const c = new THREE.Mesh(G_SPIKE, spikeDark ? SPIKE_M : SPIKE_LIGHT); c.scale.set(0.32, h, 0.32); c.position.set(x0 + (i + 0.5) * (w / n) - cx, h / 2, 0); g.add(c); const o = new THREE.Mesh(G_SPIKE, OUTLINE_M(spikeDark ? '#ffffff' : '#1a1a24')); o.scale.set(0.39, h + 0.1, 0.39); o.position.copy(c.position); g.add(o); if (!isPhone) { const t = new THREE.Mesh(G_PUFF, glow(acc)); t.scale.setScalar(0.08); t.position.set(c.position.x, h, 0); g.add(t); } }
-      const mark = new THREE.Mesh(G_BOX, glow(acc)); mark.scale.set(w + 0.2, 0.03, 0.95); mark.position.y = 0.025; g.add(mark); // 바닥 띠: 빠르게 달려도 멀리서 보이게
-    } else if (kind === 'bar') {
+    if (kind === 'bar') {
       // 숙여서 지나가는 가로대 (밑은 비어 있다)
       const beam = new THREE.Mesh(G_BOX, new THREE.MeshToonMaterial({ map: stripeTex(acc, base) })); beam.scale.set(w, h, depth); beam.position.y = h / 2; g.add(beam); outline(beam);
       for (const sx of [-1, 1]) { const ph = h + 1.0; const post = new THREE.Mesh(G_BOX, glow(shade(th.plat[1], 0.8))); post.scale.set(0.25, ph, 0.25); post.position.set(sx * w / 2, -1.0 + ph / 2, 0); g.add(post); } // 기둥: 발판(가로대 1m 아래)부터
@@ -225,7 +219,7 @@ export class Track {
     this.boxes = this.boxes.filter((o) => { if (o.s < cut) { this.root.remove(o.mesh); return false; } return true; });
     this.traps = this.traps.filter((o) => { if (o.s < cut) { this.root.remove(o.mesh); return false; } return true; });
   }
-  drop(m) { this.root.remove(m); m.traverse?.((o) => { if (o.geometry && !o.isSprite && o.geometry !== G_BOX && o.geometry !== G_EDGE && o.geometry !== G_PUFF && o.geometry !== G_HANG && o.geometry !== G_SPIKE && o.geometry !== G_SHADOW && o.geometry.type !== 'ExtrudeGeometry') o.geometry.dispose(); }); }
+  drop(m) { this.root.remove(m); m.traverse?.((o) => { if (o.geometry && !o.isSprite && o.geometry !== G_BOX && o.geometry !== G_EDGE && o.geometry !== G_PUFF && o.geometry !== G_HANG && o.geometry !== G_SHADOW && o.geometry.type !== 'ExtrudeGeometry') o.geometry.dispose(); }); }
 
   // 꿈이 바뀌는 곳: 넓은 발판 + 빛나는 문
   newDream() {
@@ -251,7 +245,7 @@ export class Track {
     const gapS = () => v * r.range(0.2, 0.4 + d * 0.06);
     const pick = r.weighted([
       ['flat', 3], ['gap', 3], ['bridge', d > 0.03 ? 2 : 0], ['stones', d > 0.05 ? 2 : 0.5], ['up', 2], ['down', 2],
-      ['hurdles', 2.2], ['bars', d > 0.02 ? 2 : 0.6], ['walls', d > 0.04 ? 2 : 0.5], ['spikes', d > 0.08 ? 1.6 : 0],
+      ['hurdles', 2.2], ['bars', d > 0.02 ? 2 : 0.6], ['walls', d > 0.04 ? 2 : 0.5], ['lanes', d > 0.08 ? 1.6 : 0],
       ['double', d > 0.15 ? 1.4 : 0], ['movers', d > 0.25 ? 1.4 : 0], ['split', d > 0.12 ? 1.2 : 0], ['zigzag', d > 0.1 ? 1.4 : 0],
     ], (x) => x[1])[0];
     let at = s;
@@ -286,14 +280,14 @@ export class Track {
         for (let i = 1; i <= n; i++) { const half = w * r.range(0.5, 0.62); const x0 = side > 0 ? this.cx + w / 2 - half : this.cx - w / 2, x1 = x0 + half; this.obstacle('wall', p.s0 + sp * i, x0, x1, this.cy, this.cy + 1.5, 1.2); this.star(p.s0 + sp * i, side > 0 ? this.cx - w / 2 + (w - half) / 2 : this.cx + w / 2 - (w - half) / 2, this.cy + 1); if (r.chance(0.7)) side = -side; }
         break;
       }
-      case 'spikes': {
+      case 'lanes': {
         const n = r.int(2, 3), sp = Math.max(v * 0.9, 9), w = Math.max(6, W() + 2);
         const p = flat(sp * (n + 1), w);
         for (let i = 1; i <= n; i++) {
-          // 빈 줄 하나를 남기고 가시 (뛰어넘어도 된다)
+          // 빈 줄 하나를 남기고 낮은 턱 (뛰어넘어도 된다)
           const lane = r.range(this.cx - w / 2 + 1.2, this.cx + w / 2 - 1.2), lw = 1.4;
-          if (lane - lw / 2 > this.cx - w / 2) this.obstacle('spike', p.s0 + sp * i, this.cx - w / 2, lane - lw / 2, this.cy, this.cy + 0.45, 1.2);
-          if (lane + lw / 2 < this.cx + w / 2) this.obstacle('spike', p.s0 + sp * i, lane + lw / 2, this.cx + w / 2, this.cy, this.cy + 0.45, 1.2);
+          if (lane - lw / 2 > this.cx - w / 2) this.obstacle('hurdle', p.s0 + sp * i, this.cx - w / 2, lane - lw / 2, this.cy, this.cy + 0.45, 1.2);
+          if (lane + lw / 2 < this.cx + w / 2) this.obstacle('hurdle', p.s0 + sp * i, lane + lw / 2, this.cx + w / 2, this.cy, this.cy + 0.45, 1.2);
         }
         break;
       }
@@ -430,9 +424,6 @@ const G_BOX = new THREE.BoxGeometry(1, 1, 1);
 const G_EDGE = G_BOX;
 const G_PUFF = new THREE.SphereGeometry(1, 10, 8);
 const G_HANG = new THREE.ConeGeometry(1, 1, 7).rotateX(Math.PI);
-const G_SPIKE = new THREE.ConeGeometry(1, 1, 6);
-const SPIKE_M = new THREE.MeshToonMaterial({ color: SPIKE_DARK });
-const SPIKE_LIGHT = new THREE.MeshToonMaterial({ color: SPIKE_LIGHT_C, emissive: '#30343c' }); // 어두운 꿈에서는 밝은 가시
 const STAR_M = new THREE.MeshToonMaterial({ color: '#ffd23f', emissive: '#7a5200' });
 const STAR_RIM = new THREE.MeshBasicMaterial({ color: '#a8560a', side: THREE.BackSide });
 const STAR_HALO = new THREE.SpriteMaterial({ map: (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,240,170,.9)'); g.addColorStop(1, 'rgba(255,220,120,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })(), transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending });
