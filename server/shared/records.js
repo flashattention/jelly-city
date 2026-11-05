@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readJson } from '../auth.js';
 import { clean } from './rooms.js';
+import { getCos } from '../cosmetics.js';
 
 const ANON = /^[a-f0-9]{16,40}$/;
 export class Records {
@@ -21,7 +22,7 @@ export class Records {
     try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify(this.data)); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('기록 저장 실패', e); }
   }
   sorted(b) { return Object.entries(this.data[b] || {}).sort((x, y) => (this.better(x[1], y[1]) ? -1 : this.better(y[1], x[1]) ? 1 : x[1].at - y[1].at)); }
-  row(sub, e, i) { return { rank: i + 1, id: sub.slice(-8), name: e.name, color: e.color, value: e.value, guest: !!e.guest, anon: !!e.anon }; }
+  row(sub, e, i) { return { rank: i + 1, id: sub.slice(-8), title: getCos()?.titleOf(sub) || null, name: e.name, color: e.color, value: e.value, guest: !!e.guest, anon: !!e.anon }; }
   top(b, n = 30) { return this.sorted(b).slice(0, n).map(([s, e], i) => this.row(s, e, i)); }
   mine(b, sub) { if (!sub || !this.data[b]?.[sub]) return null; const i = this.sorted(b).findIndex(([s]) => s === sub); return this.row(sub, this.data[b][sub], i); }
   async api(req, res, url, who, json, prefix) {
@@ -55,6 +56,7 @@ export class Records {
       const old = T[who.sub], best = !old || this.better(e, old);
       if (best) T[who.sub] = e; else { old.name = e.name; old.color = e.color; }
       this.dirty = true;
+      getCos()?.refresh(who.sub); // 업적: 기록 · 순위
       return json(res, 200, { b: body.b, best, prev: old?.value ?? null, me: this.mine(body.b, who.sub), top: this.top(body.b) });
     }
     return json(res, 404, { error: 'not found' });

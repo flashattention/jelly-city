@@ -5,8 +5,7 @@ export const DIFFS = {
   normal: { k: 1.25, name: '🙂 노멀' },
   hard: { k: 1.55, name: '🔥 하드' },
   extreme: { k: 1.9, name: '💀 익스트림' },
-  // 익스트림의 1.5배 · 2배. full: W 를 안 눌러도 항상 최대 가속
-  lightspeed: { k: 2.85, name: '⚡ 광속', full: true },
-  beyond: { k: 3.8, name: '🌌 초월', full: true },
+  lightspeed: { k: 2.85, name: '⚡ 광속' }, // 익스트림의 1.5배
+  beyond: { k: 3.8, name: '🌌 초월' }, // 익스트림의 2배
 };
 export const diffOf = (d) => (Object.hasOwn(DIFFS, d) ? d : 'easy');

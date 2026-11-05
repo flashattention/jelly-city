@@ -1,4 +1,5 @@
 // 캐릭터 외형 커스터마이징 옵션 (서버와 브라우저 공용)
+import { cleanCos } from './cos-items.js';
 // profile.look = { eyes, pupil, nose, mouth, antenna, wings, ears, tail, belly, cheek }
 //   옵션은 뒤에만 덧붙인다 (저장된 번호가 바뀌지 않게)
 
@@ -40,6 +41,7 @@ export const costumeOf = (look = {}) => Object.entries(COSTUME).map(([k, C]) => 
 export function sanitizeLook(l = {}) {
   const out = { ...DEFAULT_LOOK };
   if (!l || typeof l !== 'object') return out;
+  const cos = cleanCos(l.cos); if (cos) out.cos = cos; // 치장: 서버가 계정 기준으로 다시 확인한다
   for (const [k, part] of Object.entries(LOOK_PARTS)) {
     const v = Number(l[k]);
     if (Number.isInteger(v) && v >= 0 && v < part.options.length) out[k] = v;

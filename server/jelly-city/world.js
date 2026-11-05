@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { trustLook } from '../cosmetics.js';
 import * as THREE from 'three';
 import { SEED, DEFAULT_TIME_SPEED } from '../../public/jelly-city/js/config.js';
 import { setupWorld, housePrice, freeUnits, isHomeType, homeLabel, WORLD_VERSION } from '../../public/jelly-city/js/world-setup.js';
@@ -277,6 +278,7 @@ export class World {
     if (!acc.phone) acc.phone = this.newPhone();
     acc.contacts ||= []; acc.sms ||= [];
     const home = acc.homeId != null ? this.buildings[acc.homeId] : this.hotel;
+    if (acc.owner) acc.profile.look = trustLook(acc.profile.look, acc.owner); // 치장: 모든 게임 공용
     const p = {
       id: this.nextPid++, token, ws, name: acc.name, profile: acc.profile,
       pos: home.door.clone().addScaledVector(new THREE.Vector3(0, 0, home.dir), 1.5), heading: 0, speed: 0,

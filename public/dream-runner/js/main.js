@@ -7,13 +7,15 @@ import { localChars, LOCAL_MAX } from '../../shared/js/local-chars.js';
 import { Chat } from '../../shared/js/chat.js';
 import { Env } from './env.js';
 import { Track, speedAt, V0 } from './track.js';
-import { Runner, Ghost } from './runner.js';
+import { Runner, Ghost, BOOST } from './runner.js';
 import { THEMES } from './themes.js';
 import { sfx, setMusic, unlock, toggleMute, sound } from './music.js';
 import { ITEMS } from './items.js';
 import { DIFFS, diffOf } from './diff.js';
 import { HELLS } from './hells.js';
-import { openPatchNotes } from '../../shared/js/patchnotes.js';
+import { openPatchNotes, showWhatsNew } from '../../shared/js/patchnotes.js';
+import { openWardrobe, notifyNew, titleHtml, loadCos } from '../../shared/js/wardrobe.js';
+import { starsEarned } from '../../shared/js/cos-items.js';
 
 const $ = (id) => document.getElementById(id);
 const MODE_KEY = 'dreamrunner.mode', DIFF_KEY = 'dreamrunner.diff', CAM_KEY = 'dreamrunner.cam', MAP_KEY = 'dreamrunner.map';
@@ -53,7 +55,7 @@ game.runner = runner; game.track = track; game.env = env; game.scene = scene; ga
 
 // ---------- 입력 ----------
 const keys = new Set();
-const input = { dir: 0, jump: false, slide: false, slideHeld: false, shove: false, boost: false, item: false };
+const input = { dir: 0, jump: false, slide: false, slideHeld: false, shove: false, item: false };
 const isTyping = () => ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
 window.addEventListener('keydown', (e) => {
   if (isTyping()) return;
@@ -61,7 +63,7 @@ window.addEventListener('keydown', (e) => {
   if (e.repeat) { if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault(); return; }
   keys.add(e.code);
   if (e.code === 'Space' && game.mode === 'dead' && game.multi && game.deadT > 1.4) { e.preventDefault(); cycleWatch(); return; } // 관전 대상 바꾸기
-  if (e.code === 'Space') input.jump = true; // 점프는 Space (↑ · W 는 가속)
+  if (e.code === 'Space') input.jump = true; // 점프는 Space
   if (['KeyS', 'ArrowDown'].includes(e.code)) input.slide = true;
   if (['KeyE', 'ShiftLeft', 'ShiftRight'].includes(e.code)) input.shove = true;
   if (e.code === 'KeyM') muteBtn();
@@ -77,7 +79,6 @@ function readInput() {
   const Rt = keys.has('KeyD') || keys.has('ArrowRight') || touchHeld.has('right');
   input.dir = (Rt ? 1 : 0) - (L ? 1 : 0);
   input.slideHeld = keys.has('KeyS') || keys.has('ArrowDown') || touchHeld.has('slide');
-  input.boost = keys.has('KeyW') || keys.has('ArrowUp') || touchHeld.has('boost');
 }
 // 휴대폰: 버튼 + 밀어서(스와이프) 점프·숙이기
 const touchHeld = new Set();
@@ -169,7 +170,7 @@ function renderAccount() {
     if (!nick) { nick = on && account.user.name?.startsWith('체험판') ? account.user.name : `꿈꾸는 곰돌이 ${1000 + Math.floor(Math.random() * 9000)}`; store.set(NICK_KEY, nick); }
     $('nick').value = nick;
   }
-  game.profile = c ? { name: c.name, color: c.profile?.color || '#8a5634', look: c.profile?.look, acc: c.profile?.accessories || [], gender: c.profile?.gender } : { name: (on && account.user.nick) || $('nick').value.trim() || '꿈꾸는 곰돌이', color: '#8a5634' };
+  const eq = account.cos?.equip; game.profile = c ? { name: c.name, color: c.profile?.color || '#8a5634', look: c.profile?.look, acc: c.profile?.accessories || [], gender: c.profile?.gender } : { name: (on && account.user.nick) || $('nick').value.trim() || '꿈꾸는 곰돌이', color: '#8a5634', look: eq && Object.keys(eq).length ? { cos: eq } : undefined };
   runner.setLook(game.profile);
 }
 $('nick-edit').onclick = () => { game.editNick = true; $('acct-nick-in').value = account.user?.nick || ''; renderAccount(); $('acct-nick-in').focus(); };
@@ -258,7 +259,7 @@ async function renderMyStats() {
 // 달린 판수 · 시간 올리기 (한 판에 한 번, 서버 점검 중이면 다시 시도). 나갈 때는 페이지가 닫혀도 전해지게 한다
 function reportPlay(leaving) {
   if (game.playSent || game.runT < 3) return; game.playSent = true;
-  const body = { time: game.runT, diff: game.diff, map: game.map, anon: logged() ? undefined : anonId() };
+  const body = { time: game.runT, diff: game.diff, map: game.map, stars: runner.stars, dist: Math.floor(runner.s), anon: logged() ? undefined : anonId() };
   if (leaving) { fetch('/api/dream/played', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', ...(account.session ? { Authorization: `Bearer ${account.session}` } : {}) }, body: JSON.stringify(body) }).catch(() => {}); return; }
   (async () => { for (let i = 0; i < 100; i++) { try { await account.api('/api/dream/played', { method: 'POST', body }); return; } catch (e) { if (e.status && e.status < 500) return; await new Promise((ok) => setTimeout(ok, 3000)); } } })();
 }
@@ -267,7 +268,7 @@ async function loadBoard(mode = 'speed', diff = 'easy', map = 'dream') { try { r
 function renderBoard(el, d, hl) {
   const top = d.top || [], me = d.me;
   const myId = me?.id;
-  const row = (e) => `<div class="brow${e.id === myId ? ' me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.name)}${e.guest ? ' <span class="guest">체험판</span>' : e.anon ? ' <span class="guest">비로그인</span>' : ''}</span><span class="sc">${e.score.toLocaleString()}<small>${e.dist.toLocaleString()}m · ⭐${e.stars}</small></span></div>`;
+  const row = (e) => `<div class="brow${e.id === myId ? ' me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.name)}${titleHtml(e.title)}${e.guest ? ' <span class="guest">체험판</span>' : e.anon ? ' <span class="guest">비로그인</span>' : ''}</span><span class="sc">${e.score.toLocaleString()}<small>${e.dist.toLocaleString()}m · ⭐${e.stars}</small></span></div>`;
   let html = top.slice(0, hl ? 10 : 50).map(row).join('');
   if (me && me.rank > (hl ? 10 : 50)) html += '<div class="brow gap">⋯</div>' + row(me);
   el.innerHTML = html || '<div class="empty">아직 기록이 없어요. 첫 번째 주인공이 되어 보세요!</div>';
@@ -276,13 +277,13 @@ function renderBoard(el, d, hl) {
 // ---------- 시작 · 끝 ----------
 function newRun(seed, itemMode = false, diff = 'easy', map = 'dream') {
   game.itemMode = itemMode; game.map = mapOf(map);
-  game.diff = diffOf(diff); runner.speedK = DIFFS[game.diff].k; runner.fullBoost = !!DIFFS[game.diff].full;
+  game.diff = diffOf(diff); runner.speedK = DIFFS[game.diff].k;
   game.seed = seed;
   for (const g of game.ghosts.values()) g.remove();
   game.ghosts.clear();
   env.clear();
-  // 지옥 길은 난이도의 실제 빠르기(항상 가속 포함)에 맞춰 만든다 · 빠를수록 멀리 보이게
-  const hd = DIFFS[game.diff], K = hd.k * (hd.full ? 1.5 : 1);
+  // 지옥 길은 난이도의 실제 빠르기(가속 포함)에 맞춰 만든다 · 빠를수록 멀리 보이게
+  const K = DIFFS[game.diff].k * (1 + BOOST);
   env.fogK = game.map === 'hell' ? Math.max(1, (K / 1.9) ** 0.7) : 1;
   track.reset(seed, itemMode, { map: game.map, K });
   game.camFall = 0; game.shake = 0; env.underY = undefined; game.underY = -13;
@@ -351,12 +352,12 @@ async function postScore(body, onWait) {
   }
 }
 async function showOver() {
-  game.mode = 'over';
+  game.mode = 'over'; setTimeout(notifyNew, 900); // 별 · 기록이 들어간 뒤 새 업적을 알린다
   $('hud').classList.add('hidden'); $('touch').classList.add('hidden'); $('spectate').classList.add('hidden'); $('howto').classList.add('hidden'); $('itembar').classList.add('hidden'); $('effects').innerHTML = ''; game.effHtml = '';
   show('over');
   $('ov-why').textContent = `💤 ${game.why || '꿈에서 깼어요'}`;
   $('ov-score').textContent = score().toLocaleString();
-  $('ov-detail').textContent = `${Math.floor(runner.s).toLocaleString()}m 달림 · 별사탕 ${runner.stars}개 · ${game.map === 'hell' ? '지옥' : '꿈'} ${game.dreamsSeen}개를 지났어요 · ${Math.floor(game.runT)}초`;
+  $('ov-detail').textContent = `${Math.floor(runner.s).toLocaleString()}m 달림 · 별사탕 ${runner.stars}개 (⭐ +${starsEarned(runner.stars, game.diff, game.map).toLocaleString()}) · ${game.map === 'hell' ? '지옥' : '꿈'} ${game.dreamsSeen}개를 지났어요 · ${Math.floor(game.runT)}초`;
   const r = game.submitted;
   $('ov-save').classList.toggle('hidden', !r?.anonPending);
   if (r?.anonPending) { $('ov-nick').value = store.get(NICK_KEY) || game.profile.name; $('ov-save-btn').disabled = false; }
@@ -660,6 +661,7 @@ game.camLow = store.get(CAM_KEY) === 'low'; game.camK = game.camLow ? 1 : 0;
 function toggleCam() { game.camLow = !game.camLow; store.set(CAM_KEY, game.camLow ? 'low' : 'high'); $('b-cam').textContent = game.camLow ? '🎬' : '🎥'; toast(game.camLow ? '🎬 낮은 시점 (V)' : '🎥 높은 시점 (V)', 1200); }
 $('b-cam').onclick = toggleCam; $('b-cam').textContent = game.camLow ? '🎬' : '🎥';
 $('pn-btn').onclick = () => openPatchNotes();
+$('cos-btn').onclick = () => openWardrobe('shop', () => { renderAccount(); });
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, clock.getDelta());
@@ -776,6 +778,7 @@ function followCamera(dt) {
 // 괴물이 내리쳤다: 가까울수록 크게 흔들린다
 track.onSlam = (st, d) => { if (game.mode !== 'run' || d > 240) return; sfx('bonk'); game.shake = Math.max(game.shake || 0, 1); };
 function onFx(n, a) {
+  if (n === 'jump2') runner.bear.cos?.fire('jump'); else if (n === 'land') runner.bear.cos?.fire('land');
   if (n === 'item') { sfx('item'); renderItems(false, true); return; }
   if (n === 'itemfull') { toast('🎒 아이템은 2개까지 들 수 있어요 (Q로 쓰기)', 1000); return; }
   if (n === 'use') return;
@@ -833,7 +836,7 @@ function hud() {
   $('h-stars').textContent = runner.stars;
   $('h-speed').textContent = `${Math.round(runner.v * 3.6)}km/h`;
   $('h-speed').classList.toggle('on', runner.boost > 0.3);
-  $('speedlines').style.opacity = game.mode === 'run' ? (runner.fullBoost ? 0.4 : runner.boost * 0.9).toFixed(2) : '0'; // 항상 가속인 난이도는 앞이 잘 보이게 옅게
+  $('speedlines').style.opacity = game.mode === 'run' ? '0.4' : '0'; // 늘 가속이라 앞이 잘 보이게 옅게
   const b0 = track.bounds[game.dream] ?? 0, b1 = track.nextBoundary(runner.s);
   $('h-next').firstElementChild.style.width = `${Math.max(0, Math.min(1, (runner.s - b0) / Math.max(1, b1 - b0))) * 100}%`;
   if (game.multi) $('h-alive').textContent = `🐻 ${(runner.alive ? 1 : 0) + [...game.ghosts.values()].filter((g) => g.alive).length}/${game.members.length}`;
@@ -841,3 +844,4 @@ function hud() {
 
 boot();
 frame();
+setTimeout(() => { if (game.mode === 'title' && !new URLSearchParams(location.search).has('room')) showWhatsNew('dream-runner'); }, 900);

@@ -4,7 +4,8 @@ import { account, store } from './account.js';
 import { DEFAULT_CHAR_KEY, charLook } from './char-studio.js';
 import { localChars, LOCAL_MAX, isLocal, updateLocal } from './local-chars.js';
 import { Chat } from './chat.js';
-import { openPatchNotes } from './patchnotes.js';
+import { openPatchNotes, showWhatsNew, pageGame } from './patchnotes.js';
+import { openWardrobe, notifyNew, titleHtml } from './wardrobe.js';
 
 const $ = (id) => document.getElementById(id);
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -69,7 +70,7 @@ export class Shell {
       <div id="title-opts"></div>
       <div class="btns" id="play-btns">${(o.buttons || []).map((b) => `<button id="${b.id}" class="btn big ${b.cls || ''}">${b.label}</button>`).join('')}<button id="multi-btn" class="btn big alt">${o.multiLabel || '👥 같이 하기'} <small>최대 ${o.max || 8}명</small></button></div>
       <div class="row code-row"><input id="code-in" maxlength="6" placeholder="초대 코드 6자리" autocomplete="off" /><button id="code-btn" class="btn alt">🎟️ 코드로 참가</button></div>
-      <div class="row2" id="title-row2">${(o.extraRow || []).map((b, i) => `<button class="btn ghost" data-extra="${i}">${b.label}</button>`).join('')}<button class="btn ghost" id="pn-btn">📜 패치노트</button><a href="/" class="btn ghost">🏠 메인으로</a></div>
+      <div class="row2" id="title-row2">${(o.extraRow || []).map((b, i) => `<button class="btn ghost" data-extra="${i}">${b.label}</button>`).join('')}<button class="btn ghost" id="cos-btn">🏆 업적 · 치장</button><button class="btn ghost" id="pn-btn">📜 패치노트</button><a href="/" class="btn ghost">🏠 메인으로</a></div>
       <div class="keys">${o.keysHelp || ''}</div>
       <div id="err"></div>
     </div></div>
@@ -140,6 +141,8 @@ export class Shell {
     $('quick-btn').onclick = () => this.send({ t: 'quick', opts: this.pickOpts?.() });
     $('create-btn').onclick = () => this.send({ t: 'create', name: $('room-name').value, opts: this.pickOpts?.() });
     $('pn-btn').onclick = () => openPatchNotes();
+    $('cos-btn').onclick = () => openWardrobe('ach', () => this.updateProfile());
+    setTimeout(() => { if (!this.playing && !new URLSearchParams(location.search).has('room')) showWhatsNew(pageGame()); }, 900); // 들어올 때 이 게임에서 바뀐 것
     $('lobby-back').onclick = () => { this.multi = false; this.show('title'); };
     $('leave-btn').onclick = () => { this.send({ t: 'leave' }); this.room = null; this.afterLeave(); };
     $('start-btn').onclick = () => this.send({ t: 'start' });
@@ -161,7 +164,7 @@ export class Shell {
     this.on('room', (m) => { this.room = m.room; this.members = m.members; this.chat.renderScope(); if (!this.playing && !$('room').classList.contains('hidden')) this.renderRoom(); });
     this.on('left', () => { this.chat.show(false); const was = this.room; this.room = null; if (!this.multi || !was) return; this.afterLeave(); });
     this.on('start', (m) => { this.members = m.members; this.playing = true; o.onStart?.(m, this); });
-    this.on('finish', (m) => { this.playing = false; o.onFinish?.(m, this); });
+    this.on('finish', (m) => { this.playing = false; o.onFinish?.(m, this); setTimeout(notifyNew, 700); });
   }
   on(t, f) { this.net.handlers[t] = f; }
   send(m) { if (this.net.ws?.readyState === 1) this.net.ws.send(JSON.stringify(m)); }
@@ -260,7 +263,7 @@ export class Shell {
   updateProfile() {
     const on = this.logged();
     const c = (on ? account.chars || [] : localChars()).find((x) => x.token === this.sel) || null;
-    this.profile = c ? { ...charLook(c), name: c.name } : { name: (on && account.user.nick) || $('nick').value.trim() || '곰돌이', color: '#8a5634' };
+    const eq = account.cos?.equip; this.profile = c ? { ...charLook(c), name: c.name } : { name: (on && account.user.nick) || $('nick').value.trim() || '곰돌이', color: '#8a5634', look: eq && Object.keys(eq).length ? { cos: eq } : undefined };
     this.o.onProfile?.(this.profile, this);
   }
   // ---------- 방 ----------
@@ -287,7 +290,7 @@ export class Shell {
     $('team-row').classList.toggle('hidden', !r.opts?.team);
     const el = $('members'); el.innerHTML = '';
     el.className = r.opts?.team ? 'teams' : '';
-    const row = (m) => `<div class="mem${m.id === this.myId ? ' me' : ''}"><span class="dot" style="background:${esc(m.color)}"></span>${m.host ? '👑 ' : ''}${m.bot ? '🤖 ' : ''}${esc(m.name)}</div>`;
+    const row = (m) => `<div class="mem${m.id === this.myId ? ' me' : ''}"><span class="dot" style="background:${esc(m.color)}"></span>${m.host ? '👑 ' : ''}${m.bot ? '🤖 ' : ''}${esc(m.name)}${titleHtml(m.title)}</div>`;
     if (r.opts?.team) {
       for (const k of ['red', 'blue']) {
         const list = this.members.filter((m) => m.team === k);

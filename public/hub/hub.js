@@ -4,6 +4,7 @@ import { Creator, thumbOf, DEFAULT_CHAR_KEY } from '/shared/js/char-studio.js';
 import { localChars, addLocal, updateLocal, removeLocal, LOCAL_MAX } from '/shared/js/local-chars.js';
 import { openSens } from '/shared/js/sens.js';
 import { openPatchNotes, showWhatsNew } from '/shared/js/patchnotes.js';
+import { openWardrobe } from '/shared/js/wardrobe.js';
 import { refreshBoard } from '/hub/board.js';
 
 const $ = (id) => document.getElementById(id);
@@ -12,6 +13,7 @@ const err = (t) => { $('err').textContent = t || ''; };
 const MAX_CHARS = 4;
 $('sens-open').onclick = () => openSens();
 $('pn-open').onclick = () => openPatchNotes(null);
+$('cos-open').onclick = () => openWardrobe('ach');
 const q = new URLSearchParams(location.search);
 // 다른 게임에서 '새 캐릭터 만들기'로 왔으면 만든 뒤 그 게임으로 돌아간다
 const back = /^\/[a-z-]+\/$/.test(q.get('back') || '') ? q.get('back') : null;

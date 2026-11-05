@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { BaseRooms } from '../shared/rooms.js';
 import { diffOf } from '../../public/dream-runner/js/diff.js';
+import { trustLook } from '../cosmetics.js';
 
 const MAX = 12;
 const SNAP_HZ = 15;
@@ -41,7 +42,7 @@ export class DreamRooms {
   toRoom(room, m, except) { const s = JSON.stringify(m); for (const p of room.players) if (p !== except && p.ws.readyState === 1) p.ws.send(s); }
   roomInfo(r) { return { id: r.id, name: r.name, n: r.players.length, max: MAX, state: r.state === 'pause' ? 'run' : r.state, host: r.host?.name || '', mode: r.mode, diff: r.diff, map: r.map || 'dream', team: !!r.team }; }
   list() { return [...this.rooms.values()].map((r) => this.roomInfo(r)); }
-  members(r) { return r.players.map((p) => ({ id: p.id, name: p.name, color: p.color, look: p.look, acc: p.acc, host: p === r.host, dead: p.dead, result: p.result, team: p.team })); }
+  members(r) { return r.players.map((p) => ({ id: p.id, name: p.name, color: p.color, look: p.look, acc: p.acc, host: p === r.host, dead: p.dead, result: p.result, team: p.team, title: p.look?.cos?.title || null })); }
   roomUpdate(r) { this.toRoom(r, { t: 'room', room: this.roomInfo(r), you: null, members: this.members(r) }); }
 
   handle(c, m) {
@@ -53,7 +54,7 @@ export class DreamRooms {
         c.name = clean(m.name, 14) || '꿈꾸는 곰돌이';
         c.color = /^#[0-9a-fA-F]{6}$/.test(m.color || '') ? m.color : '#8a5634';
         const lj = m.look && typeof m.look === 'object' ? JSON.stringify(m.look) : '';
-        c.look = lj && lj.length < 600 ? JSON.parse(lj) : null;
+        c.look = trustLook(lj && lj.length < 1500 ? JSON.parse(lj) : null, c.who?.sub);
         c.acc = Array.isArray(m.acc) ? m.acc.slice(0, 6).map((x) => String(x).slice(0, 40)) : [];
         if (m.resume && this.rejoin(c, m.resume)) return; // 서버 점검 뒤 달리던 자리로 돌아오기
         return this.send(c, { t: 'hello', id: c.id, tok: c.tok, rooms: this.list(), anon: !c.who, resumeFail: !!m.resume });

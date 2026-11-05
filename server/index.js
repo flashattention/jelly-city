@@ -39,6 +39,7 @@ import { ArenaRooms } from './jelly-arena/rooms.js';
 import { normWord } from '../public/jelly-draw/js/prompts.js';
 import { complete } from './jelly-city/llm.js';
 import { Records } from './shared/records.js';
+import { Cosmetics, cosApi } from './cosmetics.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
@@ -63,6 +64,7 @@ try {
 } catch (e) { console.error('복원 실패', e); }
 const world = new World({ dataDir: DATA_DIR });
 const dreamBoard = new DreamBoard(DATA_DIR); // 드림 러너 리더보드
+const cosmetics = new Cosmetics(DATA_DIR); cosmetics.dream = dreamBoard; // 치장 · 업적 (모든 게임 공용)
 const board = new Board(DATA_DIR); // 메인 화면 게시판
 const dreamRooms = new DreamRooms((sid) => world.userOf(sid), DATA_DIR); // 드림 러너 같이 달리기 방
 // 젤리드리프트: 방 · 트랙별 최고 기록 (짧을수록 좋다)
@@ -119,6 +121,9 @@ const driftRecords = new Records(DATA_DIR, 'jelly-drift', {
   boards: RIDER_TRACKS, better: (a, b) => a.value < b.value, value: (b) => Math.round(Number(b.time) * 1000) / 1000,
   check: (b) => (Number.isFinite(Number(b.time)) && Number(b.time) >= 25 && Number(b.time) <= 3600 ? null : '기록이 이상해요'),
 });
+// 업적: 기록판 · 방 경기 결과를 치장 쪽에 잇는다
+Object.assign(cosmetics.records, { 'jelly-ten': tenRecords, 'jelly-survivor': survRecords, 'jelly-type': typeRecords, 'jelly-merge': mergeRecords, 'jelly-slide': slideRecords, 'jelly-drift': driftRecords });
+for (const [k, R] of Object.entries({ 'jelly-drift': driftRooms, 'jelly-tactical': tacticalRooms, 'jelly-drop': dropRooms, 'jelly-guard': guardRooms, 'jelly-ten': tenRooms, 'jelly-survivor': survRooms, 'jelly-word': wordRooms, 'jelly-draw': drawRooms, 'jelly-sketch': sketchRooms, 'jelly-type': typeRooms, 'jelly-rumble': rumbleRooms, 'jelly-merge': mergeRooms, 'jelly-court': courtRooms, 'jelly-ding': dingRooms, 'jelly-slide': slideRooms, 'jelly-hide': hideRooms, 'jelly-arena': arenaRooms })) R.gameKey = k;
 // 옛 주소: REDIRECT_TO 가 있으면 모든 요청을 새 주소로 보낸다
 const REDIRECT_TO = (process.env.REDIRECT_TO || '').replace(/\/$/, '');
 
@@ -155,9 +160,10 @@ async function api(req, res, url) {
     }
     else return json(res, 400, { error: '구글 로그인이 필요해요' });
     const session = world.login(info, Array.isArray(body.legacy) ? body.legacy : []);
-    return json(res, 200, { session, user: world.publicUser(world.users[info.sub]), chars: world.charList(info.sub) });
+    return json(res, 200, { session, user: world.publicUser(world.users[info.sub]), chars: world.charList(info.sub), cos: cosmetics.pub(info.sub) });
   }
   // 드림 러너 (계정 · 로그인은 젤리시티와 같이 쓴다)
+  if (url.pathname.startsWith('/api/cos/')) return cosApi(req, res, url, world.userOf(sid), cosmetics, json);
   if (url.pathname.startsWith('/api/board/')) return boardApi(req, res, url, world.userOf(sid), board, json, isAdmin);
   if (url.pathname.startsWith('/api/dream/')) return dreamApi(req, res, url, world.userOf(sid), dreamBoard, json);
   if (url.pathname.startsWith('/api/merge/')) return mergeRecords.api(req, res, url, world.userOf(sid), json, '/api/merge');
@@ -189,7 +195,7 @@ async function api(req, res, url) {
   if (url.pathname.startsWith('/api/surv/')) return survRecords.api(req, res, url, world.userOf(sid), json, '/api/surv');
   const who = world.userOf(sid);
   if (!who) return json(res, 401, { error: 'login' });
-  if (url.pathname === '/api/me') return json(res, 200, { user: world.publicUser(who.user), chars: world.charList(who.sub), admin: isAdmin(who.user) });
+  if (url.pathname === '/api/me') return json(res, 200, { user: world.publicUser(who.user), chars: world.charList(who.sub), admin: isAdmin(who.user), cos: cosmetics.pub(who.sub) });
   // 닉네임 정하기 · 바꾸기 (구글 실명 대신 모든 게임에서 쓴다)
   if (url.pathname === '/api/nick' && req.method === 'POST') { const b = await readJson(req); try { return json(res, 200, { user: world.setNick(who.sub, b.nick) }); } catch (e) { return json(res, 400, { error: e.message }); } }
   const char = url.searchParams.get('char') || '';
@@ -370,7 +376,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
     world.broadcast({ t: 'sys', text: '🔧 서버가 업데이트돼요! 잠시 후 자동으로 다시 접속해요' });
     try { const n = dreamRooms.maint(); if (n) console.log(`🌙 드림 러너: 달리던 방 ${n}개를 멈춰 적어 뒀어요`); } catch (e) { console.error('드림 러너 멈추기 실패', e); }
     try { world.save(); console.log('💾 세계를 저장했어요'); } catch (e) { console.error('저장 실패', e); }
-    dreamBoard.save(); board.save(); driftRecords.save(); tenRecords.save(); survRecords.save(); wordDict.save(); typeRecords.save(); mergeRecords.save(); slideRecords.save();
+    dreamBoard.save(); cosmetics.save(); board.save(); driftRecords.save(); tenRecords.save(); survRecords.save(); wordDict.save(); typeRecords.save(); mergeRecords.save(); slideRecords.save();
     setTimeout(() => process.exit(0), 500);
   });
 }

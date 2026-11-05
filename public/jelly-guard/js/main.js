@@ -948,7 +948,7 @@ function cutscene(m, resume) {
   const slots = lineup.map((_, i) => { const row = i === 0 ? 0 : 1, col = i === 0 ? 0 : ((i - 1) % 2 ? 1 : -1) * Math.ceil(i / 2) * 1.7; return new THREE.Vector3(base.x + col, base.y, base.z + row * 1.6); });
   lineup.forEach(([id, s], i) => {
     let o = id === game.myId ? null : game.others.get(id);
-    if (id === game.myId) { myBear = heroBear(heroById(s.hero || 'soldier'), { name: s.name }); scene.add(myBear.root); o = { bear: myBear, me: true }; }
+    if (id === game.myId) { myBear = heroBear(heroById(s.hero || 'soldier'), { name: s.name, look: shell.profile?.look }); scene.add(myBear.root); o = { bear: myBear, me: true }; }
     if (!o?.bear) return;
     const p = slots[i]; p.y = floorAt(game.map, p.x, p.z, p.y + 1.5);
     if (o.me) { myBear.root.position.copy(p); myBear.root.rotation.y = face + Math.PI; myBear.root.scale.setScalar(0.85 * myBear.size); } else { o.cutPos = p; o.cutYaw = face; o.alive = true; o.flags = 0; }

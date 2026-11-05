@@ -26,7 +26,7 @@ export const account = {
     if (!this.session) return false;
     try {
       const me = await this.api('/api/me');
-      this.user = me.user; this.chars = me.chars || [];
+      this.user = me.user; this.chars = me.chars || []; this.setCos(me.cos);
       return true;
     } catch (e) {
       if (e.status === 401) { this.session = null; store.set(SESSION_KEY, null); }
@@ -37,13 +37,15 @@ export const account = {
   async login(body) {
     const r = await this.api('/api/login', { method: 'POST', body: { ...body, password: store.get('roachcity.pw') || '' } });
     this.session = r.session; store.set(SESSION_KEY, r.session);
-    this.user = r.user; this.chars = r.chars || [];
+    this.user = r.user; this.chars = r.chars || []; this.setCos(r.cos);
     return r;
   },
   async logout() {
     try { await this.api('/api/logout', { method: 'POST' }); } catch { /* 무시 */ }
-    this.session = null; this.user = null; this.chars = []; store.set(SESSION_KEY, null);
+    this.session = null; this.user = null; this.chars = []; this.cos = null; store.set(SESSION_KEY, null);
   },
+  // 치장은 계정에 저장된다: 어느 게임이든 캐릭터 모습에 얹어 준다
+  setCos(cos) { this.cos = cos || null; const eq = cos?.equip && Object.keys(cos.equip).length ? cos.equip : null; for (const c of this.chars) { c.profile ||= {}; c.profile.look = { ...(c.profile.look || {}) }; if (eq) c.profile.look.cos = eq; else delete c.profile.look.cos; } },
   loadGoogle() {
     if (window.google?.accounts?.id) return Promise.resolve();
     return new Promise((res, rej) => {

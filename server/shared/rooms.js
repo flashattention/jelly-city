@@ -1,6 +1,7 @@
 // 여러 게임이 같이 쓰는 '방' 서버: 6자리 초대 코드 · 비로그인은 코드로만 참가 · 방장 · 설정 · 출발 · 위치 중계
 //   게임마다 이 클래스를 상속해서 onStart(r) · onMessage(c, m) · onTick(r, now) 만 채운다
 import crypto from 'node:crypto';
+import { trustLook, noteRoomEnd } from '../cosmetics.js';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 헷갈리는 0 O 1 I 는 뺐다
 export const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n);
@@ -29,7 +30,7 @@ export class BaseRooms {
   toRoom(r, m, except) { const s = JSON.stringify(m); for (const p of r.players) if (p !== except && p.ws?.readyState === 1) p.ws.send(s); }
   roomInfo(r) { return { id: r.id, name: r.name, n: r.players.length, max: this.o.max, state: r.state, host: r.host?.name || '', opts: r.opts }; }
   list() { return [...this.rooms.values()].map((r) => this.roomInfo(r)); }
-  members(r) { return r.players.map((p) => ({ id: p.id, name: p.name, color: p.color, look: p.look, acc: p.acc, host: p === r.host, team: p.team, bot: !!p.bot })); }
+  members(r) { return r.players.map((p) => ({ id: p.id, name: p.name, color: p.color, look: p.look, acc: p.acc, host: p === r.host, team: p.team, bot: !!p.bot, title: p.look?.cos?.title || null })); }
   roomUpdate(r) { this.toRoom(r, { t: 'room', room: this.roomInfo(r), members: this.members(r) }); }
   broadcastList() { const s = JSON.stringify({ t: 'rooms', rooms: this.list() }); for (const c of this.clients) if (!c.room && c.hi && c.ws.readyState === 1) c.ws.send(s); }
   needLogin(c) { this.send(c, { t: 'error', code: 'needlogin', text: '방 만들기 · 빠른 참가는 로그인(체험판도 돼요)이 필요해요. 초대 코드로는 바로 들어갈 수 있어요' }); }
@@ -45,7 +46,7 @@ export class BaseRooms {
         c.name = clean(m.name, 14) || '꿈꾸는 곰돌이';
         c.color = /^#[0-9a-fA-F]{6}$/.test(m.color || '') ? m.color : '#8a5634';
         const lj = m.look && typeof m.look === 'object' ? JSON.stringify(m.look) : '';
-        c.look = lj && lj.length < 600 ? JSON.parse(lj) : null;
+        c.look = trustLook(lj && lj.length < 1500 ? JSON.parse(lj) : null, c.who?.sub);
         c.acc = Array.isArray(m.acc) ? m.acc.slice(0, 6).map((x) => String(x).slice(0, 40)) : [];
         return this.send(c, { t: 'hello', id: c.id, rooms: this.list(), anon: !c.who });
       }
@@ -159,6 +160,7 @@ export class BaseRooms {
   }
   // 경기 끝 → 기다리는 방으로
   end(r, payload) {
+    noteRoomEnd(this.gameKey, r, payload); // 업적: 판수 · 승리
     r.state = 'wait';
     r.players = r.players.filter((p) => !p.bot); // 봇은 경기마다 새로
     this.toRoom(r, { t: 'finish', ...payload });

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CosFx } from './cos-fx.js';
 import { toon, geo, G } from './utils.js';
 import { DEFAULT_LOOK, costumeOf, slotOfSpec } from './look.js';
 
@@ -227,6 +228,7 @@ export class Roach {
     this.torso.add(this.accGroup);
     this.costume = costumeOf(look); // 옷 · 모자 꾸미기
     this.setAccessories(o.accessories || []);
+    if (look.cos && !o.noCos) this.setCos(look.cos); // 치장 (오라 · 신발 · 휘장 …): 모든 게임 공용
 
     // 나이에 따른 크기
     let sc = 0.78;
@@ -464,7 +466,9 @@ export class Roach {
     this.root.add(this.inner);
     this.heldSpec = null; this.setHeld(held);
     this.detailsDirty = true;
+    if (this.cos) { this.cos.r = this; this.cos.groups.removeFromParent(); this.root.add(this.cos.groups); }
   }
+  setCos(c) { this.cos?.dispose(); this.cos = c && Object.keys(c).length ? new CosFx(this, c) : null; }
   static setStyle(style) {
     Roach.style = style;
     for (const ref of Roach.all) { const r = ref.deref(); if (r && r.gummy !== (style !== 'roach')) r.rebuild(); }
@@ -1326,6 +1330,7 @@ export class Roach {
 
   /** speed: 현재 이동 속도 (m/s) */
   update(dt, speed = 0, opts = {}) {
+    this.cos?.update(dt, speed, this.cosBoost || 0);
     // 곰돌이 젤리: 기본 날개는 날 때만, 다른 날개를 골랐으면 늘 보인다
     if (this.gummy) { const w = !!this.flying || this.wingStyle !== 0; if (this.wings[0] && this.wings[0].visible !== w) for (const x of this.wings) x.visible = w; }
     this.t += dt;

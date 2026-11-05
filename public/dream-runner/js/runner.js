@@ -6,8 +6,7 @@ import { speedAt } from './track.js';
 import { ITEMS, MAX_ITEMS, randomItem, EffectFx } from './items.js';
 
 const GRAV = 30, JUMP = 11.5, JUMP2 = 10.5, SIDE = 8.5;
-export const BOOST = 0.5;  // ↑ · W 를 누르고 있으면 최대 50% 빨라진다
-const BOOST_UP = 2, BOOST_DOWN = 2.5; // 꽉 차기까지 · 원래 속도로 돌아오기까지 (초)
+export const BOOST = 0.5;  // 가속: 모든 난이도에서 언제나 켜져 있다
 
 export const H_STAND = 1.45, H_SLIDE = 0.7;
 
@@ -100,13 +99,13 @@ export class Runner {
     this.items = []; this.eff = { rocket: 0, shield: 0, cloud: 0, magnet: 0, ghost: 0, slow: 0 }; this.rocketK = 0; this.cloudY = 0; this.lastGroundY = 0;
     // 팀전: 마지막으로 안전하게 밟은 곳 · 부활 뒤 멈춤 · 무적
     this.safe = { s, x, y: 0 }; this.frozen = 0; this.invul = 0;
-    Object.assign(this, { s, x, y: 0, boost: 0, vx: 0, vy: 0, knock: 0, onGround: true, jumps: 0, coyote: 0, jbuf: 0, slideBuf: 0, slideT: 0, flipT: 0, shoveT: 0, alive: true, dead: null, stars: 0, plat: null, t: 0 });
+    Object.assign(this, { s, x, y: 0, boost: 1, vx: 0, vy: 0, knock: 0, onGround: true, jumps: 0, coyote: 0, jbuf: 0, slideBuf: 0, slideT: 0, flipT: 0, shoveT: 0, alive: true, dead: null, stars: 0, plat: null, t: 0 });
     this.bear.inner.rotation.set(0, 0, 0); this.bear.root.scale.setScalar(1); this.bear.root.visible = true;
   }
   get v() { return speedAt(this.s) * (this.speedK || 1) * (1 + BOOST * this.boost) * (1 + 0.8 * this.rocketK) * (this.eff.slow > 0 ? 0.6 : 1); }
   get h() { return this.slideT > 0 ? H_SLIDE : H_STAND; }
 
-  // input: { dir(-1~1), jump(눌림), slide(눌림), slideHeld, boost(누르는 중) }
+  // input: { dir(-1~1), jump(눌림), slide(눌림), slideHeld }
   update(dt, input, track, fx) {
     if (!this.alive) return this.updateDead(dt);
     this.t += dt;
@@ -114,10 +113,6 @@ export class Runner {
     // 부활 직후: 그 자리에 멈춰서 깜빡이다가 다시 달린다
     if (this.frozen > 0) { this.frozen -= dt; this.vy = 0; this.onGround = true; return; }
     const prevS = this.s, prevY = this.y;
-    // 가속: 누르고 있으면 점점 빨라지고, 떼면 서서히 원래 속도로
-    const wasB = this.boost;
-    this.boost = this.fullBoost ? 1 : input.boost ? Math.min(1, this.boost + dt / BOOST_UP) : Math.max(0, this.boost - dt / BOOST_DOWN);
-    if (input.boost && !this.fullBoost && wasB < 0.02 && this.boost > 0) fx?.('boost');
     // 아이템 효과 시간
     for (const k in this.eff) this.eff[k] = Math.max(0, this.eff[k] - dt);
     this.rocketK += ((this.eff.rocket > 0 ? 1 : 0) - this.rocketK) * Math.min(1, dt * 4);
@@ -202,7 +197,7 @@ export class Runner {
     const D = this.dead;
     let at = this.safe;
     if (D && !D.fall) { const g = track.ground(this.s, this.x, this.y + 3); if (g) at = { s: this.s, x: Math.max(g.cx - g.w / 2 + 0.6, Math.min(g.cx + g.w / 2 - 0.6, this.x)), y: g.y }; }
-    Object.assign(this, { s: at.s, x: at.x, y: at.y, vx: 0, vy: 0, knock: 0, boost: 0, onGround: true, jumps: 0, slideT: 0, flipT: 0, alive: true, dead: null, frozen: 1.2, invul: 2.6 });
+    Object.assign(this, { s: at.s, x: at.x, y: at.y, vx: 0, vy: 0, knock: 0, boost: 1, onGround: true, jumps: 0, slideT: 0, flipT: 0, alive: true, dead: null, frozen: 1.2, invul: 2.6 });
     this.bear.inner.rotation.set(0, 0, 0);
     if (this.bear.poseState) this.bear.poseState.rx = 0;
   }
@@ -226,6 +221,7 @@ export class Runner {
     b.update(dt, this.alive && this.onGround && !sliding ? Math.min(12, this.v * 0.55) : 0, { airborne: !this.onGround, noCrawl: true });
     poseBear(b, { alive: this.alive, ground: this.onGround, slide: sliding, flip: this.flipT > 0 ? 1 - this.flipT / FLIP_T : null, vy: this.vy }, dt);
     this.booster.update(dt, this.alive ? Math.max(this.boost, this.rocketK * 1.6) : 0, this.t);
+    b.cosBoost = this.alive ? this.boost : 0;
     this.efx.update(dt, this.t, this.alive ? { shield: this.eff.shield > 0, ghost: this.eff.ghost > 0, cloud: this.eff.cloud > 0 && this.onGround && this.y <= this.cloudY + 0.01 && !this.plat, magnet: this.eff.magnet > 0, slow: this.eff.slow > 0 } : {});
     if (this.shoveT > 0) for (const a of b.arms.slice(0, 2)) a.rotation.x = -1.6;
     // 부활해서 무적인 동안 깜빡깜빡

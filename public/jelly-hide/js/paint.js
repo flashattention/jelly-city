@@ -61,7 +61,7 @@ export class Bear {
   constructor(base = BASE, look = null) {
     this.base = base;
     const lk = { ...(look || {}), hat: 0, face: 0, outfit: 0, extra: 0, wings: 0, antenna: 0 }; // 꾸미기 장비는 칠할 수 없어서 뺀다
-    this.r = new Roach({ own: false, seed: 'hide' + Math.random(), color: base, age: 25, look: lk, accessories: [] });
+    this.r = new Roach({ noCos: true, own: false, seed: 'hide' + Math.random(), color: base, age: 25, look: lk, accessories: [] });
     this.root = this.r.root; this.inner = this.r.inner; this.root.scale.setScalar(SCALE);
     for (const w of this.r.wings || []) w.visible = false;
     this.canvas = document.createElement('canvas'); this.canvas.width = this.canvas.height = ATLAS;
