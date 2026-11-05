@@ -843,7 +843,7 @@ function hud(now) {
     }
     const a = game.kit.ammo(); $('ammo-n').textContent = a.big; $('ammo-r').textContent = a.small;
     const ex = game.kit.extra(); $('extra').classList.toggle('hidden', !ex);
-    if (ex) $('extra').innerHTML = `${esc(ex.label || '')}${ex.bar != null ? `<span class="bar"><i style="width:${Math.round(ex.bar * 100)}%"></i></span>` : ''}${ex.pips != null ? `<span class="pips">${'●'.repeat(ex.pips)}${'○'.repeat(3 - ex.pips)}</span>` : ''}`;
+    if (ex) $('extra').innerHTML = `${esc(ex.label || '')}${ex.bar != null ? `<span class="bar"><i style="width:${Math.round(Math.max(0, ex.bar) * 100)}%"></i></span>` : ''}${ex.pips != null ? `<span class="pips">${'●'.repeat(ex.pips)}${'○'.repeat(3 - ex.pips)}</span>` : ''}`;
     // 상태
     const tags = []; if (has('nano')) tags.push('💉 나노'); if (has('boost')) tags.push('💛 공격력 강화'); if (has('anti')) tags.push('🚫 치유 차단'); if (has('hboost')) tags.push('💚 치유 증가'); if (has('spd')) tags.push('💨 속도'); if (has('poison')) tags.push('☠️ 독'); if (has('bub')) tags.push('🫧 보호막'); if (has('grav')) tags.push('🌀 중력');
     $('tags').innerHTML = tags.map((t) => `<span>${t}</span>`).join('');
