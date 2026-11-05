@@ -5,7 +5,10 @@ import * as THREE from 'three';
 import { isPhone } from '../../shared/js/perf.js';
 import { RNG } from '../../shared/js/utils.js';
 import { THEMES } from './themes.js';
+import { HELLS } from './hells.js';
 import { glow, starG } from './kits.js';
+import { buildMonster, buildFist } from './hellkits.js';
+import { G } from '../../shared/js/utils.js';
 import { makeBox, makeTrap } from './items.js';
 
 export const V0 = 13, VMAX = 30;
@@ -102,8 +105,9 @@ export class Track {
     this.root = new THREE.Group(); scene.add(this.root);
     this.reset(seed);
   }
-  reset(seed, itemMode = false) {
-    this.itemMode = itemMode;
+  // opt.map: 'hell' 이면 랜덤 지옥 · opt.K: 난이도 빠르기 (지옥 길은 시간 기준이라 빠를수록 길어진다)
+  reset(seed, itemMode = false, opt = {}) {
+    this.itemMode = itemMode; this.hell = opt.map === 'hell'; this.K = opt.K || 1; this.strikes = []; this.nextStrike = 0; this.lastFloor = 0;
     this.irng = new RNG(seed ^ 0x2545f491); // 아이템 상자 자리 (길 모양과 따로라서 스피드전 길이 바뀌지 않는다)
     this.nextBox = 120;
     for (const c of [...this.root.children]) this.drop(c);
@@ -111,18 +115,28 @@ export class Track {
     this.rng = new RNG(seed);
     // 꿈 순서: 전부 섞어서 차례로 (다 보면 처음 순서로 다시)
     this.order = new RNG(seed ^ 0x5bd1e995).shuffle([...THEMES.keys()]);
+    // 지옥 순서: 올라가는 지옥과 떨어지는 지옥을 번갈아
+    if (this.hell) { const q = new RNG(seed ^ 0x3c6ef372), keys = (l) => q.shuffle([...HELLS.keys()].filter((i) => HELLS[i].layout === l)), a = keys('climb'), b = keys('plunge'); this.order = []; for (let i = 0; i < Math.max(a.length, b.length); i++) this.order.push(a[i % a.length], b[i % b.length]); }
     this.plats = []; this.obs = []; this.stars = []; this.portals = []; this.boxes = []; this.traps = [];
     this.origin = 0;
     this.gs = 0; this.cx = 0; this.cy = 0;
     this.dream = 0;                 // 지금 만들고 있는 꿈 번호
     this.bounds = [0];              // 꿈이 시작하는 거리들
-    this.nextB = DREAM_SEC * speedAt(0) + 20;
+    this.nextB = DREAM_SEC * speedAt(0) * (this.hell ? this.K : 1) + 20;
     // 출발 발판
     this.plat(-40, 70, 0, 10, 0);
     this.gs = 70;
     this.generate(0);
   }
-  themeOf(dream) { return THEMES[this.order[dream % THEMES.length]]; }
+  themeOf(dream) { return this.hell ? HELLS[this.order[dream % this.order.length]] : THEMES[this.order[dream % THEMES.length]]; }
+  // 이 아래로 떨어지면 탈락 (지옥은 높이가 계속 바뀌니 눈앞 발판을 기준으로)
+  deathY(s) {
+    if (!this.hell) return DEATH_Y;
+    const far = s + speedAt(s) * this.K * 1.6 + 20; let m = Infinity;
+    for (const p of this.plats) if (p.s1 >= s - 6 && p.s0 <= far && !p.doomed && p.y < m) m = p.y;
+    if (m !== Infinity) this.lastFloor = m;
+    return this.lastFloor - 16;
+  }
   dreamAt(s) { let d = 0; while (d + 1 < this.bounds.length && s >= this.bounds[d + 1]) d++; return d; }
   nextBoundary(s) { for (const b of this.bounds) if (b > s) return b; return this.nextB; }
   z(s) { return this.origin - s; }
@@ -142,6 +156,7 @@ export class Track {
     // 발판 아래로 매달린 바위/구름 (둥둥 떠 있는 느낌)
     if (th.style === 'cloud') for (let i = 0; i < Math.ceil(len / 3); i++) { const p = new THREE.Mesh(G_PUFF, glow(th.plat[0], 0.95)); const r = 0.9 + Math.random() * 0.8; p.scale.setScalar(r); p.position.set((Math.random() < 0.5 ? -1 : 1) * (w / 2) * (0.6 + Math.random() * 0.4), -thick * 0.2, -len / 2 + i * 3 + 1.5); m.add(p); }
     else if (len > 3 && !opts.thin) { const c = new THREE.Mesh(G_HANG, platMats(th)[3]); const r = Math.min(w, len) * 0.42; c.scale.set(r, Math.min(9, 2 + len * 0.18), r); c.position.set(0, -thick / 2 - c.scale.y / 2, 0); c.rotation.y = Math.random() * 3; m.add(c); }
+    if (opts.beacon) for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const e = new THREE.Mesh(G_EDGE, rm); e.scale.set(0.1, 5, 0.1); e.position.set(sx * (w / 2 - 0.1), thick / 2 + 2.5, sz * (len / 2 - 0.1)); m.add(e); } // 멀리서 떨어져도 내릴 곳이 보이게
     const p = { s0, s1, x, cx: x, w, y, th: thick, mesh: m, mv: opts.mv || null, dx: 0, dream: this.dream };
     this.plats.push(p);
     // 아이템전: 넓고 긴 발판 위에 ? 상자를 한 줄로 (모두 같은 자리)
@@ -207,9 +222,10 @@ export class Track {
 
   // 앞쪽 길을 미리 만든다
   generate(playerS) {
-    while (this.gs < playerS + AHEAD) {
+    const ahead = this.hell ? Math.max(AHEAD, speedAt(playerS) * this.K * 2.4) : AHEAD; // 내리치기 예고가 보일 만큼 앞을 만든다
+    while (this.gs < playerS + ahead) {
       if (this.gs >= this.nextB) { this.newDream(); continue; }
-      this.pattern();
+      if (this.hell) this.hellPattern(); else this.pattern();
     }
     // 지나간 것 치우기
     const cut = playerS - BEHIND;
@@ -219,22 +235,24 @@ export class Track {
     this.portals = this.portals.filter((o) => { if (o.s < cut - 30) { this.drop(o.mesh); return false; } return true; });
     this.boxes = this.boxes.filter((o) => { if (o.s < cut) { this.root.remove(o.mesh); return false; } return true; });
     this.traps = this.traps.filter((o) => { if (o.s < cut) { this.root.remove(o.mesh); return false; } return true; });
+    this.strikes = this.strikes.filter((o) => { if (o.s < cut) { this.root.remove(o.g); return false; } return true; });
   }
-  drop(m) { this.root.remove(m); m.traverse?.((o) => { if (o.geometry && !o.isSprite && o.geometry !== G_BOX && o.geometry !== G_EDGE && o.geometry !== G_PUFF && o.geometry !== G_HANG && o.geometry !== G_SHADOW && o.geometry.type !== 'ExtrudeGeometry') o.geometry.dispose(); }); }
+  drop(m) { this.root.remove(m); if (m.userData?.keepGeo) return; m.traverse?.((o) => { if (o.geometry && !o.isSprite && o.geometry !== G_BOX && o.geometry !== G_EDGE && o.geometry !== G_PUFF && o.geometry !== G_HANG && o.geometry !== G_SHADOW && o.geometry.type !== 'ExtrudeGeometry') o.geometry.dispose(); }); }
 
   // 꿈이 바뀌는 곳: 넓은 발판 + 빛나는 문
   newDream() {
-    const v = speedAt(this.gs);
+    const v = speedAt(this.gs) * (this.hell ? this.K : 1);
     const gap = this.gs > 0 ? v * 0.22 : 0;
     const s0 = this.gs + gap;
     this.dream++;
     this.bounds.push(s0 + 14);
-    this.nextB = s0 + 14 + DREAM_SEC * speedAt(s0);
+    this.nextB = s0 + 14 + DREAM_SEC * v;
     this.cx *= 0.5;
-    this.plat(s0, s0 + 34, this.cx, 10, this.cy);
+    const len = this.hell ? Math.max(34, v * 0.8) : 34; // 빠른 난이도의 지옥은 숨 돌릴 자리도 같은 시간만큼
+    this.plat(s0, s0 + len, this.cx, 10, this.cy);
     this.portal(s0 + 14, this.cx, this.cy, 10);
     this.starLine(s0 + 20, s0 + 32, this.cx, this.cy, 5);
-    this.gs = s0 + 34;
+    this.gs = s0 + len;
   }
 
   pattern() {
@@ -315,9 +333,112 @@ export class Track {
     this.gs = at;
   }
 
+  // ---------- 랜덤 지옥 ----------
+  //   길이는 시간으로 정한다: 빠른 난이도에서도 2단 점프 · 낙하에 걸리는 시간이 맞도록 빠르기(vv)만큼 늘린다
+  hellPattern() {
+    const r = this.rng, th = this.themeOf(this.dream), vv = speedAt(this.gs) * this.K, tf = (1.25 / this.K ** 0.25) * (1 - Math.min(1, this.gs / vv / 150) * 0.12);
+    const W = () => Math.max(3.8, 8.5 + r.range(-1.5, 1) - Math.min(1, this.gs / vv / 150) * 2.5);
+    if (th.layout === 'climb') this.hellClimb(r, vv, tf, W); else this.hellPlunge(r, vv, tf, W);
+  }
+  // 올라가는 지옥: 2단 점프로만 닿는 높이 (턱은 1.3m 까지 훌쩍 올라서므로 3.6m 부터는 한 번 점프로 안 된다)
+  hellClimb(r, vv, tf, W) {
+    let at = this.gs; const gap = vv * tf * 0.36, len = vv * tf * 0.62;
+    const pick = r.weighted([['stair', 4], ['zig', 3], ['narrow', 2], ['rest', 2.4]], (x) => x[1])[0];
+    if (pick === 'rest') { this.gs = this.hellRest(r, vv, tf, W()); return; }
+    for (let i = 0, n = r.int(3, 6); i < n; i++) {
+      const y0 = this.cy, x0 = this.cx; at += gap; this.cy += r.range(3.6, 4);
+      if (pick === 'zig') this.cx = Math.max(-12, Math.min(12, this.cx + (i % 2 ? 1 : -1) * r.range(3, 5)));
+      else this.cx = Math.max(-12, Math.min(12, this.cx + r.range(-1.5, 1.5)));
+      const w = pick === 'narrow' ? r.range(3.4, 4.2) : pick === 'zig' ? r.range(4.4, 5.6) : W();
+      this.plat(at, at + len, this.cx, w, this.cy, { thin: pick !== 'stair' });
+      this.starArc(at - gap, at + len * 0.3, x0, y0 + 2.4, this.cy, this.cx);
+      at += len;
+    }
+    this.gs = at;
+  }
+  // 떨어지는 지옥: 까마득히 아래 있는 발판에 정확히 내려앉는다 (공중에서 좌우로 맞춘다)
+  hellPlunge(r, vv, tf, W) {
+    const pick = r.weighted([['drop', 4], ['steps', 3], ['needle', 2.4], ['rest', 2]], (x) => x[1])[0];
+    if (pick === 'rest') { this.gs = this.hellRest(r, vv, tf, W()); return; }
+    let at = this.gs;
+    const run = this.plat(at, at + vv * tf * 0.55, this.cx, W(), this.cy); at = run.s1;
+    if (pick === 'steps') {
+      for (let i = 0, n = r.int(3, 4); i < n; i++) at = this.hellDrop(r, vv, at, r.range(8, 13), r.range(3, 6) * (i % 2 ? 1 : -1), r.range(4.4, 5.6), 0.85);
+    } else if (pick === 'needle') at = this.hellDrop(r, vv, at, r.range(30, 42), r.range(5, 9) * r.pick([-1, 1]), r.range(3.6, 4.6), 1.3);
+    else at = this.hellDrop(r, vv, at, r.range(16, 30), r.range(3, 8) * r.pick([-1, 1]), W(), 1.2);
+    this.gs = at;
+  }
+  // 낙하 한 번. 그냥 떨어지면 시작 부근에, 가장 늦게(2단 점프 후) 떨어져도 끝 안쪽에 내린다
+  hellDrop(r, vv, edge, h, off, w, stay) {
+    const tWalk = Math.sqrt(2 * h / 30), tFast = (-14 + Math.sqrt(196 + 60 * h)) / 30, x0 = this.cx, y0 = this.cy; // 숙이기(빨리 내려오기)로도 앞면에 부딪히지 않게 tFast 부터
+    this.cy -= h; this.cx = Math.max(-14, Math.min(14, this.cx + Math.sign(off) * Math.min(Math.abs(off), 8.5 * tWalk * 0.65)));
+    const s0 = edge + vv * tFast * 0.92, s1 = s0 + vv * (tWalk - tFast * 0.92 + stay);
+    this.plat(s0, s1, this.cx, w, this.cy, { beacon: true, thin: true });
+    // 별사탕이 떨어지는 길을 알려 준다
+    for (let i = 1, n = Math.max(4, Math.min(9, Math.round(h / 4))); i <= n; i++) { const t = (tWalk * i) / n; this.star(edge + vv * t, x0 + (this.cx - x0) * (i / n), y0 - 15 * t * t + 0.8); }
+    return s1;
+  }
+  // 넓은 길: 괴물이 내리치는 자리
+  hellRest(r, vv, tf, w) {
+    const at = this.gs, th = this.themeOf(this.dream), len = vv * tf * 2.4, kind = this.gs >= this.nextStrike ? r.pick(th.strikes.filter((k) => k !== 'twin' || w >= 6)) : null;
+    if (kind === 'break') { // 가운데 토막이 부서진다: 앞 토막 끝에서 뛰어넘는다
+      const a = this.plat(at, at + len * 0.5, this.cx, w, this.cy), hole = vv * 0.34, b = this.plat(a.s1, a.s1 + hole, this.cx, w, this.cy, { thin: true }), c = this.plat(b.s1, b.s1 + len * 0.5, this.cx, w, this.cy);
+      b.doomed = true; this.strike('break', (b.s0 + b.s1) / 2, this.cx, w, this.cy, b, hole); this.nextStrike = c.s1 + vv * r.range(3.5, 6.5);
+      this.starArc(a.s1 - 2, c.s0 + 2, this.cx, this.cy, this.cy);
+      return c.s1;
+    }
+    const p = this.plat(at, at + len, this.cx, w, this.cy);
+    if (kind) { this.strike(kind, at + len * 0.3, this.cx, w, this.cy); // 피한 뒤 다음 점프까지 숨 돌릴 시간을 남긴다
+      this.nextStrike = p.s1 + vv * r.range(3.5, 6.5); }
+    this.starLine(at + len * 0.5, at + len * 0.8, this.cx, this.cy, 3);
+    return p.s1;
+  }
+  // 괴물이 내리치는 자리: 판정은 그 자리에 늘 있다 (곰돌이가 닿기 전에 반드시 먼저 떨어지니 누구에게나 같다)
+  strike(kind, s, cx, w, y, plat, holeLen = 0) {
+    const r = this.rng, th = this.themeOf(this.dream), P = th.P, col = P.g || '#ff3b30', side = r.chance(0.5) ? 1 : -1;
+    const g = new THREE.Group(); g.position.set(cx, y, this.z(s)); g.userData.s = s; g.userData.keepGeo = true; g.visible = false; this.root.add(g);
+    const rects = [], D = kind === 'sweep' || kind === 'beam' ? 0.9 : 2.6;
+    if (kind === 'fist') { const left = r.chance(0.5), half = w * r.range(0.5, 0.6); rects.push(left ? [-w / 2, -w / 2 + half] : [w / 2 - half, w / 2]); }
+    else if (kind === 'twin') { const lane = r.range(-w / 2 + 2, w / 2 - 2); rects.push([-w / 2, lane - 1.3], [lane + 1.3, w / 2]); }
+    else if (kind !== 'break') rects.push([-w / 2, w / 2]);
+    const y0 = kind === 'beam' ? 1.02 : 0, h = kind === 'beam' ? 1.2 : kind === 'sweep' ? 1.05 : 1.5, fists = [];
+    for (const [a, b] of rects) {
+      const m = buildFist(th.monster, P, b - a, h, D), x = (a + b) / 2; m.position.set(x, 18, 0); g.add(m); fists.push({ m, x, y: y0 });
+      this.obs.push({ kind: kind === 'beam' ? 'bar' : 'slam', s0: s - D / 2, s1: s + D / 2, x0: cx + a, x1: cx + b, y0: y + y0, y1: y + y0 + h, mesh: g });
+    }
+    if (kind === 'break') { const m = buildFist(th.monster, P, Math.min(w, 4), 2, Math.min(holeLen, 4)); m.position.set(0, 18, 0); g.add(m); fists.push({ m, x: 0, y: 0 }); }
+    // 바닥 예고: 내리칠 곳이 번쩍인다 (멀리서도 보이게 달리는 방향으로 길게)
+    const tele = new THREE.Group(); for (const [a, b] of rects.length ? rects : [[-w / 2, w / 2]]) { const t = new THREE.Mesh(G_EDGE, glow(col, 0.55)), L = kind === 'break' ? holeLen : Math.max(D + 1.5, speedAt(s) * this.K * 0.1); t.scale.set(b - a, 0.03, L); t.position.set((a + b) / 2, 0.07, 0); tele.add(t); } g.add(tele);
+    const mon = buildMonster(th.monster, P); mon.position.set(side * (w / 2 + 9), -18, 0); mon.rotation.y = Math.PI + side * 0.55; mon.scale.setScalar(1.25); g.add(mon);
+    const arm = new THREE.Mesh(G.cyl(), glow(col, 0.45)); g.add(arm);
+    this.strikes.push({ s, kind, g, side, w, fists, tele, mon, arm, plat, landed: false, t: 0, shock: 0 });
+  }
+  updateStrikes(t, playerS, v, dt) {
+    const vs = Math.max(v || 0, 1), flash = Math.sin(t * 30) > -0.2;
+    for (const st of this.strikes) {
+      const eta = (st.s - playerS) / vs;
+      if (eta > 1.35 || !v) continue;
+      st.g.visible = true;
+      st.mon.position.y += (-3 - st.mon.position.y) * Math.min(1, dt * 7);
+      if (!st.landed) {
+        st.tele.visible = flash;
+        const p = eta > 0.5 ? 0 : Math.min(1, (0.5 - eta) / 0.12); // 닿기 0.5초 전부터 0.12초 만에 떨어진다
+        for (const f of st.fists) {
+          if (st.kind === 'sweep' || st.kind === 'beam') { f.m.position.y = f.y; f.m.position.x = f.x + st.side * (st.w + 16) * (1 - p * p); }
+          else { f.m.position.y = f.y + 13 * (1 - p * p) * (eta > 0.5 ? 1 : 1) ; f.m.position.x = f.x; }
+        }
+        if (p >= 1) { st.landed = true; st.tele.visible = false; this.onSlam?.(st, st.s - playerS); }
+      } else if (st.plat?.doomed) { st.fallV = (st.fallV || 0) + 40 * dt; st.plat.mesh.position.y -= st.fallV * dt; st.fists[0].m.position.y -= st.fallV * dt * 0.3; }
+      // 팔: 어깨에서 손까지
+      const hand = st.fists[0].m.position, sx = st.mon.position.x - st.side * 3, sy = st.mon.position.y + 3.5, dx = hand.x - sx, dy = hand.y + 1 - sy, L = Math.hypot(dx, dy);
+      st.arm.position.set(sx + dx / 2, sy + dy / 2, 0); st.arm.scale.set(0.45, L, 0.45); st.arm.rotation.z = -Math.atan2(dx, dy);
+    }
+  }
+
   // ---------- 판정 ----------
   // 움직이는 발판 위치 갱신 (모두 같은 시계 t 로 움직여서 모두에게 같은 자리)
-  update(t, playerS) {
+  update(t, playerS, v = 0, dt = 0) {
+    if (this.hell) this.updateStrikes(t, playerS, v, dt);
     for (const p of this.plats) {
       if (!p.mv) continue;
       const nx = p.x + Math.sin(t * p.mv.f + p.mv.ph) * p.mv.amp;
@@ -334,7 +455,7 @@ export class Track {
   ground(s, x, y) {
     let best = null;
     for (const p of this.plats) {
-      if (s < p.s0 - 0.2 || s > p.s1 + 0.2 || Math.abs(x - p.cx) > p.w / 2 + 0.3) continue;
+      if (p.doomed || s < p.s0 - 0.2 || s > p.s1 + 0.2 || Math.abs(x - p.cx) > p.w / 2 + 0.3) continue;
       if (p.y <= y + 0.45 && (!best || p.y > best.y)) best = p;
     }
     return best;
@@ -342,7 +463,7 @@ export class Track {
   // 앞을 막는 발판 옆면 (위로 0.9m 안이면 훌쩍 올라선다)
   wall(s0, s1, x, y) {
     for (const p of this.plats) {
-      if (p.s0 < s0 - 0.01 || p.s0 > s1 + 0.01 || Math.abs(x - p.cx) > p.w / 2) continue;
+      if (p.doomed || p.s0 < s0 - 0.01 || p.s0 > s1 + 0.01 || Math.abs(x - p.cx) > p.w / 2) continue;
       if (y < p.y - 0.45 && y + 1.3 > p.y - p.th) return p;
     }
     return null;
@@ -374,7 +495,7 @@ export class Track {
     this.obs = this.obs.filter((o) => { if (o.s1 >= s0 && o.s0 <= s1) { this.drop(o.mesh); n++; return false; } return true; });
     return n;
   }
-  breakOne(o) { this.obs = this.obs.filter((x) => x !== o); this.drop(o.mesh); }
+  breakOne(o) { this.obs = this.obs.filter((x) => x !== o && x.mesh !== o.mesh); this.drop(o.mesh); }
   // 순간이동: dist 앞쪽에서 가장 가까운 발판 위
   teleport(s, dist) {
     const want = s + dist;

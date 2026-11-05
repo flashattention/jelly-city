@@ -12,10 +12,12 @@ import { THEMES } from './themes.js';
 import { sfx, setMusic, unlock, toggleMute, sound } from './music.js';
 import { ITEMS } from './items.js';
 import { DIFFS, diffOf } from './diff.js';
+import { HELLS } from './hells.js';
 import { openPatchNotes } from '../../shared/js/patchnotes.js';
 
 const $ = (id) => document.getElementById(id);
-const MODE_KEY = 'dreamrunner.mode', DIFF_KEY = 'dreamrunner.diff', CAM_KEY = 'dreamrunner.cam';
+const MODE_KEY = 'dreamrunner.mode', DIFF_KEY = 'dreamrunner.diff', CAM_KEY = 'dreamrunner.cam', MAP_KEY = 'dreamrunner.map';
+const mapOf = (m) => (m === 'hell' ? 'hell' : 'dream'), mapName = (m) => (m === 'hell' ? '🔥 랜덤 지옥' : '🌙 랜덤 꿈나라');
 const CHAR_KEY = 'dreamrunner.char', NICK_KEY = 'dreamrunner.nick', ANON_KEY = 'dreamrunner.anon';
 // 비로그인: 이 브라우저의 임시 아이디 (순위표에서 내 기록을 찾는 데만 쓴다)
 function anonId() {
@@ -229,12 +231,16 @@ game.pickDiff = diffOf(store.get(DIFF_KEY));
 segSet('diff-pick', game.pickDiff);
 for (const b of $('diff-pick').children) b.onclick = () => { game.pickDiff = b.dataset.m; store.set(DIFF_KEY, game.pickDiff); segSet('diff-pick', game.pickDiff); };
 for (const b of $('room-diff').children) b.onclick = () => net.send({ t: 'diff', diff: b.dataset.m });
-for (const b of $('board-diff').children) b.onclick = async () => { game.boardDiff = b.dataset.m; segSet('board-diff', game.boardDiff); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff)); };
+game.pickMap = mapOf(store.get(MAP_KEY)); segSet('map-pick', game.pickMap);
+for (const b of $('map-pick').children) b.onclick = () => { game.pickMap = b.dataset.m; store.set(MAP_KEY, game.pickMap); segSet('map-pick', game.pickMap); game.titleT = 6; };
+for (const b of $('room-map').children) b.onclick = () => net.send({ t: 'map', map: b.dataset.m });
+for (const b of $('board-map').children) b.onclick = async () => { game.boardMap = b.dataset.m; segSet('board-map', game.boardMap); renderMyStats(); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
+for (const b of $('board-diff').children) b.onclick = async () => { game.boardDiff = b.dataset.m; segSet('board-diff', game.boardDiff); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
 for (const b of $('room-team').children) b.onclick = () => net.send({ t: 'team', on: b.dataset.t === '1' });
 $('team-btn').onclick = () => net.send({ t: 'switch' });
 game.boardMode = 'speed';
-for (const b of $('board-mode').children) b.onclick = async () => { game.boardMode = b.dataset.m; segSet('board-mode', game.boardMode); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff)); };
-$('board-btn').onclick = async () => { game.boardMode = game.pickMode; game.boardDiff = game.pickDiff; segSet('board-mode', game.boardMode); segSet('board-diff', game.boardDiff); show('board'); renderMyStats(); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff)); };
+for (const b of $('board-mode').children) b.onclick = async () => { game.boardMode = b.dataset.m; segSet('board-mode', game.boardMode); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
+$('board-btn').onclick = async () => { game.boardMode = game.pickMode; game.boardDiff = game.pickDiff; game.boardMap = game.pickMap; segSet('board-map', game.boardMap); segSet('board-mode', game.boardMode); segSet('board-diff', game.boardDiff); show('board'); renderMyStats(); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff)); };
 $('board-close').onclick = () => show('title');
 $('home-btn').onclick = () => { if (game.multi) { net.send({ t: 'leave' }); game.multi = false; } toTitle(); };
 $('again-btn').onclick = () => { if (game.multi) { leaveRun(); show('room'); } else startSolo(); };
@@ -244,7 +250,7 @@ $('again-btn').onclick = () => { if (game.multi) { leaveRun(); show('room'); } e
 const playTime = (t) => (t < 60 ? `${t}초` : t < 3600 ? `${Math.floor(t / 60)}분` : `${Math.floor(t / 3600)}시간 ${Math.floor(t / 60) % 60}분`);
 async function renderMyStats() {
   const el = $('my-stats'); let d;
-  try { d = await account.api('/api/dream/me' + (logged() ? '' : `?anon=${anonId()}`)); } catch { el.innerHTML = ''; return; }
+  try { d = await account.api(`/api/dream/me?map=${game.boardMap || 'dream'}` + (logged() ? '' : `&anon=${anonId()}`)); } catch { el.innerHTML = ''; return; }
   const cell = (r) => (r ? `<b>${r.rank.toLocaleString()}위</b><small>${r.score.toLocaleString()}점 · ${r.of.toLocaleString()}명 중</small>` : '<small>기록 없음</small>');
   el.innerHTML = `<div class="ms-top"><div><small>내가 달린 판수</small><b>${d.runs.toLocaleString()}판</b></div><div><small>달린 시간</small><b>${playTime(d.time)}</b></div></div><small class="ms-note">판수와 시간은 2026년 11월 2일 패치부터 세요 (그 전 기록은 남아 있지 않아요)</small>
     <div class="ms-table"><div class="ms-row ms-head"><span>난이도</span><span>판수 · 시간</span><span>⚡ 스피드전</span><span>🎁 아이템전</span></div>${Object.entries(DIFFS).map(([k, x]) => { const r = d.diffs[k]; return `<div class="ms-row"><span>${esc(x.name)}</span><span><b>${r.runs.toLocaleString()}판</b><small>${playTime(r.time)}</small></span><span>${cell(r.speed)}</span><span>${cell(r.item)}</span></div>`; }).join('')}</div>`;
@@ -252,12 +258,12 @@ async function renderMyStats() {
 // 달린 판수 · 시간 올리기 (한 판에 한 번, 서버 점검 중이면 다시 시도). 나갈 때는 페이지가 닫혀도 전해지게 한다
 function reportPlay(leaving) {
   if (game.playSent || game.runT < 3) return; game.playSent = true;
-  const body = { time: game.runT, diff: game.diff, anon: logged() ? undefined : anonId() };
+  const body = { time: game.runT, diff: game.diff, map: game.map, anon: logged() ? undefined : anonId() };
   if (leaving) { fetch('/api/dream/played', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', ...(account.session ? { Authorization: `Bearer ${account.session}` } : {}) }, body: JSON.stringify(body) }).catch(() => {}); return; }
   (async () => { for (let i = 0; i < 100; i++) { try { await account.api('/api/dream/played', { method: 'POST', body }); return; } catch (e) { if (e.status && e.status < 500) return; await new Promise((ok) => setTimeout(ok, 3000)); } } })();
 }
 addEventListener('pagehide', () => { if (game.mode === 'run' || game.mode === 'dead') reportPlay(true); });
-async function loadBoard(mode = 'speed', diff = 'easy') { try { return await account.api(`/api/dream/board?mode=${mode}&diff=${diff}` + (logged() ? '' : `&anon=${anonId()}`)); } catch { return { top: [] }; } }
+async function loadBoard(mode = 'speed', diff = 'easy', map = 'dream') { try { return await account.api(`/api/dream/board?mode=${mode}&diff=${diff}&map=${map}` + (logged() ? '' : `&anon=${anonId()}`)); } catch { return { top: [] }; } }
 function renderBoard(el, d, hl) {
   const top = d.top || [], me = d.me;
   const myId = me?.id;
@@ -268,14 +274,18 @@ function renderBoard(el, d, hl) {
 }
 
 // ---------- 시작 · 끝 ----------
-function newRun(seed, itemMode = false, diff = 'easy') {
-  game.itemMode = itemMode;
+function newRun(seed, itemMode = false, diff = 'easy', map = 'dream') {
+  game.itemMode = itemMode; game.map = mapOf(map);
   game.diff = diffOf(diff); runner.speedK = DIFFS[game.diff].k; runner.fullBoost = !!DIFFS[game.diff].full;
   game.seed = seed;
   for (const g of game.ghosts.values()) g.remove();
   game.ghosts.clear();
   env.clear();
-  track.reset(seed, itemMode);
+  // 지옥 길은 난이도의 실제 빠르기(항상 가속 포함)에 맞춰 만든다 · 빠를수록 멀리 보이게
+  const hd = DIFFS[game.diff], K = hd.k * (hd.full ? 1.5 : 1);
+  env.fogK = game.map === 'hell' ? Math.max(1, (K / 1.9) ** 0.7) : 1;
+  track.reset(seed, itemMode, { map: game.map, K });
+  game.camFall = 0; game.shake = 0; env.underY = undefined; game.underY = -13;
   runner.reset(0, 0);
   runner.multi = game.multi;
   renderItems(true);
@@ -289,7 +299,7 @@ function newRun(seed, itemMode = false, diff = 'easy') {
 }
 function startSolo() {
   game.multi = false; game.team = false; $('teambar').classList.add('hidden');
-  newRun((Math.random() * 2 ** 31) | 0, game.pickMode === 'item', game.pickDiff);
+  newRun((Math.random() * 2 ** 31) | 0, game.pickMode === 'item', game.pickDiff, game.pickMap);
   countdown(3000);
 }
 function countdown(ms) {
@@ -326,7 +336,7 @@ async function died(why) {
   sfx(why.includes('떨어') ? 'die' : 'bonk');
   game.mode = 'dead'; game.deadT = 0; game.why = why;
   reportPlay();
-  const rec = { dist: Math.floor(runner.s), stars: runner.stars, themes: game.dreamsSeen, time: game.runT, name: game.profile.name, color: game.profile.color, mode: game.itemMode ? 'item' : 'speed', diff: game.diff };
+  const rec = { dist: Math.floor(runner.s), stars: runner.stars, themes: game.dreamsSeen, time: game.runT, name: game.profile.name, color: game.profile.color, mode: game.itemMode ? 'item' : 'speed', diff: game.diff, map: game.map };
   if (game.multi) net.send({ t: 'dead', dist: rec.dist, stars: rec.stars, why });
   game.rec = rec;
   if (!logged()) { game.submitted = { anonPending: true }; return; } // 비로그인: 탈락 화면에서 임시 닉네임을 정해 남긴다
@@ -346,7 +356,7 @@ async function showOver() {
   show('over');
   $('ov-why').textContent = `💤 ${game.why || '꿈에서 깼어요'}`;
   $('ov-score').textContent = score().toLocaleString();
-  $('ov-detail').textContent = `${Math.floor(runner.s).toLocaleString()}m 달림 · 별사탕 ${runner.stars}개 · 꿈 ${game.dreamsSeen}개를 지났어요 · ${Math.floor(game.runT)}초`;
+  $('ov-detail').textContent = `${Math.floor(runner.s).toLocaleString()}m 달림 · 별사탕 ${runner.stars}개 · ${game.map === 'hell' ? '지옥' : '꿈'} ${game.dreamsSeen}개를 지났어요 · ${Math.floor(game.runT)}초`;
   const r = game.submitted;
   $('ov-save').classList.toggle('hidden', !r?.anonPending);
   if (r?.anonPending) { $('ov-nick').value = store.get(NICK_KEY) || game.profile.name; $('ov-save-btn').disabled = false; }
@@ -355,8 +365,8 @@ async function showOver() {
   if (r?.newBest) sfx('best');
   $('again-btn').textContent = game.multi ? '👥 방으로 돌아가기' : '🔁 다시 달리기';
   $('ov-board-title').classList.remove('hidden'); $('ov-board').classList.remove('hidden');
-  $('ov-board-title').textContent = `🏆 ${diffName(game.diff)} · ${modeName(game.itemMode ? 'item' : 'speed')} 최고 기록`;
-  renderBoard($('ov-board'), r?.top ? r : await loadBoard(game.itemMode ? 'item' : 'speed', game.diff), true);
+  $('ov-board-title').textContent = `🏆 ${game.map === 'hell' ? '🔥 지옥 · ' : ''}${diffName(game.diff)} · ${modeName(game.itemMode ? 'item' : 'speed')} 최고 기록`;
+  renderBoard($('ov-board'), r?.top ? r : await loadBoard(game.itemMode ? 'item' : 'speed', game.diff, game.map), true);
 }
 
 $('ov-save-btn').onclick = async () => {
@@ -380,11 +390,11 @@ function showDreamCard(d) {
   const th = track.themeOf(d);
   const el = $('dream-card');
   el.classList.add('hidden'); void el.offsetWidth;
-  el.querySelector('.dc-n').textContent = `DREAM ${d + 1}`;
+  el.querySelector('.dc-n').textContent = `${th.hell ? 'HELL' : 'DREAM'} ${d + 1}`;
   el.querySelector('.dc-e').textContent = th.emoji;
   el.querySelector('.dc-name').textContent = th.name;
   el.classList.remove('hidden');
-  $('h-dream-n').textContent = `꿈 #${d + 1}`;
+  $('h-dream-n').textContent = `${th.hell ? '지옥' : '꿈'} #${d + 1}`;
   $('h-dream-name').textContent = `${th.emoji} ${th.name}`;
 }
 function enterDream(d) {
@@ -471,7 +481,7 @@ function renderRooms(list) {
   el.innerHTML = '';
   for (const r of list) {
     const d = document.createElement('div'); d.className = 'room';
-    d.innerHTML = `<span class="nm">${esc(r.name)}</span><span class="meta">${r.team ? '👥 팀전 · ' : ''}${diffName(r.diff)} · ${modeName(r.mode)} · 👑 ${esc(r.host)} · ${r.n}/${r.max}</span><span class="tag ${r.state === 'run' ? 'run' : ''}">${r.state === 'run' ? '달리는 중' : '기다리는 중'}</span>`;
+    d.innerHTML = `<span class="nm">${esc(r.name)}</span><span class="meta">${r.team ? '👥 팀전 · ' : ''}${r.map === 'hell' ? '🔥 지옥 · ' : ''}${diffName(r.diff)} · ${modeName(r.mode)} · 👑 ${esc(r.host)} · ${r.n}/${r.max}</span><span class="tag ${r.state === 'run' ? 'run' : ''}">${r.state === 'run' ? '달리는 중' : '기다리는 중'}</span>`;
     const b = document.createElement('button'); b.className = 'btn'; b.textContent = '들어가기';
     b.disabled = r.state === 'run' || r.n >= r.max;
     b.onclick = () => net.send({ t: 'join', id: r.id });
@@ -482,7 +492,7 @@ function renderRoom(rank) {
   const r = game.room; if (!r) return;
   $('room-title').textContent = `🌙 ${r.name}`;
   $('code-txt').textContent = r.id;
-  segSet('room-mode', r.mode || 'speed'); segSet('room-diff', diffOf(r.diff));
+  segSet('room-mode', r.mode || 'speed'); segSet('room-diff', diffOf(r.diff)); segSet('room-map', mapOf(r.map));
   const me = game.members.find((m) => m.id === game.myId);
   const host = !!me?.host;
   for (const b of $('room-team').children) { b.classList.toggle('on', (b.dataset.t === '1') === !!r.team); b.disabled = !host; }
@@ -505,7 +515,7 @@ function renderRoom(rank) {
     el.appendChild(d);
   }
   $('start-btn').classList.toggle('hidden', !host);
-  for (const b of [...$('room-mode').children, ...$('room-diff').children]) b.disabled = !host; // 모드 · 난이도는 방장이 정한다
+  for (const b of [...$('room-mode').children, ...$('room-diff').children, ...$('room-map').children]) b.disabled = !host; // 모드 · 난이도는 방장이 정한다
   $('room-hint').textContent = host ? `${game.members.length}명이 모였어요. 준비되면 출발을 눌러요! (혼자서도 시작할 수 있어요)` : '방장이 출발을 누르면 다 같이 달려요 🌙';
   if (rank) {
     $('room-rank').classList.remove('hidden');
@@ -535,7 +545,7 @@ net.on('start', (m) => {
   game.team = !!m.team;
   game.myTeam = m.members.find((x) => x.id === game.myId)?.team;
   game.endAt = performance.now() + m.in + (m.dur || 180) * 1000; game.respawnT = 0;
-  newRun(m.seed, m.mode === 'item', m.diff);
+  newRun(m.seed, m.mode === 'item', m.diff, m.map);
   for (const mem of m.members) if (mem.id !== game.myId) { const g = new Ghost(scene, game.team ? { ...mem, teamColor: TEAMS[mem.team]?.color } : mem); g.speedK = runner.speedK; game.ghosts.set(mem.id, g); }
   $('teambar').classList.toggle('hidden', !game.team);
   game.alive = m.members.length;
@@ -597,8 +607,8 @@ net.on('finish', (m) => {
   const show2 = () => { showOver().then(() => { $('ov-room').classList.remove('hidden'); $('ov-room').innerHTML = '<h3>🏁 이번 판 순위</h3>' + m.rank.map((e) => `<div class="brow${e.id === game.myId ? ' me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.name)}</span><span class="sc">${e.dist.toLocaleString()}m<small>⭐${e.stars}</small></span></div>`).join(''); renderRoom(m.rank); }); };
   if (game.mode === 'dead' && game.deadT < 1.4) setTimeout(show2, (1.4 - game.deadT) * 1000); else show2();
 });
-$('quick-btn').onclick = () => net.send({ t: 'quick', mode: game.pickMode, diff: game.pickDiff });
-$('create-btn').onclick = () => net.send({ t: 'create', name: $('room-name').value, mode: game.pickMode, diff: game.pickDiff });
+$('quick-btn').onclick = () => net.send({ t: 'quick', mode: game.pickMode, diff: game.pickDiff, map: game.pickMap });
+$('create-btn').onclick = () => net.send({ t: 'create', name: $('room-name').value, mode: game.pickMode, diff: game.pickDiff, map: game.pickMap });
 $('lobby-back').onclick = () => { game.multi = false; show('title'); };
 $('leave-btn').onclick = () => { net.send({ t: 'leave' }); game.room = null; $('ov-room').classList.add('hidden'); afterLeave(); };
 // 방에서 나온 뒤: 로그인했으면 방 목록, 아니면 처음 화면
@@ -659,7 +669,7 @@ function frame() {
   if (game.mode === 'title') {
     // 처음 화면: 출발 발판에서 제자리 달리기 + 꿈이 6초마다 바뀌며 빙글 도는 카메라
     game.titleT += dt;
-    if (game.titleT > 6) { game.titleT = 0; const th = THEMES[Math.floor(Math.random() * THEMES.length)]; env.setTheme(th); }
+    if (game.titleT > 6) { game.titleT = 0; const pool = game.pickMap === 'hell' ? HELLS : THEMES, th = pool[Math.floor(Math.random() * pool.length)]; env.setTheme(th); }
     runner.bear.root.position.set(0, 0, z); runner.bear.root.rotation.y = Math.PI;
     runner.bear.update(dt, 8, { noCrawl: true });
     const a = t * 0.18;
@@ -698,7 +708,8 @@ function frame() {
       if (game.deadT > 1.4 && !game.multi && game.submitted !== null) showOver();
       if (game.multi && game.deadT > 1.4) spectate();
     }
-    track.update(game.runT, runner.s);
+    track.update(game.runT, runner.s, game.mode === 'run' && runner.alive ? runner.v : 0, dt);
+    if (track.hell) { game.underY += (track.deathY(runner.s) + 3 - game.underY) * Math.min(1, dt * 2); env.underY = game.underY; }
     track.generate(Math.max(runner.s, game.multi ? maxGhostS() : 0));
     if (game.mode === 'run') {
       const d = track.dreamAt(runner.s);
@@ -748,16 +759,22 @@ function followCamera(dt) {
   const dead = game.mode === 'dead' && !w;
   game.camK += ((game.camLow ? 1 : 0) - game.camK) * Math.min(1, dt * 6);
   const mix = (a, b) => a + (b - a) * game.camK, up = mix(CAM.high.up, CAM.low.up), back = mix(CAM.high.back, CAM.low.back), look = mix(CAM.high.look, CAM.low.look), ahead = mix(CAM.high.ahead, CAM.low.ahead);
-  const cx = x * 0.85, cy = Math.max(y, -6) + up;
+  // 지옥: 바닥 높이가 계속 바뀐다 · 떨어지는 동안은 위에서 내려다봐서 내릴 곳이 보이게
+  const hell = track.hell, fl = hell ? track.deathY(s) + 6 : -6, falling = hell && !w && runner.alive && !runner.onGround && runner.vy < -6 ? Math.min(1, -runner.vy / 26) : 0;
+  game.camFall = (game.camFall || 0) + (falling - (game.camFall || 0)) * Math.min(1, dt * 5);
+  const cx = x * 0.85, cy = Math.max(y, fl) + up + game.camFall * 5;
   camera.position.x += (cx - camera.position.x) * k;
-  camera.position.y += (cy - camera.position.y) * (dead ? k * 0.3 : k);
+  camera.position.y += (cy - camera.position.y) * (dead ? k * 0.3 : hell ? Math.min(1, k * 2.2) : k);
   camera.position.z = dead ? camera.position.z : z + back;
-  camLook.set(x, Math.max(y, -8) + look, z - ahead);
+  camLook.set(x, Math.max(y, fl - 2) + look - game.camFall * 9, z - ahead);
   camera.lookAt(camLook);
+  if (game.shake > 0) { game.shake = Math.max(0, game.shake - dt * 2.4); camera.rotation.z += (Math.random() - 0.5) * game.shake * 0.05; camera.position.y += (Math.random() - 0.5) * game.shake * 0.3; }
   const fov = Math.min(88, 60 + (v - V0) * 0.55); // 아주 빠른 난이도에서 화면이 지나치게 벌어지지 않게
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * k; camera.updateProjectionMatrix(); }
 }
 // 달리는 중 생기는 일 (소리 · 아이템 칸)
+// 괴물이 내리쳤다: 가까울수록 크게 흔들린다
+track.onSlam = (st, d) => { if (game.mode !== 'run' || d > 240) return; sfx('bonk'); game.shake = Math.max(game.shake || 0, 1); };
 function onFx(n, a) {
   if (n === 'item') { sfx('item'); renderItems(false, true); return; }
   if (n === 'itemfull') { toast('🎒 아이템은 2개까지 들 수 있어요 (Q로 쓰기)', 1000); return; }

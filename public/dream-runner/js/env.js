@@ -135,7 +135,7 @@ export class Env {
     this.theme = th;
     const tgt = {
       top: col(th.sky[0]), mid: col(th.sky[1]), bot: col(th.sky[2]),
-      near: th.fog[0], far: th.fog[1], light: th.light, stars: th.stars,
+      near: th.fog[0], far: th.fog[1] * (this.fogK || 1), light: th.light, stars: th.stars,
       hemiG: col(th.plat[1]).lerp(col(th.sky[2]), 0.5), sun: th.sun ? col(th.sun) : null,
     };
     this.target = tgt;
@@ -215,7 +215,7 @@ export class Env {
       if (!o.userData.anim) { const baked = bakeStatic(g); baked.userData.baked = true; o = baked; } else { o.userData.anim0 = o.userData.anim; o = g; o.userData.anim = (q, t, dt) => q.children[0].userData.anim(q.children[0], t, dt); }
       o.rotation.y = r.range(-0.5, 0.5);
       if (th.upside) { o.rotation.x = Math.PI; py = y + r.range(12, 18); }
-    } else if (place === 'far') { px = x + side * r.range(45, 140); py = Math.min(y, 0) + UNDER_Y - 2; o.rotation.y = r.range(0, 6.28); }
+    } else if (place === 'far') { px = x + side * r.range(45, 140); py = (th.hell ? y : Math.min(y, 0)) + UNDER_Y - 2; o.rotation.y = r.range(0, 6.28); }
     else if (place === 'sky') { px = x + side * r.range(12, 90); py = y + r.range(14, 50); }
     else if (place === 'over') { px = x; py = y; }
     else if (place === 'drift') { px = x + side * r.range(w / 2 + 2.5, w / 2 + 9); py = y + r.range(0.5, 5); }
@@ -272,7 +272,7 @@ export class Env {
     for (const u of this.unders) {
       u.material.opacity += ((u.userData.want || 0) - u.material.opacity) * k;
       if (u.material.opacity < 0.01 && !u.userData.want) u.visible = false;
-      u.position.x = cp.x; u.position.z = cp.z - 300;
+      u.position.x = cp.x; u.position.z = cp.z - 300; u.position.y = this.underY ?? UNDER_Y;
       if (u.material.map) { u.material.map.offset.set(cp.x / 1600 * 60, (-u.position.z / 1600) * 60 + t * (u.userData.flow || 0)); }
     }
     // 알갱이

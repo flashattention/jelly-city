@@ -167,7 +167,7 @@ export class Runner {
     // 장애물
     const o = this.eff.ghost > 0 || this.invul > 0 ? null : track.hit(this.s, this.x, this.y, this.h);
     if (o && this.eff.shield > 0) { this.eff.shield = 0; track.breakOne(o); fx?.('shieldbreak'); }
-    else if (o) return this.die(o.kind === 'bar' ? '가로대에 머리를 쿵!' : '장애물에 부딪혔어요', track);
+    else if (o) return this.die(o.kind === 'slam' ? '괴물의 일격에 맞았어요' : o.kind === 'bar' ? (track.hell ? '괴물의 팔에 머리를 쿵!' : '가로대에 머리를 쿵!') : '장애물에 부딪혔어요', track);
     // 별사탕
     // 아이템전: ? 상자 · 함정 · 자석
     if (track.itemMode) {
@@ -180,7 +180,7 @@ export class Runner {
     const n = track.takeStars(this.s, this.x, this.y);
     if (n) { this.stars += n; fx?.('star', n); }
     // 꿈 밖으로 떨어짐
-    if (this.y < -16) return this.die('꿈속 깊이 떨어졌어요', track);
+    if (this.y < track.deathY(this.s)) return this.die(track.hell ? '지옥 끝까지 떨어졌어요' : '꿈속 깊이 떨어졌어요', track);
     this.flipT = Math.max(0, this.flipT - dt);
     this.shoveT = Math.max(0, this.shoveT - dt);
   }

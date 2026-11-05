@@ -80,6 +80,7 @@
         <div id="chars-label" class="label hidden">누구로 달릴까요?</div>
         <div id="chars"></div>
         <div id="nick-row" class="hidden"><input id="nick" maxlength="14" placeholder="달리기 이름 (순위표 · 방에 보여요)" /></div>
+        <div class="seg" id="map-pick"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button></div>
         <div class="seg" id="mode-pick"><button data-m="speed">⚡ 스피드전</button><button data-m="item">🎁 아이템전</button></div>
         <div class="seg" id="diff-pick"></div>
         <div class="btns" id="play-btns">
@@ -118,6 +119,7 @@
       <h2 id="room-title"></h2>
       <div class="seg" id="room-team"><button data-t="0">🏃 개인전</button><button data-t="1">👥 팀전 <small>3분</small></button></div>
       <div class="seg" id="room-mode"><button data-m="speed">⚡ 스피드전</button><button data-m="item">🎁 아이템전</button></div>
+      <div class="seg" id="room-map"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button></div>
       <div class="seg" id="room-diff"></div>
       <div id="room-code"><span>초대 코드</span><b id="code-txt"></b><button id="copy-link" class="btn alt">🔗 링크 복사</button><button id="copy-code" class="btn ghost">코드 복사</button></div>
       <div class="note">링크를 보내거나 코드를 알려 주면 로그인 안 한 친구도 들어올 수 있어요</div>
@@ -150,7 +152,8 @@
   <!-- 순위표 -->
   <div id="board" class="screen hidden">
     <div class="card wide">
-      <h2>🏆 꿈나라 최고 기록</h2>
+      <h2>🏆 최고 기록</h2>
+      <div class="seg" id="board-map"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button></div>
       <div class="seg" id="board-mode"><button data-m="speed">⚡ 스피드전</button><button data-m="item">🎁 아이템전</button></div>
       <div class="seg" id="board-diff"></div>
       <div id="my-stats"></div>
