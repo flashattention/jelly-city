@@ -222,7 +222,7 @@ game.pickMode = store.get(MODE_KEY) === 'item' ? 'item' : 'speed';
 segSet('mode-pick', game.pickMode);
 for (const b of $('mode-pick').children) b.onclick = () => { game.pickMode = b.dataset.m; store.set(MODE_KEY, game.pickMode); segSet('mode-pick', game.pickMode); };
 for (const b of $('room-mode').children) b.onclick = () => net.send({ t: 'mode', mode: b.dataset.m });
-// 난이도: 길은 같고 빠르기만 다르다 (이지 · 노멀 · 하드 · 익스트림)
+// 난이도: 길은 같고 빠르기만 다르다 (이지 · 노멀 · 하드 · 익스트림 · 광속 · 초월)
 const diffName = (d) => DIFFS[diffOf(d)].name;
 for (const id of ['diff-pick', 'room-diff', 'board-diff']) $(id).innerHTML = Object.entries(DIFFS).map(([k, d]) => `<button data-m="${k}">${d.name}</button>`).join('');
 game.pickDiff = diffOf(store.get(DIFF_KEY));
@@ -270,7 +270,7 @@ function renderBoard(el, d, hl) {
 // ---------- 시작 · 끝 ----------
 function newRun(seed, itemMode = false, diff = 'easy') {
   game.itemMode = itemMode;
-  game.diff = diffOf(diff); runner.speedK = DIFFS[game.diff].k;
+  game.diff = diffOf(diff); runner.speedK = DIFFS[game.diff].k; runner.fullBoost = !!DIFFS[game.diff].full;
   game.seed = seed;
   for (const g of game.ghosts.values()) g.remove();
   game.ghosts.clear();
@@ -681,7 +681,7 @@ function frame() {
     if (game.mode === 'run') {
       game.runT += dt;
       // 빠를 때는 잘게 나눠 움직인다 (한 프레임에 장애물을 뛰어넘어 버리지 않게)
-      const steps = Math.min(8, Math.max(1, Math.ceil(runner.v * dt / 0.6)));
+      const steps = Math.min(16, Math.max(1, Math.ceil(runner.v * dt / 0.6)));
       let why = null;
       for (let i = 0; i < steps && !why; i++) {
         runner.substep = i; why = runner.update(dt / steps, input, track, onFx);
@@ -816,7 +816,7 @@ function hud() {
   $('h-stars').textContent = runner.stars;
   $('h-speed').textContent = `${Math.round(runner.v * 3.6)}km/h`;
   $('h-speed').classList.toggle('on', runner.boost > 0.3);
-  $('speedlines').style.opacity = game.mode === 'run' ? (runner.boost * 0.9).toFixed(2) : '0';
+  $('speedlines').style.opacity = game.mode === 'run' ? (runner.fullBoost ? 0.4 : runner.boost * 0.9).toFixed(2) : '0'; // 항상 가속인 난이도는 앞이 잘 보이게 옅게
   const b0 = track.bounds[game.dream] ?? 0, b1 = track.nextBoundary(runner.s);
   $('h-next').firstElementChild.style.width = `${Math.max(0, Math.min(1, (runner.s - b0) / Math.max(1, b1 - b0))) * 100}%`;
   if (game.multi) $('h-alive').textContent = `🐻 ${(runner.alive ? 1 : 0) + [...game.ghosts.values()].filter((g) => g.alive).length}/${game.members.length}`;

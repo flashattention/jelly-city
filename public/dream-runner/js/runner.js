@@ -116,8 +116,8 @@ export class Runner {
     const prevS = this.s, prevY = this.y;
     // 가속: 누르고 있으면 점점 빨라지고, 떼면 서서히 원래 속도로
     const wasB = this.boost;
-    this.boost = input.boost ? Math.min(1, this.boost + dt / BOOST_UP) : Math.max(0, this.boost - dt / BOOST_DOWN);
-    if (input.boost && wasB < 0.02 && this.boost > 0) fx?.('boost');
+    this.boost = this.fullBoost ? 1 : input.boost ? Math.min(1, this.boost + dt / BOOST_UP) : Math.max(0, this.boost - dt / BOOST_DOWN);
+    if (input.boost && !this.fullBoost && wasB < 0.02 && this.boost > 0) fx?.('boost');
     // 아이템 효과 시간
     for (const k in this.eff) this.eff[k] = Math.max(0, this.eff[k] - dt);
     this.rocketK += ((this.eff.rocket > 0 ? 1 : 0) - this.rocketK) * Math.min(1, dt * 4);

@@ -74,7 +74,7 @@ export class DreamBoard {
     const time = Number(b.time), dist = Math.floor(Number(b.dist)), stars = Math.floor(Number(b.stars)), themes = Math.floor(Number(b.themes));
     if (![time, dist, stars, themes].every(Number.isFinite) || time < 1 || time > 4 * 3600 || dist < 0 || stars < 0 || themes < 1) throw new Error('기록이 이상해요');
     const mode = b.mode === 'item' ? 'item' : 'speed', diff = diffOf(b.diff), T = this.table(mode, diff), k = DIFFS[diff].k;
-    if (dist > time * (mode === 'item' ? MAX_SPEED_ITEM : MAX_SPEED) * k + 60 || stars > dist / 2 + 5 || themes > (time / 15) * k + 3) throw new Error('기록이 이상해요');
+    if (dist > time * (mode === 'item' ? MAX_SPEED_ITEM : MAX_SPEED) * k + 60 || stars > dist / 2 + 5 || themes > (time / 15) * k * (DIFFS[diff].full ? 1.5 : 1) + 3) throw new Error('기록이 이상해요');
     const score = dist + stars * STAR_PTS;
     this.runs++; this.dirty = true;
     const name = clean(b.name, 14) || clean(who.user.nick || (who.user.guest ? who.user.name : ''), 14) || '꿈꾸는 곰돌이'; // 구글 실명은 쓰지 않는다
