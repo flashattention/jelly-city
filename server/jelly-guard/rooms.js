@@ -11,7 +11,7 @@ const SELECT_MS = 25000, SETUP_ASSAULT = 20000, SETUP_CONTROL = 12000;
 const ASSAULT_SEC = Number(process.env.WATCH_SEC) || 4 * 60, BONUS_SEC = 120, CONTROL_LIMIT = 8 * 60;
 const CAP_SOLO = Number(process.env.WATCH_CAP) || 21, CTRL_CAP = 9, CTRL_WIN = 85; // 점령 시간(초) · 쟁탈전 100% 까지 초
 const CAP_MUL = [0, 1, 1.5, 1.85, 2.1, 2.3, 2.45];
-const CLIP_TYPES = new Set(['snap', 'ps', 'fire', 'boom', 'proj', 'fx', 'form', 'spawn', 'kill']), CLIP_KEEP = 12500; // 최고의 장면에 담는 것 · 길이(ms)
+const CLIP_TYPES = new Set(['snap', 'ps', 'fire', 'boom', 'proj', 'fx', 'form', 'spawn', 'kill']), CLIP_KEEP = 12500, POTG_AFTER_SKIP = 5000; // 최고의 장면에 담는 것 · 길이(ms) · 건너뛴 뒤 결과표까지(ms)
 const ULT_X = Number(process.env.WATCH_ULTX) || 1; // 점검용: 궁극기 빨리 채우기
 const RUSHERS = new Set(['rein', 'winston', 'genji', 'reaper', 'hog', 'dva', 'tracer', 'zarya']), NO_HOP = new Set(['pharah', 'mercy']); // 파고드는 영웅 · 뛰면 안 되는 영웅
 const BOT_NAMES = ['젤리봇 딸기', '젤리봇 소다', '젤리봇 푸딩', '젤리봇 망고', '젤리봇 민트', '젤리봇 라임', '젤리봇 자두', '젤리봇 복숭아', '젤리봇 포도', '젤리봇 레몬', '젤리봇 체리', '젤리봇 키위'];
@@ -145,7 +145,8 @@ export class GuardRooms extends BaseRooms {
     // 승리 장면 → 최고의 장면 → 최고의 플레이어 → 결과표 (화면이 끝 신호를 받기 전에 장면이 도착해 있어야 한다)
     if (g.potg) { const { score, ...clip } = g.potg; this.toRoom(r, { t: 'potg', ...clip }); }
     this.toRoom(r, { t: 'phase', ph: 'over', winner, why, mvp: mvp?.id, stats });
-    setTimeout(() => { if (r.g === g && r.state === 'run') { r.g = null; this.end(r, g.result); } }, 11000 + (g.potg ? g.potg.ms + 500 : 0));
+    const wait = 11000 + (g.potg ? g.potg.ms + 500 : 0);
+    g.endAt = Date.now() + wait; g.finish = () => { if (r.g === g && r.state === 'run') { r.g = null; this.end(r, g.result); } }; g.endT = setTimeout(g.finish, wait);
   }
   onLeave(r) {
     const g = r.g; if (!g) return;
@@ -180,6 +181,8 @@ export class GuardRooms extends BaseRooms {
   onMessage(c, m, r) {
     const g = r.g; if (!g || r.state !== 'run') return;
     const now = Date.now();
+    // 최고의 장면을 사람이 모두 건너뛰면 남은 시간을 기다리지 않는다 (최고의 플레이어는 보여 준다)
+    if (m.t === 'potgskip') { if (g.phase !== 'over' || !g.finish) return; (g.skips ||= new Set()).add(c); if (r.players.every((p) => p.bot || g.skips.has(p)) && g.endAt - now > POTG_AFTER_SKIP) { clearTimeout(g.endT); g.endAt = now + POTG_AFTER_SKIP; g.endT = setTimeout(g.finish, POTG_AFTER_SKIP); } return; }
     if (m.t === 'pick') {
       const h = HEROES.find((x) => x.id === m.h); if (!h) return;
       if (r.players.some((p) => p !== c && p.team === c.team && p.hero === h.id)) return this.send(c, { t: 'toast', text: '이미 우리 팀이 고른 영웅이에요' });
@@ -543,6 +546,8 @@ export class GuardRooms extends BaseRooms {
     this.toRoom(r, { t: 'fx', k: 'slam', by: c.id, to: t.id, wall, p: [t.pos.x, t.pos.y, t.pos.z] });
   }
   bubble(t, by, now) { t.bub = 200; t.fx.bub = now + 2000; t.bubBy = by; }
+  // 봇이 기술을 쓸 때는 방패를 잠깐 내린다
+  lowerShield(r, b, now) { b.shieldDown = now + 700; if (b.shieldOn) { b.shieldOn = false; this.syncShield(r, b); } }
   syncShield(r, c) {
     let e = r.g.ents.find((x) => x.k === 'shield' && x.owner === c);
     if (c.shieldOn && c.alive) { if (!e) this.addEnt(r, { k: 'shield', team: c.team, owner: c, x: c.pos.x, y: c.pos.y, z: c.pos.z, yaw: c.yaw, hp: c.shp, max: 1200, until: Infinity }); }
@@ -933,7 +938,7 @@ export class GuardRooms extends BaseRooms {
     if (tgt !== b.target) { b.target = tgt; b.react = 0.3 + Math.random() * 0.45 * (1.3 - b.skill); }
     this.botAbil(r, b, h, tgt, td, ally, now);
     // 말랑방패: 멀리 있는 적에겐 방패를 들고 다가가고, 가까우면 내리고 휘두른다
-    if (b.hero === 'rein') { const want = !!tgt && td > 6.5 && b.shp > 150 && now - (b.shieldBroke || 0) > 5000 && !(b.fx.charge > now); if (want !== !!b.shieldOn) { b.shieldOn = want; this.syncShield(r, b); } }
+    if (b.hero === 'rein') { const want = !!tgt && td > 6.5 && b.shp > 150 && now - (b.shieldBroke || 0) > 5000 && !(b.fx.charge > now) && now >= (b.shieldDown || 0); if (want !== !!b.shieldOn) { b.shieldOn = want; this.syncShield(r, b); } }
     let moving = false, look = null;
     const range = spec.type === 'melee' ? 3.5 : spec.type === 'beam' ? spec.range - 1 : spec.near ? Math.max(6, spec.near * 0.8) : 18;
     // 공격 · 치유
@@ -1142,6 +1147,7 @@ export class GuardRooms extends BaseRooms {
     // 궁극기
     if (b.ult >= h.ult && (tgt || (h.role === 'sup' && ally))) {
       const fake = { to: ally?.id };
+      if (b.hero === 'rein' && td <= 14) this.lowerShield(r, b, now);
       if ((b.hero === 'ana' && !ally) || (b.hero === 'rein' && td > 14) || (b.hero === 'reaper' && td > 7) || (b.hero === 'hog' && td > 12) || (b.hero === 'genji' && td > 14)) { /* 기다린다 */ }
       else if (b.hero === 'junk') {
         if (tgt && td < 30) { b.ult = 0; this.toRoom(r, { t: 'fx', k: 'ult', by: b.id, h: b.hero, team: b.team, p: [b.pos.x, b.pos.y, b.pos.z], yaw: b.yaw }); this.addEnt(r, { k: 'tire', team: b.team, owner: b, x: b.pos.x, y: b.pos.y, z: b.pos.z, yaw: b.yaw, until: now + 8000 }); return; }
@@ -1180,7 +1186,7 @@ export class GuardRooms extends BaseRooms {
     if (b.hero === 'lucio') { if (lowHp < 0.6 || (ally && ally.hp / this.maxHp(ally) < 0.6)) b.song = 'heal'; else if (!tgt) b.song = 'speed'; if (cdOk('e') && near && lowHp < 0.7) { use('e'); b.fx.amp = now + 3000; return; } }
     if (b.hero === 'tracer' && cdOk('e') && lowHp < 0.35) { use('e'); const old = b.hist[0]; if (old) b.hp = Math.max(b.hp, old.hp); return; }
     if (b.hero === 'lucio' && cdOk('s') && tgt && td < 7) { use('s'); this.abilEffect(r, b, h, 's', {}, now); return; }
-    if (b.hero === 'rein' && cdOk('e') && tgt && td < 18) { use('e'); this.botShot(r, b, 'fire', tgt, now); return; }
+    if (b.hero === 'rein' && cdOk('e') && tgt && td < 18) { this.lowerShield(r, b, now); use('e'); this.botShot(r, b, 'fire', tgt, now); return; }
     if (b.hero === 'soldier' && cdOk('s') && tgt && td < 25) { use('s'); this.botShot(r, b, 'helix', tgt, now); return; }
     if (b.hero === 'cassidy' && cdOk('e') && tgt && td < 6) { use('e'); this.botShot(r, b, 'flash', tgt, now); return; }
     if (b.hero === 'ana' && cdOk('e') && (ally && ally.hp / this.maxHp(ally) < 0.6 || (tgt && td < 18))) { use('e'); this.botShot(r, b, 'biotic', ally && ally.hp / this.maxHp(ally) < 0.6 ? ally : tgt, now); return; }

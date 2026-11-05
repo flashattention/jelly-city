@@ -380,6 +380,7 @@ document.addEventListener('contextmenu', (e) => { if (game.mode === 'play') e.pr
 document.addEventListener('wheel', (e) => { if (!locked() || game.mode !== 'play' || !me.alive || Math.abs(e.deltaY) < 1) return; const t0 = performance.now(); if (t0 - (game.wheelT || 0) < 250) return; game.wheelT = t0; game.kit?.wheel?.(); }, { passive: true }); // 휠: 토닥 지팡이 ↔ 딱총
 window.addEventListener('keydown', (e) => {
   if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+  if (game.potg && e.code === 'Space') { e.preventDefault(); skipPotg(); return; }
   if (game.mode !== 'play') return;
   if (['Space', 'Tab'].includes(e.code)) e.preventDefault();
   if (e.code === 'Tab') { $('scoreboard').classList.remove('hidden'); renderBoard(); return; }
@@ -641,8 +642,10 @@ shell.on('spawn', (m) => {
   const o = game.others.get(m.id); if (!o) return;
   o.setHero(m.h); o.alive = true; o.lie = 0; o.deadT = -1; o.set(m.p, true);
 });
-shell.on('snap', (m) => { for (const [id, ...st] of m.p) { if (id === game.myId) continue; game.others.get(id)?.set(st); } });
+// 최고의 장면을 재생하는 동안 서버가 계속 보내는 지금 상태는 무시한다 (기록과 섞이면 캐릭터가 두 자리를 오가며 번쩍인다)
+shell.on('snap', (m) => { if (game.potg) return; for (const [id, ...st] of m.p) { if (id === game.myId) continue; game.others.get(id)?.set(st); } });
 shell.on('ps', (m) => {
+  if (game.potg && !game.potg.playing) return;
   game.obj = m.o;
   for (const p of m.p) {
     const [id, hp, max, temp, ult, flags] = p;
@@ -972,6 +975,7 @@ function cutscene(m, resume) {
 }
 // ---------- 최고의 장면: 서버가 잘라 둔 경기 장면을 그대로 다시 재생한다 ----------
 shell.on('potg', (m) => { game.clip = m; });
+$('potg-skip').onclick = skipPotg;
 function startPotg(c) {
   endCut(); $('cut').classList.add('hidden');
   const star = c.players.find((p) => p.id === c.id); const realId = game.myId;
@@ -982,8 +986,11 @@ function startPotg(c) {
     if (!o) { o = new Other(p); game.others.set(p.id, o); if (p.id === realId) temp = o; }
     if (p.hero) o.setHero(p.hero); o.bear?.playEmote(null); o.cutPos = null; o.alive = true; o.flags = 0;
   }
-  const first = c.msgs.map(([, s]) => JSON.parse(s)).find((m) => m.t === 'snap'); if (first) for (const [id, ...st] of first.p) game.others.get(id)?.set(st, true);
-  game.potg = { c, t: 0, i: 0, realId, temp, msgs: c.msgs, end: c.ms / 1000 + 0.6, cam: null };
+  // 움직임은 미리 다 받아 두었으니 앞뒤 기록 사이를 이어서 그린다 (실시간처럼 쫓아가면 초당 10번 기록이 뚝뚝 끊겨 보인다)
+  const msgs = c.msgs.map(([t, s]) => [t, JSON.parse(s)]);
+  const snaps = msgs.filter(([, m]) => m.t === 'snap').map(([t, m]) => [t, new Map(m.p.map(([id, ...st]) => [id, st]))]);
+  if (snaps[0]) for (const [id, st] of snaps[0][1]) game.others.get(id)?.set(st, true);
+  game.potg = { c, t: 0, i: 0, si: 0, realId, temp, msgs: msgs.filter(([, m]) => m.t !== 'snap'), snaps, end: c.ms / 1000 + 0.6, cam: null, yaw: null };
   const h = heroById(star?.hero);
   $('potg-t').textContent = '🎬 이번 경기 최고의 장면';
   $('potg-n').innerHTML = `${h?.emoji || ''} <b>${esc(star?.name || '')}</b> <small>${esc(h?.name || '')}</small>`;
@@ -993,17 +1000,32 @@ function startPotg(c) {
 }
 function updatePotg(dt) {
   const P = game.potg; P.t += dt;
-  while (P.i < P.msgs.length && P.msgs[P.i][0] / 1000 <= P.t) { const m = JSON.parse(P.msgs[P.i++][1]); try { shell.net.handlers[m.t]?.(m); } catch (e) { console.warn('다시 보기', m.t, e); } }
+  while (P.i < P.msgs.length && P.msgs[P.i][0] / 1000 <= P.t) { const m = P.msgs[P.i++][1]; P.playing = true; try { shell.net.handlers[m.t]?.(m); } catch (e) { console.warn('다시 보기', m.t, e); } P.playing = false; }
+  potgPose(P);
   // 주인공 등 뒤에서 따라간다 (벽에 막히면 당겨 온다)
   const o = game.others.get(P.c.id);
   if (o) {
-    const f = new THREE.Vector3(-Math.sin(o.yaw), 0, -Math.cos(o.yaw)), head = o.pos.clone().setY(o.pos.y + 1.6), back = rayBoxes(game.map, head, new THREE.Vector3(-f.x, 0.35, -f.z).normalize(), 4.6);
+    // 카메라는 주인공이 휙 돌아도 천천히 따라 돈다
+    if (P.yaw == null) P.yaw = o.yaw; else P.yaw += Math.atan2(Math.sin(o.yaw - P.yaw), Math.cos(o.yaw - P.yaw)) * Math.min(1, dt * 3.5);
+    const f = new THREE.Vector3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)), head = o.pos.clone().setY(o.pos.y + 1.6), back = rayBoxes(game.map, head, new THREE.Vector3(-f.x, 0.35, -f.z).normalize(), 4.6);
     const want = head.clone().add(new THREE.Vector3(-f.x, 0.35, -f.z).normalize().multiplyScalar(Math.max(0.8, back - 0.3)));
     P.cam = P.cam ? P.cam.lerp(want, Math.min(1, dt * 7)) : want.clone(); camera.position.copy(P.cam);
     const look = head.clone().addScaledVector(f, 5).setY(head.y - 0.1); P.look = P.look ? P.look.lerp(look, Math.min(1, dt * 8)) : look; camera.lookAt(P.look);
   }
   if (P.t >= P.end) stopPotg(true);
 }
+function potgPose(P) {
+  const ms = P.t * 1000, S = P.snaps; while (P.si + 1 < S.length && S[P.si + 1][0] <= ms) P.si++;
+  const A = S[P.si], B = S[P.si + 1]; if (!A) return;
+  const k = B ? Math.min(1, Math.max(0, (ms - A[0]) / (B[0] - A[0] || 1))) : 0;
+  for (const [id, a] of A[1]) {
+    const o = game.others.get(id); if (!o) continue;
+    const b = B?.[1].get(id) || a, far = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) > 4, u = far ? 0 : k; // 멀리 튀면(부활 · 순간이동) 잇지 않는다
+    const dy = Math.atan2(Math.sin(b[3] - a[3]), Math.cos(b[3] - a[3]));
+    o.set([a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u, a[3] + dy * k, a[4] + (b[4] - a[4]) * k, a[5]], true);
+  }
+}
+function skipPotg() { shell.send({ t: 'potgskip' }); stopPotg(true); }
 function stopPotg(backToCut) {
   const P = game.potg; if (!P) return;
   game.potg = null; game.myId = P.realId; game.clip = null; $('potg').classList.add('hidden');
@@ -1160,9 +1182,9 @@ function frame() {
     if (sendT <= 0 && me.alive) { sendT = 0.05; shell.send({ t: 'st', p: [me.pos.x, me.pos.y, me.pos.z, me.yaw, me.pitch, (me.crouch > 0.5 ? 1 : 0) | (Math.hypot(me.vel.x, me.vel.z) > 1 ? 2 : 0)] }); }
     hud(now);
   } else if (game.potg) {
+    updatePotg(dt); // 움직임을 먼저 정해야 캐릭터와 카메라가 같은 자리를 본다
     for (const o of game.others.values()) o.update(dt, t);
     updateProjs(dt); ents.update(dt);
-    updatePotg(dt);
   } else if (game.cut) {
     for (const o of game.others.values()) o.update(dt, t);
     updateCut(dt);
