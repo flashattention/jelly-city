@@ -76,6 +76,7 @@ export class CosFx {
     if (fx('back')) this.back(fx('back'));
     if (fx('sash')) this.sash(fx('sash'));
     if (fx('crown')) this.crown(fx('crown'));
+    if (fx('sash') && r.opts?.cosBadge) this.badge(itemById.get(this.cos.sash), !!this.cos.crown);
     for (const s of ['trail', 'jump', 'boost', 'land']) if (fx(s)) this.sprays[s] = new Spray(r.root, fx(s), s === 'trail' || s === 'boost' ? 60 : (fx(s).n || 16) + 8);
   }
   attach(parent, build) { const g = new THREE.Group(); parent.add(g); this.parts.push(g); build(g); return g; }
@@ -143,6 +144,16 @@ export class CosFx {
       this.anim.push((dt, t) => { g.rotation.y = t * 0.7; g.position.y = y0 + Math.sin(t * 2) * 0.04; halo.opacity = 0.45 + Math.abs(Math.sin(t * 2.2)) * 0.4; halo.color.copy(paint('rainbow', t)); gold.emissiveIntensity = 0.55 + Math.abs(Math.sin(t * 3)) * 0.5;
         for (const q of sp) { const a = q.a + t * 1.6; q.o.position.set(Math.cos(a) * 0.5, 0.15 + Math.sin(a * 2) * 0.22, Math.sin(a) * 0.5); q.o.scale.setScalar(0.05 + Math.max(0, Math.sin(t * 7 + q.a * 4)) * 0.16); q.m.color.copy(paint('rainbow', t, q.a)); } });
     });
+  }
+  // 머리 위에 착용 중인 휘장 이름표 (드림 러너). 등급에 맞춰 빛나고, 전설은 무지개로 돈다
+  badge(it, crown) {
+    const f = it.fx, c = document.createElement('canvas'); c.width = 512; c.height = 96; const x = c.getContext('2d'), text = it.name.replace(/ 휘장$/, ''); x.font = 'bold 40px Jua, sans-serif'; const tw = Math.min(452, x.measureText(`🎗️ ${text}`).width), w = tw + 44, l = (512 - w) / 2;
+    x.beginPath(); x.roundRect(l, 12, w, 72, 36); x.fillStyle = 'rgba(16,10,36,.86)'; x.fill(); x.lineWidth = 5; x.strokeStyle = f.tierColor; x.stroke(); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#ffffff'; x.fillText(`🎗️ ${text}`, 256, 50, 452);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const m = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }), sp = new THREE.Sprite(m), H = crown ? 3.75 : 3.05; sp.scale.set(2.9, 0.54, 1); sp.position.y = H;
+    const gm = new THREE.SpriteMaterial({ map: texOf('glow'), color: f.tierColor, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), gl = new THREE.Sprite(gm); gl.scale.set(Math.min(3.4, (w / 512) * 3.6), 0.9, 1); gl.position.y = H - 0.001;
+    this.attach(this.groups, (g) => { g.add(gl, sp); });
+    this.anim.push((dt, t) => { gm.opacity = 0.35 + Math.abs(Math.sin(t * 2.4)) * (0.2 + f.tier * 0.08); if (f.rainbow) gm.color.copy(paint('rainbow', t)); });
   }
   // 터지는 효과: jump · land (드림 러너가 부른다)
   fire(name) {

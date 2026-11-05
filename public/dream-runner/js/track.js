@@ -107,7 +107,7 @@ export class Track {
   }
   // opt.map: 'hell' 이면 랜덤 지옥 · opt.K: 난이도 빠르기 (지옥 길은 시간 기준이라 빠를수록 길어진다)
   reset(seed, itemMode = false, opt = {}) {
-    this.itemMode = itemMode; this.hell = opt.map === 'hell'; this.K = opt.K || 1; this.strikes = []; this.nextStrike = 0; this.lastFloor = 0;
+    this.itemMode = itemMode; this.hell = opt.map === 'hell'; this.K = opt.K || 1; this.strikes = []; this.nextStrike = 0; this.lastFloor = 0; this.trend = 0; this.lastPat = '';
     this.irng = new RNG(seed ^ 0x2545f491); // 아이템 상자 자리 (길 모양과 따로라서 스피드전 길이 바뀌지 않는다)
     this.nextBox = 120;
     for (const c of [...this.root.children]) this.drop(c);
@@ -245,7 +245,7 @@ export class Track {
     const gap = this.gs > 0 ? v * 0.22 : 0;
     const s0 = this.gs + gap;
     this.dream++;
-    this.bounds.push(s0 + 14);
+    this.bounds.push(s0 + 14); this.trend = 0;
     this.nextB = s0 + 14 + DREAM_SEC * v;
     this.cx *= 0.5;
     const len = this.hell ? Math.max(34, v * 0.8) : 34; // 빠른 난이도의 지옥은 숨 돌릴 자리도 같은 시간만큼
@@ -336,37 +336,94 @@ export class Track {
   // ---------- 랜덤 지옥 ----------
   //   길이는 시간으로 정한다: 빠른 난이도에서도 2단 점프 · 낙하에 걸리는 시간이 맞도록 빠르기(vv)만큼 늘린다
   hellPattern() {
-    const r = this.rng, th = this.themeOf(this.dream), vv = speedAt(this.gs) * this.K, tf = (1.25 / this.K ** 0.25) * (1 - Math.min(1, this.gs / vv / 150) * 0.12);
-    const W = () => Math.max(3.8, 8.5 + r.range(-1.5, 1) - Math.min(1, this.gs / vv / 150) * 2.5);
-    if (th.layout === 'climb') this.hellClimb(r, vv, tf, W); else this.hellPlunge(r, vv, tf, W);
+    const r = this.rng, th = this.themeOf(this.dream), vv = speedAt(this.gs) * this.K, late = Math.min(1, this.gs / vv / 150), tf = (1.25 / this.K ** 0.25) * (1 - late * 0.12);
+    const W = () => Math.max(3.8, 8.5 + r.range(-1.5, 1) - late * 2.5), y0 = this.cy;
+    // 지옥마다 성격은 있지만 한쪽으로만 가지 않는다: 많이 올랐으면 떨어지고, 많이 떨어졌으면 오른다 · 같은 무늬는 연달아 안 나온다
+    const up = th.layout === 'climb' ? 2.4 : 0.9, down = th.layout === 'plunge' ? 2.4 : 0.9, tr = this.trend || 0, U = tr > 9 ? 0 : up, D = tr < -22 ? 0 : down;
+    const table = [['stair', U], ['zig', U * 0.8], ['narrow', late > 0.15 ? U * 0.6 : 0], ['drop', D], ['steps', D * 0.8], ['needle', late > 0.1 ? D * 0.6 : 0], ['twinDrop', D * 0.9], ['wave', 2], ['fork', 2.2], ['gauntlet', 3.4], ['slalom', 1.6], ['mover', late > 0.05 ? 1.4 : 0.5], ['rest', 2.2]];
+    const pick = r.weighted(table.map(([k, w]) => [k, k === this.lastPat ? 0 : w]), (x) => x[1])[0]; this.lastPat = pick;
+    const start = this.gs, at = this[`hp_${pick}`](r, vv, tf, W); (this.patLog ||= []).push([start, pick]); if (this.patLog.length > 60) this.patLog.shift();
+    this.gs = at; this.trend = tr + this.cy - y0;
   }
-  // 올라가는 지옥: 2단 점프로만 닿는 높이 (턱은 1.3m 까지 훌쩍 올라서므로 3.6m 부터는 한 번 점프로 안 된다)
-  hellClimb(r, vv, tf, W) {
-    let at = this.gs; const gap = vv * tf * 0.36, len = vv * tf * 0.62;
-    const pick = r.weighted([['stair', 4], ['zig', 3], ['narrow', 2], ['rest', 2.4]], (x) => x[1])[0];
-    if (pick === 'rest') { this.gs = this.hellRest(r, vv, tf, W()); return; }
-    for (let i = 0, n = r.int(3, 6); i < n; i++) {
+  // 길 위 장애물: 뛰어넘기 · 숙이기 · 옆으로 피하기를 섞는다. 다음 조작까지 시간 간격을 지킨다
+  hellObstacles(r, vv, s0, s1, cx, w, y, every = 1) {
+    let at = s0;
+    while (at < s1 - vv * 1) { // 뛰어넘어도 길 안에 내려앉도록 끝에는 안 놓는다
+      const kinds = w >= 6 ? ['hurdle', 'bar', 'wall', 'lanes', 'wall', 'lanes'] : w >= 4.6 ? ['hurdle', 'bar', 'wall'] : ['hurdle', 'bar'], k = r.pick(kinds), L = cx - w / 2, R = cx + w / 2;
+      if (k === 'hurdle') this.obstacle('hurdle', at, L, R, y, y + r.range(0.5, 0.7));
+      else if (k === 'bar') this.obstacle('bar', at, L, R, y + 1, y + 2, 0.5);
+      else if (k === 'wall') { const half = w * r.range(0.5, 0.62), right = r.chance(0.5); this.obstacle('wall', at, right ? R - half : L, right ? R : L + half, y, y + 1.5, 1.2); this.star(at, right ? L + (w - half) / 2 : R - (w - half) / 2, y + 1); }
+      else { const lane = r.range(L + 1.3, R - 1.3); if (lane - 0.8 > L) this.obstacle('hurdle', at, L, lane - 0.8, y, y + 0.45, 1.2); if (lane + 0.8 < R) this.obstacle('hurdle', at, lane + 0.8, R, y, y + 0.45, 1.2); this.star(at, lane, y + 1); }
+      at += vv * r.range(0.95, 1.35) * every;
+    }
+  }
+  // 장애물 몰이: 길게 달리며 연달아 피한다 (별은 피하는 자리에)
+  hp_gauntlet(r, vv, tf, W) { const w = Math.max(5.5, W()), len = vv * tf * r.range(4, 6), p = this.plat(this.gs, this.gs + len, this.cx, w, this.cy); this.hellObstacles(r, vv, p.s0 + vv * 0.7, p.s1, this.cx, w, this.cy, 0.85); return p.s1; }
+  // 2단 점프로만 닿는 계단 (턱은 1.3m 까지 훌쩍 올라서므로 3.6m 부터는 한 번 점프로 안 된다)
+  hellSteps(r, vv, tf, at, n, opt = {}) {
+    const gap = vv * tf * 0.36, len = vv * tf * 0.62;
+    for (let i = 0; i < n; i++) {
       const y0 = this.cy, x0 = this.cx; at += gap; this.cy += r.range(3.6, 4);
-      if (pick === 'zig') this.cx = Math.max(-12, Math.min(12, this.cx + (i % 2 ? 1 : -1) * r.range(3, 5)));
-      else this.cx = Math.max(-12, Math.min(12, this.cx + r.range(-1.5, 1.5)));
-      const w = pick === 'narrow' ? r.range(3.4, 4.2) : pick === 'zig' ? r.range(4.4, 5.6) : W();
-      this.plat(at, at + len, this.cx, w, this.cy, { thin: pick !== 'stair' });
-      this.starArc(at - gap, at + len * 0.3, x0, y0 + 2.4, this.cy, this.cx);
+      if (opt.zig) this.cx = Math.max(-12, Math.min(12, this.cx + (i % 2 ? 1 : -1) * r.range(3, 5))); else this.cx = Math.max(-12, Math.min(12, this.cx + r.range(-1.5, 1.5)));
+      this.plat(at, at + len, this.cx, opt.w ? opt.w() : r.range(5, 8), this.cy, { thin: !!opt.zig || !!opt.narrow });
+      // 별: 2단 점프로 올라가는 길 위에 (턱에 닿기 0.5초 전 뛰면 지나가는 자리) + 내려선 발판 위에
+      [[0.46, 1.5], [0.3, 2.5], [0.14, 3.2]].forEach(([b, h], q) => this.star(at - vv * b, x0 + (this.cx - x0) * ((q + 1) / 3), y0 + h - 1 + 1));
+      this.star(at + len * 0.25, this.cx, this.cy + 1);
       at += len;
     }
-    this.gs = at;
+    return at;
   }
+  hp_stair(r, vv, tf) { return this.hellSteps(r, vv, tf, this.gs, r.int(2, 3)); }
+  hp_zig(r, vv, tf) { return this.hellSteps(r, vv, tf, this.gs, r.int(2, 4), { zig: true, w: () => r.range(4.4, 5.6) }); }
+  hp_narrow(r, vv, tf) { return this.hellSteps(r, vv, tf, this.gs, r.int(2, 3), { narrow: true, w: () => r.range(3.4, 4.2) }); }
   // 떨어지는 지옥: 까마득히 아래 있는 발판에 정확히 내려앉는다 (공중에서 좌우로 맞춘다)
-  hellPlunge(r, vv, tf, W) {
-    const pick = r.weighted([['drop', 4], ['steps', 3], ['needle', 2.4], ['rest', 2]], (x) => x[1])[0];
-    if (pick === 'rest') { this.gs = this.hellRest(r, vv, tf, W()); return; }
+  hellRun(vv, tf, w) { const run = this.plat(this.gs, this.gs + vv * tf * 0.55, this.cx, w, this.cy); return run.s1; }
+  hp_drop(r, vv, tf, W) { return this.hellDrop(r, vv, this.hellRun(vv, tf, W()), r.range(14, 26), r.range(3, 8) * r.pick([-1, 1]), W(), 1.2); }
+  hp_steps(r, vv, tf, W) { let at = this.hellRun(vv, tf, W()); for (let i = 0, n = r.int(2, 4); i < n; i++) at = this.hellDrop(r, vv, at, r.range(7, 12), r.range(3, 6) * (i % 2 ? 1 : -1), r.range(4.4, 5.6), 0.85); return at; }
+  hp_needle(r, vv, tf, W) { return this.hellDrop(r, vv, this.hellRun(vv, tf, W()), r.range(26, 38), r.range(5, 9) * r.pick([-1, 1]), r.range(3.6, 4.6), 1.3); }
+  // 파도: 올라갔다 떨어지기를 되풀이한다
+  hp_wave(r, vv, tf) {
     let at = this.gs;
-    const run = this.plat(at, at + vv * tf * 0.55, this.cx, W(), this.cy); at = run.s1;
-    if (pick === 'steps') {
-      for (let i = 0, n = r.int(3, 4); i < n; i++) at = this.hellDrop(r, vv, at, r.range(8, 13), r.range(3, 6) * (i % 2 ? 1 : -1), r.range(4.4, 5.6), 0.85);
-    } else if (pick === 'needle') at = this.hellDrop(r, vv, at, r.range(30, 42), r.range(5, 9) * r.pick([-1, 1]), r.range(3.6, 4.6), 1.3);
-    else at = this.hellDrop(r, vv, at, r.range(16, 30), r.range(3, 8) * r.pick([-1, 1]), W(), 1.2);
-    this.gs = at;
+    for (let i = 0, n = r.int(2, 3); i < n; i++) { at = this.hellSteps(r, vv, tf, at, 2, { w: () => r.range(4.6, 6.5) }); at = this.hellDrop(r, vv, at, r.range(6, 9.5), r.range(3, 6) * (i % 2 ? 1 : -1), r.range(4.6, 6), 0.8); }
+    return at;
+  }
+  // 갈림길: 낮은 길은 쉽지만 별이 적고, 높은 길은 2단 점프 두 번에 별이 잔뜩 있다 (실력껏 고른다)
+  hp_fork(r, vv, tf) {
+    const y = this.cy, cx = this.cx, entry = this.plat(this.gs, this.gs + vv * tf * 0.9, cx, 16, y), side = r.chance(0.5) ? 1 : -1, xA = cx - side * 6, xB = cx + side * 6, gap = vv * tf * 0.36, len = vv * tf * 0.62;
+    this.star(entry.s0 + vv * tf * 0.45, xB, y + 1); this.star(entry.s0 + vv * tf * 0.6, xB, y + 1); // 높은 길 쪽을 알려 준다
+    let at = entry.s1, py = y;
+    for (let i = 0; i < 2; i++) { at += gap; py += r.range(3.6, 4); this.plat(at, at + len, xB, 5, py, { thin: true }); for (let k = 0; k < 4; k++) this.star(at + (len * (k + 0.5)) / 4, xB, py + 1); at += len; }
+    const tF = (-14 + Math.sqrt(196 + 60 * (py - y))) / 30, merge = at + vv * tF * 0.92, low = this.plat(entry.s1, merge, xA, 5.2, y);
+    const mid = entry.s1 + (merge - entry.s1) * 0.55; this.obstacle('hurdle', mid, xA - 2.6, xA + 2.6, y, y + 0.6);
+    this.star(entry.s1 + (merge - entry.s1) * 0.2, xA, y + 1);
+    const m = this.plat(merge, merge + vv * tf * 2.6, cx, 18, y); this.hellObstacles(r, vv, merge + vv * 1.1, m.s1, cx, 10, y); void low; return m.s1;
+  }
+  // 고르는 낙하: 넓은 발판은 안전하고, 좁은 발판에는 별 더미가 있다
+  hp_twinDrop(r, vv, tf, W) {
+    const edge = this.hellRun(vv, tf, W()), h = r.range(14, 24), side = r.chance(0.5) ? 1 : -1, tW = Math.sqrt(2 * h / 30), tF = (-14 + Math.sqrt(196 + 60 * h)) / 30, y = this.cy - h, cx = this.cx, s0 = edge + vv * tF * 0.92, s1 = s0 + vv * (tW - tF * 0.92 + 1.1);
+    const reach = Math.min(8.5 * tW * 0.7, 11), xS = cx - side * Math.min(5, reach * 0.6), xR = cx + side * reach;
+    this.plat(s0, s1, xS, 7, y, { beacon: true, thin: true }); this.plat(s0, s1, xR, r.range(3.2, 3.8), y, { beacon: true, thin: true });
+    for (let i = 0; i < 6; i++) this.star(s0 + (s1 - s0) * (0.45 + (i % 3) * 0.1) + i * 0.1, xR + ((i % 3) - 1) * 0.8, y + 1 + (i >> 1) % 2);
+    this.dropStars(vv, edge, cx, y + h, xR, h); // 위험한 쪽으로 점프해 떨어지면 별이 이어진다
+    this.cy = y; const m = this.plat(s1, s1 + vv * tf * 2.4, cx, 18, y); this.hellObstacles(r, vv, s1 + vv * 0.7, m.s1, cx, 10, y); return m.s1;
+  }
+  // 지그재그: 좌우로 뛰어 건넌다
+  hp_slalom(r, vv, tf) {
+    let at = this.gs, s = r.chance(0.5) ? 1 : -1; const len = vv * 0.82, gap = vv * 0.22; // 한 번 점프(0.77초)로 다음 발판 안에 내린다
+    for (let i = 0, n = r.int(4, 6); i < n; i++, s = -s) { at += gap; this.cx = Math.max(-11, Math.min(11, this.cx + s * r.range(3.2, 5))); this.plat(at, at + len, this.cx, 4.4, this.cy, { thin: true }); this.star(at + len / 2, this.cx, this.cy + 1); if (i % 2) this.star(at - gap / 2, this.cx, this.cy + 2.6); at += len; }
+    return at;
+  }
+  // 움직이는 발판: 때를 봐서 건넌다
+  hp_mover(r, vv, tf) {
+    let at = this.gs; const len = vv * 0.82, gap = vv * 0.22;
+    for (let i = 0, n = r.int(3, 4); i < n; i++) { at += gap; this.plat(at, at + len, this.cx, 4.6, this.cy, { thin: true, mv: { amp: r.range(1.6, 3), f: r.range(0.9, 1.4), ph: r.range(0, 6) } }); this.star(at + len / 2, this.cx, this.cy + 1); at += len; }
+    const m = this.plat(at + gap, at + gap + vv * tf * 0.7, this.cx, 9, this.cy); return m.s1;
+  }
+  hp_rest(r, vv, tf, W) { return this.hellRest(r, vv, tf, W()); }
+  // 별: 끝에서 점프해야 지나가는 포물선 위에 놓는다 (그냥 걸어 떨어지면 훨씬 아래로 지나가서 놓친다)
+  dropStars(vv, edge, x0, y0, x1, h) {
+    const lead = 0.08, tEnd = (11.5 + Math.sqrt(132.25 + 60 * Math.max(0, h - 0.8))) / 30, n = Math.max(5, Math.min(10, Math.round(tEnd * 6)));
+    for (let i = 1; i <= n; i++) { const t = (tEnd * i) / n, k = Math.min(1, t / tEnd); this.star(edge - vv * lead + vv * t, x0 + Math.sign(x1 - x0) * Math.min(Math.abs(x1 - x0), 8.2 * t), y0 + 11.5 * t - 15 * t * t + 0.75); void k; }
   }
   // 낙하 한 번. 그냥 떨어지면 시작 부근에, 가장 늦게(2단 점프 후) 떨어져도 끝 안쪽에 내린다
   hellDrop(r, vv, edge, h, off, w, stay) {
@@ -374,8 +431,8 @@ export class Track {
     this.cy -= h; this.cx = Math.max(-14, Math.min(14, this.cx + Math.sign(off) * Math.min(Math.abs(off), 8.5 * tWalk * 0.65)));
     const s0 = edge + vv * tFast * 0.92, s1 = s0 + vv * (tWalk - tFast * 0.92 + stay);
     this.plat(s0, s1, this.cx, w, this.cy, { beacon: true, thin: true });
-    // 별사탕이 떨어지는 길을 알려 준다
-    for (let i = 1, n = Math.max(4, Math.min(9, Math.round(h / 4))); i <= n; i++) { const t = (tWalk * i) / n; this.star(edge + vv * t, x0 + (this.cx - x0) * (i / n), y0 - 15 * t * t + 0.8); }
+    { const tJump = (11.5 + Math.sqrt(132.25 + 60 * h)) / 30, safe = edge + vv * (tJump + 0.5); if (s1 - safe > vv * 0.6) this.hellObstacles(r, vv, safe, s1, this.cx, w, this.cy); } // 어떻게 떨어져도 내린 뒤 숨 돌릴 틈을 두고
+    this.dropStars(vv, edge, x0, y0, this.cx, h);
     return s1;
   }
   // 넓은 길: 괴물이 내리치는 자리
@@ -388,9 +445,11 @@ export class Track {
       return c.s1;
     }
     const p = this.plat(at, at + len, this.cx, w, this.cy);
+    if (!kind) this.hellObstacles(r, vv, at + vv * 0.6, p.s1, this.cx, w, this.cy);
     if (kind) { this.strike(kind, at + len * 0.3, this.cx, w, this.cy); // 피한 뒤 다음 점프까지 숨 돌릴 시간을 남긴다
       this.nextStrike = p.s1 + vv * r.range(3.5, 6.5); }
     this.starLine(at + len * 0.5, at + len * 0.8, this.cx, this.cy, 3);
+    for (let i = 0; i < 5; i++) this.star(at + len * (0.55 + i * 0.07), this.cx, this.cy + 3.6); // 2단 점프해야 닿는 보너스
     return p.s1;
   }
   // 괴물이 내리치는 자리: 판정은 그 자리에 늘 있다 (곰돌이가 닿기 전에 반드시 먼저 떨어지니 누구에게나 같다)

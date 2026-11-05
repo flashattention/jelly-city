@@ -75,7 +75,7 @@ function opaque(m) {
   return c;
 }
 export function makeBear(p = {}) {
-  const r = new Roach({ own: true, seed: p.name || 'dream', color: p.color || '#8a5634', age: 25, gender: p.gender, look: p.look, accessories: p.acc || [] });
+  const r = new Roach({ own: true, cosBadge: true, seed: p.name || 'dream', color: p.color || '#8a5634', age: 25, gender: p.gender, look: p.look, accessories: p.acc || [] });
   r.root.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.material = Array.isArray(o.material) ? o.material.map(opaque) : opaque(o.material); } });
   r.bodyM = opaque(r.bodyM);
   return r;

@@ -241,8 +241,18 @@ for (const b of $('room-team').children) b.onclick = () => net.send({ t: 'team',
 $('team-btn').onclick = () => net.send({ t: 'switch' });
 game.boardMode = 'speed';
 for (const b of $('board-mode').children) b.onclick = async () => { game.boardMode = b.dataset.m; segSet('board-mode', game.boardMode); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
-$('board-btn').onclick = async () => { game.boardMode = game.pickMode; game.boardDiff = game.pickDiff; game.boardMap = game.pickMap; segSet('board-map', game.boardMap); segSet('board-mode', game.boardMode); segSet('board-diff', game.boardDiff); show('board'); renderMyStats(); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff)); };
+$('board-btn').onclick = async () => { game.boardMode = game.pickMode; game.boardDiff = game.pickDiff; game.boardMap = game.pickMap; segSet('board-map', game.boardMap); segSet('board-mode', game.boardMode); segSet('board-diff', game.boardDiff); show('board'); renderAdmin(); renderMyStats(); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff)); };
 $('board-close').onclick = () => show('title');
+// 운영자: 확인 대기 기록 승인 · 거절, 수상한 기록 삭제
+async function renderAdmin(d) {
+  const el = $('board-admin'); if (!account.admin) { el.innerHTML = ''; return; }
+  try { d ||= await account.api('/api/dream/admin/list'); } catch { return; }
+  const row = (t, btns) => `<div class="brow"><span class="nm">${t}</span>${btns}</div>`, act = (u, b) => async () => { renderAdmin(await account.api(`/api/dream/admin/${u}`, { method: 'POST', body: b })); };
+  el.innerHTML = `<h3>🛡️ 기록 확인 · 정상 ${d.stat.ok} / 불일치 ${d.stat.bad} / 기록 없음 ${d.stat.none}</h3>` + d.pending.map((p) => row(`${esc(p.e.name)} ${p.e.score.toLocaleString()}점 ${esc(p.diff)} ${esc(p.map)} (${esc(p.why)}${p.r ? ` · 재생 ${p.r.dist}m ★${p.r.stars}` : ''})`, `<button class="mini" data-a="${esc(p.id)}">승인</button><button class="mini" data-x="${esc(p.id)}">거절</button>`)).join('') + d.flagged.slice(0, 30).map((f) => row(`⚠️ ${esc(f.name)} ${f.score.toLocaleString()}점 ${esc(f.t)} (${esc(f.u)})`, `<button class="mini" data-s="${esc(f.sub)}" data-t="${esc(f.t)}">삭제 · 별 몰수</button>`)).join('');
+  for (const b of el.querySelectorAll('[data-a]')) b.onclick = act('approve', { id: b.dataset.a });
+  for (const b of el.querySelectorAll('[data-x]')) b.onclick = act('reject', { id: b.dataset.x });
+  for (const b of el.querySelectorAll('[data-s]')) b.onclick = () => { if (confirm('이 기록을 지우고 드림 러너 업적과 별을 거둘까요?')) act('remove', { sub: b.dataset.s, t: b.dataset.t })(); };
+}
 $('home-btn').onclick = () => { if (game.multi) { net.send({ t: 'leave' }); game.multi = false; } toTitle(); };
 $('again-btn').onclick = () => { if (game.multi) { leaveRun(); show('room'); } else startSolo(); };
 
@@ -259,7 +269,7 @@ async function renderMyStats() {
 // 달린 판수 · 시간 올리기 (한 판에 한 번, 서버 점검 중이면 다시 시도). 나갈 때는 페이지가 닫혀도 전해지게 한다
 function reportPlay(leaving) {
   if (game.playSent || game.runT < 3) return; game.playSent = true;
-  const body = { time: game.runT, diff: game.diff, map: game.map, stars: runner.stars, dist: Math.floor(runner.s), anon: logged() ? undefined : anonId() };
+  const body = { time: game.runT, diff: game.diff, map: game.map, stars: runner.stars, dist: Math.floor(runner.s), tk: game.tk || undefined, anon: logged() ? undefined : anonId() };
   if (leaving) { fetch('/api/dream/played', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', ...(account.session ? { Authorization: `Bearer ${account.session}` } : {}) }, body: JSON.stringify(body) }).catch(() => {}); return; }
   (async () => { for (let i = 0; i < 100; i++) { try { await account.api('/api/dream/played', { method: 'POST', body }); return; } catch (e) { if (e.status && e.status < 500) return; await new Promise((ok) => setTimeout(ok, 3000)); } } })();
 }
@@ -287,6 +297,8 @@ function newRun(seed, itemMode = false, diff = 'easy', map = 'dream') {
   env.fogK = game.map === 'hell' ? Math.max(1, (K / 1.9) ** 0.7) : 1;
   track.reset(seed, itemMode, { map: game.map, K });
   game.camFall = 0; game.shake = 0; env.underY = undefined; game.underY = -13;
+  game.rp = !itemMode && !game.multi ? { dts: [], evs: [], last: -1 } : null; game.dtCarry = 0;
+  game.tkP = game.mode === 'title' && !game.starting ? null : getTicket(seed, itemMode, game.diff, game.map);
   runner.reset(0, 0);
   runner.multi = game.multi;
   renderItems(true);
@@ -298,9 +310,18 @@ function newRun(seed, itemMode = false, diff = 'easy', map = 'dream') {
   $('t-item').classList.toggle('hidden', !itemMode);
   $('itembar').classList.toggle('hidden', !itemMode);
 }
+// 출발표: 기다리지 않고 뒤에서 받아 둔다. 못 받아도 게임은 그대로 할 수 있다
+function getTicket(seed, itemMode, diff, map) { return account.api('/api/dream/run', { method: 'POST', body: { seed, diff, map, mode: itemMode ? 'item' : 'speed' } }).then((r) => { game.tk = r.tk; return r.tk; }).catch(() => null); }
+async function encodeReplay(R) {
+  if (!R || !R.dts.length) return null;
+  const text = `${R.dts.join(',')}|${R.evs.join(',')}`;
+  if (typeof CompressionStream !== 'function') return text.length < 600000 ? { d: text } : null;
+  try { const buf = new Uint8Array(await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()); let s = ''; for (let i = 0; i < buf.length; i += 8192) s += String.fromCharCode(...buf.subarray(i, i + 8192)); return { z: 1, d: btoa(s) }; } catch { return text.length < 600000 ? { d: text } : null; }
+}
 function startSolo() {
-  game.multi = false; game.team = false; $('teambar').classList.add('hidden');
+  game.multi = false; game.team = false; $('teambar').classList.add('hidden'); game.starting = true; game.tk = null;
   newRun((Math.random() * 2 ** 31) | 0, game.pickMode === 'item', game.pickDiff, game.pickMap);
+  game.starting = false;
   countdown(3000);
 }
 function countdown(ms) {
@@ -336,10 +357,12 @@ function score() { return Math.floor(runner.s) + runner.stars * 10; }
 async function died(why) {
   sfx(why.includes('떨어') ? 'die' : 'bonk');
   game.mode = 'dead'; game.deadT = 0; game.why = why;
+  const rpNow = game.rp; game.rp = null;
   reportPlay();
-  const rec = { dist: Math.floor(runner.s), stars: runner.stars, themes: game.dreamsSeen, time: game.runT, name: game.profile.name, color: game.profile.color, mode: game.itemMode ? 'item' : 'speed', diff: game.diff, map: game.map };
+  const rec = { dist: Math.floor(runner.s), stars: runner.stars, themes: game.dreamsSeen, time: game.runT, name: game.profile.name, color: game.profile.color, mode: game.itemMode ? 'item' : 'speed', diff: game.diff, map: game.map, seed: game.seed, multi: game.multi || undefined };
   if (game.multi) net.send({ t: 'dead', dist: rec.dist, stars: rec.stars, why });
   game.rec = rec;
+  rec.tk = await Promise.race([game.tkP, new Promise((ok) => setTimeout(ok, 800))]) || game.tk || undefined; rec.replay = await encodeReplay(rpNow) || undefined;
   if (!logged()) { game.submitted = { anonPending: true }; return; } // 비로그인: 탈락 화면에서 임시 닉네임을 정해 남긴다
   try { game.submitted = await postScore(rec, () => { if (game.submitted === null) game.submitted = { waiting: true }; }); } catch (e) { game.submitted = { error: e.message }; }
   if (game.mode === 'over' && !game.multi && game.rec === rec) showOver(); // 점검이 끝나 늦게 올라갔으면 결과 화면을 고친다
@@ -361,7 +384,7 @@ async function showOver() {
   const r = game.submitted;
   $('ov-save').classList.toggle('hidden', !r?.anonPending);
   if (r?.anonPending) { $('ov-nick').value = store.get(NICK_KEY) || game.profile.name; $('ov-save-btn').disabled = false; }
-  $('ov-best').textContent = r?.waiting ? '🔧 서버 점검 중이에요 · 끝나면 기록을 자동으로 올려요' : r?.error ? `기록을 올리지 못했어요 (${r.error})` : r?.newBest ? `🎉 내 최고 기록! 전체 ${r.me?.rank}위` : r?.me ? `내 최고 ${r.me.score.toLocaleString()}점 · 전체 ${r.me.rank}위` : '';
+  $('ov-best').textContent = r?.pending ? '🔍 기록을 확인하고 있어요 · 확인되면 순위표에 올라가요' : r?.waiting ? '🔧 서버 점검 중이에요 · 끝나면 기록을 자동으로 올려요' : r?.error ? `기록을 올리지 못했어요 (${r.error})` : r?.newBest ? `🎉 내 최고 기록! 전체 ${r.me?.rank}위` : r?.me ? `내 최고 ${r.me.score.toLocaleString()}점 · 전체 ${r.me.rank}위` : '';
   if (r?.anonPending) $('ov-best').textContent = '';
   if (r?.newBest) sfx('best');
   $('again-btn').textContent = game.multi ? '👥 방으로 돌아가기' : '🔁 다시 달리기';
@@ -543,10 +566,10 @@ net.on('room', (m) => { game.room = m.room; game.members = m.members; chat.rende
 net.on('left', () => { chat.show(false); const was = game.room; game.room = null; if (!game.multi || !was) return; afterLeave(); });
 net.on('start', (m) => {
   game.members = m.members;
-  game.team = !!m.team;
+  game.team = !!m.team; game.tk = null; game.starting = true;
   game.myTeam = m.members.find((x) => x.id === game.myId)?.team;
   game.endAt = performance.now() + m.in + (m.dur || 180) * 1000; game.respawnT = 0;
-  newRun(m.seed, m.mode === 'item', m.diff, m.map);
+  newRun(m.seed, m.mode === 'item', m.diff, m.map); game.starting = false;
   for (const mem of m.members) if (mem.id !== game.myId) { const g = new Ghost(scene, game.team ? { ...mem, teamColor: TEAMS[mem.team]?.color } : mem); g.speedK = runner.speedK; game.ghosts.set(mem.id, g); }
   $('teambar').classList.toggle('hidden', !game.team);
   game.alive = m.members.length;
@@ -664,7 +687,8 @@ $('pn-btn').onclick = () => openPatchNotes();
 $('cos-btn').onclick = () => openWardrobe('shop', () => { renderAccount(); });
 function frame() {
   requestAnimationFrame(frame);
-  const dt = Math.min(0.05, clock.getDelta());
+  // 프레임 시간을 0.1ms 단위로 (기록과 똑같이 다시 돌릴 수 있게 · 몸으로 느낄 수 없는 차이)
+  const dtRaw = Math.min(0.05, clock.getDelta()) + (game.dtCarry || 0), dtT = Math.round(dtRaw * 10000), dt = dtT / 10000; game.dtCarry = dtRaw - dt;
   t += dt;
   readInput();
   const z = track.origin - runner.s;
@@ -692,6 +716,7 @@ function frame() {
     }
     if (game.mode === 'run') {
       game.runT += dt;
+      if (game.rp && game.rp.dts.length < 450000) { const R = game.rp, bits = (input.dir + 1) | (input.jump ? 4 : 0) | (input.slide ? 8 : 0) | (input.slideHeld ? 16 : 0); if (bits !== R.last) { R.evs.push(`${R.dts.length}:${bits}`); R.last = bits; } R.dts.push(dtT); } else if (game.rp) game.rp = null; // 이 판의 입력 기록
       // 빠를 때는 잘게 나눠 움직인다 (한 프레임에 장애물을 뛰어넘어 버리지 않게)
       const steps = Math.min(16, Math.max(1, Math.ceil(runner.v * dt / 0.6)));
       let why = null;
@@ -762,11 +787,11 @@ function followCamera(dt) {
   game.camK += ((game.camLow ? 1 : 0) - game.camK) * Math.min(1, dt * 6);
   const mix = (a, b) => a + (b - a) * game.camK, up = mix(CAM.high.up, CAM.low.up), back = mix(CAM.high.back, CAM.low.back), look = mix(CAM.high.look, CAM.low.look), ahead = mix(CAM.high.ahead, CAM.low.ahead);
   // 지옥: 바닥 높이가 계속 바뀐다 · 떨어지는 동안은 위에서 내려다봐서 내릴 곳이 보이게
-  const hell = track.hell, fl = hell ? track.deathY(s) + 6 : -6, falling = hell && !w && runner.alive && !runner.onGround && runner.vy < -6 ? Math.min(1, -runner.vy / 26) : 0;
-  game.camFall = (game.camFall || 0) + (falling - (game.camFall || 0)) * Math.min(1, dt * 5);
+  const hell = track.hell, fl = hell ? track.deathY(s) + 6 : -6, drop = hell && !w && runner.alive && !runner.onGround ? y - (fl + 10) : 0, falling = drop > 7 ? Math.min(1, (drop - 7) / 12) : 0; // 숙이기 · 작은 턱에는 시점이 흔들리지 않고, 까마득히 떨어질 때만 내려다본다
+  game.camFall = (game.camFall || 0) + (falling - (game.camFall || 0)) * Math.min(1, dt * 2.5);
   const cx = x * 0.85, cy = Math.max(y, fl) + up + game.camFall * 5;
   camera.position.x += (cx - camera.position.x) * k;
-  camera.position.y += (cy - camera.position.y) * (dead ? k * 0.3 : hell ? Math.min(1, k * 2.2) : k);
+  camera.position.y += (cy - camera.position.y) * (dead ? k * 0.3 : hell ? Math.min(1, k * 1.5) : k);
   camera.position.z = dead ? camera.position.z : z + back;
   camLook.set(x, Math.max(y, fl - 2) + look - game.camFall * 9, z - ahead);
   camera.lookAt(camLook);
