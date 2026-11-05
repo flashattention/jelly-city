@@ -144,7 +144,7 @@ const limited = (req) => {
 async function api(req, res, url) {
   const sid = (req.headers.authorization || '').replace(/^Bearer /, '');
   if (url.pathname === '/api/status') {
-    return json(res, 200, { llm: llmEnabled, model: MODEL, password: !!PASSWORD, players: world.players.size, multiplayer: true, googleClientId: GOOGLE_CLIENT_ID, devLogin: DEV_LOGIN });
+    return json(res, 200, { llm: llmEnabled, model: MODEL, password: !!PASSWORD, players: world.players.size, multiplayer: true, googleClientId: GOOGLE_CLIENT_ID, devLogin: DEV_LOGIN, replay: !!dreamBoard.pool?.ok });
   }
   if (url.pathname === '/api/login' && req.method === 'POST') {
     if (limited(req)) return json(res, 429, { error: '잠시 후 다시 시도해 주세요' });
