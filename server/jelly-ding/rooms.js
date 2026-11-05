@@ -37,7 +37,7 @@ export class DingRooms extends BaseRooms {
   onStart(r) {
     const R = rng(r.seed);
     for (let i = 0; i < (r.opts.bots || 0) && r.players.length < this.o.max; i++) {
-      r.players.push({ id: this.nextPid++, bot: true, name: BOT_NAMES[i], color: BOT_COLORS[i], look: null, acc: [], team: null, skill: 0.5 + R() * 0.5 });
+      r.players.push({ id: this.nextPid++, bot: true, name: BOT_NAMES[i], color: BOT_COLORS[i], look: null, acc: [], team: null, skill: 0.35 + R() * 0.55 });
     }
     const deck = makeDeck(R, r.opts.specials !== false), n = r.players.length, each = Math.floor(deck.length / n);
     r.players.forEach((p, i) => { p.deck = deck.slice(i * each, (i + 1) * each); p.pile = []; p.out = false; p.outAt = 0; p.rings = 0; p.good = 0; p.planV = -1; p.ringAt = 0; p.flipAt = 0; });
@@ -133,20 +133,21 @@ export class DingRooms extends BaseRooms {
     // 차례 시간이 지나면 저절로 뒤집는다 (템포 유지)
     if (g.turn && now >= g.turnEnd) return this.flip(r, g.turn, now);
     // 봇: 장면이 바뀔 때마다 한 번 판단 · 사람처럼 늦게 · 가끔 실수
-    const j = judge(this.tops(r), g.target);
+    //   보이는 카드가 많을수록 세는 데 오래 걸리고, 봇이 많을수록 조금씩 느슨해진다 (여럿 중 가장 빠른 봇이 너무 빨라지지 않게)
+    const tops = this.tops(r), j = judge(tops, g.target), crowd = r.players.filter((p) => p.bot && !p.out).length, seen = tops.filter((c) => c >= 0).length;
     for (const b of r.players) {
       if (!b.bot || b.out) continue;
       if (b.planV !== g.v) {
         b.planV = g.v; b.ringAt = 0;
         const sk = b.skill;
-        if (j.ok) { if (Math.random() < 0.55 + sk * 0.42) b.ringAt = now + (j.why === 'gold' ? 360 : 420) + Math.random() * (700 - sk * 350) + (1 - sk) * 300; }
-        else if (j.why === 'sour' && j.totals.includes(g.target)) { if (Math.random() < 0.12 * (1.15 - sk)) b.ringAt = now + 450 + Math.random() * 500; } // 시큼젤리 함정에 걸린다
-        else if (Math.random() < 0.022 * (1.3 - sk)) b.ringAt = now + 500 + Math.random() * 700; // 헛손질
+        if (j.ok) { if (Math.random() < 0.65 + sk * 0.3 - (crowd - 1) * 0.01) b.ringAt = now + (j.why === 'gold' ? 500 : 700 + seen * 80) * (1.25 - sk * 0.5) + (crowd - 1) * 30 + Math.random() * 600; }
+        else if (j.why === 'sour' && j.totals.includes(g.target)) { if (Math.random() < 0.3 * (1.15 - sk)) b.ringAt = now + 800 + Math.random() * 600; } // 시큼젤리 함정에 걸린다
+        else if (Math.random() < 0.03 * (1.3 - sk)) b.ringAt = now + 800 + Math.random() * 800; // 헛손질
         b.flipAt = 0;
       }
       if (b.ringAt && now >= b.ringAt) { b.ringAt = 0; this.ring(r, b, g.v, now); }
       if (g.turn === b && !g.rings.length) {
-        if (!b.flipAt) b.flipAt = Math.max(now + 420 + Math.random() * 650, b.ringAt ? b.ringAt + 150 : 0); // 칠 생각이면 먼저 치고 뒤집는다
+        if (!b.flipAt) b.flipAt = Math.max(now + 750 + Math.random() * 800, b.ringAt ? b.ringAt + 150 : 0); // 칠 생각이면 먼저 치고 뒤집는다
         else if (now >= b.flipAt) { b.flipAt = 0; this.flip(r, b, now); return; }
       }
     }
