@@ -26,7 +26,7 @@ export const account = {
     if (!this.session) return false;
     try {
       const me = await this.api('/api/me');
-      this.user = me.user; this.chars = me.chars || []; this.setCos(me.cos);
+      this.user = me.user; this.chars = me.chars || []; this.admin = !!me.admin; this.setCos(me.cos);
       return true;
     } catch (e) {
       if (e.status === 401) { this.session = null; store.set(SESSION_KEY, null); }

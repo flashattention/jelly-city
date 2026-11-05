@@ -38,8 +38,8 @@ export class Cosmetics {
     const recRow = (g, b) => { const k = `r:${g}:${b}`; if (!cache.has(k)) cache.set(k, rec(g)?.mine(b, sub) || null); return cache.get(k); };
     const ok = (r) => {
       switch (r.kind) {
-        case 'dream': { const m = dreamRow(r.map, r.diff); return !!m && m.rank <= r.rank && Object.keys(this.dream.table('speed', r.diff, r.map)).length >= MIN_FIELD[r.rank]; }
-        case 'dreamDist': return (this.dream?.table('speed', r.diff, r.map)?.[sub]?.dist || 0) >= r.value;
+        case 'dream': { const m = dreamRow(r.map, r.diff); return !!m && !this.dream.table('speed', r.diff, r.map)[sub]?.u && m.rank <= r.rank && Object.keys(this.dream.table('speed', r.diff, r.map)).length >= MIN_FIELD[r.rank]; }
+        case 'dreamDist': { const e = this.dream?.table('speed', r.diff, r.map)?.[sub]; return !!e && !e.u && e.dist >= r.value; }
         case 'starTotal': return u.total >= r.value;
         case 'record': { const m = recRow(r.game, r.board); return !!m && m.rank <= r.rank && Object.keys(rec(r.game).data[r.board] || {}).length >= MIN_FIELD[r.rank]; }
         case 'recordVal': { const m = recRow(r.game, r.board); return !!m && m.value >= r.value; }
@@ -55,6 +55,8 @@ export class Cosmetics {
     if (fresh.length) { u.fresh = [...(u.fresh || []), ...fresh].slice(-40); this.dirty = true; }
     return fresh;
   }
+  // 조작이 확인된 계정: 해당 업적을 거두고 별을 비운다 (남은 정상 기록으로 다시 계산)
+  punish(sub, prefix) { const u = this.users[sub]; if (!u) return; for (const id of Object.keys(u.ach)) if (id.startsWith(prefix) || id.startsWith('all.')) delete u.ach[id]; u.stars = 0; u.fresh = []; for (const [s, id] of Object.entries(u.equip)) if (!this.owns(sub, id)) delete u.equip[s]; this.dirty = true; this.refresh(sub); }
   pub(sub) {
     if (!sub) return { stars: 0, total: 0, owned: [], equip: {}, ach: {}, plays: {}, wins: {}, pvp: {}, fresh: [], best: {} };
     this.refresh(sub);
@@ -65,7 +67,7 @@ export class Cosmetics {
   buy(sub, id) {
     const it = itemById.get(id); if (!it?.shop) throw new Error('살 수 없는 물건이에요');
     const u = this.u(sub); if (u.owned.includes(id)) throw new Error('이미 가지고 있어요');
-    if (it.req && (this.dream?.table('speed', it.req.diff, it.req.map)?.[sub]?.dist || 0) < it.req.dist) throw new Error(`아직 살 수 없어요 (${reqText(it.req)})`);
+    if (it.req && (this.dream?.table('speed', it.req.diff, it.req.map)?.[sub]?.u || (this.dream?.table('speed', it.req.diff, it.req.map)?.[sub]?.dist || 0) < it.req.dist)) throw new Error(`아직 살 수 없어요 (${reqText(it.req)})`);
     if (u.stars < it.price) throw new Error('별이 모자라요');
     u.stars -= it.price; u.owned.push(id); this.dirty = true;
   }
