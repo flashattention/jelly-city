@@ -30,6 +30,11 @@ function hexTex() {
 }
 export const TEAM_COL = { red: '#ff5a7a', blue: '#4cc3ff' };
 
+// 활 몸체: 가운데가 앞(-z)으로 나오고 끝은 다시 앞으로 젖혀진 곡선 (span: 끝까지의 높이)
+function bowCurve(span, r) {
+  const pts = [[1, -0.02], [0.88, 0.05], [0.55, -0.06], [0.18, -0.17], [-0.18, -0.17], [-0.55, -0.06], [-0.88, 0.05], [-1, -0.02]].map(([y, z]) => new THREE.Vector3(0, y * span, z));
+  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, r, 8);
+}
 // ---------- 3인칭 영웅 곰돌이 ----------
 //   손 무기는 roach 에 있는 것은 그대로, 없는 것(망치 · 지팡이 · 캐논 …)은 여기서 만든다
 function customHeld(bear, kind, col) {
@@ -40,6 +45,7 @@ function customHeld(bear, kind, col) {
   else if (kind === 'cannons') { part(g, BOX, m, 0, -0.25, 0, 0.3, 0.6, 0.3); part(g, CYL, dark, 0, -0.65, 0, 0.09, 0.4, 0.09); bear.heldPose = 'heavy'; }
   else if (kind === 'scrap') { part(g, BOX, toon('#8a6a4a'), 0, -0.3, 0, 0.22, 0.75, 0.22); part(g, CYL, dark, 0, -0.8, 0, 0.11, 0.35, 0.11); part(g, CYL, toon('#c98a3a'), 0, -0.3, 0.17, 0.14, 0.18, 0.14, 0, 0, Math.PI / 2); bear.heldPose = 'heavy'; }
   else if (kind === 'particle') { part(g, BOX, dark, 0, -0.3, 0, 0.26, 0.85, 0.26); part(g, CYL, glowM('#ff7ab8'), 0, -0.82, 0, 0.12, 0.12, 0.12); for (let i = 0; i < 3; i++) part(g, TOR, toon('#ff7ab8'), 0, -0.15 - i * 0.18, 0, 0.17, 0.17, 0.4, Math.PI / 2); bear.heldPose = 'heavy'; }
+  else if (kind === 'bow') { const b = new THREE.Group(); b.rotation.x = -Math.PI / 2; b.position.y = -0.3; g.add(b); b.scale.setScalar(1.05); part(b, bowCurve(0.66, 0.028), toon('#2f4f7a'), 0, 0, 0.17, 1, 1, 1); part(b, CYL, toon('#5b3f2a'), 0, 0, 0, 0.05, 0.28, 0.05); for (const s of [-1, 1]) { part(b, SPH, gold, 0, s * 0.66, 0.15, 0.04, 0.04, 0.04); part(b, CYL, toon('#f2f2f2'), 0, s * 0.3, 0.22, 0.008, 0.6, 0.008); } part(b, CYL, toon('#d9c7a0'), 0, 0, -0.2, 0.014, 0.85, 0.014, Math.PI / 2); part(b, SPH, glowM('#8fd4ff'), 0, 0, -0.64, 0.04, 0.04, 0.07); bear.heldPose = 'gun'; }
   else if (kind === 'tesla') { part(g, BOX, toon('#d8dde6'), 0, -0.25, 0, 0.24, 0.55, 0.24); part(g, CYL, glowM('#8fd8ff'), 0, -0.6, 0, 0.08, 0.2, 0.08); bear.heldPose = 'heavy'; }
   bear.detailsDirty = true;
 }
@@ -48,7 +54,7 @@ export function heroBear(h, { name, look } = {}) {
   const bear = new Roach({ own: true, seed: name || h.id, color: h.color, age: 25, look: { ...(look || {}), hat: 0, face: 0, outfit: 0, extra: 0, ears: 0 }, accessories: hasLook(h.id) ? [] : h.acc || [] });
   dressHero(bear, h.id);
   const held = h.held || null;
-  if (['hammer', 'staff', 'cannons', 'scrap', 'particle', 'tesla'].includes(held)) { bear.setHeld(null); customHeld(bear, held, h.color); }
+  if (['hammer', 'staff', 'cannons', 'scrap', 'particle', 'tesla', 'bow'].includes(held)) { bear.setHeld(null); customHeld(bear, held, h.color); }
   else bear.setHeld(held ? (held.includes(':') ? held : `${held}:${h.color}`) : null);
   const size = h.role === 'tank' ? (h.id === 'dva' ? 1.22 : 1.14) : 1;
   bear.root.scale.setScalar(0.85 * size); bear.size = size;
@@ -111,7 +117,7 @@ export class HeroVM {
   }
   set(kind, col) {
     if (kind === this.kind && col === this.col) return;
-    this.kind = kind; this.col = col; this.rig.clear(); this.muzzles = []; this.head = null; this.fl = null;
+    this.kind = kind; this.col = col; this.rig.clear(); this.muzzles = []; this.head = null; this.fl = null; this.bow = null;
     if (this.trail) { this.scene.remove(this.trail, this.guard); this.trail = this.guard = null; }
     const g = this.rig, m = toon(col), dark = toon('#33363f'), metal = toon('#8f97a6'), gold = toon('#ffd36b');
     const paw = toon(col, { transparent: true, opacity: 0.95 });
@@ -143,7 +149,23 @@ export class HeroVM {
         this.guard = add(new THREE.RingGeometry(0.3, 0.33, 48)); this.guard.position.set(0, -0.1, -0.9);
         this.guard.add(new THREE.Mesh(new THREE.CircleGeometry(0.3, 48), mat(0.07)));
         break; }
-      case 'bow': { const b = new THREE.Group(); b.position.set(0.34, -0.24, -0.72); b.rotation.set(0, 0, -0.3); b.scale.setScalar(0.62); g.add(b); const arc = new THREE.Mesh(new THREE.TorusGeometry(0.52, 0.022, 8, 28, Math.PI), toon('#2f4f7a')); arc.rotation.z = -Math.PI / 2; b.add(arc); for (const s of [-1, 1]) part(b, SPH, gold, 0, s * 0.52, 0, 0.035, 0.05, 0.035); part(b, BOX, toon('#f2f2f2'), -0.12, 0, 0, 0.006, 1.02, 0.006); part(b, CYL, toon('#d9c7a0'), 0.1, 0, -0.1, 0.012, 0.9, 0.012, Math.PI / 2); part(b, SPH, glowM('#8fd4ff'), 0.1, 0, -0.56, 0.035, 0.035, 0.07); pawAt(0.28, -0.08, -0.25, 1); mz(0.1, -0.2, -1); break; }
+      case 'bow': {
+        // 몸쪽으로 휜 활 (곡선은 앞뒤로, 끝은 다시 앞으로 젖힌다) · 시위와 화살은 bowPose 가 당긴다
+        const b = new THREE.Group(); b.position.set(0.24, -0.26, -0.8); b.rotation.z = -0.3; b.scale.setScalar(0.58); g.add(b);
+        const limb = toon('#2f4f7a'), wood = toon('#5b3f2a');
+        part(b, bowCurve(0.66, 0.018), limb, 0, 0, 0, 1, 1, 1);
+        part(b, CYL, wood, 0, 0, -0.17, 0.042, 0.26, 0.042);
+        for (const s of [-1, 1]) { part(b, CYL, gold, 0, s * 0.15, -0.165, 0.03, 0.03, 0.03); part(b, SPH, gold, 0, s * 0.66, -0.02, 0.03, 0.03, 0.03); }
+        const strs = [-1, 1].map((s) => ({ s, m: part(b, CYL, toon('#f2f2f2'), 0, 0, 0, 0.005, 1, 0.005) }));
+        const arrow = new THREE.Group(); b.add(arrow);
+        part(arrow, CYL, toon('#d9c7a0'), 0, 0, -0.475, 0.011, 0.95, 0.011, Math.PI / 2);
+        for (const s of [-1, 1]) part(arrow, BOX, gold, s * 0.018, 0, -0.06, 0.03, 0.006, 0.1);
+        const tip = part(arrow, SPH, glowM('#8fd4ff'), 0, 0, -0.97, 0.03, 0.03, 0.07);
+        part(b, SPH, paw, 0, -0.01, -0.17, 0.085, 0.09, 0.085);
+        const pull = part(b, SPH, paw, 0, -0.02, 0.1, 0.075, 0.068, 0.09);
+        this.bow = { k: 0, strs, arrow, tip, pull };
+        mz(0.19, -0.18, -1.1); break;
+      }
       case 'sniper': part(g, BOX, toon('#5b3f8f'), 0.24, -0.24, -0.55, 0.08, 0.12, 0.8); part(g, CYL, dark, 0.24, -0.2, -1.05, 0.025, 0.4, 0.025, Math.PI / 2); part(g, CYL, dark, 0.24, -0.13, -0.5, 0.04, 0.28, 0.04, Math.PI / 2); part(g, SPH, glowM('#ff6bd6'), 0.24, -0.13, -0.66, 0.03, 0.03, 0.03); pawAt(0.24, -0.34, -0.34); pawAt(0.22, -0.3, -0.75); mz(0.24, -0.2, -1.26); break;
       case 'pistols': for (const s of [-1, 1]) { part(g, BOX, toon('#ffa04a'), s * 0.26, -0.22, -0.45, 0.06, 0.08, 0.24); part(g, BOX, glowM('#9fe8ff'), s * 0.26, -0.18, -0.45, 0.065, 0.02, 0.2); part(g, BOX, dark, s * 0.26, -0.28, -0.38, 0.05, 0.1, 0.05); pawAt(s * 0.26, -0.3, -0.36); mz(s * 0.26, -0.21, -0.58); } break;
       case 'staff': { const s = new THREE.Group(); s.position.set(0.3, -0.36, -0.55); s.rotation.set(-1.15, 0, 0.12); g.add(s); part(s, CYL, toon('#ffffff'), 0, 0.2, 0, 0.022, 1.0, 0.022); part(s, SPH, gold, 0, 0.72, 0, 0.06, 0.06, 0.06); part(s, BOX, gold, 0.07, 0.68, 0, 0.12, 0.03, 0.015, 0, 0, 0.5); part(s, BOX, gold, -0.07, 0.68, 0, 0.12, 0.03, 0.015, 0, 0, -0.5); this.tip = part(s, SPH, glowM('#ffe48a', 0.8), 0, 0.78, 0, 0.05, 0.05, 0.05); pawAt(0.3, -0.38, -0.42); } mz(0.32, -0.12, -0.95); break;
@@ -173,6 +195,7 @@ export class HeroVM {
       else if (this.kind === 'paws') { this.pL.position.z = -0.45 - (side < 0 ? s * 0.4 : 0); this.pR.position.z = -0.45 - (side > 0 ? s * 0.4 : 0); }
       else if (this.kind !== 'sword') g.rotation.set(-s * 0.3, side * s * 0.9, -side * s * 0.6);
     }
+    if (this.bow) this.bowPose(dt);
     if (this.kind === 'hammer' && this.trail && this.swingT <= 0) this.trail.visible = false;
     if (this.impactT > 0) { this.impactT -= dt; const k = this.impactT / 0.16; g.position.x += (Math.random() - 0.5) * 0.03 * k; g.position.y += (Math.random() - 0.5) * 0.03 * k; g.scale.setScalar(0.5 * (1 + k * 0.06)); }
     if (this.kind === 'sword' && this.trail) this.swordPose(dt, side0(this), deflect);
@@ -183,6 +206,14 @@ export class HeroVM {
     if (this.gL) { this.gL.material.opacity = glow === 'L' ? pulse + 0.3 : 0.35; this.gR.material.opacity = glow === 'R' ? pulse + 0.3 : 0.35; }
     if (this.tip) this.tip.material.opacity = glow ? pulse + 0.3 : 0.5;
     g.visible = this.ads < 0.85 || !(this.kind === 'sniper' || this.kind === 'biorifle');
+  }
+  // 활: 당긴 만큼 시위 · 화살 · 뒷손이 뒤로 온다 (놓으면 시위가 빠르게 돌아간다)
+  bowPose(dt) {
+    const B = this.bow, want = this.draw || 0; B.k += (want - B.k) * Math.min(1, dt * (want > B.k ? 20 : 45));
+    const REST = 0.05, nz = REST + B.k * 0.4, full = B.k >= 0.95;
+    for (const { s, m } of B.strs) { const dy = -s * 0.6, dz = nz - REST; m.position.set(0, s * 0.3, (nz + REST) / 2); m.scale.y = Math.hypot(dy, dz); m.rotation.x = Math.atan2(dz, dy); }
+    B.arrow.position.z = nz; B.arrow.visible = this.nocked !== false; B.pull.position.z = nz + 0.05;
+    B.tip.material.opacity = full ? 0.75 + Math.sin(performance.now() / 70) * 0.25 : 0.45; B.tip.scale.setScalar(full ? 0.05 : 0.03); B.tip.scale.z = full ? 0.11 : 0.07;
   }
   // 망치: 크게 들어 올렸다가(0~25%) 화면을 가로질러 내려치고(25~50%) 천천히 돌아온다 · 내려칠 때 넓은 궤적
   hammerPose(side) {

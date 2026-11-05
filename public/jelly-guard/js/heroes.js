@@ -28,11 +28,11 @@ export const PROJ = {
   sonic: { speed: 50, grav: 0, dmg: 18, splash: 0, r: 0, life: 1, size: 0.13, color: '#a6ff5e', trail: '#e6ffd0', head: 2 },
   orb: { speed: 8, grav: 0, dmg: 0, splash: 0, r: 0, life: 7, size: 0.4, color: '#d38bff', trail: '#f2deff', make: 'orb' },
   pulsebomb: { dmg: 0, splash: 350, r: 3.2, kb: 3, self: 0.1 },
-  // bounce: 벽 · 바닥에서 튕기는 횟수 (사람에 맞거나 시간이 다 되면 터진다)
-  arrow: { speed: 85, grav: 0.22, dmg: 120, head: 2, splash: 0, r: 0, life: 1.6, size: 0.1, color: '#8fd4ff', trail: '#d8f0ff' },
-  arrowq: { speed: 45, grav: 0.75, dmg: 35, head: 2, splash: 0, r: 0, life: 1.6, size: 0.08, color: '#bfe4ff', trail: '#eaf6ff' },
-  storm: { speed: 70, grav: 0.3, dmg: 55, head: 2, splash: 0, r: 0, life: 1.4, size: 0.09, color: '#5fc8ff', trail: '#c8ecff' },
-  echo: { speed: 45, grav: 0.3, dmg: 0, splash: 0, r: 0, life: 2, size: 0.12, color: '#ffd76a', trail: '#fff0b0', make: 'echo' },
+  // bounce: 벽 · 바닥에서 튕기는 횟수 (사람에 맞거나 시간이 다 되면 터진다) · flat: 위로 던지지 않고 조준점을 향해 곧게 쏜다
+  arrow: { speed: 85, flat: true, grav: 0.22, dmg: 120, head: 2, splash: 0, r: 0, life: 1.6, size: 0.1, color: '#8fd4ff', trail: '#d8f0ff' },
+  arrowq: { speed: 70, flat: true, grav: 0.75, dmg: 35, head: 2, splash: 0, r: 0, life: 1.6, size: 0.08, color: '#bfe4ff', trail: '#eaf6ff' },
+  storm: { speed: 70, flat: true, grav: 0.3, dmg: 55, head: 2, splash: 0, r: 0, life: 1.4, size: 0.09, color: '#5fc8ff', trail: '#c8ecff' },
+  echo: { speed: 45, flat: true, grav: 0.3, dmg: 0, splash: 0, r: 0, life: 2, size: 0.12, color: '#ffd76a', trail: '#fff0b0', make: 'echo' },
   frag: { speed: 27, grav: 0.85, dmg: 20, splash: 65, r: 2.6, kb: 3, self: 0.2, life: 1.5, size: 0.2, color: '#8a9a5b', trail: '#e8d9a0', bounce: 4, burst: true },
   jmine: { speed: 22, grav: 0.75, dmg: 0, splash: 60, r: 4, kb: 13, self: 0, selfKb: true, life: 3, size: 0.26, color: '#ffb43a', trail: '#ffe2a8', burst: true },
   jtrap: { speed: 16, grav: 1, dmg: 0, splash: 0, r: 0, life: 3, size: 0.22, color: '#c9c9d6', trail: '#8a8a99', make: 'jtrap' },

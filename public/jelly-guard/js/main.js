@@ -245,7 +245,7 @@ function melee({ range, arc, a, cleave }) {
 }
 // 투사체 (내 것은 판정까지)
 const projs = []; let projId = 1;
-function fireProj(k, { a = 'p', i = 0, yawOff = 0, jitter = 0, side = 0, pierce, stick } = {}) {
+function fireProj(k, { a = 'p', i = 0, yawOff = 0, jitter = 0, side = 0, speedK = 1, pierce, stick } = {}) {
   const P = PROJ[k]; if (!P) return;
   const e = eye(), f = fwd();
   if (yawOff) f.applyAxisAngle(new THREE.Vector3(0, 1, 0), yawOff);
@@ -254,8 +254,8 @@ function fireProj(k, { a = 'p', i = 0, yawOff = 0, jitter = 0, side = 0, pierce,
   let o = muzzle(muzzleI++);
   if (side) o = o.add(new THREE.Vector3(Math.cos(me.yaw), 0, -Math.sin(me.yaw)).multiplyScalar(side));
   if (!clearLine(game.map, e, o)) o = e.clone();
-  const dir = P.grav ? f.clone() : aim.sub(o).normalize();
-  const v = dir.multiplyScalar(P.speed); if (P.grav) v.y += P.speed * 0.18;
+  const lob = P.grav && !P.flat, dir = lob ? f.clone() : aim.sub(o).normalize();
+  const v = dir.multiplyScalar(P.speed * speedK); if (lob) v.y += P.speed * 0.18;
   const id = projId++;
   const pr = { k, P, mesh: projMesh(k), p: o.clone(), v, life: P.life, mine: true, a, pierce: pierce || P.pierce, stick: stick || P.stick, hitSet: new Set(), id, trailT: 0 };
   pr.mesh.position.copy(o); scene.add(pr.mesh); projs.push(pr);

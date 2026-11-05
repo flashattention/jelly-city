@@ -16,6 +16,8 @@ const ULT_X = Number(process.env.WATCH_ULTX) || 1; // 점검용: 궁극기 빨�
 const RUSHERS = new Set(['rein', 'winston', 'genji', 'reaper', 'hog', 'dva', 'tracer', 'zarya']), NO_HOP = new Set(['pharah', 'mercy']); // 파고드는 영웅 · 뛰면 안 되는 영웅
 const BOT_NAMES = ['젤리봇 딸기', '젤리봇 소다', '젤리봇 푸딩', '젤리봇 망고', '젤리봇 민트', '젤리봇 라임', '젤리봇 자두', '젤리봇 복숭아', '젤리봇 포도', '젤리봇 레몬', '젤리봇 체리', '젤리봇 키위'];
 // 영웅마다 쏠 수 있는 투사체
+// 곧게 쏘는 화살이 떨어지는 만큼만 올려 쏜다 (봇 화살이 눈에도 표적으로 날아가게)
+const flatLift = (P, L) => (P.flat ? 21 * P.grav * L / (2 * P.speed) : 0);
 const PKINDS = { rein: ['fire'], dva: ['mini'], zarya: ['egren', 'grav'], pharah: ['rocket', 'conc', 'barrage'], hog: ['hook'], soldier: ['helix'], genji: ['shuri'], cassidy: ['flash'], widow: ['mine'], tracer: ['pulse'], mercy: ['bolt'], ana: ['sleep', 'biotic'], lucio: ['sonic'], moira: [], junk: ['frag', 'jmine', 'jtrap'], archer: ['arrow', 'arrowq', 'storm', 'echo'] };
 // 상태 이상 → 화면에 보내는 비트
 const F = { stun: 1, sleep: 2, invuln: 4, nano: 8, boost: 16, matrix: 32, deflect: 64, grav: 128, anti: 256, hboost: 512, primal: 1024, pilot: 2048, valk: 4096, bub: 8192, reveal: 16384, blossom: 32768, hogult: 65536, blade: 131072, barrage: 262144, deadeye: 524288, coal: 1 << 20, ghost: 1 << 21, spd: 1 << 22, amp: 1 << 23, visor: 1 << 24, breath: 1 << 25, songheal: 1 << 26, poison: 1 << 27, shield: 1 << 28, down: 1 << 29 };
@@ -1104,7 +1106,7 @@ export class GuardRooms extends BaseRooms {
         const e = eyeOf(b), q = chest(tgt), lead = d3(e, q) / P.speed;
         const hit = Math.random() < pAcc(0.85 - td * 0.012);
         const aim = { x: q.x + (tgt.pos.x - (tgt.lx ?? tgt.pos.x)) * lead * 10 + (hit ? 0 : rnd(-2.2, 2.2)), y: q.y + (hit ? rnd(-0.3, 0.3) : rnd(-1, 1.4)), z: q.z + (tgt.pos.z - (tgt.lz ?? tgt.pos.z)) * lead * 10 + (hit ? 0 : rnd(-2.2, 2.2)) };
-        const L = d3(e, aim) || 1, v = [(aim.x - e.x) / L * P.speed, (aim.y - e.y) / L * P.speed, (aim.z - e.z) / L * P.speed];
+        const L = d3(e, aim) || 1, v = [(aim.x - e.x) / L * P.speed, (aim.y - e.y) / L * P.speed + flatLift(P, L), (aim.z - e.z) / L * P.speed];
         this.toRoom(r, { t: 'proj', by: b.id, k: spec.k, o: [e.x, e.y, e.z], v });
         setTimeout(() => {
           if (!r.g || r.g.phase === 'over') return;
@@ -1198,7 +1200,7 @@ export class GuardRooms extends BaseRooms {
     const hit = Math.random() < 0.45 + b.skill * 0.4;
     const aim = { x: q.x + (hit ? 0 : rnd(-2, 2)), y: q.y + (hit ? 0 : rnd(-0.5, 1)), z: q.z + (hit ? 0 : rnd(-2, 2)) };
     const L = d3(e, aim) || 1;
-    this.toRoom(r, { t: 'proj', by: b.id, k, o: [e.x, e.y, e.z], v: [(aim.x - e.x) / L * P.speed, (aim.y - e.y) / L * P.speed + (P.grav ? L * 0.25 : 0), (aim.z - e.z) / L * P.speed] });
+    this.toRoom(r, { t: 'proj', by: b.id, k, o: [e.x, e.y, e.z], v: [(aim.x - e.x) / L * P.speed, (aim.y - e.y) / L * P.speed + (P.flat ? flatLift(P, L) : P.grav ? L * 0.25 : 0), (aim.z - e.z) / L * P.speed] });
     setTimeout(() => {
       if (!r.g || r.g.phase === 'over' || !b.alive) return;
       const bl = blockBy(r.g.ents, e, aim, b.team), p = bl ? { x: e.x + (aim.x - e.x) * bl.t, y: e.y + (aim.y - e.y) * bl.t, z: e.z + (aim.z - e.z) * bl.t } : aim;

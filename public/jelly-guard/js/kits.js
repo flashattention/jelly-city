@@ -180,6 +180,7 @@ export function makeKit(h, G) {
 
   // 활: 누르고 있으면 당기고, 떼면 쏜다. 끝까지 당겨야 제 위력 (돌풍 화살은 누르는 동안 빠르게)
   K.bow = (now, held) => {
+    G.vm.draw = st.drawAt ? Math.min(1, (now - st.drawAt) / 750) : 0; G.vm.nocked = now >= st.next;
     if (busy()) { st.drawAt = 0; return; }
     if (st.storm > 0) {
       if (now > st.stormEnd) { st.storm = 0; st.bowWait = true; return; }
@@ -190,7 +191,8 @@ export function makeKit(h, G) {
     if (held) { if (now >= st.next && !st.drawAt) { st.drawAt = now; G.sfx('tick'); } return; }
     if (!st.drawAt) return;
     const k = Math.min(1, (now - st.drawAt) / 750); st.drawAt = 0; st.next = now + 260;
-    G.fireProj(k >= 0.95 ? 'arrow' : 'arrowq', { a: 'p' }); G.vm.kick(k >= 0.95 ? 0.9 : 0.35); G.sfx('swing');
+    // 덜 당긴 화살은 느려서 더 빨리 떨어진다
+    G.fireProj(k >= 0.95 ? 'arrow' : 'arrowq', { a: 'p', speedK: k >= 0.95 ? 1 : 0.43 + 0.6 * k }); G.vm.kick(k >= 0.95 ? 0.9 : 0.35); G.sfx('swing');
   };
   // ---------- Shift · E · Q ----------
   K.abil = (slot, now) => {
