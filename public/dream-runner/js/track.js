@@ -60,6 +60,7 @@ export function topTexture(style, top, side, edge) {
       case 'glass': x.strokeStyle = 'rgba(255,255,255,.7)'; x.lineWidth = 2; x.strokeRect(4, 4, n - 8, n - 8); x.beginPath(); x.moveTo(12, 30); x.lineTo(40, 12); x.stroke(); break;
       case 'grid': x.fillStyle = top; x.fillRect(0, 0, n, n); x.strokeStyle = edge || '#ff2bd6'; x.lineWidth = 3; x.shadowColor = edge || '#ff2bd6'; x.shadowBlur = 8; x.strokeRect(1, 1, n - 2, n - 2); break;
       case 'paper': x.fillStyle = shade(top, 0.92); for (let i = 0; i < 6; i++) { x.beginPath(); x.moveTo(R(n), R(n)); x.lineTo(R(n), R(n)); x.lineTo(R(n), R(n)); x.fill(); } x.strokeStyle = 'rgba(80,140,220,.35)'; for (let y = 16; y < n; y += 16) { x.beginPath(); x.moveTo(0, y); x.lineTo(n, y); x.stroke(); } break;
+      case 'pastel': ['#ffd6e4', '#ffe6cf', '#fff6cf', '#d8f3dc', '#d3e9ff', '#e6dcf8'].forEach((c, i) => { x.fillStyle = c; x.fillRect(i * n / 6, 0, n / 6 + 1, n); }); break;
       case 'rainbow': ['#ff5252', '#ffab40', '#ffee58', '#69f0ae', '#40c4ff', '#7c4dff'].forEach((c, i) => { x.fillStyle = c; x.fillRect(i * n / 6, 0, n / 6 + 1, n); }); break;
       case 'road': x.fillStyle = '#ffffff'; x.fillRect(n / 2 - 3, 8, 6, n / 2 - 16); x.fillStyle = '#ffd54f'; x.fillRect(4, 0, 4, n); x.fillRect(n - 8, 0, 4, n); break;
       case 'static': for (let i = 0; i < 600; i++) { const v = Math.floor(R(255)); x.fillStyle = `rgb(${v},${v},${v})`; x.fillRect(R(n), R(n), 3, 3); } break;
