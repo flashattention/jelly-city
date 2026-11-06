@@ -15,7 +15,7 @@ const MAX_SPEED = 50;
 const MAX_SPEED_ITEM = 75; // 아이템전: 로켓 · 순간이동이 있어서 더 넉넉하게      // 게임 속 최고 속도(30m/s × 가속 1.5)보다 넉넉하게: 이보다 빠른 기록은 조작으로 본다
 const TOP = 50;
 const STAR_PTS = 10;       // 별사탕 하나 = 10점
-const TOP_GUARD = 10, DAY_STARS = 300000; // 확인 안 된 기록은 이 순위 안으로 바로 못 들어온다 · 하루에 벌 수 있는 별 (사람이 닿지 못할 만큼 넉넉하게)
+const TOP_GUARD = 10, DAY_STARS = 300000; // 확인 안 된 기록이 이 순위 안에 들면 비상 리포트 · 하루에 벌 수 있는 별 (사람이 닿지 못할 만큼 넉넉하게)
 
 const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n);
 
@@ -26,21 +26,23 @@ export class DreamBoard {
     this.bestItem = {}; // 아이템전
     this.boards = {};   // 노멀(easy) 말고 다른 난이도: 'speed:hard' → { sub → 기록 } (노멀은 위 둘을 그대로 쓴다)
     this.stats = {};    // sub → { runs, time, by: { easy: { runs, time } } } (순위와 상관없이 달린 판수 · 시간)
-    this.runs = 0; this.pending = []; this.secret = crypto.randomBytes(24).toString('hex'); this.vstat = { ok: 0, bad: 0, none: 0, skip: 0 }; this.dayStars = new Map();
+    this.runs = 0; this.pending = []; this.reports = []; this.secret = crypto.randomBytes(24).toString('hex'); this.vstat = { ok: 0, bad: 0, none: 0, skip: 0 }; this.dayStars = new Map();
     this.lastPost = new Map();
     this.lastPlay = new Map();
     this.ipHits = new Map();
     try {
       const d = JSON.parse(fs.readFileSync(this.file, 'utf8'));
-      this.best = d.best || {}; this.bestItem = d.bestItem || {}; this.boards = d.boards || {}; this.stats = d.stats || {}; this.runs = d.runs || 0; this.pending = d.pending || []; this.secret = d.secret || this.secret;
+      this.best = d.best || {}; this.bestItem = d.bestItem || {}; this.boards = d.boards || {}; this.stats = d.stats || {}; this.runs = d.runs || 0; this.reports = d.reports || []; this.secret = d.secret || this.secret;
+      // 예전 '확인 대기' 기록: 순위표에 올리고 비상 리포트로 옮긴다 (더는 기다리게 하지 않는다)
+      for (const p of d.pending || []) { this.mig = true; const T = this.table(p.mode, p.diff, p.map); if (!T[p.sub] || p.e.score > T[p.sub].score) T[p.sub] = p.e; this.report('red', p.sub, p.mode, p.diff, p.map, p.why, p.e, p.r); }
     } catch { /* 처음 */ }
-    this.dirty = false; this.tickets = new Tickets(this.secret); this.pool = new ReplayPool();
+    this.dirty = !!this.mig; this.tickets = new Tickets(this.secret); this.pool = new ReplayPool();
     setInterval(() => this.save(), 20000).unref();
   }
   save() {
     if (!this.dirty) return;
     this.dirty = false;
-    try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ best: this.best, bestItem: this.bestItem, boards: this.boards, stats: this.stats, runs: this.runs, pending: this.pending, secret: this.secret })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('드림 러너 저장 실패', e); }
+    try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ best: this.best, bestItem: this.bestItem, boards: this.boards, stats: this.stats, runs: this.runs, reports: this.reports, secret: this.secret })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('드림 러너 저장 실패', e); }
   }
   // map: 'hell' 은 난이도마다 따로 (꿈나라 노멀은 예전 표 그대로)
   table(mode, diff, map = 'dream') { if (map === 'hell') return (this.boards[`hell:${mode}:${diff}`] ||= {}); if (diff !== 'easy') return (this.boards[`${mode}:${diff}`] ||= {}); return mode === 'item' ? this.bestItem : this.best; }
@@ -102,9 +104,19 @@ export class DreamBoard {
   }
   ticket(b) { return this.tickets.issue({ seed: Number(b.seed) | 0, diff: diffOf(b.diff), map: b.map === 'hell' ? 'hell' : 'dream', mode: b.mode === 'item' ? 'item' : 'speed' }); }
   // 사람이 볼 목록 · 승인 · 삭제 (삭제하면 그 계정의 드림 러너 업적을 다시 계산하고 별을 거둔다)
-  adminList() { const flagged = []; for (const k of ['best', 'bestItem']) for (const [sub, e] of Object.entries(this[k])) if (e.u) flagged.push({ sub, t: k === 'best' ? 'speed:easy' : 'item:easy', ...e }); for (const [t, T] of Object.entries(this.boards)) for (const [sub, e] of Object.entries(T)) if (e.u) flagged.push({ sub, t, ...e }); return { pending: this.pending.slice(-100).reverse(), flagged: flagged.sort((a, b) => b.score - a.score).slice(0, 100), stat: this.vstat }; }
-  approve(i) { const p = this.pending.find((x) => x.id === i); if (!p) throw new Error('없어요'); this.pending = this.pending.filter((x) => x !== p); const T = this.table(p.mode, p.diff, p.map), old = T[p.sub]; if (!old || p.e.score > old.score) T[p.sub] = p.e; this.dirty = true; getCos()?.refresh(p.sub); }
-  reject(i) { this.pending = this.pending.filter((x) => x.id !== i); this.dirty = true; }
+  // 비상 리포트: 조작(AI) 의심 기록. 순위표에는 바로 올라가고, 운영자가 접속하면 크게 뜬다
+  //   red = 서버가 다시 돌려 본 결과와 다름 · 시간이 맞지 않음 · 입력 기록 없음 (상위권) / yellow = 재생은 맞지만 1위를 갑자기 크게 앞섬 (진짜 키를 누르는 프로그램일 수 있다)
+  report(lvl, sub, mode, diff, map, why, e, r, extra) { this.reports.push({ id: crypto.randomBytes(5).toString('hex'), lvl, sub, mode, diff, map, why, name: e.name, score: e.score, dist: e.dist, stars: e.stars, time: e.time, eat: e.at, r: r ? { dist: r.dist, stars: r.stars } : null, ...extra, at: Date.now(), open: true }); if (this.reports.length > 300) this.reports.splice(0, this.reports.length - 300); this.dirty = true; console.warn(`드림 러너 비상 리포트(${lvl}): ${e.name} ${e.score}점 ${map} ${diff} (${why})`); }
+  tkey(mode, diff, map) { return map === 'hell' ? `hell:${mode}:${diff}` : `${mode}:${diff}`; }
+  adminList() { const flagged = []; for (const k of ['best', 'bestItem']) for (const [sub, e] of Object.entries(this[k])) if (e.u) flagged.push({ sub, t: k === 'best' ? 'speed:easy' : 'item:easy', ...e }); for (const [t, T] of Object.entries(this.boards)) for (const [sub, e] of Object.entries(T)) if (e.u) flagged.push({ sub, t, ...e }); return { reports: this.reports.filter((x) => x.open).reverse().map((x) => ({ ...x, t: this.tkey(x.mode, x.diff, x.map), live: this.table(x.mode, x.diff, x.map)[x.sub]?.at === x.eat })), flagged: flagged.sort((a, b) => b.score - a.score).slice(0, 100), stat: this.vstat }; }
+  // 정상으로 인정: 확인 안 됨 표시를 지워 업적 · 왕관도 받게 / 삭제: 기록을 지우고 별 · 업적을 거둔다 / 넘기기: 그대로 두고 리포트만 닫는다
+  resolve(id, act) {
+    const x = this.reports.find((q) => q.id === id); if (!x) throw new Error('없어요'); x.open = false; x.act = act; this.dirty = true;
+    const T = this.table(x.mode, x.diff, x.map), e = T[x.sub];
+    if (act === 'ok' && e && e.at === x.eat) { delete e.u; e.v = 1; getCos()?.refresh(x.sub); }
+    if (act === 'del') this.removeRecord(x.sub, this.tkey(x.mode, x.diff, x.map));
+    for (const q of this.reports) if (q.open && q.sub === x.sub && act === 'del') q.open = false; // 지운 사람의 다른 리포트도 닫는다
+  }
   removeRecord(sub, t) { const [a, b, c] = String(t).split(':'), T = a === 'hell' ? this.boards[t] : b === 'easy' ? (a === 'item' ? this.bestItem : this.best) : this.boards[`${a}:${b}`]; if (T?.[sub]) { delete T[sub]; this.dirty = true; } getCos()?.punish(sub, 'dr.'); void c; }
   // 한 판 끝: 말이 안 되는 기록은 거르고, 점수는 서버가 다시 계산한다
   async submit(who, b) {
@@ -122,9 +134,12 @@ export class DreamBoard {
     const color = /^#[0-9a-fA-F]{6}$/.test(b.color || '') ? b.color : '#8a5634';
     const old = T[who.sub];
     const newBest = !old || score > old.score, entry = { name, color, score, dist, stars, themes, time: Math.round(time), at: now, guest: !!who.user.guest, anon: !!who.user.anon, ...(chk.ok ? { v: 1 } : { u: chk.why }) };
-    // 확인 안 된 기록이 상위권으로 들어오려 하면 사람이 볼 때까지 순위표에 올리지 않는다
-    if (newBest && !chk.ok && !chk.soft) { const higher = Object.values(T).filter((e) => e.score > score).length; if (higher < TOP_GUARD) { this.pending.push({ id: crypto.randomBytes(5).toString('hex'), sub: who.sub, mode, diff, map, why: chk.why, e: entry, r: chk.r ? { dist: chk.r.dist, stars: chk.r.stars } : null, at: now }); if (this.pending.length > 500) this.pending.shift(); this.dirty = true; console.warn(`드림 러너 기록 확인 대기: ${score}점 (${chk.why})`); return { score, mode, diff, map, pending: true, newBest: false, prev: old?.score || 0, me: this.mine(who.sub, mode, diff, map), top: this.top(mode, diff, map), runs: this.runs }; } }
+    const prevTop = newBest ? Math.max(0, ...Object.entries(T).filter(([k]) => k !== who.sub).map(([, e]) => e.score)) : 0;
     if (newBest) T[who.sub] = entry;
+    // 비상 리포트 (기록은 바로 순위표에 오른다)
+    if (newBest) { const higher = Object.values(T).filter((e) => e.score > score).length;
+      if (!chk.ok && !chk.soft && higher < TOP_GUARD) this.report('red', who.sub, mode, diff, map, chk.why, entry, chk.r);
+      else if (chk.ok && higher === 0 && prevTop >= 1000 && score > prevTop * 1.5) this.report('yellow', who.sub, mode, diff, map, 'jump', entry, chk.r, { prevTop }); }
     else { old.name = name; old.color = color; } // 이름·색은 최근 것으로
     getCos()?.refresh(who.sub); // 업적: 거리 · 순위
     return { score, mode, diff, map, newBest, prev: old?.score || 0, me: this.mine(who.sub, mode, diff, map), top: this.top(mode, diff, map), runs: this.runs };
@@ -155,7 +170,7 @@ export async function dreamApi(req, res, url, who, board, json, isAdmin) {
     if (!who || !isAdmin?.(who.user)) return json(res, 403, { error: '관리자만 할 수 있어요' });
     if (url.pathname === '/api/dream/admin/list') return json(res, 200, board.adminList());
     const b = await readJson(req);
-    try { if (url.pathname === '/api/dream/admin/approve') board.approve(String(b.id)); else if (url.pathname === '/api/dream/admin/reject') board.reject(String(b.id)); else if (url.pathname === '/api/dream/admin/remove') board.removeRecord(String(b.sub), String(b.t)); else return json(res, 404, { error: 'not found' }); return json(res, 200, board.adminList()); } catch (e) { return json(res, 400, { error: e.message }); }
+    try { if (url.pathname === '/api/dream/admin/resolve') board.resolve(String(b.id), ['ok', 'del', 'skip'].includes(b.act) ? b.act : 'skip'); else if (url.pathname === '/api/dream/admin/remove') board.removeRecord(String(b.sub), String(b.t)); else return json(res, 404, { error: 'not found' }); return json(res, 200, board.adminList()); } catch (e) { return json(res, 400, { error: e.message }); }
   }
   if (url.pathname === '/api/dream/score' && req.method === 'POST') {
     const b = await readJson(req, 900 * 1024);

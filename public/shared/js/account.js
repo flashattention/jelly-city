@@ -27,6 +27,7 @@ export const account = {
     try {
       const me = await this.api('/api/me');
       this.user = me.user; this.chars = me.chars || []; this.admin = !!me.admin; this.setCos(me.cos);
+      if (this.admin) import('./admin-alert.js').then((m) => m.adminAlert()).catch(() => {}); // 운영자: 비상 리포트를 바로 띄운다
       return true;
     } catch (e) {
       if (e.status === 401) { this.session = null; store.set(SESSION_KEY, null); }

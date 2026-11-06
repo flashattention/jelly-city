@@ -247,11 +247,11 @@ $('board-close').onclick = () => show('title');
 async function renderAdmin(d) {
   const el = $('board-admin'); if (!account.admin) { el.innerHTML = ''; return; }
   try { d ||= await account.api('/api/dream/admin/list'); } catch { return; }
-  const row = (t, btns) => `<div class="brow"><span class="nm">${t}</span>${btns}</div>`, act = (u, b) => async () => { renderAdmin(await account.api(`/api/dream/admin/${u}`, { method: 'POST', body: b })); };
-  el.innerHTML = `<h3>🛡️ 기록 확인 · 정상 ${d.stat.ok} / 불일치 ${d.stat.bad} / 기록 없음 ${d.stat.none}</h3>` + d.pending.map((p) => row(`${esc(p.e.name)} ${p.e.score.toLocaleString()}점 ${esc(p.diff)} ${esc(p.map)} (${esc(p.why)}${p.r ? ` · 재생 ${p.r.dist}m ★${p.r.stars}` : ''})`, `<button class="mini" data-a="${esc(p.id)}">승인</button><button class="mini" data-x="${esc(p.id)}">거절</button>`)).join('') + d.flagged.slice(0, 30).map((f) => row(`⚠️ ${esc(f.name)} ${f.score.toLocaleString()}점 ${esc(f.t)} (${esc(f.u)})`, `<button class="mini" data-s="${esc(f.sub)}" data-t="${esc(f.t)}">삭제 · 별 몰수</button>`)).join('');
-  for (const b of el.querySelectorAll('[data-a]')) b.onclick = act('approve', { id: b.dataset.a });
-  for (const b of el.querySelectorAll('[data-x]')) b.onclick = act('reject', { id: b.dataset.x });
-  for (const b of el.querySelectorAll('[data-s]')) b.onclick = () => { if (confirm('이 기록을 지우고 드림 러너 업적과 별을 거둘까요?')) act('remove', { sub: b.dataset.s, t: b.dataset.t })(); };
+  const { reportRow, bindReports } = await import('../../shared/js/admin-alert.js');
+  const row = (t, btns) => `<div class="brow"><span class="nm">${t}</span>${btns}</div>`;
+  el.innerHTML = `<h3>🛡️ 기록 확인 · 정상 ${d.stat.ok} / 불일치 ${d.stat.bad} / 기록 없음 ${d.stat.none}</h3>` + (d.reports.length ? `<h3>🚨 비상 리포트 ${d.reports.length}건</h3>` + d.reports.map(reportRow).join('') : '') + d.flagged.slice(0, 30).map((f) => row(`⚠️ ${esc(f.name)} ${f.score.toLocaleString()}점 ${esc(f.t)} (${esc(f.u)})`, `<button class="mini" data-s="${esc(f.sub)}" data-t="${esc(f.t)}">삭제 · 별 몰수</button>`)).join('');
+  bindReports(el, (n) => renderAdmin(n));
+  for (const b of el.querySelectorAll('[data-s]')) b.onclick = async () => { if (confirm('이 기록을 지우고 드림 러너 업적과 별을 거둘까요?')) renderAdmin(await account.api('/api/dream/admin/remove', { method: 'POST', body: { sub: b.dataset.s, t: b.dataset.t } })); };
 }
 $('home-btn').onclick = () => { if (game.multi) { net.send({ t: 'leave' }); game.multi = false; } toTitle(); };
 $('again-btn').onclick = () => { if (game.multi) { leaveRun(); show('room'); } else startSoloFresh(); };
