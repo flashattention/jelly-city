@@ -1330,7 +1330,7 @@ export class Roach {
 
   /** speed: 현재 이동 속도 (m/s) */
   update(dt, speed = 0, opts = {}) {
-    this.cos?.update(dt, speed, this.cosBoost || 0);
+    this.cos?.update(dt, this.cosSpeed ?? speed, this.cosBoost || 0);
     // 곰돌이 젤리: 기본 날개는 날 때만, 다른 날개를 골랐으면 늘 보인다
     if (this.gummy) { const w = !!this.flying || this.wingStyle !== 0; if (this.wings[0] && this.wings[0].visible !== w) for (const x of this.wings) x.visible = w; }
     this.t += dt;

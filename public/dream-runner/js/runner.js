@@ -218,6 +218,7 @@ export class Runner {
     b.root.position.set(this.x, this.y, z);
     b.root.rotation.y = Math.PI - (this.vx + this.knock) * 0.035;
     const sliding = this.slideT > 0 && this.onGround;
+    b.cosSpeed = this.alive && this.onGround ? Math.min(12, this.v * 0.55) : 0; // 발자취: 숙이는 동안에도 땅 위면 나온다
     b.update(dt, this.alive && this.onGround && !sliding ? Math.min(12, this.v * 0.55) : 0, { airborne: !this.onGround, noCrawl: true });
     poseBear(b, { alive: this.alive, ground: this.onGround, slide: sliding, flip: this.flipT > 0 ? 1 - this.flipT / FLIP_T : null, vy: this.vy }, dt);
     this.booster.update(dt, this.alive ? Math.max(this.boost, this.rocketK * 1.6) : 0, this.t);
