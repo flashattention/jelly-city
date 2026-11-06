@@ -152,7 +152,7 @@ async function api(req, res, url) {
     if (PASSWORD && body.password !== PASSWORD) return json(res, 403, { error: 'password' });
     let info;
     if (body.credential) info = await verifyGoogle(body.credential);
-    else if (DEV_LOGIN && typeof body.dev === 'string' && body.dev.trim()) info = { sub: `dev:${body.dev.trim().slice(0, 16)}`, email: '', name: body.dev.trim().slice(0, 16), picture: '' };
+    else if (DEV_LOGIN && typeof body.dev === 'string' && body.dev.trim()) info = { sub: `dev:${body.dev.trim().slice(0, 16)}`, email: `${body.dev.trim().slice(0, 16)}@dev.local`, name: body.dev.trim().slice(0, 16), picture: '' };
     else if (body.guest === true) {
       // 체험판: 구글 로그인 없이 바로 (이틀 동안 접속하지 않으면 캐릭터가 사라진다)
       if (world.guestCount() >= 300) return json(res, 503, { error: '체험판 자리가 꽉 찼어요. 구글로 로그인해 주세요' });
