@@ -21,7 +21,9 @@ const DRAW = {
   coin: (x) => { x.fillStyle = '#fff'; x.beginPath(); x.arc(32, 32, 25, 0, 7); x.fill(); x.globalCompositeOperation = 'destination-out'; x.lineWidth = 4; x.beginPath(); x.arc(32, 32, 17, 0, 7); x.stroke(); x.globalCompositeOperation = 'source-over'; },
 };
 function texOf(k) { if (texCache[k]) return texCache[k]; const c = document.createElement('canvas'); c.width = c.height = 64; (DRAW[k] || DRAW.glow)(c.getContext('2d')); return (texCache[k] = new THREE.CanvasTexture(c)); }
-const CC = new THREE.Color();
+const CC = new THREE.Color(), CC2 = new THREE.Color();
+// 업적 치장의 무지개: 난이도마다 정해진 색들 사이를 돈다 (없으면 온 무지개)
+const gpaint = (f, t, i = 0) => { if (!f?.grad) return paint('rainbow', t, i); const g = f.grad, x = (((t * 0.25 + i * 0.13) % 1) + 1) % 1 * g.length, a = Math.floor(x); return CC.set(g[a % g.length]).lerp(CC2.set(g[(a + 1) % g.length]), x - a); };
 const paint = (col, t, i = 0) => (col === 'rainbow' ? CC.setHSL((t * 0.25 + i * 0.13) % 1, 1, 0.62) : CC.set(col));
 const pick = (cols, i, t) => paint(cols === 'rainbow' ? 'rainbow' : cols[i % cols.length], t, i);
 const WV = new THREE.Vector3();
@@ -126,23 +128,34 @@ export class CosFx {
       const edge = glowM(f.rainbow ? 'rainbow' : f.tierColor, 0.75); part(g, RING, edge, 0.085, 0, 0, 0.5, 0.64, 0.6).rotation.y = Math.PI / 2; part(g, RING, edge, -0.085, 0, 0, 0.5, 0.64, 0.6).rotation.y = Math.PI / 2;
       const med = new THREE.MeshStandardMaterial({ color: f.tierColor, emissive: f.tierColor, emissiveIntensity: 0.8, metalness: 0.9, roughness: 0.2 }), medal = part(g, SPH, med, 0, 0.12, 0.51, 0.1, 0.1, 0.04); part(medal, RING, edge, 0, 0, 0.6, 1.1);
       // 반짝임: 띠를 따라 별이 돈다
-      const n = 2 + f.tier * 2, sp = []; for (let i = 0; i < n; i++) { const m = new THREE.SpriteMaterial({ map: texOf('star'), color: f.glow, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), o = new THREE.Sprite(m); g.add(o); sp.push({ o, m, a: (i / n) * 6.28 }); }
-      this.anim.push((dt, t) => { const k = 0.35 + Math.abs(Math.sin(t * 2.4)) * 0.3; mat.emissiveIntensity = k + f.tier * 0.12; if (f.rainbow) { const c = paint('rainbow', t); edge.color.copy(c); mat.emissive.copy(c); }
-        for (const q of sp) { const a = q.a + t * 1.1; q.o.position.set(0, Math.sin(a) * 0.66, Math.cos(a) * 0.53); const s = Math.max(0, Math.sin(t * 6 + q.a * 5)); q.o.scale.setScalar(0.06 + s * (0.07 + f.tier * 0.035)); if (f.rainbow) q.m.color.copy(paint('rainbow', t, q.a)); } });
+      const L = Math.max(0, ((f.pr || 1) - 1) / 4.5), n = 2 + f.tier * 2 + Math.round(L * 10), sp = []; for (let i = 0; i < n; i++) { const m = new THREE.SpriteMaterial({ map: texOf('star'), color: f.glow, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), o = new THREE.Sprite(m); g.add(o); sp.push({ o, m, a: (i / n) * 6.28 }); }
+      this.anim.push((dt, t) => { const k = 0.35 + Math.abs(Math.sin(t * 2.4)) * 0.3; mat.emissiveIntensity = k + f.tier * 0.12 + L * 0.5; if (f.rainbow || L >= 0.6) { const c = gpaint(f, t); edge.color.copy(c); mat.emissive.copy(c); }
+        for (const q of sp) { const a = q.a + t * 1.1; q.o.position.set(0, Math.sin(a) * 0.66, Math.cos(a) * 0.53); const s = Math.max(0, Math.sin(t * 6 + q.a * 5)); q.o.scale.setScalar(0.06 + s * (0.07 + f.tier * 0.035 + L * 0.06)); if (f.rainbow || L >= 0.6) q.m.color.copy(gpaint(f, t, q.a)); } });
     });
   }
-  // 왕관: 머리 위에 떠서 천천히 돈다 (1위만)
+  // 왕관: 머리 위에 떠서 천천히 돈다 (1위만). 어려운 난이도 1위일수록 크고 화려하다 (L 0 = 노멀 · 기록판, 1 = 지옥 초월)
   crown(f) {
-    const parent = this.r.head || this.r.torso || this.r.inner;
+    const parent = this.r.head || this.r.torso || this.r.inner, L = Math.max(0, Math.min(1, ((f.pr || 1) - 1) / 4.5));
     this.attach(parent, (g) => {
-      const y0 = parent === this.r.head ? 0.86 : 2; g.position.set(0, y0, 0);
+      const y0 = parent === this.r.head ? 0.86 : 2; g.position.set(0, y0, 0); g.scale.setScalar(1 + L * 0.3);
       const gold = new THREE.MeshStandardMaterial({ color: '#ffc93c', emissive: '#ffb300', emissiveIntensity: 0.75, metalness: 1, roughness: 0.22 });
       const c = part(g, RING, gold, 0, 0, 0, 0.36); c.rotation.x = Math.PI / 2; c.scale.z = 2.6;
-      for (let i = 0; i < 5; i++) { const a = (i / 5) * 6.28; part(g, CONE, gold, Math.cos(a) * 0.36, 0.13, Math.sin(a) * 0.36, 0.07, 0.26, 0.07); part(g, SPH, glowM(f.color, 1), Math.cos(a) * 0.36, 0.29, Math.sin(a) * 0.36, 0.05); }
-      const halo = new THREE.SpriteMaterial({ map: texOf('glow'), color: '#ffdf7a', transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }), hs = new THREE.Sprite(halo); hs.scale.setScalar(1.3); g.add(hs);
-      const sp = []; for (let i = 0; i < 7; i++) { const m = new THREE.SpriteMaterial({ map: texOf('star'), color: '#ffffff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), o = new THREE.Sprite(m); g.add(o); sp.push({ o, m, a: i * 0.9 }); }
-      this.anim.push((dt, t) => { g.rotation.y = t * 0.7; g.position.y = y0 + Math.sin(t * 2) * 0.04; halo.opacity = 0.45 + Math.abs(Math.sin(t * 2.2)) * 0.4; halo.color.copy(paint('rainbow', t)); gold.emissiveIntensity = 0.55 + Math.abs(Math.sin(t * 3)) * 0.5;
-        for (const q of sp) { const a = q.a + t * 1.6; q.o.position.set(Math.cos(a) * 0.5, 0.15 + Math.sin(a * 2) * 0.22, Math.sin(a) * 0.5); q.o.scale.setScalar(0.05 + Math.max(0, Math.sin(t * 7 + q.a * 4)) * 0.16); q.m.color.copy(paint('rainbow', t, q.a)); } });
+      const nP = 5 + Math.round(L * 4), gems = [];
+      for (let i = 0; i < nP; i++) { const a = (i / nP) * 6.28, gm = glowM(f.grad ? f.grad[i % f.grad.length] : f.color, 1); part(g, CONE, gold, Math.cos(a) * 0.36, 0.13, Math.sin(a) * 0.36, 0.07, 0.26 + L * 0.12, 0.07); part(g, SPH, gm, Math.cos(a) * 0.36, 0.29 + L * 0.12, Math.sin(a) * 0.36, 0.05 + L * 0.02); gems.push(gm); }
+      const halo = new THREE.SpriteMaterial({ map: texOf('glow'), color: '#ffdf7a', transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }), hs = new THREE.Sprite(halo); hs.scale.setScalar(1.3 + L * 1.1); g.add(hs);
+      // 하드 이상: 왕관 둘레를 거꾸로 도는 보석 띠
+      let ring2 = null; if (L >= 0.2) { ring2 = new THREE.Group(); g.add(ring2); const n2 = 6 + Math.round(L * 8); for (let i = 0; i < n2; i++) { const a = (i / n2) * 6.28; part(ring2, SPH, glowM(f.grad ? f.grad[i % f.grad.length] : '#fff0a0', 0.95), Math.cos(a) * 0.58, 0.12, Math.sin(a) * 0.58, 0.035); } }
+      // 광속 이상: 머리 위로 솟는 빛기둥
+      let beam = null; if (L >= 0.6) { beam = new THREE.SpriteMaterial({ map: texOf('glow'), color: '#ffffff', transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }); const bs = new THREE.Sprite(beam); bs.scale.set(0.55, 3.2 + L * 1.5, 1); bs.position.y = 1.5; g.add(bs); }
+      // 초월: 비스듬히 도는 빛의 고리 두 개
+      const orbits = []; if (L >= 0.8) for (let k = 0; k < 2; k++) { const og = new THREE.Group(); og.rotation.set(k ? 1.1 : -1.1, 0, k ? 0.5 : -0.5); g.add(og); const m = glowM('#ffffff', 0.7), o = part(og, RING, m, 0, 0.15, 0, 0.75 + k * 0.12); o.rotation.x = Math.PI / 2; o.scale.z = 0.25; orbits.push({ og, m, k }); }
+      const sp = []; const nS = 7 + Math.round(L * 14); for (let i = 0; i < nS; i++) { const m = new THREE.SpriteMaterial({ map: texOf('star'), color: '#ffffff', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), o = new THREE.Sprite(m); g.add(o); sp.push({ o, m, a: i * (6.28 / nS) * 1.7, r: 0.5 + (i % 3) * L * 0.18 }); }
+      this.anim.push((dt, t) => { g.rotation.y = t * (0.7 + L * 0.5); g.position.y = y0 + Math.sin(t * 2) * 0.04; halo.opacity = 0.45 + Math.abs(Math.sin(t * 2.2)) * (0.4 + L * 0.2); halo.color.copy(gpaint(f, t)); gold.emissiveIntensity = 0.55 + Math.abs(Math.sin(t * 3)) * (0.5 + L * 0.5);
+        if (L >= 0.8) gold.emissive.copy(gpaint(f, t * 0.6)).lerp(CC2.set('#ffb300'), 0.45);
+        if (ring2) ring2.rotation.y = -t * 2.2;
+        if (beam) { beam.opacity = 0.25 + Math.abs(Math.sin(t * 1.7)) * 0.35; beam.color.copy(gpaint(f, t, 0.5)); }
+        for (const o of orbits) { o.og.rotation.y = t * (o.k ? -1.6 : 1.3); o.m.color.copy(gpaint(f, t, o.k * 0.5)); }
+        for (const q of sp) { const a = q.a + t * (1.6 + L); q.o.position.set(Math.cos(a) * q.r, 0.15 + Math.sin(a * 2) * (0.22 + L * 0.2), Math.sin(a) * q.r); q.o.scale.setScalar(0.05 + Math.max(0, Math.sin(t * 7 + q.a * 4)) * (0.16 + L * 0.08)); q.m.color.copy(gpaint(f, t, q.a)); } });
     });
   }
   // 머리 위에 착용 중인 휘장 이름표 (드림 러너). 등급에 맞춰 빛나고, 전설은 무지개로 돈다
@@ -153,7 +166,7 @@ export class CosFx {
     const m = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }), sp = new THREE.Sprite(m), H = crown ? 3.75 : 3.05; sp.scale.set(2.9, 0.54, 1); sp.position.y = H;
     const gm = new THREE.SpriteMaterial({ map: texOf('glow'), color: f.tierColor, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), gl = new THREE.Sprite(gm); gl.scale.set(Math.min(3.4, (w / 512) * 3.6), 0.9, 1); gl.position.y = H - 0.001;
     this.attach(this.groups, (g) => { g.add(gl, sp); });
-    this.anim.push((dt, t) => { gm.opacity = 0.35 + Math.abs(Math.sin(t * 2.4)) * (0.2 + f.tier * 0.08); if (f.rainbow) gm.color.copy(paint('rainbow', t)); });
+    this.anim.push((dt, t) => { gm.opacity = 0.35 + Math.abs(Math.sin(t * 2.4)) * (0.2 + f.tier * 0.08); if (f.rainbow) gm.color.copy(gpaint(f, t)); });
   }
   // 터지는 효과: jump · land (드림 러너가 부른다)
   fire(name) {

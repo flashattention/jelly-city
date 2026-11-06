@@ -30,7 +30,7 @@ export class BaseRooms {
   toRoom(r, m, except) { const s = JSON.stringify(m); for (const p of r.players) if (p !== except && p.ws?.readyState === 1) p.ws.send(s); }
   roomInfo(r) { return { id: r.id, name: r.name, n: r.players.length, max: this.o.max, state: r.state, host: r.host?.name || '', opts: r.opts }; }
   list() { return [...this.rooms.values()].map((r) => this.roomInfo(r)); }
-  members(r) { return r.players.map((p) => ({ id: p.id, name: p.name, color: p.color, look: p.look, acc: p.acc, host: p === r.host, team: p.team, bot: !!p.bot, title: p.look?.cos?.title || null })); }
+  members(r) { return r.players.map((p) => ({ id: p.id, name: p.name, color: p.color, look: p.look, acc: p.acc, host: p === r.host, team: p.team, bot: !!p.bot, title: p.look?.cos?.title || null, medal: p.look?.cos?.medal || null })); }
   roomUpdate(r) { this.toRoom(r, { t: 'room', room: this.roomInfo(r), members: this.members(r) }); }
   broadcastList() { const s = JSON.stringify({ t: 'rooms', rooms: this.list() }); for (const c of this.clients) if (!c.room && c.hi && c.ws.readyState === 1) c.ws.send(s); }
   needLogin(c) { this.send(c, { t: 'error', code: 'needlogin', text: '방 만들기 · 빠른 참가는 로그인(체험판도 돼요)이 필요해요. 초대 코드로는 바로 들어갈 수 있어요' }); }

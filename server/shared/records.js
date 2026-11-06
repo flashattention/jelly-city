@@ -22,7 +22,7 @@ export class Records {
     try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify(this.data)); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('기록 저장 실패', e); }
   }
   sorted(b) { return Object.entries(this.data[b] || {}).sort((x, y) => (this.better(x[1], y[1]) ? -1 : this.better(y[1], x[1]) ? 1 : x[1].at - y[1].at)); }
-  row(sub, e, i) { return { rank: i + 1, id: sub.slice(-8), title: getCos()?.titleOf(sub) || null, name: e.name, color: e.color, value: e.value, guest: !!e.guest, anon: !!e.anon }; }
+  row(sub, e, i) { return { rank: i + 1, id: sub.slice(-8), title: getCos()?.titleOf(sub) || null, medal: getCos()?.medalOf(sub) || null, name: e.name, color: e.color, value: e.value, guest: !!e.guest, anon: !!e.anon }; }
   top(b, n = 30) { return this.sorted(b).slice(0, n).map(([s, e], i) => this.row(s, e, i)); }
   mine(b, sub) { if (!sub || !this.data[b]?.[sub]) return null; const i = this.sorted(b).findIndex(([s]) => s === sub); return this.row(sub, this.data[b][sub], i); }
   async api(req, res, url, who, json, prefix) {

@@ -15,6 +15,17 @@ const CSS = `
 .cos-title{display:inline-block;margin-left:5px;padding:0 7px;border-radius:999px;font-size:.78em;line-height:1.55;vertical-align:1px;white-space:nowrap;color:#1a1030;background:linear-gradient(100deg,var(--c1),#fff 45%,var(--c1));background-size:220% 100%;animation:cosShine 2.4s linear infinite;box-shadow:0 0 calc(var(--g)*1px) var(--c1)}
 .cos-title.rb{background:linear-gradient(100deg,#ff5c8a,#ffc93c,#5fe0b0,#7fe9ff,#c77dff,#ff5c8a);background-size:300% 100%;animation-name:cosShineRb;animation-duration:1.6s;font-weight:bold}
 /* 무늬 한 장(배경 크기)만큼 정확히 밀어야 끝 프레임이 첫 프레임과 맞물린다: 220% → 이동 1.2배 × 183.33% = 2.2, 300% → 2배 × 150% = 3 */
+.cos-title.p2{box-shadow:0 0 14px var(--c1),0 0 3px #fff inset}
+.cos-title.p3{animation:cosShine 2s linear infinite,cosGlow 1.4s ease-in-out infinite alternate;text-shadow:0 0 4px #fff}
+.cos-title.rb.p3{animation:cosShineRb 1.4s linear infinite,cosGlow 1.4s ease-in-out infinite alternate}
+.cos-title.p4{outline:1.5px solid rgba(255,255,255,.85);outline-offset:1px;animation:cosShineRb 1.2s linear infinite,cosGlow 1s ease-in-out infinite alternate;text-shadow:0 0 5px #fff}
+.cos-title.p5{position:relative;outline:2px solid #fff;outline-offset:1px;padding:0 9px;font-weight:bold;background:linear-gradient(100deg,#ff5c8a,#ffc93c,#5fe0b0,#7fe9ff,#c77dff,#ff5c8a);background-size:300% 100%;animation:cosShineRb .9s linear infinite,cosAura 2.4s linear infinite;text-shadow:0 0 6px #fff}
+.cos-title.p5::after{content:'✦';position:absolute;right:-7px;top:-8px;font-size:11px;color:#fff;text-shadow:0 0 6px #fff,0 0 12px #ffe27a;animation:cosTwinkle 1.2s ease-in-out infinite}
+.cos-title.p5::before{content:'✦';position:absolute;left:-6px;bottom:-7px;font-size:9px;color:#fff;text-shadow:0 0 6px #fff,0 0 12px #7fe9ff;animation:cosTwinkle 1.2s ease-in-out .6s infinite}
+.cos-medal{--c1:#ffc93c}.cos-medal.h0{--c1:#ffd54a}.cos-medal.h1{--c1:#e3ebf5}.cos-medal.h2{--c1:#e0955f}.cos-medal.h3{--c1:#ff7ab0}.cos-medal.h4{--c1:#7fe9ff}.cos-medal.h5{--c1:#e9c46a}
+@keyframes cosGlow{from{box-shadow:0 0 6px var(--c1)}to{box-shadow:0 0 18px var(--c1),0 0 4px #fff}}
+@keyframes cosAura{0%,100%{box-shadow:0 0 12px #ff5c8a,0 0 26px #ff5c8a}25%{box-shadow:0 0 12px #ffc93c,0 0 26px #ffc93c}50%{box-shadow:0 0 12px #7fe9ff,0 0 26px #7fe9ff}75%{box-shadow:0 0 12px #c77dff,0 0 26px #c77dff}}
+@keyframes cosTwinkle{0%,100%{opacity:.2;transform:scale(.6) rotate(0)}50%{opacity:1;transform:scale(1.3) rotate(45deg)}}
 @keyframes cosShine{from{background-position:183.333% 0}to{background-position:0 0}}@keyframes cosShineRb{from{background-position:150% 0}to{background-position:0 0}}
 .cos-toast{position:fixed;left:50%;top:14%;transform:translateX(-50%);z-index:100002;padding:14px 26px;border-radius:18px;background:linear-gradient(120deg,#3a1f6a,#1d1a33);border:2px solid #ffe27a;color:#fff;font-family:'Jua',sans-serif;text-align:center;box-shadow:0 0 40px rgba(255,226,122,.6);animation:cosPop .5s ease-out;pointer-events:none}.cos-toast small{display:block;color:#ffe27a;font-size:14px;margin-bottom:2px}.cos-toast b{font-weight:normal;font-size:22px}
 @keyframes cosPop{from{transform:translateX(-50%) scale(.6);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
@@ -22,10 +33,20 @@ const CSS = `
 function css() { if (!document.getElementById('cw-css')) { const s = document.createElement('style'); s.id = 'cw-css'; s.textContent = CSS; document.head.append(s); } }
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // 이름 옆 칭호 (빛나는 글자). 어느 게임 화면이든 HTML 로 끼워 넣는다
+// 격(pr): 어려운 난이도 1위일수록 더 화려하다 (p1 ~ p5, 초월이 가장 화려)
+// 무지개 칭호: 난이도마다 다른 색으로 돈다 (첫 색을 끝에 한 번 더 넣어 이음매 없이)
+const gradCss = (f, force) => (f?.grad && (f.rainbow || force) ? `;background-image:linear-gradient(100deg,${[...f.grad, f.grad[0]].join(',')});background-size:300% 100%` : '');
+const prCls = (f) => (f?.pr >= 1 ? ` p${Math.min(5, Math.floor(f.pr))}` : '');
 export function titleHtml(id) {
   const it = id && itemById.get(id); if (!it || it.slot !== 'title') return '';
   css(); const t = TIERS[it.rarity] || TIERS.bronze;
-  return `<span class="cos-title${it.fx.rainbow ? ' rb' : ''}" style="--c1:${t.color};--g:${t.n * 3}" title="${esc(ACHIEVEMENTS.find((a) => a.id === it.ach)?.desc || '')}">${it.emoji} ${esc(it.name)}</span>`;
+  return `<span class="cos-title${it.fx.rainbow ? ' rb' : ''}${prCls(it.fx)}" style="--c1:${it.fx.grad && it.fx.rainbow ? it.fx.grad[0] : t.color};--g:${t.n * 3}${gradCss(it.fx)}" title="${esc(ACHIEVEMENTS.find((a) => a.id === it.ach)?.desc || '')}">${it.emoji} ${esc(it.name)}</span>`;
+}
+// 이름 옆 메달 (서버가 지금 가장 높은 순위를 골라 준다: 🥇 1위 → 🥈 2위 → 🥉 3위 → 상위 1% → 5% → 10%)
+export function medalHtml(id) {
+  const it = id && itemById.get(id); if (!it || it.slot !== 'medal') return '';
+  css(); const h = it.fx.honor, t = TIERS[it.rarity] || TIERS.gold;
+  return `<span class="cos-title cos-medal h${h}${h === 0 || h === 3 ? ' rb' : ''}${h === 0 ? prCls(it.fx) : h <= 3 ? prCls({ pr: Math.min(3, it.fx.pr) }) : ''}" style="--g:${t.n * 3}${h === 0 || h === 3 ? gradCss(it.fx, true) : ''}" title="지금 ${esc(it.name)}">${it.emoji}${it.fx.de || ''} ${esc(it.name)}</span>`;
 }
 const anon = () => (account.session ? '' : store.get('dreamrunner.anon') || '');
 const q = () => (anon() ? `?anon=${anon()}` : '');
@@ -79,7 +100,7 @@ export async function openWardrobe(tab = 'ach', onChange) {
   const card = (html, cls, click) => { const d = document.createElement('div'); d.className = `cw-it ${cls}`; d.innerHTML = html; if (click) d.onclick = click; return d; };
   const stars = (n) => `⭐ ${Number(n).toLocaleString()}`;
   function drawEq() {
-    const e = C.equip || {}; $('.cw-eq').innerHTML = Object.entries(SLOTS).filter(([s]) => e[s]).map(([s, v]) => `${v.emoji} ${v.name}: <b>${esc(itemById.get(e[s])?.name || '')}</b><button data-off="${s}">벗기</button>`).join('<br>') || '<div style="text-align:center">아직 입은 게 없어요</div>';
+    const e = C.equip || {}; $('.cw-eq').innerHTML = Object.entries(SLOTS).filter(([s]) => e[s]).map(([s, v]) => `${v.emoji} ${v.name}: <b>${esc(itemById.get(e[s])?.name || '')}</b>${SLOTS[s].auto ? '' : `<button data-off="${s}">벗기</button>`}`).join('<br>') || '<div style="text-align:center">아직 입은 게 없어요</div>';
     for (const b of $('.cw-eq').querySelectorAll('[data-off]')) b.onclick = () => post('/api/cos/equip', { slot: b.dataset.off, id: null });
   }
   function draw() {
@@ -89,12 +110,15 @@ export async function openWardrobe(tab = 'ach', onChange) {
       const done = Object.keys(C.ach || {}).length; sum.innerHTML = `달성 ${done} / ${ACHIEVEMENTS.length}<div class="cw-bar"><i style="width:${(done / ACHIEVEMENTS.length) * 100}%"></i></div>`;
       chips([['all', '전체'], ['done', '✅ 달성'], ...Object.entries(GAMES).map(([k, g]) => [k, `${g.emoji} ${g.name}`])], S.game, (k) => { S.game = k; });
       const rows = ACHIEVEMENTS.filter((a) => (S.game === 'all' ? true : S.game === 'done' ? C.ach?.[a.id] : a.game === S.game)).sort((a, b) => (!!C.ach?.[b.id] - !!C.ach?.[a.id]) || (TIERS[b.tier].n - TIERS[a.tier].n));
-      for (const a of rows.slice(0, 180)) { const T = TIERS[a.tier], ok = !!C.ach?.[a.id], rw = [`🏷️ 칭호`, T.n >= 3 && '🎗️ 휘장', a.rule.crown && '👑 왕관'].filter(Boolean).join(' · '), g = GAMES[a.game]; list.append(card(`<div class="cw-n">${g?.emoji || '🏆'} ${esc(a.name)}</div><div class="cw-s">${esc(a.desc)}</div><div class="cw-r" style="color:${T.color}">${T.name} 등급 · ${rw}${ok ? ' · ✅' : ''}</div>`, ok ? '' : 'lock', null)); }
+      for (const a of rows.slice(0, 180)) { const T = TIERS[a.tier], ok = !!C.ach?.[a.id], rw = [`🏷️ 칭호`, T.n >= 3 && '🎗️ 휘장', a.rule.crown && '👑 왕관', (a.rule.crown || a.rule.pct || a.rule.rank === 3) && '🎖️ 메달'].filter(Boolean).join(' · '), g = GAMES[a.game]; list.append(card(`<div class="cw-n">${g?.emoji || '🏆'} ${esc(a.name)}</div><div class="cw-s">${esc(a.desc)}</div><div class="cw-r" style="color:${T.color}">${T.name} 등급 · ${rw}${ok ? ' · ✅' : ''}</div>`, ok ? '' : 'lock', null)); }
       if (rows.length > 180) list.append(card(`<div class="cw-s">게임을 골라 나머지 ${rows.length - 180}개를 볼 수 있어요</div>`, ''));
     } else if (S.tab === 'closet') {
       sum.textContent = '가진 치장은 모든 게임에서 보여요. 2D 게임에서는 칭호가 이름 옆에 빛나요';
       chips(Object.entries(SLOTS).map(([k, v]) => [k, `${v.emoji} ${v.name}`]), S.slot, (k) => { S.slot = k; });
-      const mine = [...itemById.values()].filter((i) => i.slot === S.slot && owns(i));
+      const mine = [...itemById.values()].filter((i) => i.slot === S.slot && owns(i)).sort((a, b) => S.slot === 'medal' ? a.fx.honor - b.fx.honor || b.fx.pr - a.fx.pr : 0);
+      if (S.slot === 'medal') { list.append(card(`<div class="cw-s">🎖️ 메달은 고르지 않아도 돼요. 지금 가장 높은 순위 하나가 이름 옆에 저절로 붙어요 (🥇 1위 → 🥈 2위 → 🥉 3위 → 상위 1% → 5% → 10%, 같으면 더 어려운 순위표). 자리를 내주면 다음 메달로 바뀌어요</div>`, ''));
+        for (const it of mine) list.append(card(`<div class="cw-n">${medalHtml(it.id)}</div><div class="cw-r">${C.equip?.medal === it.id ? '✅ 지금 붙어 있어요' : '지금 자리에 있어요'}</div>`, C.equip?.medal === it.id ? 'on' : ''));
+        if (!mine.length) list.append(card(`<div class="cw-s">아직 없어요. 순위표 3위 안이나 상위 10% 안에 들면 생겨요</div>`, '')); return; }
       if (!mine.length) list.append(card(`<div class="cw-s">아직 없어요. ${SLOTS[S.slot].sub}${S.slot === 'crown' ? ' · 지금 1위인 순위표의 왕관만 쓸 수 있어요' : ['sash', 'title'].includes(S.slot) ? ' · 업적을 달성하면 얻어요 (1위 칭호는 1위인 동안만)' : ' · 별 상점에서 살 수 있어요'}</div>`, ''));
       for (const it of mine) { const on = C.equip?.[S.slot] === it.id, rc = RARITY[it.rarity]?.color || TIERS[it.rarity]?.color; const d = card(`<div class="cw-n">${it.emoji} ${esc(it.name)}</div><div class="cw-r" style="color:${rc}">${RARITY[it.rarity]?.name || TIERS[it.rarity]?.name}</div><button class="cw-b">${on ? '벗기' : '입기'}</button>`, on ? 'on' : ''); d.querySelector('button').onclick = () => post('/api/cos/equip', { slot: S.slot, id: on ? null : it.id }); list.append(d); }
     } else {

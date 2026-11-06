@@ -3,12 +3,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { readJson } from './auth.js';
-import { ACHIEVEMENTS, achById, SHOP, itemById, cleanCos, starsEarned, reqText } from '../public/shared/js/cos-items.js';
+import { ACHIEVEMENTS, achById, SHOP, ITEMS, PCT_MIN, itemById, cleanCos, starsEarned, reqText } from '../public/shared/js/cos-items.js';
 
 const ANON = /^[a-f0-9]{16,40}$/, MAX_STARS_RUN = 6000;
 // 순위 업적은 겨룬 사람이 있어야 인정한다 (빈 순위표의 1위는 왕관이 아니다)
-const MIN_FIELD = { 1: 5, 3: 10, 10: 20 };
+const MIN_FIELD = { 1: 5, 2: 10, 3: 10, 10: 20 };
 let inst = null;
+// 순위 조건: 몇 위 안 (rank) 또는 상위 몇 % (pct). n = 순위표 사람 수
+const placed = (r, rank, n) => (r.pct ? n >= PCT_MIN[r.pct] && rank <= Math.max(1, Math.ceil((n * r.pct) / 100)) : n >= MIN_FIELD[r.rank] && (r.exact ? rank === r.rank : rank <= r.rank));
+// 훈장: 업적 id → 훈장 아이템
+const medalByAch = new Map(); for (const i of ITEMS) if (i.slot === 'medal') { if (!medalByAch.has(i.ach)) medalByAch.set(i.ach, []); medalByAch.get(i.ach).push(i); }
 export const getCos = () => inst;
 // 방 참가할 때: 그 계정의 진짜 착용 정보로 바꾼다
 export function trustLook(look, sub) {
@@ -24,7 +28,7 @@ export class Cosmetics {
   }
   save() { if (!this.dirty) return; this.dirty = false; try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ users: this.users })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('치장 저장 실패', e.message); } }
   u(sub) { return (this.users[sub] ||= { stars: 0, total: 0, owned: [], equip: {}, ach: {}, plays: {}, wins: {}, pvp: {}, fresh: [] }); }
-  equipOf(sub) { const u = this.users[sub]; if (!u) return null; const eq = { ...u.equip }; for (const sl of ['crown', 'title']) if (eq[sl] && !this.owns(sub, eq[sl])) delete eq[sl]; return cleanCos(eq); }
+  equipOf(sub) { const u = this.users[sub]; if (!u) return null; const eq = { ...u.equip }; for (const sl of ['crown', 'title']) if (eq[sl] && !this.owns(sub, eq[sl])) delete eq[sl]; delete eq.medal; const md = this.medalOf(sub); if (md) eq.medal = md; return cleanCos(eq); }
   titleOf(sub) { const id = this.users[sub]?.equip?.title; return id && itemById.has(id) && this.owns(sub, id) ? id : null; }
   owns(sub, id) { const u = this.users[sub], it = itemById.get(id); if (!u || !it) return false; if (it.shop) return u.owned.includes(id); return this.live(it) ? this.holdsNow(sub, it) : !!u.ach[it.ach]; }
   // 한 판 끝: 별을 지갑에 넣는다 (난이도 · 지옥이면 더 많이)
@@ -38,10 +42,10 @@ export class Cosmetics {
     const dreamRow = (m, d) => { const k = `d:${m}:${d}`; if (!cache.has(k)) cache.set(k, this.dream?.mine(sub, 'speed', d, m) || null); return cache.get(k); };
     const recRow = (g, b) => { const k = `r:${g}:${b}`; if (!cache.has(k)) { const R = rec(g), e = R?.data[b]?.[sub]; cache.set(k, e ? { rank: R.sorted(b).findIndex(([x]) => x === sub) + 1, value: e.value } : null); } return cache.get(k); }; // mine() 은 칭호를 다시 물어서 쓰지 않는다
     switch (r.kind) {
-      case 'dream': { const m = dreamRow(r.map, r.diff); return !!m && !this.dream.table('speed', r.diff, r.map)[sub]?.u && m.rank <= r.rank && Object.keys(this.dream.table('speed', r.diff, r.map)).length >= MIN_FIELD[r.rank]; }
+      case 'dream': { const m = dreamRow(r.map, r.diff); return !!m && !this.dream.table('speed', r.diff, r.map)[sub]?.u && placed(r, m.rank, Object.keys(this.dream.table('speed', r.diff, r.map)).length); }
       case 'dreamDist': { const e = this.dream?.table('speed', r.diff, r.map)?.[sub]; return !!e && !e.u && e.dist >= r.value; }
       case 'starTotal': return u.total >= r.value;
-      case 'record': { const m = recRow(r.game, r.board); return !!m && m.rank <= r.rank && Object.keys(rec(r.game).data[r.board] || {}).length >= MIN_FIELD[r.rank]; }
+      case 'record': { const m = recRow(r.game, r.board); return !!m && placed(r, m.rank, Object.keys(rec(r.game).data[r.board] || {}).length); }
       case 'recordVal': { const m = recRow(r.game, r.board); return !!m && m.value >= r.value; }
       case 'plays': return (r.game === 'dream-runner' ? this.dream?.stats?.[sub]?.runs || 0 : u.plays[r.game] || 0) >= r.value;
       case 'wins': return (u.wins[r.game] || 0) >= r.value;
@@ -50,8 +54,14 @@ export class Cosmetics {
     }
   }
   // 1위 업적의 왕관 · 칭호는 지금 1위인 동안만 쓴다 (업적 기록은 남는다)
-  live(it) { return (it.slot === 'crown' || it.slot === 'title') && !!achById.get(it.ach)?.rule.crown; }
-  holdsNow(sub, it, cache) { const a = achById.get(it.ach); return !!a && !!this.users[sub]?.ach[a.id] && this.meets(sub, a.rule, cache); }
+  live(it) { return it.slot === 'medal' || ((it.slot === 'crown' || it.slot === 'title') && !!achById.get(it.ach)?.rule.crown); }
+  // 이름 옆 메달: 지금 자리 중 가장 높은 것 (1위 → 2위 → 3위 → 상위 1% → 5% → 10%, 같으면 어려운 순위표)
+  medalOf(sub) {
+    const u = this.users[sub]; if (!u) return null; const cache = new Map(); let best = null;
+    for (const id of Object.keys(u.ach)) for (const it of medalByAch.get(id) || []) { if (best && (it.fx.honor > best.fx.honor || (it.fx.honor === best.fx.honor && it.fx.pr <= best.fx.pr))) continue; if (this.holdsNow(sub, it, cache)) best = it; }
+    return best?.id || null;
+  }
+  holdsNow(sub, it, cache) { const a = achById.get(it.ach); return !!a && !!this.users[sub]?.ach[a.id] && this.meets(sub, it.rule || a.rule, cache); }
   // 기록 · 순위를 보고 새로 달성한 업적을 적는다 (예전 기록도 여기서 인정된다)
   refresh(sub) {
     const u = this.u(sub), cache = new Map();
@@ -79,7 +89,7 @@ export class Cosmetics {
     u.stars -= it.price; u.owned.push(id); this.dirty = true;
   }
   equip(sub, slot, id) {
-    const u = this.u(sub); if (!id) { delete u.equip[slot]; this.dirty = true; return; }
+    if (slot === 'medal') throw new Error('메달은 저절로 붙어요'); const u = this.u(sub); if (!id) { delete u.equip[slot]; this.dirty = true; return; }
     const it = itemById.get(id); if (!it || it.slot !== slot) throw new Error('그 칸에 쓸 수 없어요'); if (!this.owns(sub, id)) throw new Error('아직 가지고 있지 않아요');
     u.equip[slot] = id; this.dirty = true;
   }

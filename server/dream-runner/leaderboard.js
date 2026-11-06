@@ -43,7 +43,7 @@ export class DreamBoard {
   table(mode, diff, map = 'dream') { if (map === 'hell') return (this.boards[`hell:${mode}:${diff}`] ||= {}); if (diff !== 'easy') return (this.boards[`${mode}:${diff}`] ||= {}); return mode === 'item' ? this.bestItem : this.best; }
   sorted(mode, diff, map) { return Object.entries(this.table(mode, diff, map)).sort((a, b) => b[1].score - a[1].score || a[1].at - b[1].at); }
   top(mode, diff, map) {
-    return this.sorted(mode, diff, map).slice(0, TOP).map(([sub, e], i) => ({ rank: i + 1, id: sub.slice(-8), title: getCos()?.titleOf(sub) || null, name: e.name, color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon }));
+    return this.sorted(mode, diff, map).slice(0, TOP).map(([sub, e], i) => ({ rank: i + 1, id: sub.slice(-8), title: getCos()?.titleOf(sub) || null, medal: getCos()?.medalOf(sub) || null, name: e.name, color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon }));
   }
   mine(sub, mode, diff, map) {
     const T = this.table(mode, diff, map);

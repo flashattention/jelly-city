@@ -5,7 +5,7 @@ import { DEFAULT_CHAR_KEY, charLook } from './char-studio.js';
 import { localChars, LOCAL_MAX, isLocal, updateLocal } from './local-chars.js';
 import { Chat } from './chat.js';
 import { openPatchNotes, showWhatsNew, pageGame } from './patchnotes.js';
-import { openWardrobe, notifyNew, titleHtml } from './wardrobe.js';
+import { openWardrobe, notifyNew, titleHtml, medalHtml } from './wardrobe.js';
 
 const $ = (id) => document.getElementById(id);
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -290,7 +290,7 @@ export class Shell {
     $('team-row').classList.toggle('hidden', !r.opts?.team);
     const el = $('members'); el.innerHTML = '';
     el.className = r.opts?.team ? 'teams' : '';
-    const row = (m) => `<div class="mem${m.id === this.myId ? ' me' : ''}"><span class="dot" style="background:${esc(m.color)}"></span>${m.host ? '👑 ' : ''}${m.bot ? '🤖 ' : ''}${esc(m.name)}${titleHtml(m.title)}</div>`;
+    const row = (m) => `<div class="mem${m.id === this.myId ? ' me' : ''}"><span class="dot" style="background:${esc(m.color)}"></span>${m.host ? '👑 ' : ''}${m.bot ? '🤖 ' : ''}${esc(m.name)}${medalHtml(m.medal)}${titleHtml(m.title)}</div>`;
     if (r.opts?.team) {
       for (const k of ['red', 'blue']) {
         const list = this.members.filter((m) => m.team === k);

@@ -3,7 +3,7 @@
 export const SLOTS = {
   aura: { name: '오라', emoji: '✨', sub: '몸을 감싸는 빛' }, shoes: { name: '신발', emoji: '👟', sub: '발에 신는 것' }, back: { name: '등 장식', emoji: '🪽', sub: '날개와 빛' },
   trail: { name: '발자취', emoji: '🐾', sub: '달리면 남는 자국' }, jump: { name: '2단 점프', emoji: '🌟', sub: '드림 러너 2단 점프 효과' }, boost: { name: '가속', emoji: '🚀', sub: '드림 러너 가속 효과' }, land: { name: '착지', emoji: '💥', sub: '드림 러너 착지 효과' },
-  sash: { name: '휘장', emoji: '🎗️', sub: '업적으로만 얻는 어깨띠' }, crown: { name: '왕관', emoji: '👑', sub: '지금 1위인 동안만 쓰는 왕관' }, title: { name: '칭호', emoji: '🏷️', sub: '이름 옆에 빛나는 글자' },
+  sash: { name: '휘장', emoji: '🎗️', sub: '업적으로만 얻는 어깨띠' }, crown: { name: '왕관', emoji: '👑', sub: '지금 1위인 동안만 쓰는 왕관' }, medal: { name: '훈장', emoji: '🎖️', sub: '지금 가장 높은 순위(🥇 1위 → 🥈 2위 → 🥉 3위 → 상위 1% → 5% → 10%)가 이름 옆에 저절로 붙어요', auto: true }, title: { name: '칭호', emoji: '🏷️', sub: '이름 옆에 빛나는 글자' },
 };
 export const RARITY = {
   common: { name: '일반', color: '#c8d0dc' }, rare: { name: '희귀', color: '#5fb6ff' }, epic: { name: '영웅', color: '#c77dff' }, legend: { name: '전설', color: '#ffc93c' }, myth: { name: '신화', color: '#ff5c8a' },
@@ -110,14 +110,30 @@ const RECORD_GAMES = {
   'jelly-drift': { boards: { candy: '사탕', cloud: '구름', neon: '네온', lava: '용암', sakura: '벚꽃', synth: '신스', snow: '눈', deep: '심해', hairpin: '헤어핀', choco: '초코', crystal: '수정', steam: '증기', park: '공원', rainbow: '무지개', moon: '달', chess: '체스' }, steps: [], lower: true, unit: '초' },
 };
 export const RECORD_GAME_KEYS = Object.keys(RECORD_GAMES);
+// 상위 % 업적은 이만큼 겨룬 순위표에서만 (사람이 적으면 1위와 다를 게 없다)
+export const PCT_MIN = { 1: 100, 5: 40, 10: 20 };
+// 훈장(메달): 0 = 🥇 1위, 1 = 🥈 2위, 2 = 🥉 3위, 3 = 상위 1%, 4 = 5%, 5 = 10%. 숫자가 작을수록 먼저 보인다
+//   [순서, 열쇠 업적 꼬리, 지금 확인할 조건, 아이콘, 이름 꼬리]
+export const MEDALS = [[0, 'r1', { rank: 1 }, '🥇', '1위'], [1, 'r3', { rank: 2, exact: true }, '🥈', '2위'], [2, 'r3', { rank: 3, exact: true }, '🥉', '3위'], [3, 'p1', { pct: 1 }, '💎', '상위 1%'], [4, 'p5', { pct: 5 }, '🏅', '상위 5%'], [5, 'p10', { pct: 10 }, '🎖️', '상위 10%']];
+// 순위 업적의 격: 어려운 난이도 · 지옥일수록 높다 (1 ~ 5.5). 높을수록 왕관 · 칭호 · 휘장이 화려하다
+const DIFF_ORDER = ['easy', 'hard', 'extreme', 'lightspeed', 'beyond'];
+// 드림 러너 난이도마다 아이콘 · 무지개 색이 다르다 (지옥은 끝에 용암색이 섞인다)
+export const DIFF_STYLE = {
+  easy: { e: '🙂', grad: ['#5fe0b0', '#b8f5c8', '#4cc3ff'] }, hard: { e: '🔥', grad: ['#ff5c3a', '#ffa23a', '#ffd27a'] }, extreme: { e: '💀', grad: ['#ff2e63', '#b026ff', '#ff7ab0'] },
+  lightspeed: { e: '⚡', grad: ['#ffee70', '#7ff0ff', '#4d7cff'] }, beyond: { e: '🌌', grad: ['#ff5c8a', '#ffc93c', '#5fe0b0', '#7fe9ff', '#c77dff'] },
+};
+const styleOf = (r) => { const d = r?.diff && DIFF_STYLE[r.diff]; return d ? { e: d.e, grad: r.map === 'hell' ? [...d.grad, '#ff3a1a'] : d.grad } : null; };
+export const prestigeOf = (r) => (r?.kind === 'dream' ? 1 + Math.max(0, DIFF_ORDER.indexOf(r.diff)) + (r.map === 'hell' ? 0.5 : 0) : r?.kind === 'record' ? 1 : 0);
 const TIER_STEP = ['bronze', 'silver', 'gold', 'platinum', 'legend'];
 const ach = (id, game, name, desc, tier, rule) => ({ id, game, name, desc, tier, rule });
 function buildAch() {
   const A = [];
+  // 순위 업적: 1위 → 상위 1% → 5% → 10% → 3위권 → 10위권 순서로 보인다
   const rankSet = (base, game, label, rule) => {
+    A.push(ach(`${base}.r1`, game, `${label} 1위`, `${label} 순위표 1위에 오르기 (5명 이상 겨룬 순위표) · 1위인 동안 왕관 · 1위 칭호 · 🥇 메달이 붙어요`, 'legend', { ...rule, rank: 1, crown: true }));
+    for (const [p, t] of [[1, 'legend'], [5, 'platinum'], [10, 'gold']]) A.push(ach(`${base}.p${p}`, game, `${label} 상위 ${p}%`, `${label} 순위표 상위 ${p}% 안에 들기 (${PCT_MIN[p]}명 이상 겨룬 순위표) · 그 자리에 있는 동안 메달이 붙어요`, t, { ...rule, pct: p }));
+    A.push(ach(`${base}.r3`, game, `${label} 3위권`, `${label} 순위표 3위 안에 들기 (10명 이상 겨룬 순위표) · 2위 · 3위인 동안 🥈 · 🥉 메달이 붙어요`, 'platinum', { ...rule, rank: 3 }));
     A.push(ach(`${base}.r10`, game, `${label} 10위권`, `${label} 순위표 10위 안에 들기 (20명 이상 겨룬 순위표)`, 'silver', { ...rule, rank: 10 }));
-    A.push(ach(`${base}.r3`, game, `${label} 3위권`, `${label} 순위표 3위 안에 들기 (10명 이상 겨룬 순위표)`, 'platinum', { ...rule, rank: 3 }));
-    A.push(ach(`${base}.r1`, game, `${label} 1위`, `${label} 순위표 1위에 오르기 (5명 이상 겨룬 순위표) · 1위인 동안 왕관과 1위 칭호를 쓸 수 있어요`, 'legend', { ...rule, rank: 1, crown: true }));
   };
   // 드림 러너: 맵 × 난이도마다 순위 · 거리
   const STEP = { easy: [1000, 3000, 6000, 12000], hard: [800, 2000, 4000, 8000], extreme: [500, 1500, 3000, 6000], lightspeed: [500, 1200, 2500, 5000], beyond: [300, 800, 2000, 4000] };
@@ -151,10 +167,13 @@ const gameColor = (a) => GAMES[a.game]?.color || '#ffc93c';
 function rewardItems() {
   const out = [];
   for (const a of ACHIEVEMENTS) {
-    const T = TIERS[a.tier], fx = { tier: T.n, color: gameColor(a), tierColor: T.color, glow: T.glow, rainbow: a.tier === 'legend' };
-    out.push({ id: `title.${a.id}`, slot: 'title', name: a.name, emoji: GAMES[a.game]?.emoji || '🏆', ach: a.id, rarity: a.tier, fx });
+    const T = TIERS[a.tier], pr = a.rule.rank || a.rule.pct ? prestigeOf(a.rule) : 0, st = styleOf(a.rule), fx = { tier: T.n, color: gameColor(a), tierColor: T.color, glow: T.glow, rainbow: a.tier === 'legend', pr, ...(st ? { grad: st.grad, de: st.e } : {}) };
+    out.push({ id: `title.${a.id}`, slot: 'title', name: a.name, emoji: st?.e || GAMES[a.game]?.emoji || '🏆', ach: a.id, rarity: a.tier, fx });
     if (T.n >= 3) out.push({ id: `sash.${a.id}`, slot: 'sash', name: `${a.name} 휘장`, emoji: '🎗️', ach: a.id, rarity: a.tier, fx });
     if (a.rule.crown) out.push({ id: `crown.${a.id}`, slot: 'crown', name: `${a.name} 왕관`, emoji: '👑', ach: a.id, rarity: 'legend', fx });
+    // 메달: 열쇠 업적(1위 · 3위권 · 상위 %)을 가진 사람 중 지금 그 자리인 사람에게 붙는다
+    const tail = a.id.slice(a.id.lastIndexOf('.') + 1), base = a.id.slice(0, a.id.lastIndexOf('.')), label = a.name.replace(/ (1위|3위권|상위 \d+%)$/, '');
+    for (const [h, key, cond, em, nm] of MEDALS) if (key === tail) { const { rank, pct, crown, ...rest } = a.rule; out.push({ id: `medal.${base}.m${h}`, slot: 'medal', name: `${label} ${nm}`, emoji: em, ach: a.id, rule: { ...rest, ...cond }, rarity: ['legend', 'platinum', 'gold', 'legend', 'platinum', 'gold'][h], fx: { ...fx, honor: h }, auto: true }); }
   }
   return out;
 }
