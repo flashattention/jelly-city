@@ -13,8 +13,9 @@ const CSS = `
 .cw-sum{padding:10px 14px 0;color:#c9cce0;font-size:14px}.cw-bar{height:8px;margin-top:5px;border-radius:5px;background:rgba(255,255,255,.12);overflow:hidden}.cw-bar i{display:block;height:100%;background:linear-gradient(90deg,#ff5c8a,#ffc93c,#7fe9ff)}
 .cw-msg{padding:0 16px 8px;min-height:18px;color:#ffb3b3;font-size:13px}
 .cos-title{display:inline-block;margin-left:5px;padding:0 7px;border-radius:999px;font-size:.78em;line-height:1.55;vertical-align:1px;white-space:nowrap;color:#1a1030;background:linear-gradient(100deg,var(--c1),#fff 45%,var(--c1));background-size:220% 100%;animation:cosShine 2.4s linear infinite;box-shadow:0 0 calc(var(--g)*1px) var(--c1)}
-.cos-title.rb{background:linear-gradient(100deg,#ff5c8a,#ffc93c,#5fe0b0,#7fe9ff,#c77dff,#ff5c8a);background-size:300% 100%;animation-duration:1.6s;font-weight:bold}
-@keyframes cosShine{from{background-position:220% 0}to{background-position:0 0}}
+.cos-title.rb{background:linear-gradient(100deg,#ff5c8a,#ffc93c,#5fe0b0,#7fe9ff,#c77dff,#ff5c8a);background-size:300% 100%;animation-name:cosShineRb;animation-duration:1.6s;font-weight:bold}
+/* 무늬 한 장(배경 크기)만큼 정확히 밀어야 끝 프레임이 첫 프레임과 맞물린다: 220% → 이동 1.2배 × 183.33% = 2.2, 300% → 2배 × 150% = 3 */
+@keyframes cosShine{from{background-position:183.333% 0}to{background-position:0 0}}@keyframes cosShineRb{from{background-position:150% 0}to{background-position:0 0}}
 .cos-toast{position:fixed;left:50%;top:14%;transform:translateX(-50%);z-index:100002;padding:14px 26px;border-radius:18px;background:linear-gradient(120deg,#3a1f6a,#1d1a33);border:2px solid #ffe27a;color:#fff;font-family:'Jua',sans-serif;text-align:center;box-shadow:0 0 40px rgba(255,226,122,.6);animation:cosPop .5s ease-out;pointer-events:none}.cos-toast small{display:block;color:#ffe27a;font-size:14px;margin-bottom:2px}.cos-toast b{font-weight:normal;font-size:22px}
 @keyframes cosPop{from{transform:translateX(-50%) scale(.6);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
 @media(max-width:720px){.cw-left{display:none}.cw-card{height:94vh}}`;
