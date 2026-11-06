@@ -225,7 +225,7 @@ game.pickMode = store.get(MODE_KEY) === 'item' ? 'item' : 'speed';
 segSet('mode-pick', game.pickMode);
 for (const b of $('mode-pick').children) b.onclick = () => { game.pickMode = b.dataset.m; store.set(MODE_KEY, game.pickMode); segSet('mode-pick', game.pickMode); };
 for (const b of $('room-mode').children) b.onclick = () => net.send({ t: 'mode', mode: b.dataset.m });
-// 난이도: 길은 같고 빠르기만 다르다 (이지 · 노멀 · 하드 · 익스트림 · 광속 · 초월)
+// 난이도: 길은 같고 빠르기만 다르다 (노멀 · 하드 · 익스트림 · 광속 · 초월)
 const diffName = (d) => DIFFS[diffOf(d)].name;
 for (const id of ['diff-pick', 'room-diff', 'board-diff']) $(id).innerHTML = Object.entries(DIFFS).map(([k, d]) => `<button data-m="${k}">${d.name}</button>`).join('');
 game.pickDiff = diffOf(store.get(DIFF_KEY));

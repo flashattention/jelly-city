@@ -86,12 +86,12 @@ export const SHOP = [
   it('land', 'meteor', '운석 충돌', '☄️', 12000, 'legend', { shape: 'flame', colors: ['#ff8a3d', '#ffd27a'], n: 26, size: 0.5, ring: '#ff5a1f' }, R('extreme', 1500)),
 ];
 // 난이도 · 맵별 별 보상 배수 (어려울수록 많이)
-export const STAR_MULT = { easy: 1, normal: 1.25, hard: 1.6, extreme: 2.2, lightspeed: 3.2, beyond: 4.5 };
+export const STAR_MULT = { easy: 1, hard: 1.6, extreme: 2.2, lightspeed: 3.2, beyond: 4.5 };
 export const HELL_MULT = 1.5;
 export const starsEarned = (stars, diff, map) => Math.floor((Number(stars) || 0) * (STAR_MULT[diff] || 1) * (map === 'hell' ? HELL_MULT : 1));
 
 // ---------- 업적 ----------
-const DIFF_NAMES = { easy: '이지', normal: '노멀', hard: '하드', extreme: '익스트림', lightspeed: '광속', beyond: '초월' }, MAPS = { dream: '꿈나라', hell: '지옥' };
+const DIFF_NAMES = { easy: '노멀', hard: '하드', extreme: '익스트림', lightspeed: '광속', beyond: '초월' }, MAPS = { dream: '꿈나라', hell: '지옥' };
 export const GAMES = {
   'dream-runner': { name: '드림 러너', emoji: '🌙', color: '#8f7bff' }, 'jelly-guard': { name: '젤리수호대', emoji: '🛡️', color: '#4cc3ff' }, 'jelly-arena': { name: '젤리 아레나', emoji: '⚔️', color: '#ff5c5c' },
   'jelly-tactical': { name: '젤리택티컬', emoji: '🎯', color: '#7ee081' }, 'jelly-drop': { name: '젤리드롭', emoji: '🪂', color: '#ffb347' }, 'jelly-drift': { name: '젤리드리프트', emoji: '🏎️', color: '#ff7ac6' },
@@ -120,7 +120,7 @@ function buildAch() {
     A.push(ach(`${base}.r1`, game, `${label} 1위`, `${label} 순위표 1위에 오르기 (5명 이상 겨룬 순위표) · 1위인 동안 왕관과 1위 칭호를 쓸 수 있어요`, 'legend', { ...rule, rank: 1, crown: true }));
   };
   // 드림 러너: 맵 × 난이도마다 순위 · 거리
-  const STEP = { easy: [1000, 3000, 6000, 12000], normal: [1000, 3000, 6000, 10000], hard: [800, 2000, 4000, 8000], extreme: [500, 1500, 3000, 6000], lightspeed: [500, 1200, 2500, 5000], beyond: [300, 800, 2000, 4000] };
+  const STEP = { easy: [1000, 3000, 6000, 12000], hard: [800, 2000, 4000, 8000], extreme: [500, 1500, 3000, 6000], lightspeed: [500, 1200, 2500, 5000], beyond: [300, 800, 2000, 4000] };
   for (const [m, mn] of Object.entries(MAPS)) for (const [d, dn] of Object.entries(DIFF_NAMES)) {
     const base = `dr.${m}.${d}`, label = `${mn} ${dn}`;
     rankSet(base, 'dream-runner', label, { kind: 'dream', map: m, diff: d });

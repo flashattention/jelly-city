@@ -21,7 +21,7 @@ export class DreamBoard {
     this.file = path.join(dataDir, 'dream-runner.json');
     this.best = {};   // 스피드전: sub → { name, color, score, dist, stars, themes, time, at, guest }
     this.bestItem = {}; // 아이템전
-    this.boards = {};   // 이지 말고 다른 난이도: 'speed:hard' → { sub → 기록 } (이지는 위 둘을 그대로 쓴다)
+    this.boards = {};   // 노멀(easy) 말고 다른 난이도: 'speed:hard' → { sub → 기록 } (노멀은 위 둘을 그대로 쓴다)
     this.stats = {};    // sub → { runs, time, by: { easy: { runs, time } } } (순위와 상관없이 달린 판수 · 시간)
     this.runs = 0; this.pending = []; this.secret = crypto.randomBytes(24).toString('hex'); this.vstat = { ok: 0, bad: 0, none: 0, skip: 0 }; this.dayStars = new Map();
     this.lastPost = new Map();
@@ -39,7 +39,7 @@ export class DreamBoard {
     this.dirty = false;
     try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ best: this.best, bestItem: this.bestItem, boards: this.boards, stats: this.stats, runs: this.runs, pending: this.pending, secret: this.secret })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('드림 러너 저장 실패', e); }
   }
-  // map: 'hell' 은 난이도마다 따로 (꿈나라 이지는 예전 표 그대로)
+  // map: 'hell' 은 난이도마다 따로 (꿈나라 노멀은 예전 표 그대로)
   table(mode, diff, map = 'dream') { if (map === 'hell') return (this.boards[`hell:${mode}:${diff}`] ||= {}); if (diff !== 'easy') return (this.boards[`${mode}:${diff}`] ||= {}); return mode === 'item' ? this.bestItem : this.best; }
   sorted(mode, diff, map) { return Object.entries(this.table(mode, diff, map)).sort((a, b) => b[1].score - a[1].score || a[1].at - b[1].at); }
   top(mode, diff, map) {
