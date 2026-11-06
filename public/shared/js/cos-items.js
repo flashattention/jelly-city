@@ -3,7 +3,7 @@
 export const SLOTS = {
   aura: { name: '오라', emoji: '✨', sub: '몸을 감싸는 빛' }, shoes: { name: '신발', emoji: '👟', sub: '발에 신는 것' }, back: { name: '등 장식', emoji: '🪽', sub: '날개와 빛' },
   trail: { name: '발자취', emoji: '🐾', sub: '달리면 남는 자국' }, jump: { name: '2단 점프', emoji: '🌟', sub: '드림 러너 2단 점프 효과' }, boost: { name: '가속', emoji: '🚀', sub: '드림 러너 가속 효과' }, land: { name: '착지', emoji: '💥', sub: '드림 러너 착지 효과' },
-  sash: { name: '휘장', emoji: '🎗️', sub: '업적으로만 얻는 어깨띠' }, crown: { name: '왕관', emoji: '👑', sub: '1위만 쓰는 왕관' }, title: { name: '칭호', emoji: '🏷️', sub: '이름 옆에 빛나는 글자' },
+  sash: { name: '휘장', emoji: '🎗️', sub: '업적으로만 얻는 어깨띠' }, crown: { name: '왕관', emoji: '👑', sub: '지금 1위인 동안만 쓰는 왕관' }, title: { name: '칭호', emoji: '🏷️', sub: '이름 옆에 빛나는 글자' },
 };
 export const RARITY = {
   common: { name: '일반', color: '#c8d0dc' }, rare: { name: '희귀', color: '#5fb6ff' }, epic: { name: '영웅', color: '#c77dff' }, legend: { name: '전설', color: '#ffc93c' }, myth: { name: '신화', color: '#ff5c8a' },
@@ -117,7 +117,7 @@ function buildAch() {
   const rankSet = (base, game, label, rule) => {
     A.push(ach(`${base}.r10`, game, `${label} 10위권`, `${label} 순위표 10위 안에 들기 (20명 이상 겨룬 순위표)`, 'silver', { ...rule, rank: 10 }));
     A.push(ach(`${base}.r3`, game, `${label} 3위권`, `${label} 순위표 3위 안에 들기 (10명 이상 겨룬 순위표)`, 'platinum', { ...rule, rank: 3 }));
-    A.push(ach(`${base}.r1`, game, `${label} 1위`, `${label} 순위표 1위에 오르기 (5명 이상 겨룬 순위표) · 왕관을 쓸 수 있어요`, 'legend', { ...rule, rank: 1, crown: true }));
+    A.push(ach(`${base}.r1`, game, `${label} 1위`, `${label} 순위표 1위에 오르기 (5명 이상 겨룬 순위표) · 1위인 동안 왕관을 쓸 수 있어요`, 'legend', { ...rule, rank: 1, crown: true }));
   };
   // 드림 러너: 맵 × 난이도마다 순위 · 거리
   const STEP = { easy: [1000, 3000, 6000, 12000], normal: [1000, 3000, 6000, 10000], hard: [800, 2000, 4000, 8000], extreme: [500, 1500, 3000, 6000], lightspeed: [500, 1200, 2500, 5000], beyond: [300, 800, 2000, 4000] };

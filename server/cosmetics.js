@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { readJson } from './auth.js';
-import { ACHIEVEMENTS, SHOP, itemById, cleanCos, starsEarned, reqText } from '../public/shared/js/cos-items.js';
+import { ACHIEVEMENTS, achById, SHOP, itemById, cleanCos, starsEarned, reqText } from '../public/shared/js/cos-items.js';
 
 const ANON = /^[a-f0-9]{16,40}$/, MAX_STARS_RUN = 6000;
 // 순위 업적은 겨룬 사람이 있어야 인정한다 (빈 순위표의 1위는 왕관이 아니다)
@@ -24,33 +24,38 @@ export class Cosmetics {
   }
   save() { if (!this.dirty) return; this.dirty = false; try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ users: this.users })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('치장 저장 실패', e.message); } }
   u(sub) { return (this.users[sub] ||= { stars: 0, total: 0, owned: [], equip: {}, ach: {}, plays: {}, wins: {}, pvp: {}, fresh: [] }); }
-  equipOf(sub) { const u = this.users[sub]; return u ? cleanCos(u.equip) : null; }
+  equipOf(sub) { const u = this.users[sub]; if (!u) return null; const eq = { ...u.equip }; if (eq.crown && !this.owns(sub, eq.crown)) delete eq.crown; return cleanCos(eq); }
   titleOf(sub) { const id = this.users[sub]?.equip?.title; return id && itemById.has(id) ? id : null; }
-  owns(sub, id) { const u = this.users[sub], it = itemById.get(id); if (!u || !it) return false; return it.shop ? u.owned.includes(id) : !!u.ach[it.ach]; }
+  owns(sub, id) { const u = this.users[sub], it = itemById.get(id); if (!u || !it) return false; if (it.shop) return u.owned.includes(id); return it.slot === 'crown' ? this.crownNow(sub, it) : !!u.ach[it.ach]; }
   // 한 판 끝: 별을 지갑에 넣는다 (난이도 · 지옥이면 더 많이)
   earn(sub, stars, diff, map) { const n = starsEarned(Math.min(MAX_STARS_RUN, Math.max(0, stars | 0)), diff, map); if (n <= 0) return 0; const u = this.u(sub); u.stars += n; u.total += n; this.dirty = true; this.refresh(sub); return n; }
   // 방 경기 하나 끝: 판수 · 승리 (pvp = 다른 사람과 함께)
   noteGame(game, sub, won, pvp) { const u = this.u(sub); u.plays[game] = (u.plays[game] || 0) + 1; if (won) { u.wins[game] = (u.wins[game] || 0) + 1; if (pvp) u.pvp[game] = (u.pvp[game] || 0) + 1; } this.dirty = true; this.refresh(sub); }
   // 기록 · 순위를 보고 새로 달성한 업적을 적는다 (예전 기록도 여기서 인정된다)
-  refresh(sub) {
-    const u = this.u(sub), cache = new Map(), rec = (g) => this.records[g];
+  // 조건 하나를 지금 기록으로 확인한다 (cache 는 한 번 계산할 때만 쓴다)
+  meets(sub, r, cache = new Map()) {
+    const u = this.u(sub), rec = (g) => this.records[g];
     const dreamRow = (m, d) => { const k = `d:${m}:${d}`; if (!cache.has(k)) cache.set(k, this.dream?.mine(sub, 'speed', d, m) || null); return cache.get(k); };
     const recRow = (g, b) => { const k = `r:${g}:${b}`; if (!cache.has(k)) cache.set(k, rec(g)?.mine(b, sub) || null); return cache.get(k); };
-    const ok = (r) => {
-      switch (r.kind) {
-        case 'dream': { const m = dreamRow(r.map, r.diff); return !!m && !this.dream.table('speed', r.diff, r.map)[sub]?.u && m.rank <= r.rank && Object.keys(this.dream.table('speed', r.diff, r.map)).length >= MIN_FIELD[r.rank]; }
-        case 'dreamDist': { const e = this.dream?.table('speed', r.diff, r.map)?.[sub]; return !!e && !e.u && e.dist >= r.value; }
-        case 'starTotal': return u.total >= r.value;
-        case 'record': { const m = recRow(r.game, r.board); return !!m && m.rank <= r.rank && Object.keys(rec(r.game).data[r.board] || {}).length >= MIN_FIELD[r.rank]; }
-        case 'recordVal': { const m = recRow(r.game, r.board); return !!m && m.value >= r.value; }
-        case 'plays': return (r.game === 'dream-runner' ? this.dream?.stats?.[sub]?.runs || 0 : u.plays[r.game] || 0) >= r.value;
-        case 'wins': return (u.wins[r.game] || 0) >= r.value;
-        case 'pvp': return (u.pvp[r.game] || 0) >= r.value;
-        default: return false;
-      }
-    };
+    switch (r.kind) {
+      case 'dream': { const m = dreamRow(r.map, r.diff); return !!m && !this.dream.table('speed', r.diff, r.map)[sub]?.u && m.rank <= r.rank && Object.keys(this.dream.table('speed', r.diff, r.map)).length >= MIN_FIELD[r.rank]; }
+      case 'dreamDist': { const e = this.dream?.table('speed', r.diff, r.map)?.[sub]; return !!e && !e.u && e.dist >= r.value; }
+      case 'starTotal': return u.total >= r.value;
+      case 'record': { const m = recRow(r.game, r.board); return !!m && m.rank <= r.rank && Object.keys(rec(r.game).data[r.board] || {}).length >= MIN_FIELD[r.rank]; }
+      case 'recordVal': { const m = recRow(r.game, r.board); return !!m && m.value >= r.value; }
+      case 'plays': return (r.game === 'dream-runner' ? this.dream?.stats?.[sub]?.runs || 0 : u.plays[r.game] || 0) >= r.value;
+      case 'wins': return (u.wins[r.game] || 0) >= r.value;
+      case 'pvp': return (u.pvp[r.game] || 0) >= r.value;
+      default: return false;
+    }
+  }
+  // 왕관은 지금 1위인 동안만 쓴다 (업적 기록은 남는다)
+  crownNow(sub, it, cache) { const a = achById.get(it.ach); return !!a && !!this.users[sub]?.ach[a.id] && this.meets(sub, a.rule, cache); }
+  // 기록 · 순위를 보고 새로 달성한 업적을 적는다 (예전 기록도 여기서 인정된다)
+  refresh(sub) {
+    const u = this.u(sub), cache = new Map();
     const now = Date.now(); let n = Object.keys(u.ach).length; const fresh = [];
-    for (const a of ACHIEVEMENTS) { if (u.ach[a.id] || a.rule.kind === 'count') continue; if (ok(a.rule)) { u.ach[a.id] = now; n++; fresh.push(a.id); } }
+    for (const a of ACHIEVEMENTS) { if (u.ach[a.id] || a.rule.kind === 'count') continue; if (this.meets(sub, a.rule, cache)) { u.ach[a.id] = now; n++; fresh.push(a.id); } }
     for (const a of ACHIEVEMENTS) if (a.rule.kind === 'count' && !u.ach[a.id] && n >= a.rule.value) { u.ach[a.id] = now; n++; fresh.push(a.id); }
     if (fresh.length) { u.fresh = [...(u.fresh || []), ...fresh].slice(-40); this.dirty = true; }
     return fresh;
@@ -58,11 +63,12 @@ export class Cosmetics {
   // 조작이 확인된 계정: 해당 업적을 거두고 별을 비운다 (남은 정상 기록으로 다시 계산)
   punish(sub, prefix) { const u = this.users[sub]; if (!u) return; for (const id of Object.keys(u.ach)) if (id.startsWith(prefix) || id.startsWith('all.')) delete u.ach[id]; u.stars = 0; u.fresh = []; for (const [s, id] of Object.entries(u.equip)) if (!this.owns(sub, id)) delete u.equip[s]; this.dirty = true; this.refresh(sub); }
   pub(sub) {
-    if (!sub) return { stars: 0, total: 0, owned: [], equip: {}, ach: {}, plays: {}, wins: {}, pvp: {}, fresh: [], best: {} };
+    if (!sub) return { stars: 0, total: 0, owned: [], crowns: [], equip: {}, ach: {}, plays: {}, wins: {}, pvp: {}, fresh: [], best: {} };
     this.refresh(sub);
     const u = this.u(sub), best = {};
     for (const s of SHOP) if (s.req) { const k = `${s.req.map}:${s.req.diff}`; if (!(k in best)) best[k] = this.dream?.table('speed', s.req.diff, s.req.map)?.[sub]?.dist || 0; }
-    return { stars: u.stars, total: u.total, owned: u.owned, equip: cleanCos(u.equip) || {}, ach: u.ach, plays: u.plays, wins: u.wins, pvp: u.pvp, fresh: u.fresh || [], best };
+    const crowns = []; const cache = new Map(); for (const it of itemById.values()) if (it.slot === 'crown' && u.ach[it.ach] && this.crownNow(sub, it, cache)) crowns.push(it.id);
+    return { stars: u.stars, total: u.total, owned: u.owned, crowns, equip: this.equipOf(sub) || {}, ach: u.ach, plays: u.plays, wins: u.wins, pvp: u.pvp, fresh: u.fresh || [], best };
   }
   buy(sub, id) {
     const it = itemById.get(id); if (!it?.shop) throw new Error('살 수 없는 물건이에요');
