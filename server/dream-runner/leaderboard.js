@@ -105,7 +105,7 @@ export class DreamBoard {
   ticket(b) { return this.tickets.issue({ seed: Number(b.seed) | 0, diff: diffOf(b.diff), map: b.map === 'hell' ? 'hell' : 'dream', mode: b.mode === 'item' ? 'item' : 'speed' }); }
   // 사람이 볼 목록 · 승인 · 삭제 (삭제하면 그 계정의 드림 러너 업적을 다시 계산하고 별을 거둔다)
   // 비상 리포트: 조작(AI) 의심 기록. 순위표에는 바로 올라가고, 운영자가 접속하면 크게 뜬다
-  //   red = 서버가 다시 돌려 본 결과와 다름 · 시간이 맞지 않음 · 입력 기록 없음 (상위권) / yellow = 재생은 맞지만 1위를 갑자기 크게 앞섬 (진짜 키를 누르는 프로그램일 수 있다)
+  //   red = 서버가 다시 돌려 본 결과와 다름 · 시간이 맞지 않음 · 입력 기록 없음 (상위권)
   report(lvl, sub, mode, diff, map, why, e, r, extra) { this.reports.push({ id: crypto.randomBytes(5).toString('hex'), lvl, sub, mode, diff, map, why, name: e.name, score: e.score, dist: e.dist, stars: e.stars, time: e.time, eat: e.at, r: r ? { dist: r.dist, stars: r.stars } : null, ...extra, at: Date.now(), open: true }); if (this.reports.length > 300) this.reports.splice(0, this.reports.length - 300); this.dirty = true; console.warn(`드림 러너 비상 리포트(${lvl}): ${e.name} ${e.score}점 ${map} ${diff} (${why})`); }
   tkey(mode, diff, map) { return map === 'hell' ? `hell:${mode}:${diff}` : `${mode}:${diff}`; }
   adminList() { const flagged = []; for (const k of ['best', 'bestItem']) for (const [sub, e] of Object.entries(this[k])) if (e.u) flagged.push({ sub, t: k === 'best' ? 'speed:easy' : 'item:easy', ...e }); for (const [t, T] of Object.entries(this.boards)) for (const [sub, e] of Object.entries(T)) if (e.u) flagged.push({ sub, t, ...e }); return { reports: this.reports.filter((x) => x.open).reverse().map((x) => ({ ...x, t: this.tkey(x.mode, x.diff, x.map), live: this.table(x.mode, x.diff, x.map)[x.sub]?.at === x.eat })), flagged: flagged.sort((a, b) => b.score - a.score).slice(0, 100), stat: this.vstat }; }
@@ -134,12 +134,10 @@ export class DreamBoard {
     const color = /^#[0-9a-fA-F]{6}$/.test(b.color || '') ? b.color : '#8a5634';
     const old = T[who.sub];
     const newBest = !old || score > old.score, entry = { name, color, score, dist, stars, themes, time: Math.round(time), at: now, guest: !!who.user.guest, anon: !!who.user.anon, ...(chk.ok ? { v: 1 } : { u: chk.why }) };
-    const prevTop = newBest ? Math.max(0, ...Object.entries(T).filter(([k]) => k !== who.sub).map(([, e]) => e.score)) : 0;
     if (newBest) T[who.sub] = entry;
     // 비상 리포트 (기록은 바로 순위표에 오른다)
     if (newBest) { const higher = Object.values(T).filter((e) => e.score > score).length;
-      if (!chk.ok && !chk.soft && higher < TOP_GUARD) this.report('red', who.sub, mode, diff, map, chk.why, entry, chk.r);
-      else if (chk.ok && higher === 0 && prevTop >= 1000 && score > prevTop * 1.5) this.report('yellow', who.sub, mode, diff, map, 'jump', entry, chk.r, { prevTop }); }
+      if (!chk.ok && !chk.soft && higher < TOP_GUARD) this.report('red', who.sub, mode, diff, map, chk.why, entry, chk.r); }
     else { old.name = name; old.color = color; } // 이름·색은 최근 것으로
     getCos()?.refresh(who.sub); // 업적: 거리 · 순위
     return { score, mode, diff, map, newBest, prev: old?.score || 0, me: this.mine(who.sub, mode, diff, map), top: this.top(mode, diff, map), runs: this.runs };
