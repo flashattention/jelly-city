@@ -296,7 +296,7 @@ function newRun(seed, itemMode = false, diff = 'easy', map = 'dream') {
   const K = DIFFS[game.diff].k * (1 + BOOST);
   env.fogK = game.map === 'hell' ? Math.max(1, (K / 1.9) ** 0.7) : 1;
   track.reset(seed, itemMode, { map: game.map, K });
-  game.camFall = 0; game.shake = 0; env.underY = undefined; game.underY = -13;
+  game.camFall = 0; game.camG = null; game.shake = 0; env.underY = undefined; game.underY = -13;
   game.rp = !itemMode && !game.multi ? { dts: [], evs: [], last: -1 } : null; game.dtCarry = 0;
   game.tkP = game.mode === 'title' && !game.starting ? null : getTicket(seed, itemMode, game.diff, game.map);
   runner.reset(0, 0);
@@ -789,11 +789,19 @@ function followCamera(dt) {
   // 지옥: 바닥 높이가 계속 바뀐다 · 떨어지는 동안은 위에서 내려다봐서 내릴 곳이 보이게
   const hell = track.hell, fl = hell ? track.deathY(s) + 6 : -6, drop = hell && !w && runner.alive && !runner.onGround ? y - (fl + 10) : 0, falling = drop > 7 ? Math.min(1, (drop - 7) / 12) : 0; // 숙이기 · 작은 턱에는 시점이 흔들리지 않고, 까마득히 떨어질 때만 내려다본다
   game.camFall = (game.camFall || 0) + (falling - (game.camFall || 0)) * Math.min(1, dt * 2.5);
-  const cx = x * 0.85, cy = Math.max(y, fl) + up + game.camFall * 5;
+  // 지옥 공중: 오르는 동안만 따라가고 내려오는 동안은 그 높이에 머문다 (계단에서 꼭대기 → 발판으로 출렁이지 않게). 뛴 발판보다 아래로 떨어지면 다시 따라간다
+  let yc = y;
+  if (hell && !w && runner.alive) {
+    if (runner.onGround || game.camG == null) { game.camG = y; game.camR = y; }
+    else if (y < game.camG - 0.5) game.camR = y;
+    else game.camR = Math.max(game.camR, game.camG + Math.max(0, y - game.camG - 0.8));
+    yc = game.camR;
+  } else game.camG = null;
+  const cx = x * 0.85, cy = Math.max(yc, fl) + up + game.camFall * 5;
   camera.position.x += (cx - camera.position.x) * k;
   camera.position.y += (cy - camera.position.y) * (dead ? k * 0.3 : hell ? Math.min(1, k * 1.5) : k);
   camera.position.z = dead ? camera.position.z : z + back;
-  camLook.set(x, Math.max(y, fl - 2) + look - game.camFall * 9, z - ahead);
+  camLook.set(x, Math.max(yc, fl - 2) + look - game.camFall * 9, z - ahead);
   camera.lookAt(camLook);
   if (game.shake > 0) { game.shake = Math.max(0, game.shake - dt * 2.4); camera.rotation.z += (Math.random() - 0.5) * game.shake * 0.05; camera.position.y += (Math.random() - 0.5) * game.shake * 0.3; }
   const fov = Math.min(88, 60 + (v - V0) * 0.55); // 아주 빠른 난이도에서 화면이 지나치게 벌어지지 않게
