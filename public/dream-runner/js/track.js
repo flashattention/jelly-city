@@ -368,8 +368,10 @@ export class Track {
   hp_gauntlet(r, vv, tf, W) { const w = Math.max(4.6, W()), len = vv * r.range(5, 7.5), // 내리치기 자리를 뺀 나머지에 장애물을 빽빽하게
       p = this.plat(this.gs, this.gs + len, this.cx, w, this.cy); const hit = this.gs >= this.nextStrike; this.hellObstacles(r, vv, p.s0 + vv * 0.55, hit ? p.s1 - vv * 1.6 : p.s1, this.cx, w, this.cy, 0.9); if (hit) { this.strike(r.pick(this.themeOf(this.dream).strikes.filter((k) => k !== 'twin' && k !== 'break')), p.s1 - vv * 1.25, this.cx, w, this.cy); this.nextStrike = p.s1 + vv * r.range(2, 4); } return p.s1; }
   // 2단 점프로만 닿는 계단 (턱은 1.3m 까지 훌쩍 올라서므로 3.6m 부터는 한 번 점프로 안 된다)
+  // 계단 한 칸의 길이 · 틈 (초): 빠른 난이도 · 오래 달린 뒤에도 이보다 짧아지지 않는다 (점프를 누를 수 있는 때가 0.4초는 남게)
+  stepT(vv, tf) { return { gap: vv * Math.max(tf * 0.36, 0.32), len: vv * Math.max(tf * 0.62, 0.6) }; }
   hellSteps(r, vv, tf, at, n, opt = {}) {
-    const gap = vv * tf * 0.36, len = vv * tf * 0.62;
+    const { gap, len } = this.stepT(vv, tf);
     for (let i = 0; i < n; i++) {
       const y0 = this.cy, x0 = this.cx; at += gap; this.cy += r.range(3.6, 4);
       if (opt.zig) this.cx = Math.max(-12, Math.min(12, this.cx + (i % 2 ? 1 : -1) * r.range(3.8, 5.6))); else this.cx = Math.max(-12, Math.min(12, this.cx + r.range(-1.5, 1.5)));
@@ -397,7 +399,7 @@ export class Track {
   }
   // 갈림길: 낮은 길은 쉽지만 별이 적고, 높은 길은 2단 점프 두 번에 별이 잔뜩 있다 (실력껏 고른다)
   hp_fork(r, vv, tf) {
-    const y = this.cy, cx = this.cx, entry = this.plat(this.gs, this.gs + vv * tf * 1.35, cx, 15, y), side = r.chance(0.5) ? 1 : -1, xA = cx - side * 6, xB = cx + side * 6, gap = vv * tf * 0.36, len = vv * tf * 0.62;
+    const y = this.cy, cx = this.cx, entry = this.plat(this.gs, this.gs + vv * tf * 1.35, cx, 15, y), side = r.chance(0.5) ? 1 : -1, xA = cx - side * 6, xB = cx + side * 6, { gap, len } = this.stepT(vv, tf);
     this.star(entry.s0 + vv * tf * 0.45, xB, y + 1); this.star(entry.s0 + vv * tf * 0.6, xB, y + 1); // 높은 길 쪽을 알려 준다
     let at = entry.s1, py = y;
     for (let i = 0; i < 2; i++) { at += gap; py += r.range(3.6, 4); this.plat(at, at + len, xB, 3.6, py, { thin: true }); for (let k = 0; k < 4; k++) this.star(at + (len * (k + 0.5)) / 4, xB, py + 1); at += len; }
