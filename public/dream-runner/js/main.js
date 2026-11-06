@@ -296,7 +296,7 @@ function newRun(seed, itemMode = false, diff = 'easy', map = 'dream') {
   const K = DIFFS[game.diff].k * (1 + BOOST);
   env.fogK = game.map === 'hell' ? Math.max(1, (K / 1.9) ** 0.7) : 1;
   track.reset(seed, itemMode, { map: game.map, K });
-  game.camFall = 0; game.camG = null; game.shake = 0; env.underY = undefined; game.underY = -13;
+  game.camFall = 0; game.camG = null; game.rec = null; game.shake = 0; env.underY = undefined; game.underY = -13;
   game.rp = !itemMode && !game.multi ? { dts: [], evs: [], last: -1 } : null; game.dtCarry = 0;
   game.tkP = game.mode === 'title' && !game.starting ? null : getTicket(seed, itemMode, game.diff, game.map);
   runner.reset(0, 0);
@@ -379,8 +379,9 @@ async function showOver() {
   $('hud').classList.add('hidden'); $('touch').classList.add('hidden'); $('spectate').classList.add('hidden'); $('howto').classList.add('hidden'); $('itembar').classList.add('hidden'); $('effects').innerHTML = ''; game.effHtml = '';
   show('over');
   $('ov-why').textContent = `💤 ${game.why || '꿈에서 깼어요'}`;
-  $('ov-score').textContent = score().toLocaleString();
-  $('ov-detail').textContent = `${Math.floor(runner.s).toLocaleString()}m 달림 · 별사탕 ${runner.stars}개 (⭐ +${starsEarned(runner.stars, game.diff, game.map).toLocaleString()}) · ${game.map === 'hell' ? '지옥' : '꿈'} ${game.dreamsSeen}개를 지났어요 · ${Math.floor(game.runT)}초`;
+  const fin = game.rec || { dist: Math.floor(runner.s), stars: runner.stars }; // 쓰러진 순간의 기록 (쓰러지는 동안 조금 더 미끄러진 거리는 넣지 않는다 · 순위표와 같은 값)
+  $('ov-score').textContent = (fin.dist + fin.stars * 10).toLocaleString();
+  $('ov-detail').textContent = `${fin.dist.toLocaleString()}m 달림 · 별사탕 ${fin.stars}개 (⭐ +${starsEarned(fin.stars, game.diff, game.map).toLocaleString()}) · ${game.map === 'hell' ? '지옥' : '꿈'} ${game.dreamsSeen}개를 지났어요 · ${Math.floor(game.runT)}초`;
   const r = game.submitted;
   $('ov-save').classList.toggle('hidden', !r?.anonPending);
   if (r?.anonPending) { $('ov-nick').value = store.get(NICK_KEY) || game.profile.name; $('ov-save-btn').disabled = false; }
