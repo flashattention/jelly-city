@@ -290,7 +290,7 @@ export class Shell {
     $('team-row').classList.toggle('hidden', !r.opts?.team);
     const el = $('members'); el.innerHTML = '';
     el.className = r.opts?.team ? 'teams' : '';
-    const row = (m) => `<div class="mem${m.id === this.myId ? ' me' : ''}"><span class="dot" style="background:${esc(m.color)}"></span>${m.host ? '👑 ' : ''}${m.bot ? '🤖 ' : ''}${esc(m.name)}${medalHtml(m.medal)}${titleHtml(m.title)}</div>`;
+    const row = (m) => `<div class="mem${m.id === this.myId ? ' me' : ''}"><span class="dot" style="background:${esc(m.color)}"></span>${m.host ? '👑 ' : ''}${m.bot ? '🤖 ' : ''}${esc(m.name)}${medalHtml(m.medal, m.title)}${titleHtml(m.title)}</div>`;
     if (r.opts?.team) {
       for (const k of ['red', 'blue']) {
         const list = this.members.filter((m) => m.team === k);

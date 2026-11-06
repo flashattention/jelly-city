@@ -3,13 +3,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readJson } from '../auth.js';
 import { clean } from './rooms.js';
-import { getCos } from '../cosmetics.js';
+import { getCos, boardMedal } from '../cosmetics.js';
 
 const ANON = /^[a-f0-9]{16,40}$/;
 export class Records {
   // name: 파일 이름 · better(a, b): a 가 b 보다 좋은가 · check(body): 말이 되는 기록인가 (아니면 오류 문구)
   constructor(dataDir, name, { boards, better, check, value }) {
-    this.file = path.join(dataDir, `${name}.json`);
+    this.file = path.join(dataDir, `${name}.json`); this.name = name;
     this.boards = boards; this.better = better; this.check = check; this.value = value;
     this.data = {}; this.last = new Map(); this.ipHits = new Map();
     try { this.data = JSON.parse(fs.readFileSync(this.file, 'utf8')); } catch { /* 처음 */ }
@@ -22,9 +22,9 @@ export class Records {
     try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify(this.data)); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('기록 저장 실패', e); }
   }
   sorted(b) { return Object.entries(this.data[b] || {}).sort((x, y) => (this.better(x[1], y[1]) ? -1 : this.better(y[1], x[1]) ? 1 : x[1].at - y[1].at)); }
-  row(sub, e, i) { return { rank: i + 1, id: sub.slice(-8), title: getCos()?.titleOf(sub) || null, medal: getCos()?.medalOf(sub) || null, name: e.name, color: e.color, value: e.value, guest: !!e.guest, anon: !!e.anon }; }
-  top(b, n = 30) { return this.sorted(b).slice(0, n).map(([s, e], i) => this.row(s, e, i)); }
-  mine(b, sub) { if (!sub || !this.data[b]?.[sub]) return null; const i = this.sorted(b).findIndex(([s]) => s === sub); return this.row(sub, this.data[b][sub], i); }
+  row(sub, e, i, b) { return { rank: i + 1, id: sub.slice(-8), title: getCos()?.titleOf(sub) || null, medal: b ? boardMedal(`${this.name}.${b}`, i + 1, Object.keys(this.data[b] || {}).length) : null, name: e.name, color: e.color, value: e.value, guest: !!e.guest, anon: !!e.anon }; }
+  top(b, n = 30) { return this.sorted(b).slice(0, n).map(([s, e], i) => this.row(s, e, i, b)); }
+  mine(b, sub) { if (!sub || !this.data[b]?.[sub]) return null; const i = this.sorted(b).findIndex(([s]) => s === sub); return this.row(sub, this.data[b][sub], i, b); }
   async api(req, res, url, who, json, prefix) {
     const b = url.searchParams.get('b');
     // 판마다 1등만 한꺼번에 (트랙 고르는 화면에 최고 기록 표시)

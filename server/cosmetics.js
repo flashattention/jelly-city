@@ -14,6 +14,12 @@ const placed = (r, rank, n) => (r.pct ? n >= PCT_MIN[r.pct] && rank <= Math.max(
 // 훈장: 업적 id → 훈장 아이템
 const medalByAch = new Map(); for (const i of ITEMS) if (i.slot === 'medal') { if (!medalByAch.has(i.ach)) medalByAch.set(i.ach, []); medalByAch.get(i.ach).push(i); }
 export const getCos = () => inst;
+// 순위표 한 줄의 메달: 그 순위표 안 순위로만 (1 ~ 3위는 순위 칸에 🥇🥈🥉 가 이미 있어서 상위 % 메달만)
+export function boardMedal(base, rank, n) {
+  if (rank <= 3) return null;
+  for (const [h, p] of [[3, 1], [4, 5], [5, 10]]) if (n >= PCT_MIN[p] && rank <= Math.max(1, Math.ceil((n * p) / 100))) { const id = `medal.${base}.m${h}`; return itemById.has(id) ? id : null; }
+  return null;
+}
 // 방 참가할 때: 그 계정의 진짜 착용 정보로 바꾼다
 export function trustLook(look, sub) {
   const out = look && typeof look === 'object' ? { ...look } : null; if (out) delete out.cos;

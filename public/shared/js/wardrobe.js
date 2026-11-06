@@ -43,8 +43,10 @@ export function titleHtml(id) {
   return `<span class="cos-title${it.fx.rainbow ? ' rb' : ''}${prCls(it.fx)}" style="--c1:${it.fx.grad && it.fx.rainbow ? it.fx.grad[0] : t.color};--g:${t.n * 3}${gradCss(it.fx)}" title="${esc(ACHIEVEMENTS.find((a) => a.id === it.ach)?.desc || '')}">${it.emoji} ${esc(it.name)}</span>`;
 }
 // 이름 옆 메달 (서버가 지금 가장 높은 순위를 골라 준다: 🥇 1위 → 🥈 2위 → 🥉 3위 → 상위 1% → 5% → 10%)
-export function medalHtml(id) {
+// title 을 주면: 같은 순위표의 1위 칭호를 이미 달고 있을 때 1위 메달은 빼서 같은 글자가 두 번 뜨지 않게
+export function medalHtml(id, title) {
   const it = id && itemById.get(id); if (!it || it.slot !== 'medal') return '';
+  if (title && it.fx.honor === 0 && itemById.get(title)?.ach === it.ach) return '';
   css(); const h = it.fx.honor, t = TIERS[it.rarity] || TIERS.gold;
   return `<span class="cos-title cos-medal h${h}${h === 0 || h === 3 ? ' rb' : ''}${h === 0 ? prCls(it.fx) : h <= 3 ? prCls({ pr: Math.min(3, it.fx.pr) }) : ''}" style="--g:${t.n * 3}${h === 0 || h === 3 ? gradCss(it.fx, true) : ''}" title="지금 ${esc(it.name)}">${it.emoji}${it.fx.de || ''} ${esc(it.name)}</span>`;
 }
