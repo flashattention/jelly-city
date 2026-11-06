@@ -114,7 +114,8 @@ export const RECORD_GAME_KEYS = Object.keys(RECORD_GAMES);
 export const PCT_MIN = { 1: 100, 5: 40, 10: 20 };
 // 훈장(메달): 0 = 🥇 1위, 1 = 🥈 2위, 2 = 🥉 3위, 3 = 상위 1%, 4 = 5%, 5 = 10%. 숫자가 작을수록 먼저 보인다
 //   [순서, 열쇠 업적 꼬리, 지금 확인할 조건, 아이콘, 이름 꼬리]
-export const MEDALS = [[0, 'r1', { rank: 1 }, '🥇', '1위'], [1, 'r3', { rank: 2, exact: true }, '🥈', '2위'], [2, 'r3', { rank: 3, exact: true }, '🥉', '3위'], [3, 'p1', { pct: 1 }, '💎', '상위 1%'], [4, 'p5', { pct: 5 }, '🏅', '상위 5%'], [5, 'p10', { pct: 10 }, '🎖️', '상위 10%']];
+//   1 ~ 3위 메달은 인원 · 업적과 상관없이 지금 그 순위면 붙는다 (any)
+export const MEDALS = [[0, 'r1', { rank: 1, exact: true, any: true }, '🥇', '1위'], [1, 'r3', { rank: 2, exact: true, any: true }, '🥈', '2위'], [2, 'r3', { rank: 3, exact: true, any: true }, '🥉', '3위'], [3, 'p1', { pct: 1 }, '💎', '상위 1%'], [4, 'p5', { pct: 5 }, '🏅', '상위 5%'], [5, 'p10', { pct: 10 }, '🎖️', '상위 10%']];
 // 순위 업적의 격: 어려운 난이도 · 지옥일수록 높다 (1 ~ 5.5). 높을수록 왕관 · 칭호 · 휘장이 화려하다
 const DIFF_ORDER = ['easy', 'hard', 'extreme', 'lightspeed', 'beyond'];
 // 드림 러너 난이도마다 아이콘 · 무지개 색이 다르다 (지옥은 끝에 용암색이 섞인다)
@@ -130,9 +131,9 @@ function buildAch() {
   const A = [];
   // 순위 업적: 1위 → 상위 1% → 5% → 10% → 3위권 → 10위권 순서로 보인다
   const rankSet = (base, game, label, rule) => {
-    A.push(ach(`${base}.r1`, game, `${label} 1위`, `${label} 순위표 1위에 오르기 (5명 이상 겨룬 순위표) · 1위인 동안 왕관 · 1위 칭호 · 🥇 메달이 붙어요`, 'legend', { ...rule, rank: 1, crown: true }));
+    A.push(ach(`${base}.r1`, game, `${label} 1위`, `${label} 순위표 1위에 오르기 (5명 이상 겨룬 순위표) · 1위인 동안 왕관 · 1위 칭호를 쓸 수 있어요`, 'legend', { ...rule, rank: 1, crown: true }));
     for (const [p, t] of [[1, 'legend'], [5, 'platinum'], [10, 'gold']]) A.push(ach(`${base}.p${p}`, game, `${label} 상위 ${p}%`, `${label} 순위표 상위 ${p}% 안에 들기 (${PCT_MIN[p]}명 이상 겨룬 순위표) · 그 자리에 있는 동안 메달이 붙어요`, t, { ...rule, pct: p }));
-    A.push(ach(`${base}.r3`, game, `${label} 3위권`, `${label} 순위표 3위 안에 들기 (10명 이상 겨룬 순위표) · 2위 · 3위인 동안 🥈 · 🥉 메달이 붙어요`, 'platinum', { ...rule, rank: 3 }));
+    A.push(ach(`${base}.r3`, game, `${label} 3위권`, `${label} 순위표 3위 안에 들기 (10명 이상 겨룬 순위표) `, 'platinum', { ...rule, rank: 3 }));
     A.push(ach(`${base}.r10`, game, `${label} 10위권`, `${label} 순위표 10위 안에 들기 (20명 이상 겨룬 순위표)`, 'silver', { ...rule, rank: 10 }));
   };
   // 드림 러너: 맵 × 난이도마다 순위 · 거리

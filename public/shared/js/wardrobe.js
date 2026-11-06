@@ -112,7 +112,7 @@ export async function openWardrobe(tab = 'ach', onChange) {
       const done = Object.keys(C.ach || {}).length; sum.innerHTML = `달성 ${done} / ${ACHIEVEMENTS.length}<div class="cw-bar"><i style="width:${(done / ACHIEVEMENTS.length) * 100}%"></i></div>`;
       chips([['all', '전체'], ['done', '✅ 달성'], ...Object.entries(GAMES).map(([k, g]) => [k, `${g.emoji} ${g.name}`])], S.game, (k) => { S.game = k; });
       const rows = ACHIEVEMENTS.filter((a) => (S.game === 'all' ? true : S.game === 'done' ? C.ach?.[a.id] : a.game === S.game)).sort((a, b) => (!!C.ach?.[b.id] - !!C.ach?.[a.id]) || (TIERS[b.tier].n - TIERS[a.tier].n));
-      for (const a of rows.slice(0, 180)) { const T = TIERS[a.tier], ok = !!C.ach?.[a.id], rw = [`🏷️ 칭호`, T.n >= 3 && '🎗️ 휘장', a.rule.crown && '👑 왕관', (a.rule.crown || a.rule.pct || a.rule.rank === 3) && '🎖️ 메달'].filter(Boolean).join(' · '), g = GAMES[a.game]; list.append(card(`<div class="cw-n">${g?.emoji || '🏆'} ${esc(a.name)}</div><div class="cw-s">${esc(a.desc)}</div><div class="cw-r" style="color:${T.color}">${T.name} 등급 · ${rw}${ok ? ' · ✅' : ''}</div>`, ok ? '' : 'lock', null)); }
+      for (const a of rows.slice(0, 180)) { const T = TIERS[a.tier], ok = !!C.ach?.[a.id], rw = [`🏷️ 칭호`, T.n >= 3 && '🎗️ 휘장', a.rule.crown && '👑 왕관', a.rule.pct && '🎖️ 메달'].filter(Boolean).join(' · '), g = GAMES[a.game]; list.append(card(`<div class="cw-n">${g?.emoji || '🏆'} ${esc(a.name)}</div><div class="cw-s">${esc(a.desc)}</div><div class="cw-r" style="color:${T.color}">${T.name} 등급 · ${rw}${ok ? ' · ✅' : ''}</div>`, ok ? '' : 'lock', null)); }
       if (rows.length > 180) list.append(card(`<div class="cw-s">게임을 골라 나머지 ${rows.length - 180}개를 볼 수 있어요</div>`, ''));
     } else if (S.tab === 'closet') {
       sum.textContent = '가진 치장은 모든 게임에서 보여요. 2D 게임에서는 칭호가 이름 옆에 빛나요';
@@ -120,7 +120,7 @@ export async function openWardrobe(tab = 'ach', onChange) {
       const mine = [...itemById.values()].filter((i) => i.slot === S.slot && owns(i)).sort((a, b) => S.slot === 'medal' ? a.fx.honor - b.fx.honor || b.fx.pr - a.fx.pr : 0);
       if (S.slot === 'medal') { list.append(card(`<div class="cw-s">🎖️ 메달은 고르지 않아도 돼요. 지금 가장 높은 순위 하나가 이름 옆에 저절로 붙어요 (🥇 1위 → 🥈 2위 → 🥉 3위 → 상위 1% → 5% → 10%, 같으면 더 어려운 순위표). 자리를 내주면 다음 메달로 바뀌어요</div>`, ''));
         for (const it of mine) list.append(card(`<div class="cw-n">${medalHtml(it.id)}</div><div class="cw-r">${C.equip?.medal === it.id ? '✅ 지금 붙어 있어요' : '지금 자리에 있어요'}</div>`, C.equip?.medal === it.id ? 'on' : ''));
-        if (!mine.length) list.append(card(`<div class="cw-s">아직 없어요. 순위표 3위 안이나 상위 10% 안에 들면 생겨요</div>`, '')); return; }
+        if (!mine.length) list.append(card(`<div class="cw-s">아직 없어요. 순위표 3위 안에 들거나 상위 10% 업적을 달성하면 생겨요</div>`, '')); return; }
       if (!mine.length) list.append(card(`<div class="cw-s">아직 없어요. ${SLOTS[S.slot].sub}${S.slot === 'crown' ? ' · 지금 1위인 순위표의 왕관만 쓸 수 있어요' : ['sash', 'title'].includes(S.slot) ? ' · 업적을 달성하면 얻어요 (1위 칭호는 1위인 동안만)' : ' · 별 상점에서 살 수 있어요'}</div>`, ''));
       for (const it of mine) { const on = C.equip?.[S.slot] === it.id, rc = RARITY[it.rarity]?.color || TIERS[it.rarity]?.color; const d = card(`<div class="cw-n">${it.emoji} ${esc(it.name)}</div><div class="cw-r" style="color:${rc}">${RARITY[it.rarity]?.name || TIERS[it.rarity]?.name}</div><button class="cw-b">${on ? '벗기' : '입기'}</button>`, on ? 'on' : ''); d.querySelector('button').onclick = () => post('/api/cos/equip', { slot: S.slot, id: on ? null : it.id }); list.append(d); }
     } else {
