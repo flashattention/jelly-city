@@ -8,6 +8,9 @@ import { getCos, boardMedal } from '../cosmetics.js';
 import crypto from 'node:crypto';
 import { Tickets, ReplayPool, decodeReplay } from './verify.js';
 
+// 게임 코드 판: 서버가 다시 돌려 보는 코드와 브라우저 코드가 같아야 기록이 맞는다. 배포로 바뀌면 브라우저가 달리기 전에 새로 고친다
+const JS_DIR = new URL('../../public/dream-runner/js/', import.meta.url);
+export const DREAM_VER = (() => { try { const h = crypto.createHash('sha1'); for (const f of fs.readdirSync(JS_DIR).filter((x) => x.endsWith('.js')).sort()) h.update(fs.readFileSync(new URL(f, JS_DIR))); return h.digest('hex').slice(0, 12); } catch { return 'x'; } })();
 const MAX_SPEED = 50;
 const MAX_SPEED_ITEM = 75; // 아이템전: 로켓 · 순간이동이 있어서 더 넉넉하게      // 게임 속 최고 속도(30m/s × 가속 1.5)보다 넉넉하게: 이보다 빠른 기록은 조작으로 본다
 const TOP = 50;
@@ -146,7 +149,8 @@ export async function dreamApi(req, res, url, who, board, json, isAdmin) {
     try { return json(res, 200, { ok: true, ...board.played(who?.sub || 'anon:' + b.anon, b) }); } catch (e) { return json(res, 400, { error: e.message }); }
   }
   // 출발표: 기다리지 않고 시작하고, 뒤에서 받아 둔다
-  if (url.pathname === '/api/dream/run' && req.method === 'POST') { const b = await readJson(req); return json(res, 200, { tk: board.ticket(b) }); }
+  if (url.pathname === '/api/dream/ver') return json(res, 200, { v: DREAM_VER });
+  if (url.pathname === '/api/dream/run' && req.method === 'POST') { const b = await readJson(req); return json(res, 200, { tk: board.ticket(b), v: DREAM_VER }); }
   if (url.pathname.startsWith('/api/dream/admin/')) {
     if (!who || !isAdmin?.(who.user)) return json(res, 403, { error: '관리자만 할 수 있어요' });
     if (url.pathname === '/api/dream/admin/list') return json(res, 200, board.adminList());

@@ -70,7 +70,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyV') toggleCam();
   if (e.code === 'KeyQ') input.item = true;
   if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
-  if (game.mode === 'over' && (e.code === 'Space' || e.code === 'Enter') && !game.multi) { e.preventDefault(); startSolo(); }
+  if (game.mode === 'over' && (e.code === 'Space' || e.code === 'Enter') && !game.multi) { e.preventDefault(); startSoloFresh(); }
 });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
 window.addEventListener('blur', () => keys.clear());
@@ -215,7 +215,7 @@ $('code-btn').onclick = () => joinByCode($('code-in').value);
 $('code-btn2').onclick = () => joinByCode($('code-in2').value);
 $('code-in').onkeydown = (e) => { if (e.key === 'Enter') $('code-btn').click(); };
 $('code-in2').onkeydown = (e) => { if (e.key === 'Enter') $('code-btn2').click(); };
-$('solo-btn').onclick = () => { unlock(); startSolo(); };
+$('solo-btn').onclick = () => { unlock(); startSoloFresh(); };
 $('multi-btn').onclick = () => { unlock(); openLobby(); };
 // ---------- 스피드전 · 아이템전 ----------
 const modeName = (m) => (m === 'item' ? '🎁 아이템전' : '⚡ 스피드전');
@@ -254,7 +254,7 @@ async function renderAdmin(d) {
   for (const b of el.querySelectorAll('[data-s]')) b.onclick = () => { if (confirm('이 기록을 지우고 드림 러너 업적과 별을 거둘까요?')) act('remove', { sub: b.dataset.s, t: b.dataset.t })(); };
 }
 $('home-btn').onclick = () => { if (game.multi) { net.send({ t: 'leave' }); game.multi = false; } toTitle(); };
-$('again-btn').onclick = () => { if (game.multi) { leaveRun(); show('room'); } else startSolo(); };
+$('again-btn').onclick = () => { if (game.multi) { leaveRun(); show('room'); } else startSoloFresh(); };
 
 // ---------- 순위표 ----------
 // 내 기록: 판수 · 달린 시간 · 난이도별 지금 순위
@@ -317,6 +317,14 @@ async function encodeReplay(R) {
   const text = `${R.dts.join(',')}|${R.evs.join(',')}`;
   if (typeof CompressionStream !== 'function') return text.length < 600000 ? { d: text } : null;
   try { const buf = new Uint8Array(await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()); let s = ''; for (let i = 0; i < buf.length; i += 8192) s += String.fromCharCode(...buf.subarray(i, i + 8192)); return { z: 1, d: btoa(s) }; } catch { return text.length < 600000 ? { d: text } : null; }
+}
+// 새 버전이 배포됐으면 달리기 전에 페이지를 새로 고치고 바로 출발한다 (예전 코드로 달리면 서버 확인과 길이 달라 기록이 '확인 중'에 걸린다)
+game.ver = null; const verOf = () => fetch('/api/dream/ver', { cache: 'no-store' }).then((r) => r.json()).then((j) => j.v).catch(() => null);
+verOf().then((v) => { game.ver = v; });
+try { if (sessionStorage.getItem('dreamrunner.autostart')) { sessionStorage.removeItem('dreamrunner.autostart'); const go = (n) => (game.mode === 'title' && runner ? (toast('🆕 새 버전으로 바꿨어요'), startSolo()) : n > 0 && setTimeout(() => go(n - 1), 100)); setTimeout(() => go(80), 300); } } catch { /* 없음 */ }
+async function startSoloFresh() {
+  if (game.ver) { const v = await Promise.race([verOf(), new Promise((ok) => setTimeout(() => ok(null), 700))]); if (v && v !== game.ver) { try { sessionStorage.setItem('dreamrunner.autostart', '1'); } catch { /* 없음 */ } window.onbeforeunload = null; location.reload(); return; } }
+  startSolo();
 }
 function startSolo() {
   game.multi = false; game.team = false; $('teambar').classList.add('hidden'); game.starting = true; game.tk = null;
