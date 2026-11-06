@@ -1,6 +1,6 @@
 // 업적 · 옷장 · 별 상점 창 (메인 · 모든 게임 공용). 치장은 계정에 저장되어 모든 게임에서 쓴다
 import { account, store } from './account.js';
-import { SLOTS, SHOP, RARITY, TIERS, ACHIEVEMENTS, GAMES, itemById, reqText, cleanCos } from './cos-items.js';
+import { SLOTS, SHOP, RARITY, TIERS, ACHIEVEMENTS, achById, GAMES, itemById, reqText, cleanCos } from './cos-items.js';
 
 const CSS = `
 .cw-wrap{position:fixed;inset:0;z-index:100001;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(8,6,20,.78);font-family:'Jua','Noto Sans KR',sans-serif;color:#fff}
@@ -50,7 +50,7 @@ export async function openWardrobe(tab = 'ach', onChange) {
   wrap.innerHTML = `<div class="cw-card"><div class="cw-head"><h2>🏆 업적 · 치장</h2><span class="cw-stars"></span><button class="cw-x">✕</button></div><div class="cw-tabs"><button data-t="ach">🏆 업적</button><button data-t="closet">👕 옷장</button><button data-t="shop">⭐ 별 상점</button></div><div class="cw-msg"></div><div class="cw-body"><div class="cw-left"><canvas class="cw-pv" width="500" height="660"></canvas><div class="cw-spin"><button class="cw-spin-b">⏸ 멈추기</button><span>끌어서 돌려 보세요</span></div><div class="cw-eq"></div></div><div class="cw-right"><div class="cw-sum"></div><div class="cw-chips"></div><div class="cw-list"></div></div></div></div>`;
   document.body.append(wrap);
   const $ = (s) => wrap.querySelector(s), msg = (t) => { $('.cw-msg').textContent = t || ''; };
-  const owns = (it) => (it.shop ? C.owned.includes(it.id) : it.slot === 'crown' ? (C.crowns || []).includes(it.id) : !!C.ach[it.ach]);
+  const owns = (it) => (it.shop ? C.owned.includes(it.id) : C.live && (it.slot === 'crown' || it.slot === 'title') && achById.get(it.ach)?.rule.crown ? C.live.includes(it.id) : !!C.ach[it.ach]);
   const post = async (path, body) => { msg(''); try { C = await account.api(path, { method: 'POST', body: { ...body, anon: anon() || undefined } }); if (account.session) account.setCos(C); else account.cos = C; onChange?.(C); draw(); pv?.set(C.equip); } catch (e) { msg(e.status === 401 ? '로그인하거나 드림 러너를 한 판 달리면 쓸 수 있어요' : e.message); } };
   // 미리보기: 곰돌이에 입혀 빙글빙글
   let pv = null;
@@ -95,7 +95,7 @@ export async function openWardrobe(tab = 'ach', onChange) {
       sum.textContent = '가진 치장은 모든 게임에서 보여요. 2D 게임에서는 칭호가 이름 옆에 빛나요';
       chips(Object.entries(SLOTS).map(([k, v]) => [k, `${v.emoji} ${v.name}`]), S.slot, (k) => { S.slot = k; });
       const mine = [...itemById.values()].filter((i) => i.slot === S.slot && owns(i));
-      if (!mine.length) list.append(card(`<div class="cw-s">아직 없어요. ${SLOTS[S.slot].sub}${S.slot === 'crown' ? ' · 지금 1위인 순위표의 왕관만 쓸 수 있어요' : ['sash', 'title'].includes(S.slot) ? ' · 업적을 달성하면 얻어요' : ' · 별 상점에서 살 수 있어요'}</div>`, ''));
+      if (!mine.length) list.append(card(`<div class="cw-s">아직 없어요. ${SLOTS[S.slot].sub}${S.slot === 'crown' ? ' · 지금 1위인 순위표의 왕관만 쓸 수 있어요' : ['sash', 'title'].includes(S.slot) ? ' · 업적을 달성하면 얻어요 (1위 칭호는 1위인 동안만)' : ' · 별 상점에서 살 수 있어요'}</div>`, ''));
       for (const it of mine) { const on = C.equip?.[S.slot] === it.id, rc = RARITY[it.rarity]?.color || TIERS[it.rarity]?.color; const d = card(`<div class="cw-n">${it.emoji} ${esc(it.name)}</div><div class="cw-r" style="color:${rc}">${RARITY[it.rarity]?.name || TIERS[it.rarity]?.name}</div><button class="cw-b">${on ? '벗기' : '입기'}</button>`, on ? 'on' : ''); d.querySelector('button').onclick = () => post('/api/cos/equip', { slot: S.slot, id: on ? null : it.id }); list.append(d); }
     } else {
       sum.textContent = '별은 드림 러너를 달리면 모여요. 어려운 난이도와 랜덤 지옥일수록 많이 받아요';

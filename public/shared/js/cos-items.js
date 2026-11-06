@@ -117,7 +117,7 @@ function buildAch() {
   const rankSet = (base, game, label, rule) => {
     A.push(ach(`${base}.r10`, game, `${label} 10위권`, `${label} 순위표 10위 안에 들기 (20명 이상 겨룬 순위표)`, 'silver', { ...rule, rank: 10 }));
     A.push(ach(`${base}.r3`, game, `${label} 3위권`, `${label} 순위표 3위 안에 들기 (10명 이상 겨룬 순위표)`, 'platinum', { ...rule, rank: 3 }));
-    A.push(ach(`${base}.r1`, game, `${label} 1위`, `${label} 순위표 1위에 오르기 (5명 이상 겨룬 순위표) · 1위인 동안 왕관을 쓸 수 있어요`, 'legend', { ...rule, rank: 1, crown: true }));
+    A.push(ach(`${base}.r1`, game, `${label} 1위`, `${label} 순위표 1위에 오르기 (5명 이상 겨룬 순위표) · 1위인 동안 왕관과 1위 칭호를 쓸 수 있어요`, 'legend', { ...rule, rank: 1, crown: true }));
   };
   // 드림 러너: 맵 × 난이도마다 순위 · 거리
   const STEP = { easy: [1000, 3000, 6000, 12000], normal: [1000, 3000, 6000, 10000], hard: [800, 2000, 4000, 8000], extreme: [500, 1500, 3000, 6000], lightspeed: [500, 1200, 2500, 5000], beyond: [300, 800, 2000, 4000] };
