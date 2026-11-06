@@ -61,7 +61,7 @@ export const SHOP = [
   it('trail', 'coin', '금화 뿌리기', '🪙', 900, 'rare', { shape: 'coin', colors: ['#ffc93c', '#ffe27a'], size: 0.26, life: 0.9 }),
   it('trail', 'flame', '불길', '🔥', 2400, 'epic', { shape: 'flame', colors: ['#ff5a1f', '#ffd27a'], size: 0.42, life: 0.5 }),
   it('trail', 'bolt', '번개 자국', '⚡', 6000, 'epic', { shape: 'bolt', colors: ['#7ff0ff', '#ffffff'], size: 0.42, life: 0.35 }),
-  it('trail', 'rainbow', '무지개 길', '🌈', 22000, 'legend', { shape: 'glow', colors: RAIN, size: 0.5, life: 1 }, R('extreme', 2000)),
+  it('trail', 'rainbow', '무지개 길', '🌈', 22000, 'legend', { shape: 'star', colors: RAIN, size: 0.42, life: 1.1, rate: 55, ribbon: { w: 1.25, life: 1.6 } }, R('extreme', 2000)), // 바닥에 깔리는 무지개 띠 + 반짝이
   it('trail', 'skull', '해골 발자국', '💀', 30000, 'legend', { shape: 'skull', colors: ['#e8e0c8', '#ff3b4d'], size: 0.38, life: 0.8 }, R('hard', 3000, 'hell')),
   // 2단 점프
   it('jump', 'puff', '뭉게구름', '☁️', 60, 'common', { shape: 'glow', colors: ['#ffffff'], n: 12, size: 0.5 }),

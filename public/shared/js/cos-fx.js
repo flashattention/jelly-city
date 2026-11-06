@@ -26,7 +26,9 @@ const CC = new THREE.Color(), CC2 = new THREE.Color();
 const gpaint = (f, t, i = 0) => { if (!f?.grad) return paint('rainbow', t, i); const g = f.grad, x = (((t * 0.25 + i * 0.13) % 1) + 1) % 1 * g.length, a = Math.floor(x); return CC.set(g[a % g.length]).lerp(CC2.set(g[(a + 1) % g.length]), x - a); };
 const paint = (col, t, i = 0) => (col === 'rainbow' ? CC.setHSL((t * 0.25 + i * 0.13) % 1, 1, 0.62) : CC.set(col));
 const pick = (cols, i, t) => paint(cols === 'rainbow' ? 'rainbow' : cols[i % cols.length], t, i);
-const WV = new THREE.Vector3();
+const QQ = new THREE.Quaternion(), WV = new THREE.Vector3(), WV2 = new THREE.Vector3();
+// 치장 창 미리보기: 제자리 곰돌이도 달리는 것처럼 발자취가 뒤로 흘러간다 (게임에서는 0)
+const DR = new THREE.Vector3();
 const toon = (c, o = {}) => new THREE.MeshToonMaterial({ color: c, ...o });
 const glowM = (c, op = 0.85) => new THREE.MeshBasicMaterial({ color: c === 'rainbow' ? '#ffffff' : c, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false });
 const SPH = new THREE.SphereGeometry(1, 12, 9), BOX = new THREE.BoxGeometry(1, 1, 1), RING = new THREE.TorusGeometry(1, 0.035, 8, 36), SASH = new THREE.TorusGeometry(1, 0.085, 8, 30);
@@ -58,13 +60,47 @@ class Spray {
       this.age[i] += dt; const k = 1 - this.age[i] / this.life[i];
       if (k <= 0) { this.life[i] = 0; continue; }
       any = true;
-      this.w[i * 3] += this.v[i * 3] * dt; this.w[i * 3 + 1] += this.v[i * 3 + 1] * dt; this.w[i * 3 + 2] += this.v[i * 3 + 2] * dt;
+      this.w[i * 3] += (this.v[i * 3] + DR.x) * dt; this.w[i * 3 + 1] += this.v[i * 3 + 1] * dt; this.w[i * 3 + 2] += (this.v[i * 3 + 2] + DR.z) * dt;
       WV.set(this.w[i * 3], this.w[i * 3 + 1], this.w[i * 3 + 2]); this.root.worldToLocal(WV);
       this.pos[i * 3] = WV.x; this.pos[i * 3 + 1] = WV.y; this.pos[i * 3 + 2] = WV.z;
       this.col[i * 3] = this.base[i * 3] * k; this.col[i * 3 + 1] = this.base[i * 3 + 1] * k; this.col[i * 3 + 2] = this.base[i * 3 + 2] * k;
     }
     this.pts.visible = any; if (any) { a.position.needsUpdate = true; a.color.needsUpdate = true; }
   }
+}
+
+// 바닥에 깔리는 띠 (무지개 길): 발자국 자리를 이어 폭이 있는 띠를 그리고 뒤로 갈수록 옅어진다
+let rainTex = null;
+function rainbowTex() {
+  if (rainTex) return rainTex; const c = document.createElement('canvas'); c.width = 64; c.height = 4; const x = c.getContext('2d'), g = x.createLinearGradient(0, 0, 64, 0);
+  ['#ff3b5c', '#ff9a2e', '#ffe14d', '#4fe08a', '#3fc8ff', '#5b6bff', '#c45bff'].forEach((col, i) => { g.addColorStop(0.04 + i * 0.153, col); });
+  x.fillStyle = g; x.fillRect(0, 0, 64, 4); const e = x.createLinearGradient(0, 0, 64, 0); e.addColorStop(0, 'rgba(0,0,0,1)'); e.addColorStop(0.08, 'rgba(0,0,0,0)'); e.addColorStop(0.92, 'rgba(0,0,0,0)'); e.addColorStop(1, 'rgba(0,0,0,1)'); x.globalCompositeOperation = 'destination-out'; x.fillStyle = e; x.fillRect(0, 0, 64, 4);
+  rainTex = new THREE.CanvasTexture(c); rainTex.colorSpace = THREE.SRGBColorSpace; return rainTex;
+}
+class Ribbon {
+  constructor(root, o) {
+    this.root = root; this.w = o.w || 0.9; this.life = o.life || 1.2; this.N = 48; this.pts = []; this.acc = 0;
+    const g = new THREE.BufferGeometry(), n = this.N * 2; this.pos = new Float32Array(n * 3); this.col = new Float32Array(n * 4); const uv = new Float32Array(n * 2), idx = [];
+    for (let i = 0; i < this.N; i++) { uv.set([0, i / this.N, 1, i / this.N], i * 4); if (i) { const a = (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } }
+    g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(this.col, 4)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(idx);
+    this.mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: rainbowTex(), vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide })); // 밝은 바닥에서도 색이 날아가지 않게 보통 섞기 + 꼭짓점 투명도
+    this.mesh.frustumCulled = false; root.add(this.mesh);
+  }
+  update(dt, on, x, y, z) {
+    for (const p of this.pts) { p.a += dt; p.x += DR.x * dt; p.z += DR.z * dt; }
+    while (this.pts.length && this.pts[0].a > this.life) this.pts.shift();
+    this.acc += dt; if (on && this.acc > 0.025) { this.acc = 0; this.pts.push({ x, y: y + 0.04, z, a: 0 }); if (this.pts.length > this.N) this.pts.shift(); }
+    const P = this.pts, n = P.length; this.mesh.visible = n > 1; if (n < 2) return;
+    this.root.updateMatrixWorld();
+    for (let i = 0; i < this.N; i++) {
+      const j = Math.min(n - 1, i), p = P[j], q = P[Math.min(n - 1, j + 1)], o = P[Math.max(0, j - 1)];
+      let dx = q.x - o.x, dz = q.z - o.z; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
+      const k = i < n ? Math.max(0, 1 - p.a / this.life) : 0, hw = this.w * 0.5 * (0.55 + 0.45 * k);
+      for (let sd = 0; sd < 2; sd++) { const sgn = sd ? 1 : -1; WV2.set(p.x - dz * hw * sgn, p.y, p.z + dx * hw * sgn); this.root.worldToLocal(WV2); this.pos.set([WV2.x, WV2.y, WV2.z], (i * 2 + sd) * 3); this.col.set([1, 1, 1, Math.min(0.92, k * 1.1)], (i * 2 + sd) * 4); }
+    }
+    const a = this.mesh.geometry.attributes; a.position.needsUpdate = true; a.color.needsUpdate = true;
+  }
+  dispose() { this.mesh.removeFromParent(); this.mesh.geometry.dispose(); this.mesh.material.dispose(); }
 }
 
 export class CosFx {
@@ -79,7 +115,8 @@ export class CosFx {
     if (fx('sash')) this.sash(fx('sash'));
     if (fx('crown')) this.crown(fx('crown'));
     if (fx('sash') && r.opts?.cosBadge) this.badge(itemById.get(this.cos.sash), !!this.cos.crown);
-    for (const s of ['trail', 'jump', 'boost', 'land']) if (fx(s)) this.sprays[s] = new Spray(r.root, fx(s), s === 'trail' || s === 'boost' ? 60 : (fx(s).n || 16) + 8);
+    for (const s of ['trail', 'jump', 'boost', 'land']) if (fx(s)) this.sprays[s] = new Spray(r.root, fx(s), s === 'trail' ? Math.max(60, Math.ceil((fx(s).rate || 26) * (fx(s).life || 1) * 1.3)) : s === 'boost' ? 60 : (fx(s).n || 16) + 8);
+    if (fx('trail')?.ribbon) this.ribbon = new Ribbon(r.root, fx('trail').ribbon);
   }
   attach(parent, build) { const g = new THREE.Group(); parent.add(g); this.parts.push(g); build(g); return g; }
   aura(f) {
@@ -180,10 +217,13 @@ export class CosFx {
     const emit = this.sprays.trail || this.sprays.boost;
     if (emit) { this.r.root.getWorldPosition(WV); this.wx = WV.x; this.wy = WV.y; this.wz = WV.z; }
     const tr = this.sprays.trail;
-    if (tr && speed > 1) { this.tr += dt * 26; while (this.tr > 1) { this.tr--; tr.emit(this.wx + (Math.random() - 0.5) * 0.5, this.wy + 0.08, this.wz + (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.6, 0.5 + Math.random() * 0.6, (Math.random() - 0.5) * 0.6, tr.fx.life * (0.7 + Math.random() * 0.5), t); } }
+    // 미리보기(치장 창): 곰돌이 등 뒤로 흘려보내 달리는 것처럼
+    if (this.r.opts?.cosPreview && speed > 1) { this.r.root.getWorldQuaternion(QQ); DR.set(0, 0, -5).applyQuaternion(QQ); DR.y = 0; } else DR.set(0, 0, 0);
+    if (this.ribbon) { if (!emit) { this.r.root.getWorldPosition(WV); this.wx = WV.x; this.wy = WV.y; this.wz = WV.z; } this.ribbon.update(dt, speed > 1, this.wx, this.wy, this.wz); }
+    if (tr && speed > 1) { this.tr += dt * (tr.fx.rate || 26); while (this.tr > 1) { this.tr--; tr.emit(this.wx + (Math.random() - 0.5) * 0.5, this.wy + 0.08, this.wz + (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.6, 0.5 + Math.random() * 0.6, (Math.random() - 0.5) * 0.6, tr.fx.life * (0.7 + Math.random() * 0.5), t); } }
     const bo = this.sprays.boost;
     if (bo && boost > 0.05) { this.bo += dt * (bo.fx.rate || 50) * boost; while (this.bo > 1) { this.bo--; bo.emit(this.wx + (Math.random() - 0.5) * 0.4, this.wy + 0.8 + (Math.random() - 0.5) * 0.5, this.wz + 0.5, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 1.5, 2 + Math.random() * 4, bo.fx.life * (0.7 + Math.random() * 0.6), t); } }
     for (const k in this.sprays) this.sprays[k].update(dt);
   }
-  dispose() { for (const g of this.parts) g.removeFromParent(); this.groups.removeFromParent(); for (const k in this.sprays) { const p = this.sprays[k].pts; p.removeFromParent(); p.geometry.dispose(); p.material.dispose(); } }
+  dispose() { this.ribbon?.dispose(); for (const g of this.parts) g.removeFromParent(); this.groups.removeFromParent(); for (const k in this.sprays) { const p = this.sprays[k].pts; p.removeFromParent(); p.geometry.dispose(); p.material.dispose(); } }
 }

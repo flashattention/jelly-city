@@ -82,7 +82,7 @@ export async function openWardrobe(tab = 'ach', onChange) {
       const THREE = await import('three'), { Roach } = await import('./roach.js'), cv = $('.cw-pv'); if (!cv.offsetWidth) return;
       const r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); r.setPixelRatio(1); r.setSize(cv.width, cv.height, false);
       const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(32, cv.width / cv.height, 0.1, 50); cam.position.set(0, 1.5, 6); cam.lookAt(0, 1.25, 0); sc.add(new THREE.HemisphereLight('#ffffff', '#6a6090', 2.4)); const dl = new THREE.DirectionalLight('#ffffff', 1.6); dl.position.set(2, 4, 3); sc.add(dl);
-      const c0 = account.chars?.[0]?.profile, b = new Roach({ own: true, seed: 'pv', color: c0?.color || '#8a5634', age: 25, look: { ...(c0?.look || {}), cos: undefined }, accessories: c0?.accessories || [] }); sc.add(b.root); b.setCos(C.equip);
+      const c0 = account.chars?.[0]?.profile, b = new Roach({ own: true, cosPreview: true, seed: 'pv', color: c0?.color || '#8a5634', age: 25, look: { ...(c0?.look || {}), cos: undefined }, accessories: c0?.accessories || [] }); sc.add(b.root); b.setCos(C.equip);
       pv = { set: (e) => b.setCos(e), bear: b }; let last = performance.now(), T = 0, alive = true; pv.stop = () => { alive = false; r.dispose(); };
       // 돌리기: 저절로 천천히 돌고, 단추로 멈추거나 끌어서 직접 돌린다
       const spinB = $('.cw-spin-b'); let auto = true, drag = null, yaw = 0; const label = () => { spinB.textContent = auto ? '⏸ 멈추기' : '▶ 돌리기'; };
