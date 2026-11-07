@@ -30,7 +30,7 @@ const QQ = new THREE.Quaternion(), WV = new THREE.Vector3(), WV2 = new THREE.Vec
 // 치장 창 미리보기: 제자리 곰돌이도 달리는 것처럼 발자취가 뒤로 흘러간다 (게임에서는 0)
 const DR = new THREE.Vector3();
 const toon = (c, o = {}) => new THREE.MeshToonMaterial({ color: c, ...o });
-const glowM = (c, op = 0.85) => new THREE.MeshBasicMaterial({ color: c === 'rainbow' ? '#ffffff' : c, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false });
+const glowM = (c, op = 0.85) => new THREE.MeshBasicMaterial({ color: c === 'rainbow' ? '#ffffff' : c, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }); // 양면: 좌우를 뒤집은 날개 · 뒤에서 본 빛도 보이게
 const SPH = new THREE.SphereGeometry(1, 12, 9), BOX = new THREE.BoxGeometry(1, 1, 1), RING = new THREE.TorusGeometry(1, 0.035, 8, 36), SASH = new THREE.TorusGeometry(1, 0.085, 8, 30);
 const CONE = new THREE.ConeGeometry(1, 1, 4);
 const WING = (() => { const s = new THREE.Shape(); s.moveTo(0, 0); s.bezierCurveTo(0.3, 0.55, 0.85, 0.72, 1.15, 0.5); s.bezierCurveTo(1, 0.25, 0.95, 0.05, 0.9, -0.1); s.bezierCurveTo(0.65, -0.05, 0.3, -0.25, 0, 0); return new THREE.ShapeGeometry(s); })();
@@ -89,10 +89,13 @@ class Ribbon {
     const g = new THREE.BufferGeometry(), n = this.N * 2; this.pos = new Float32Array(n * 3); this.col = new Float32Array(n * 4); const uv = new Float32Array(n * 2), idx = [];
     for (let i = 0; i < this.N; i++) { uv.set([0, i / this.N, 1, i / this.N], i * 4); if (i) { const a = (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } }
     g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(this.col, 4)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(idx);
-    this.mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: ribbonTex(o.colors), vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide })); // 밝은 바닥에서도 색이 날아가지 않게 보통 섞기 + 꼭짓점 투명도
+    this.glow = !!o.glow; this.gcols = o.gcols; this.t = 0;
+    this.mesh = new THREE.Mesh(g, this.glow ? new THREE.MeshBasicMaterial({ map: (() => { const t = shineTex().clone(); t.needsUpdate = true; return t; })(), vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }) : new THREE.MeshBasicMaterial({ map: ribbonTex(o.colors), vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide })); // 밝은 바닥에서도 색이 날아가지 않게 보통 섞기 + 꼭짓점 투명도 (고급 연출의 빛줄기 겹띠는 더하기 섞기)
+    if (this.glow) { this.mesh.material.map.repeat.set(1, 3); this.mesh.renderOrder = 2; }
     this.mesh.frustumCulled = false; root.add(this.mesh);
   }
   update(dt, on, x, y, z) {
+    this.t += dt; if (this.glow) { this.mesh.material.map.offset.y = (this.mesh.material.map.offset.y + dt * 1.4) % 1; this.mesh.material.color.copy(cyc(this.gcols, this.t)); }
     for (const p of this.pts) { p.a += dt; p.x += DR.x * dt; p.z += DR.z * dt; }
     while (this.pts.length && this.pts[0].a > this.life) this.pts.shift();
     this.off = on ? 0 : this.off + dt;
@@ -117,7 +120,40 @@ class Ribbon {
     }
     const a = this.mesh.geometry.attributes; a.position.needsUpdate = true; a.color.needsUpdate = true;
   }
-  dispose() { this.mesh.removeFromParent(); this.mesh.geometry.dispose(); this.mesh.material.dispose(); }
+  dispose() { this.mesh.removeFromParent(); this.mesh.geometry.dispose(); if (this.glow) this.mesh.material.map.dispose(); this.mesh.material.dispose(); }
+}
+
+// ---------- 고급 연출 (fx.grand 1~3): 초월 도전 · 최정상 아이템만. 높을수록 겹겹이 더 화려하다 ----------
+//   1 = 전설(2,500m) · 2 = 신화(5,000m) · 3 = 초월 등급(10,000m · 초월 1위)
+const sigTex = {};
+function sigilTex() { // 바닥 마법진: 겹친 원 + 별 + 룬 눈금
+  if (sigTex.t) return sigTex.t; const n = 256, c = document.createElement('canvas'); c.width = c.height = n; const x = c.getContext('2d'), m = n / 2;
+  x.strokeStyle = '#fff'; x.shadowColor = '#fff'; x.shadowBlur = 8;
+  for (const [r, w] of [[120, 5], [104, 2.5], [70, 3]]) { x.lineWidth = w; x.beginPath(); x.arc(m, m, r, 0, 7); x.stroke(); }
+  x.lineWidth = 3; x.beginPath(); for (let i = 0; i <= 5; i++) { const a = -Math.PI / 2 + (i * 4 * Math.PI) / 5; x[i ? 'lineTo' : 'moveTo'](m + Math.cos(a) * 104, m + Math.sin(a) * 104); } x.stroke();
+  for (let i = 0; i < 24; i++) { const a = (i / 24) * Math.PI * 2; x.lineWidth = i % 3 ? 2 : 4; x.beginPath(); x.moveTo(m + Math.cos(a) * 106, m + Math.sin(a) * 106); x.lineTo(m + Math.cos(a) * (i % 3 ? 114 : 120), m + Math.sin(a) * (i % 3 ? 114 : 120)); x.stroke(); }
+  const t = new THREE.CanvasTexture(c); return (sigTex.t = t);
+}
+const shnTex = {};
+function shineTex() { // 띠 위로 흐르는 빛줄기: 가운데가 밝고, 길이 방향으로 밝은 마디가 되풀이된다
+  if (shnTex.t) return shnTex.t; const c = document.createElement('canvas'); c.width = 64; c.height = 64; const x = c.getContext('2d');
+  for (let y = 0; y < 64; y++) { const band = Math.pow(Math.max(0, Math.sin((y / 64) * Math.PI * 2)), 6); for (let i = 0; i < 64; i++) { const across = Math.pow(Math.sin((i / 63) * Math.PI), 2.2); const v = Math.min(1, across * (0.25 + band * 0.9)); x.fillStyle = `rgba(255,255,255,${v})`; x.fillRect(i, y, 1, 1); } }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return (shnTex.t = t);
+}
+// 빛나는 색만 (더하기 섞기라 어두운 색은 안 보인다)
+const brightOf = (cols) => { const a = (cols === 'rainbow' ? RAIN7 : cols).filter((c) => { CC.set(c); return CC.r + CC.g + CC.b > 0.6; }); return a.length ? a : ['#ffffff']; };
+const cyc = (cols, t, i = 0) => { const g = cols, x = (((t * 0.3 + i * 0.17) % 1) + 1) % 1 * g.length, a = Math.floor(x); return CC.set(g[a % g.length]).lerp(CC2.set(g[(a + 1) % g.length]), x - a); };
+const sprite = (g, color, s, op, tex = 'glow') => { const m = new THREE.SpriteMaterial({ map: typeof tex === 'string' ? texOf(tex) : tex, color, transparent: true, opacity: op, depthWrite: false, blending: THREE.AdditiveBlending }), o = new THREE.Sprite(m); o.scale.setScalar(s); g.add(o); return { o, m }; };
+const flatM = (tex, op = 0.9) => new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: op, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+const PLANE = new THREE.PlaneGeometry(1, 1);
+// 곰돌이 몸 둘레를 도는 작은 빛 알갱이 (로컬): 오라 · 날개 · 신발의 반짝이
+function orbitDust(anim, g, cols, n, R, y0, h, size, sp = 1, fall = 0) {
+  n = Math.round(n * (isPhone ? 0.5 : 1)); const geo = new THREE.BufferGeometry(), pos = new Float32Array(n * 3), col = new Float32Array(n * 3), seed = Array.from({ length: n }, () => [Math.random() * 6.28, R * (0.7 + Math.random() * 0.5), Math.random() * h, 0.6 + Math.random()]);
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ map: texOf('star'), size, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); pts.frustumCulled = false; g.add(pts);
+  anim.push((dt, t) => { for (let i = 0; i < n; i++) { const [a, r, yy, s] = seed[i], ang = a + t * s * sp, y = fall ? h - ((yy + t * fall * s) % h) : (yy + t * 0.25 * s) % h, tw = 0.35 + 0.65 * Math.max(0, Math.sin(t * 6 * s + a * 3)); pos[i * 3] = Math.cos(ang) * r; pos[i * 3 + 1] = y0 + y; pos[i * 3 + 2] = Math.sin(ang) * r; cyc(cols, t, i * 0.37); col[i * 3] = CC.r * tw; col[i * 3 + 1] = CC.g * tw; col[i * 3 + 2] = CC.b * tw; }
+    geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true; });
+  return pts;
 }
 
 export class CosFx {
@@ -134,7 +170,65 @@ export class CosFx {
     if (fx('sash') && r.opts?.cosBadge) this.badge(itemById.get(this.cos.sash), !!this.cos.crown);
     for (const s of ['trail', 'jump', 'boost', 'land']) if (fx(s)) this.sprays[s] = new Spray(r.root, fx(s), s === 'trail' ? Math.max(60, Math.ceil((fx(s).rate || 26) * (fx(s).life || 1) * 1.3)) : s === 'boost' ? 60 : (fx(s).n || 16) + 8);
     if (fx('trail')?.ribbon) this.ribbon = new Ribbon(r.root, fx('trail').ribbon);
+    // 고급 연출 (초월 도전 · 정상 · 최정상 아이템)
+    this.bursts = [];
+    if (fx('aura')?.grand) this.grandAura(fx('aura'));
+    if (fx('back')?.grand) this.grandBack(fx('back'));
+    if (fx('shoes')?.grand) this.grandShoes(fx('shoes'));
+    const tf = fx('trail');
+    if (tf?.grand) { const L = tf.grand; if (tf.ribbon) this.ribGlow = new Ribbon(r.root, { ...tf.ribbon, w: tf.ribbon.w * (1.2 + L * 0.12), life: tf.ribbon.life * 1.1, glow: true, gcols: brightOf(tf.ribbon.colors || RAIN7) }); this.sprays.spark = new Spray(r.root, { shape: 'star', colors: brightOf(tf.colors), size: 0.18 + L * 0.05 }, 60 + L * 30); this.sparkRate = 10 + L * 12; this.sk = 0; }
+    const bf = fx('boost');
+    if (bf?.grand) { const cols = brightOf(bf.colors); this.bHead = sprite(this.groups, cols[0], 1.6 + bf.grand * 0.4, 0); this.bHead.o.position.set(0, 0.8, -0.5); this.bCore = sprite(this.groups, '#ffffff', 0.7, 0); this.bCore.o.position.set(0, 0.8, -0.45); this.bCols = cols; this.sprays.bspark = new Spray(r.root, { shape: 'star', colors: cols, size: 0.2 + bf.grand * 0.03 }, 60 + bf.grand * 30); this.bk = 0; this.bL = bf.grand; this.bRing = 0; }
   }
+  // 오라 고급: 몸을 감싸는 빛 · 비스듬히 도는 궤도 고리 → 바닥 마법진 → 빛기둥 · 도는 빛 구슬
+  grandAura(f) {
+    const L = f.grand, cols = brightOf(f.colors);
+    this.attach(this.groups, (g) => {
+      const body = sprite(g, cols[0], 2.1 + L * 0.5, 0.3); body.o.position.y = 1;
+      orbitDust(this.anim, g, cols, 16 + L * 10, 0.75, 0, 2.2, 0.12 + L * 0.02, 0.9);
+      const orbits = []; for (let k = 0; k < (L >= 3 ? 3 : 2); k++) { const og = new THREE.Group(); og.position.y = 1; og.rotation.set(k === 1 ? 1.15 : k === 2 ? 0.25 : -1.15, 0, k === 1 ? 0.5 : -0.5); g.add(og); const m = glowM(cols[k % cols.length], 0.75), o = part(og, RING, m, 0, 0, 0, 1.0 + k * 0.14); o.rotation.x = Math.PI / 2; o.scale.z = 1.6; const gem = sprite(og, '#ffffff', 0.32, 0.9, 'star'); orbits.push({ og, m, k, gem, r: 1.0 + k * 0.14 }); }
+      let sig = null; if (L >= 2) { const m = flatM(sigilTex(), 0.8); sig = { o: part(g, PLANE, m, 0, 0.04, 0, 2.3 + L * 0.35), m }; sig.o.rotation.x = -Math.PI / 2; }
+      let pillar = null; const orbs = []; if (L >= 3) { pillar = sprite(g, cols[0], 1, 0.4); pillar.o.scale.set(1.2, 6.5, 1); pillar.o.position.y = 2.6; for (let i = 0; i < 3; i++) { const b = sprite(g, cols[(i + 1) % cols.length], 0.55, 0.95); orbs.push({ ...b, a: (i / 3) * 6.28 }); } orbitDust(this.anim, g, cols, 30, 0.45, 0, 4, 0.16, 0.5); }
+      this.anim.push((dt, t) => {
+        body.m.opacity = 0.22 + Math.abs(Math.sin(t * 2.2)) * (0.18 + L * 0.05); body.m.color.copy(cyc(cols, t));
+        for (const q of orbits) { q.og.rotation.y = t * (q.k === 1 ? -1.5 : 1.2 + q.k * 0.3); q.m.color.copy(cyc(cols, t, q.k * 0.4)); q.m.opacity = 0.55 + Math.sin(t * 3 + q.k) * 0.25; const a = t * (2.2 + q.k * 0.4); q.gem.o.position.set(Math.cos(a) * q.r, 0, Math.sin(a) * q.r); }
+        if (sig) { sig.o.rotation.z = t * 0.6; sig.m.opacity = 0.45 + Math.abs(Math.sin(t * 1.8)) * 0.4; sig.m.color.copy(cyc(cols, t * 0.7)); }
+        if (pillar) { pillar.m.opacity = 0.22 + Math.abs(Math.sin(t * 1.4)) * 0.3; pillar.m.color.copy(cyc(cols, t * 0.5, 0.3)); for (const b of orbs) { const a = b.a + t * 1.8; b.o.position.set(Math.cos(a) * 1.3, 1 + Math.sin(t * 2.4 + b.a) * 0.7, Math.sin(a) * 1.3); b.o.scale.setScalar(0.45 + Math.abs(Math.sin(t * 4 + b.a)) * 0.3); } }
+      });
+    });
+  }
+  // 날개 고급: 아래쪽 작은 날개 한 쌍 · 떨어지는 빛가루 → 등 뒤 광륜 → 날개 사이 에너지 코어 · 날개 테두리 빛
+  grandBack(f) {
+    if (f.kind === 'halo') return;
+    const L = f.grand, cols = f.glow === 'rainbow' ? RAIN7 : brightOf([f.glow || f.color, f.color]), parent = this.r.torso || this.r.inner;
+    this.attach(parent, (g) => {
+      g.position.set(0, 1.12, -0.42);
+      const geo = f.sharp ? WING2 : WING, m = new THREE.MeshToonMaterial({ color: f.color, side: THREE.DoubleSide }), gl = glowM(cols[0], 0.45), sc = (f.big ? 1.5 : 1.05) * 0.62, ws = [];
+      for (const s of [-1, 1]) { const w = new THREE.Group(); w.position.set(s * 0.1, -0.3, 0.02); w.rotation.z = s * -0.55; g.add(w); const a = new THREE.Mesh(geo, m); a.scale.set(s * sc, sc, sc); w.add(a); const b = new THREE.Mesh(geo, gl); b.scale.set(s * sc * 1.18, sc * 1.18, sc); b.position.z = -0.02; w.add(b); ws.push({ w, s }); }
+      orbitDust(this.anim, g, cols, 20 + L * 10, 1.0, -0.9, 1.9, 0.11 + L * 0.02, 0.35, 0.55);
+      let halo = null; if (L >= 2) { const hm = glowM(cols[0], 0.8), ho = part(g, RING, hm, 0, 0.55, -0.12, 0.7); const h2 = part(g, RING, glowM(cols[1 % cols.length], 0.45), 0, 0.55, -0.12, 0.86); for (let i = 0; i < 12; i++) { const a = (i / 12) * 6.28; part(ho, BOX, hm, Math.cos(a), Math.sin(a), 0, 0.12, 0.025, 0.025).rotation.z = a; } halo = { ho, h2, hm }; }
+      let core = null, edge = null, edge2 = null; if (L >= 3) { core = sprite(g, '#ffffff', 1.1, 0.95); core.o.position.set(0, 0.1, -0.05); edge = glowM(cols[0], 0.7); edge2 = glowM(cols[1 % cols.length], 0.35); const B = f.big ? 1.5 : 1.05; for (const [em, k, z] of [[edge, 1.14, -0.03], [edge2, 1.42, -0.06]]) for (const s of [-1, 1]) { const e = new THREE.Mesh(geo, em); e.scale.set(s * B * k, B * k, 1); e.position.set(s * 0.12, 0, z); g.add(e); ws.push({ w: e, s, edge: true }); } }
+      this.anim.push((dt, t) => {
+        const fl = Math.sin(t * (f.big ? 3.4 : 5) + 0.6) * 0.3; for (const q of ws) q.w.rotation.y = q.s * (0.35 + (q.edge ? Math.sin(t * (f.big ? 3.4 : 5)) * 0.32 : fl));
+        gl.color.copy(cyc(cols, t, 0.5));
+        if (halo) { halo.ho.rotation.z = t * 0.7; halo.h2.rotation.z = -t * 0.5; halo.hm.color.copy(cyc(cols, t)); }
+        if (core) { core.o.scale.setScalar(0.7 + Math.abs(Math.sin(t * 3)) * 0.5); core.m.color.copy(cyc(cols, t * 1.3)); edge.color.copy(cyc(cols, t, 0.3)); edge.opacity = 0.5 + Math.abs(Math.sin(t * 2.4)) * 0.4; edge2.color.copy(cyc(cols, t, 0.8)); edge2.opacity = 0.2 + Math.abs(Math.sin(t * 1.6 + 1)) * 0.3; }
+      });
+    });
+  }
+  // 신발 고급: 발목에 도는 빛 고리(신화부터 두 겹) · 발밑 큰 빛 · 위로 솟는 빛줄기 · 반짝이
+  grandShoes(f) {
+    const L = f.grand, cols = brightOf([f.sole, f.wing, f.flame, f.shine].filter(Boolean));
+    for (const leg of this.r.legs || []) this.attach(leg, (g) => {
+      const rings = []; for (let k = 0; k < (L >= 2 ? 2 : 1); k++) { const m = glowM(cols[k % cols.length], 0.85), o = part(g, RING, m, 0, -0.5 + k * 0.14, 0.06, 0.24 + k * 0.06); o.rotation.x = Math.PI / 2; o.scale.z = 2.6; rings.push({ o, m, k }); }
+      const glow = sprite(g, cols[0], 0.9 + L * 0.25, 0.6); glow.o.position.set(0, -0.66, 0.08);
+      const beam = sprite(g, cols[0], 1, 0.4); beam.o.scale.set(0.35, 1.2 + L * 0.3, 1); beam.o.position.set(0, -0.2, 0.08);
+      orbitDust(this.anim, g, cols, 10 + L * 5, 0.3, -0.7, 0.9, 0.09, 1.8);
+      this.anim.push((dt, t) => { for (const q of rings) { q.o.rotation.z = t * (q.k ? -4 : 3); q.m.color.copy(cyc(cols, t, q.k * 0.5)); q.o.position.y = -0.5 + q.k * 0.14 + Math.sin(t * 4 + q.k) * 0.05; } glow.m.opacity = 0.4 + Math.abs(Math.sin(t * 3)) * 0.4; glow.m.color.copy(cyc(cols, t, 0.5)); beam.m.opacity = 0.18 + Math.abs(Math.sin(t * 2.2)) * 0.25; beam.m.color.copy(cyc(cols, t)); });
+    });
+  }
+  // 세계 좌표에 남는 연출 (충격파 · 마법진 · 빛기둥): 곰돌이가 움직여도 그 자리에
+  burst(o, life, upd) { this.r.root.add(o); this.r.root.getWorldPosition(WV); this.bursts.push({ o, w: WV.clone(), age: 0, life, upd }); }
   attach(parent, build) { const g = new THREE.Group(); parent.add(g); this.parts.push(g); build(g); return g; }
   aura(f) {
     this.attach(this.groups, (g) => {
@@ -226,6 +320,12 @@ export class CosFx {
   fire(name) {
     const sp = this.sprays[name]; if (!sp) return; const f = sp.fx; this.r.root.getWorldPosition(WV); const px = WV.x, py = WV.y, pz = WV.z, n = Math.round((f.n || 12) * (isPhone ? 0.5 : 1));
     for (let i = 0; i < n; i++) { const a = (i / n) * 6.28 + Math.random() * 0.3, s = 3 + Math.random() * 3; sp.emit(px, py + 0.25, pz, Math.cos(a) * s, (name === 'jump' ? -1.5 : 1) + Math.random() * 2, Math.sin(a) * s, 0.45 + Math.random() * 0.35, this.t); }
+    if (!f.grand) return;
+    const L = f.grand, cols = brightOf(f.colors), c0 = cols[0], c1 = cols[1 % cols.length];
+    // 충격파 고리 (높을수록 겹겹이)
+    for (let k = 0; k < L; k++) { const m = glowM(k % 2 ? c1 : c0, 0.9), o = new THREE.Mesh(RING, m); o.rotation.x = Math.PI / 2; this.burst(o, 0.55 + k * 0.12, (o, q) => { const e = Math.max(0, q - k * 0.12); o.scale.set(0.3 + e * (3.2 + L * 0.6), 0.3 + e * (3.2 + L * 0.6), 6 * (1 - e)); m.opacity = 0.9 * Math.max(0, 1 - e); }); }
+    if (name === 'land') { const m = flatM(sigilTex(), 0.95), o = new THREE.Mesh(PLANE, m); o.rotation.x = -Math.PI / 2; m.color.set(c0); this.burst(o, 0.9, (o, q) => { o.position.y += 0.04; o.scale.setScalar(0.6 + q * (2.4 + L * 0.5)); o.rotation.z = q * 2.5; m.opacity = 0.95 * (1 - q * q); }); }
+    if (name === 'jump') { const m = new THREE.SpriteMaterial({ map: texOf('glow'), color: c0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), o = new THREE.Sprite(m); this.burst(o, 0.6, (o, q) => { o.scale.set(0.9 + L * 0.2, (2 + L) * (0.4 + q), 1); o.position.y += 0.6; m.opacity = 0.75 * (1 - q); }); }
   }
   // 곰돌이가 달릴 때 · 가속할 때 뿜는다
   update(dt, speed, boost = 0) {
@@ -240,7 +340,14 @@ export class CosFx {
     if (tr && speed > 1) { this.tr += dt * (tr.fx.rate || 26); while (this.tr > 1) { this.tr--; tr.emit(this.wx + (Math.random() - 0.5) * 0.5, this.wy + 0.08, this.wz + (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.6, 0.5 + Math.random() * 0.6, (Math.random() - 0.5) * 0.6, tr.fx.life * (0.7 + Math.random() * 0.5), t); } }
     const bo = this.sprays.boost;
     if (bo && boost > 0.05) { this.bo += dt * (bo.fx.rate || 50) * boost; while (this.bo > 1) { this.bo--; bo.emit(this.wx + (Math.random() - 0.5) * 0.4, this.wy + 0.8 + (Math.random() - 0.5) * 0.5, this.wz + 0.5, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 1.5, 2 + Math.random() * 4, bo.fx.life * (0.7 + Math.random() * 0.6), t); } }
+    if (this.ribGlow) this.ribGlow.update(dt, speed > 1, this.wx, this.wy, this.wz);
+    const sk = this.sprays.spark;
+    if (sk && speed > 1) { this.sk += dt * this.sparkRate * (isPhone ? 0.5 : 1); while (this.sk > 1) { this.sk--; sk.emit(this.wx + (Math.random() - 0.5) * 1.4, this.wy + 0.1, this.wz + (Math.random() - 0.5) * 1.4, (Math.random() - 0.5) * 0.4, 1.2 + Math.random() * 1.6, (Math.random() - 0.5) * 0.4, 0.8 + Math.random() * 0.7, t); } }
+    if (this.bHead) { const k = Math.min(1, boost); this.bHead.m.opacity = 0.55 * k * (0.75 + Math.sin(t * 20) * 0.25); this.bHead.m.color.copy(cyc(this.bCols, t)); this.bCore.m.opacity = 0.8 * k; const bs = this.sprays.bspark; if (bs && boost > 0.05) { this.bk += dt * 40 * boost; while (this.bk > 1) { this.bk--; bs.emit(this.wx + (Math.random() - 0.5) * 0.8, this.wy + 0.4 + Math.random() * 0.9, this.wz + 0.4, (Math.random() - 0.5) * 3, Math.random() * 2, 3 + Math.random() * 5, 0.4 + Math.random() * 0.4, t); } }
+      // 초월 등급: 가속하는 동안 음속 충격파 고리가 연달아 퍼진다
+      if (this.bL >= 3 && boost > 0.4) { this.bRing -= dt; if (this.bRing <= 0) { this.bRing = 0.22; const m = glowM(cyc(this.bCols, t).getStyle(), 0.85), o = new THREE.Mesh(RING, m); this.burst(o, 0.45, (o, q) => { o.position.y += 0.85; o.position.z -= 0.6 + q * 1.5; o.scale.set(0.4 + q * 1.8, 0.4 + q * 1.8, 4 * (1 - q)); m.opacity = 0.85 * (1 - q); }); } } }
+    if (this.bursts.length) { this.r.root.updateMatrixWorld(); this.bursts = this.bursts.filter((b) => { b.age += dt; const q = b.age / b.life; if (q >= 1) { b.o.removeFromParent(); b.o.material?.dispose(); return false; } WV2.copy(b.w); this.r.root.worldToLocal(WV2); b.o.position.copy(WV2); b.upd(b.o, q); return true; }); }
     for (const k in this.sprays) this.sprays[k].update(dt);
   }
-  dispose() { this.ribbon?.dispose(); for (const g of this.parts) g.removeFromParent(); this.groups.removeFromParent(); for (const k in this.sprays) { const p = this.sprays[k].pts; p.removeFromParent(); p.geometry.dispose(); p.material.dispose(); } }
+  dispose() { this.ribbon?.dispose(); this.ribGlow?.dispose(); for (const b of this.bursts || []) b.o.removeFromParent(); for (const g of this.parts) g.removeFromParent(); this.groups.removeFromParent(); for (const k in this.sprays) { const p = this.sprays[k].pts; p.removeFromParent(); p.geometry.dispose(); p.material.dispose(); } }
 }

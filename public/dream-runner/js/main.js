@@ -122,7 +122,7 @@ function show(id) { for (const s of screens) $(s).classList.toggle('hidden', s !
 // 처음 화면 왼쪽: 명예의 전당 (높은 난이도 1위부터, 한 사람은 한 번만)
 async function renderFame() {
   let d; try { d = await account.api('/api/dream/fame'); } catch { return; }
-  const row = (f) => `<div class="fame-row"><span class="fame-rk">${['🥇', '🥈', '🥉'][f.rank - 1]}</span><span class="fame-nm"><span class="dot" style="background:${esc(f.color)}"></span>${esc(f.name)}</span><span class="fame-sc">${f.score.toLocaleString()}</span><span class="fame-md">${(f.medals || []).map((m) => medalHtml(m)).join('')}</span></div>`;
+  const row = (f) => `<div class="fame-row"><span class="fame-rk">${['🥇', '🥈', '🥉'][f.rank - 1]}</span><span class="fame-nm"><span class="dot" style="background:${esc(f.color)}"></span>${esc(f.name)}</span><span class="fame-md">${(f.medals || []).map((m) => medalHtml(m)).join('')}</span></div>`;
   $('fame').innerHTML = `<div class="fame-h">🏆 명예의 전당</div>` + (d.fame.length ? d.fame.map(row).join('') : '<div class="empty">아직 기록이 없어요</div>');
 }
 renderFame(); // 처음 열 때
@@ -255,7 +255,7 @@ for (const b of $('room-mode').children) b.onclick = () => net.send({ t: 'mode',
 // 난이도: 길은 같고 빠르기만 다르다 (노멀 · 하드 · 익스트림 · 광속 · 초월)
 const diffName = (d) => DIFFS[diffOf(d)].name;
 for (const id of ['diff-pick', 'room-diff', 'board-diff']) $(id).innerHTML = Object.entries(DIFFS).map(([k, d]) => `<button data-m="${k}">${d.name}</button>`).join('');
-game.pickDiff = diffOf(store.get(DIFF_KEY));
+game.pickDiff = store.get(DIFF_KEY) ? diffOf(store.get(DIFF_KEY)) : 'hard'; // 처음 온 사람은 하드부터 · 그다음부터는 마지막에 고른 난이도
 segSet('diff-pick', game.pickDiff);
 for (const b of $('diff-pick').children) b.onclick = () => { game.pickDiff = b.dataset.m; store.set(DIFF_KEY, game.pickDiff); segSet('diff-pick', game.pickDiff); };
 for (const b of $('room-diff').children) b.onclick = () => net.send({ t: 'diff', diff: b.dataset.m });
@@ -275,7 +275,7 @@ async function renderAdmin(d) {
   const el = $('board-admin'); if (!account.admin) { el.innerHTML = ''; return; }
   try { d ||= await account.api('/api/dream/admin/list'); } catch { return; }
   const { reportRow, bindReports } = await import('../../shared/js/admin-alert.js');
-  const row = (t, btns) => `<div class="brow"><span class="nm">${t}</span>${btns}</div>`;
+  const row = (t, btns) => `<div class="brow adm"><span class="adm-t">${t}</span><span class="adm-b">${btns}</span></div>`; // 운영자 줄: 글 + 단추 (순위표 줄 모양과 따로)
   el.innerHTML = `<h3>🛡️ 기록 확인 · 정상 ${d.stat.ok} / 불일치 ${d.stat.bad} / 기록 없음 ${d.stat.none}</h3>` + (d.reports.length ? `<h3>🚨 비상 리포트 ${d.reports.length}건</h3>` + d.reports.map(reportRow).join('') : '') + d.flagged.slice(0, 30).map((f) => row(`⚠️ ${esc(f.name)} ${f.score.toLocaleString()}점 ${esc(f.t)} (${esc(f.u)})`, `<button class="mini" data-ok-s="${esc(f.sub)}" data-t="${esc(f.t)}">정상 인정</button><button class="mini" data-s="${esc(f.sub)}" data-t="${esc(f.t)}">삭제 · 별 몰수</button>`)).join('');
   bindReports(el, (n) => renderAdmin(n));
   for (const b of el.querySelectorAll('[data-ok-s]')) b.onclick = async () => renderAdmin(await account.api('/api/dream/admin/verify', { method: 'POST', body: { sub: b.dataset.okS, t: b.dataset.t } }));
@@ -740,7 +740,7 @@ game.camLow = store.get(CAM_KEY) === 'low'; game.camK = game.camLow ? 1 : 0;
 function toggleCam() { game.camLow = !game.camLow; store.set(CAM_KEY, game.camLow ? 'low' : 'high'); $('b-cam').textContent = game.camLow ? '🎬' : '🎥'; toast(game.camLow ? '🎬 낮은 시점 (V)' : '🎥 높은 시점 (V)', 1200); }
 $('b-cam').onclick = toggleCam; $('b-cam').textContent = game.camLow ? '🎬' : '🎥';
 $('pn-btn').onclick = () => openPatchNotes();
-$('cos-btn').onclick = () => openWardrobe('shop', () => { renderAccount(); });
+$('cos-btn').onclick = () => openWardrobe('shop', () => { renderAccount(); }, { game: 'dream-runner' }); // 업적 칸엔 드림 러너 업적만
 function frame() {
   requestAnimationFrame(frame);
   // 프레임 시간을 0.1ms 단위로 (기록과 똑같이 다시 돌릴 수 있게 · 몸으로 느낄 수 없는 차이)

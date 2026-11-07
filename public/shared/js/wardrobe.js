@@ -65,10 +65,11 @@ export async function notifyNew() {
   try { const c = await loadCos(); if (!c.fresh?.length) return c; toastQ.push(...c.fresh.slice(-5)); if (!toasting) nextToast(); account.api('/api/cos/seen', { method: 'POST', body: { anon: anon() || undefined } }).catch(() => {}); return c; } catch { return null; }
 }
 // ---------- 창 ----------
-export async function openWardrobe(tab = 'ach', onChange) {
+// opt.game: 그 게임에서 열면 업적 칸에 그 게임 업적만 (예: 드림 러너는 'dream-runner')
+export async function openWardrobe(tab = 'ach', onChange, opt = {}) {
   css(); if (document.querySelector('.cw-wrap')) return;
   let C; try { C = await loadCos(); } catch { C = { stars: 0, owned: [], equip: {}, ach: {}, best: {} }; }
-  const S = { tab, game: 'all', slot: 'aura', show: 'all' };
+  const S = { tab, game: 'all', slot: 'aura', show: 'all' }, only = opt.game || null;
   const wrap = document.createElement('div'); wrap.className = 'cw-wrap';
   wrap.innerHTML = `<div class="cw-card"><div class="cw-head"><h2>🏆 업적 · 치장</h2><span class="cw-stars"></span><button class="cw-x">✕</button></div><div class="cw-tabs"><button data-t="ach">🏆 업적</button><button data-t="closet">👕 옷장</button><button data-t="shop">⭐ 별 상점</button></div><div class="cw-msg"></div><div class="cw-body"><div class="cw-left"><canvas class="cw-pv" width="500" height="660"></canvas><div class="cw-spin"><button class="cw-spin-b">⏸ 멈추기</button><span>끌어서 돌려 보세요</span></div><div class="cw-eq"></div></div><div class="cw-right"><div class="cw-sum"></div><div class="cw-chips"></div><div class="cw-list"></div></div></div></div>`;
   document.body.append(wrap);
@@ -110,8 +111,8 @@ export async function openWardrobe(tab = 'ach', onChange) {
     const list = $('.cw-list'); list.innerHTML = ''; const sum = $('.cw-sum');
     if (S.tab === 'ach') {
       const done = Object.keys(C.ach || {}).length; sum.innerHTML = `달성 ${done} / ${ACHIEVEMENTS.length}<div class="cw-bar"><i style="width:${(done / ACHIEVEMENTS.length) * 100}%"></i></div>`;
-      chips([['all', '전체'], ['done', '✅ 달성'], ...Object.entries(GAMES).map(([k, g]) => [k, `${g.emoji} ${g.name}`])], S.game, (k) => { S.game = k; });
-      const rows = ACHIEVEMENTS.filter((a) => (S.game === 'all' ? true : S.game === 'done' ? C.ach?.[a.id] : a.game === S.game)).sort((a, b) => (!!C.ach?.[b.id] - !!C.ach?.[a.id]) || (TIERS[b.tier].n - TIERS[a.tier].n));
+      chips([['all', '전체'], ['done', '✅ 달성'], ...(only ? [] : Object.entries(GAMES).map(([k, g]) => [k, `${g.emoji} ${g.name}`]))], S.game, (k) => { S.game = k; });
+      const rows = ACHIEVEMENTS.filter((a) => !only || a.game === only).filter((a) => (S.game === 'all' ? true : S.game === 'done' ? C.ach?.[a.id] : a.game === S.game)).sort((a, b) => (!!C.ach?.[b.id] - !!C.ach?.[a.id]) || (TIERS[b.tier].n - TIERS[a.tier].n));
       for (const a of rows.slice(0, 180)) { const T = TIERS[a.tier], ok = !!C.ach?.[a.id], rw = [`🏷️ 칭호`, T.n >= 3 && '🎗️ 휘장', a.rule.crown && '👑 왕관', a.rule.pct && '🎖️ 메달'].filter(Boolean).join(' · '), g = GAMES[a.game]; list.append(card(`<div class="cw-n">${g?.emoji || '🏆'} ${esc(a.name)}</div><div class="cw-s">${esc(a.desc)}</div><div class="cw-r" style="color:${T.color}">${T.name} 등급 · ${rw}${ok ? ' · ✅' : ''}</div>`, ok ? '' : 'lock', null)); }
       if (rows.length > 180) list.append(card(`<div class="cw-s">게임을 골라 나머지 ${rows.length - 180}개를 볼 수 있어요</div>`, ''));
     } else if (S.tab === 'closet') {
@@ -132,7 +133,7 @@ export async function openWardrobe(tab = 'ach', onChange) {
         const preview = () => pv?.set(cleanCos({ ...(C.equip || {}), [it.slot]: it.id }) || {}); d.onmouseenter = preview; d.onmouseleave = () => pv?.set(C.equip); d.querySelector('button').onclick = (e) => { e.stopPropagation(); if (confirm(`${it.name} 을(를) ${it.price.toLocaleString()}개로 살까요?`)) post('/api/cos/buy', { id: it.id }); }; list.append(d);
       }
       // 최정상의 길 · 정상의 길: 별로 살 수 없다. 그 순위표에서 지금 1위 · 3위 안이면 바로 입을 수 있다
-      if (S.slot === 'trail') for (const it of [...TOP1_TRAILS, ...TOP3_TRAILS]) {
+      if (S.slot === 'trail') for (const it of [...TOP3_TRAILS, ...TOP1_TRAILS]) { // 정상의 길 아래에 최정상의 길
         const has = owns(it), on = C.equip?.trail === it.id, R = RARITY[it.rarity], one = !!it.top1;
         const d = card(`<div class="cw-n">${it.emoji} ${esc(it.name)}</div><div class="cw-r" style="color:${R.color}">${R.name} · ${one ? '👑 초월 1위 전용' : '🏆 3위 안 전용'}</div><div class="cw-s">${esc(liveTrailText(it))}</div><button class="cw-b" ${has ? '' : 'disabled'}>${on ? '벗기' : has ? '입기' : one ? '🔒 지금 1위가 아니에요' : '🔒 지금 3위 밖'}</button>`, on ? 'on' : has ? '' : 'lock');
         d.onmouseenter = () => pv?.set(cleanCos({ ...(C.equip || {}), trail: it.id }) || {}); d.onmouseleave = () => pv?.set(C.equip);

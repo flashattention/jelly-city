@@ -97,17 +97,29 @@ export const SHOP = [
   it('land', 'meteor', '운석 충돌', '☄️', 12000, 'legend', { shape: 'flame', colors: ['#ff8a3d', '#ffd27a'], n: 26, size: 0.5, ring: '#ff5a1f' }, R('extreme', 1500)),
   // 초월 도전: 맵마다 초월 난이도 2,500m(전설) · 5,000m(신화) · 10,000m(초월 등급). 높을수록 크고 화려하다
   //   🌙 꿈나라 — 달빛 · 꿈결 (파스텔 · 무지개)
-  it('aura', 'dreamb', '꿈결 오로라', '🌙', 55000, 'legend', { shape: 'star', colors: ['#ffe8a8', '#c8b6ff', '#a8e8ff'], n: 38, size: 0.32, ring: '#c8b6ff', ring2: '#ffe8a8', rise: 1 }, R('beyond', 2500)),
-  it('back', 'dreamb', '달빛 꿈의 날개', '🦋', 150000, 'myth', { kind: 'wing', color: '#c8b6ff', glow: RAIN, big: 1 }, R('beyond', 5000)),
-  it('trail', 'dreamb', '꿈의 끝 은하 융단', '🌌', 300000, 'apex', { shape: 'star', colors: RAIN, size: 0.5, life: 1.6, rate: 70, ribbon: { w: 1.6, life: 2.2, colors: ['#1b1450', '#ff7aa8', '#ffe8a8', '#ffffff', '#a8e8ff', '#c8b6ff', '#1b1450'] } }, R('beyond', 10000)),
+  it('aura', 'dreamb', '꿈결 오로라', '🌙', 55000, 'legend', { grand: 1, shape: 'star', colors: ['#ffe8a8', '#c8b6ff', '#a8e8ff'], n: 38, size: 0.32, ring: '#c8b6ff', ring2: '#ffe8a8', rise: 1 }, R('beyond', 2500)),
+  it('back', 'dreamb', '달빛 꿈의 날개', '🦋', 150000, 'myth', { grand: 2, kind: 'wing', color: '#c8b6ff', glow: RAIN, big: 1 }, R('beyond', 5000)),
+  it('trail', 'dreamb', '꿈의 끝 은하 융단', '🌌', 300000, 'apex', { grand: 3, shape: 'star', colors: RAIN, size: 0.5, life: 1.6, rate: 70, ribbon: { w: 1.6, life: 2.2, colors: ['#1b1450', '#ff7aa8', '#ffe8a8', '#ffffff', '#a8e8ff', '#c8b6ff', '#1b1450'] } }, R('beyond', 10000)),
   //   🔥 지옥 — 업화 · 마왕
-  it('jump', 'hellb', '업화의 포효', '🐲', 60000, 'legend', { shape: 'flame', colors: ['#ff2b2b', '#ff8a3d', '#ffd27a'], n: 44, size: 0.62, ring: '#ff2b2b' }, R('beyond', 2500, 'hell')),
-  it('boost', 'hellb', '염화 질주', '☄️', 160000, 'myth', { shape: 'flame', colors: ['#5a0a0a', '#ff2b2b', '#ff8a3d', '#ffd27a'], size: 0.7, life: 0.7, rate: 110 }, R('beyond', 5000, 'hell')),
-  it('aura', 'hellb', '마왕의 화염 왕좌', '👹', 320000, 'apex', { shape: 'flame', colors: ['#1a0000', '#ff2b2b', '#ff8a3d', '#ffd27a'], n: 56, size: 0.46, ring: '#ff2b2b', ring2: '#ffd27a', rise: 4, dark: true }, R('beyond', 10000, 'hell')),
+  it('jump', 'hellb', '업화의 포효', '🐲', 60000, 'legend', { grand: 1, shape: 'flame', colors: ['#ff2b2b', '#ff8a3d', '#ffd27a'], n: 44, size: 0.62, ring: '#ff2b2b' }, R('beyond', 2500, 'hell')),
+  it('boost', 'hellb', '염화 질주', '☄️', 160000, 'myth', { grand: 2, shape: 'flame', colors: ['#5a0a0a', '#ff2b2b', '#ff8a3d', '#ffd27a'], size: 0.7, life: 0.7, rate: 110 }, R('beyond', 5000, 'hell')),
+  it('aura', 'hellb', '마왕의 화염 왕좌', '👹', 320000, 'apex', { grand: 3, shape: 'flame', colors: ['#1a0000', '#ff2b2b', '#ff8a3d', '#ffd27a'], n: 56, size: 0.46, ring: '#ff2b2b', ring2: '#ffd27a', rise: 4, dark: true }, R('beyond', 10000, 'hell')),
   //   🌌 이공간 — 차원 · 특이점
-  it('land', 'voidb', '차원 균열 착지', '🌀', 65000, 'legend', { shape: 'rune', colors: ['#b28bff', '#7fe9ff', '#ffffff'], n: 30, size: 0.52, ring: '#b28bff' }, R('beyond', 2500, 'void')),
-  it('shoes', 'voidb', '사건의 지평선', '🕳️', 170000, 'myth', { color: '#06040e', sole: '#b28bff', wing: '#7fe9ff', flame: '#b28bff', shine: '#ffffff' }, R('beyond', 5000, 'void')),
-  it('back', 'voidb', '특이점의 날개', '✴️', 350000, 'apex', { kind: 'wing', color: '#06040e', glow: RAIN, big: 1, sharp: 1 }, R('beyond', 10000, 'void')),
+  it('land', 'voidb', '차원 균열 착지', '🌀', 65000, 'legend', { grand: 1, shape: 'rune', colors: ['#b28bff', '#7fe9ff', '#ffffff'], n: 30, size: 0.52, ring: '#b28bff' }, R('beyond', 2500, 'void')),
+  it('shoes', 'voidb', '사건의 지평선', '🕳️', 170000, 'myth', { grand: 2, color: '#06040e', sole: '#b28bff', wing: '#7fe9ff', flame: '#b28bff', shine: '#ffffff' }, R('beyond', 5000, 'void')),
+  it('jump', 'dreamb', '꿈의 별무리 폭발', '🎆', 155000, 'myth', { grand: 2, shape: 'star', colors: ['#ffe8a8', '#ff9ae0', '#a8e8ff', '#ffffff'], n: 48, size: 0.5, ring: '#ffe8a8' }, R('beyond', 5000)),
+  it('land', 'dreamb', '달빛 착지', '🌕', 150000, 'myth', { grand: 2, shape: 'glow', colors: ['#fff4c2', '#c8b6ff', '#ffffff'], n: 34, size: 0.5, ring: '#fff4c2' }, R('beyond', 5000)),
+  it('aura', 'dreamb2', '꿈의 주인', '👑', 330000, 'apex', { grand: 3, shape: 'star', colors: ['#ffd700', '#ffe8a8', '#c8b6ff', '#a8e8ff'], n: 60, size: 0.36, ring: '#ffd700', ring2: '#c8b6ff', rise: 2 }, R('beyond', 10000)),
+  it('boost', 'dreamb', '유성우 질주', '🌠', 310000, 'apex', { grand: 3, shape: 'star', colors: ['#ffffff', '#ffe8a8', '#a8e8ff', '#ff9ae0'], size: 0.62, life: 0.8, rate: 130 }, R('beyond', 10000)),
+  it('back', 'hellb', '마왕의 날개', '🦇', 165000, 'myth', { grand: 2, kind: 'wing', color: '#2a0606', glow: '#ff2b2b', big: 1, sharp: 1 }, R('beyond', 5000, 'hell')),
+  it('shoes', 'hellb', '용암 발굽', '🌋', 160000, 'myth', { grand: 2, color: '#1a0606', sole: '#ff5a1f', flame: '#ff2b2b', shine: '#ffd27a', tall: 1 }, R('beyond', 5000, 'hell')),
+  it('trail', 'hellb', '지옥불 강', '🔥', 340000, 'apex', { grand: 3, shape: 'flame', colors: ['#ffd27a', '#ff8a3d', '#ff2b2b'], size: 0.56, life: 0.9, rate: 75, ribbon: { w: 1.7, life: 2.3, colors: ['#000000', '#5a0a0a', '#ff2b2b', '#ff8a3d', '#ffd27a', '#ff8a3d', '#ff2b2b', '#5a0a0a', '#000000'] } }, R('beyond', 10000, 'hell')),
+  it('land', 'hellb', '종말의 낙인', '☄️', 320000, 'apex', { grand: 3, shape: 'flame', colors: ['#ff2b2b', '#ff8a3d', '#ffd27a'], n: 48, size: 0.62, ring: '#ff2b2b' }, R('beyond', 10000, 'hell')),
+  it('aura', 'voidb', '차원의 소용돌이', '🌀', 170000, 'myth', { grand: 2, shape: 'rune', colors: ['#b28bff', '#7fe9ff', '#ffffff'], n: 44, size: 0.38, ring: '#b28bff', ring2: '#7fe9ff', rise: 1 }, R('beyond', 5000, 'void')),
+  it('jump', 'voidb', '중력 붕괴', '🕳️', 165000, 'myth', { grand: 2, shape: 'rune', colors: ['#7fe9ff', '#b28bff', '#ffffff'], n: 44, size: 0.52, ring: '#7fe9ff' }, R('beyond', 5000, 'void')),
+  it('trail', 'voidb', '시공의 균열 길', '⚡', 360000, 'apex', { grand: 3, shape: 'bolt', colors: ['#ffffff', '#7fe9ff', '#b28bff'], size: 0.5, life: 0.8, rate: 75, ribbon: { w: 1.7, life: 2.3, colors: ['#06040e', '#3a1a8a', '#b28bff', '#7fe9ff', '#ffffff', '#7fe9ff', '#b28bff', '#3a1a8a', '#06040e'] } }, R('beyond', 10000, 'void')),
+  it('boost', 'voidb', '광속 돌파', '💫', 330000, 'apex', { grand: 3, shape: 'rune', colors: ['#ffffff', '#7fe9ff', '#b28bff'], size: 0.66, life: 0.7, rate: 130 }, R('beyond', 10000, 'void')),
+  it('back', 'voidb', '특이점의 날개', '✴️', 350000, 'apex', { grand: 3, kind: 'wing', color: '#06040e', glow: RAIN, big: 1, sharp: 1 }, R('beyond', 10000, 'void')),
 ];
 // 난이도 · 맵별 별 보상 배수 (어려울수록 많이)
 export const STAR_MULT = { easy: 1, hard: 1.6, extreme: 2.2, lightspeed: 3.2, beyond: 4.5 };
@@ -152,7 +164,7 @@ export const DIFF_STYLE = {
 export const TOP3_TRAILS = DIFF_ORDER.map((d, i) => {
   const st = DIFF_STYLE[d], cols = st.grad;
   return { id: `trail.top3.${d}`, slot: 'trail', name: `${DIFF_NAMES[d]} 정상의 길`, emoji: st.e, rarity: 'myth', top3: d,
-    fx: { shape: i >= 3 ? 'star' : 'glow', colors: cols, size: 0.36 + i * 0.03, life: 1.1 + i * 0.1, rate: 45 + i * 6, ribbon: { w: 1.25 + i * 0.07, life: 1.6 + i * 0.12, colors: [...cols, cols[0]] } } };
+    fx: { grand: i >= 4 ? 2 : i >= 3 ? 1 : 0, shape: i >= 3 ? 'star' : 'glow', colors: cols, size: 0.36 + i * 0.03, life: 1.1 + i * 0.1, rate: 45 + i * 6, ribbon: { w: 1.25 + i * 0.07, life: 1.6 + i * 0.12, colors: [...cols, cols[0]] } } };
 });
 export const top3Text = (it) => `${DIFF_STYLE[it.top3]?.e || ''} ${DIFF_NAMES[it.top3]} 순위표(꿈나라 · 지옥 · 이공간) 지금 3위 안에 있는 동안만 쓸 수 있어요`;
 // 최정상의 길: 맵마다 하나. 그 맵 초월 순위표에서 지금 1위인 동안만 쓴다 (사지 않는다 · 1위를 내주면 저절로 벗겨진다)
@@ -163,7 +175,7 @@ const TOP1 = {
   void: { name: '이공간', e: '🌌', shape: 'rune', colors: ['#ffffff', '#b28bff', '#7fe9ff'], rib: ['#06040e', '#7c4dff', '#7fe9ff', '#ffffff', '#7fe9ff', '#7c4dff', '#06040e'] },
 };
 export const TOP1_TRAILS = Object.entries(TOP1).map(([map, t]) => ({ id: `trail.top1.${map}`, slot: 'trail', name: `${t.name} 최정상의 길`, emoji: '👑', rarity: 'apex', top1: map,
-  fx: { shape: t.shape, colors: t.colors, size: 0.52, life: 1.7, rate: 80, ribbon: { w: 1.75, life: 2.5, colors: t.rib } } }));
+  fx: { grand: 3, shape: t.shape, colors: t.colors, size: 0.52, life: 1.7, rate: 80, ribbon: { w: 1.75, life: 2.5, colors: t.rib } } }));
 export const liveTrailText = (it) => (it.top1 ? `👑 ${TOP1[it.top1].e} ${TOP1[it.top1].name} 초월 순위표에서 지금 1위인 동안만 쓸 수 있어요` : top3Text(it));
 const styleOf = (r) => { const d = r?.diff && DIFF_STYLE[r.diff]; return d ? { e: d.e, grad: r.map === 'hell' ? [...d.grad, '#ff3a1a'] : r.map === 'void' ? [...d.grad, '#7c4dff'] : d.grad } : null; };
 export const prestigeOf = (r) => (r?.kind === 'dream' ? 1 + Math.max(0, DIFF_ORDER.indexOf(r.diff)) + (r.map === 'hell' ? 0.5 : r.map === 'void' ? 0.7 : 0) : r?.kind === 'record' ? 1 : 0);
