@@ -98,7 +98,7 @@ $('c').addEventListener('pointerup', (e) => {
 });
 
 // ---------- 화면 ----------
-const screens = ['title', 'lobby', 'room', 'over', 'board'];
+const screens = ['title', 'lobby', 'room', 'over', 'board', 'stats'];
 // ESC: 순위표 · 방 목록을 닫는다
 addEventListener('keydown', (e) => { if (e.key !== 'Escape' || ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return; if (['board', 'lobby'].some((id) => !document.getElementById(id).classList.contains('hidden'))) show('title'); });
 function show(id) { for (const s of screens) $(s).classList.toggle('hidden', s !== id); if (id === 'title') renderFame(); }
@@ -242,13 +242,13 @@ for (const b of $('room-diff').children) b.onclick = () => net.send({ t: 'diff',
 game.pickMap = mapOf(store.get(MAP_KEY)); segSet('map-pick', game.pickMap);
 for (const b of $('map-pick').children) b.onclick = () => { game.pickMap = b.dataset.m; store.set(MAP_KEY, game.pickMap); segSet('map-pick', game.pickMap); game.titleT = 6; };
 for (const b of $('room-map').children) b.onclick = () => net.send({ t: 'map', map: b.dataset.m });
-for (const b of $('board-map').children) b.onclick = async () => { game.boardMap = b.dataset.m; segSet('board-map', game.boardMap); renderMyStats(); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
+for (const b of $('board-map').children) b.onclick = async () => { game.boardMap = b.dataset.m; segSet('board-map', game.boardMap); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
 for (const b of $('board-diff').children) b.onclick = async () => { game.boardDiff = b.dataset.m; segSet('board-diff', game.boardDiff); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
 for (const b of $('room-team').children) b.onclick = () => net.send({ t: 'team', on: b.dataset.t === '1' });
 $('team-btn').onclick = () => net.send({ t: 'switch' });
 game.boardMode = 'speed';
 for (const b of $('board-mode').children) b.onclick = async () => { game.boardMode = b.dataset.m; segSet('board-mode', game.boardMode); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
-$('board-btn').onclick = async () => { game.boardMode = game.pickMode; game.boardDiff = game.pickDiff; game.boardMap = game.pickMap; segSet('board-map', game.boardMap); segSet('board-mode', game.boardMode); segSet('board-diff', game.boardDiff); show('board'); renderAdmin(); renderMyStats(); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
+$('board-btn').onclick = async () => { game.boardMode = game.pickMode; game.boardDiff = game.pickDiff; game.boardMap = game.pickMap; segSet('board-map', game.boardMap); segSet('board-mode', game.boardMode); segSet('board-diff', game.boardDiff); show('board'); renderAdmin(); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
 $('board-close').onclick = () => show('title');
 // 운영자: 확인 대기 기록 승인 · 거절, 수상한 기록 삭제
 async function renderAdmin(d) {
@@ -267,9 +267,12 @@ $('again-btn').onclick = () => { if (game.multi) { leaveRun(); show('room'); } e
 // ---------- 순위표 ----------
 // 내 기록: 판수 · 달린 시간 · 난이도별 지금 순위
 const playTime = (t) => (t < 60 ? `${t}초` : t < 3600 ? `${Math.floor(t / 60)}분` : `${Math.floor(t / 3600)}시간 ${Math.floor(t / 60) % 60}분`);
+$('stats-btn').onclick = () => { game.statsMap = game.pickMap || 'dream'; segSet('stats-map', game.statsMap); show('stats'); renderMyStats(); };
+for (const b of $('stats-map').children) b.onclick = () => { game.statsMap = b.dataset.m; segSet('stats-map', game.statsMap); renderMyStats(); };
+$('stats-close').onclick = () => show('title');
 async function renderMyStats() {
   const el = $('my-stats'); let d;
-  try { d = await account.api(`/api/dream/me?map=${game.boardMap || 'dream'}` + (logged() ? '' : `&anon=${anonId()}`)); } catch { el.innerHTML = ''; return; }
+  try { d = await account.api(`/api/dream/me?map=${game.statsMap || 'dream'}` + (logged() ? '' : `&anon=${anonId()}`)); } catch { el.innerHTML = ''; return; }
   const cell = (r) => (r ? `<b>${r.rank.toLocaleString()}위</b><small>${r.score.toLocaleString()}점 · ${r.of.toLocaleString()}명 중</small>` : '<small>기록 없음</small>');
   el.innerHTML = `<div class="ms-top"><div><small>내가 달린 판수</small><b>${d.runs.toLocaleString()}판</b></div><div><small>달린 시간</small><b>${playTime(d.time)}</b></div></div><small class="ms-note">판수와 시간은 2026년 11월 2일 패치부터 세요 (그 전 기록은 남아 있지 않아요)</small>
     <div class="ms-table"><div class="ms-row ms-head"><span>난이도</span><span>판수 · 시간</span><span>⚡ 스피드전</span><span>🎁 아이템전</span></div>${Object.entries(DIFFS).map(([k, x]) => { const r = d.diffs[k]; return `<div class="ms-row"><span>${esc(x.name)}</span><span><b>${r.runs.toLocaleString()}판</b><small>${playTime(r.time)}</small></span><span>${cell(r.speed)}</span><span>${cell(r.item)}</span></div>`; }).join('')}</div>`;

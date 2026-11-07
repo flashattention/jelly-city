@@ -48,7 +48,7 @@ export class DreamBoard {
   // map: 'hell' 은 난이도마다 따로 (꿈나라 노멀은 예전 표 그대로)
   table(mode, diff, map = 'dream') { if (map === 'hell') return (this.boards[`hell:${mode}:${diff}`] ||= {}); if (diff !== 'easy') return (this.boards[`${mode}:${diff}`] ||= {}); return mode === 'item' ? this.bestItem : this.best; }
   sorted(mode, diff, map) { return Object.entries(this.table(mode, diff, map)).sort((a, b) => b[1].score - a[1].score || a[1].at - b[1].at); }
-  // 메달: 드림러너 모든 순위표(난이도 × 꿈나라 · 지옥)의 지금 1 ~ 3위 메달을 높은 난이도부터 (같은 난이도면 높은 순위 → 지옥 먼저)
+  // 메달: 드림러너 모든 순위표(난이도 × 꿈나라 · 지옥)의 지금 1 ~ 3위 메달. 익스트림 이상 먼저(1위 → 2위 → 3위, 같은 순위면 높은 난이도 · 지옥 먼저), 그다음 익스트림 아래
   podium() {
     const P = new Map();
     Object.keys(DIFFS).forEach((diff, di) => { for (const map of ['dream', 'hell']) { const all = this.sorted('speed', diff, map); all.slice(0, 3).forEach(([sub], i) => { const id = boardMedal(`dr.${map}.${diff}`, i + 1, all.length); if (id) { if (!P.has(sub)) P.set(sub, []); P.get(sub).push({ id, k: di * 2 + (map === 'hell' ? 1 : 0), rank: i + 1 }); } }); } });
@@ -58,7 +58,7 @@ export class DreamBoard {
   badges(sub, P, mode, diff, map, rank, n) {
     const L = [...(P.get(sub) || [])], own = mode === 'speed' ? boardMedal(`dr.${map}.${diff}`, rank, n) : null;
     if (own && !L.some((m) => m.id === own)) L.push({ id: own, k: Object.keys(DIFFS).indexOf(diff) * 2 + (map === 'hell' ? 1 : 0), rank });
-    const medals = L.sort((a, b) => (b.k >> 1) - (a.k >> 1) || a.rank - b.rank || b.k - a.k).map((m) => m.id);
+    const hi = (m) => ((m.k >> 1) >= 2 ? 0 : 1), medals = L.sort((a, b) => hi(a) - hi(b) || a.rank - b.rank || b.k - a.k).map((m) => m.id);
     let title = getCos()?.titleOf(sub, ['dr.', 'dream-runner.']) || null;
     if (title && medals.some((id) => { const it = itemById.get(id); return it?.fx.honor === 0 && `title.${it.ach}` === title; })) title = null;
     return { title, medals, medal: own };

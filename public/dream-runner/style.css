@@ -83,7 +83,8 @@ h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 .board { display: flex; flex-direction: column; gap: 4px; text-align: left; max-height: 340px; overflow-y: auto; }
 .brow { display: grid; grid-template-columns: 38px 1fr auto; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,.06); font-size: 15px; }
 .brow .rk { font-family: 'Jua', sans-serif; text-align: center; }
-.brow .nm { display: flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.brow .nm { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; } /* 메달이 많으면 다음 줄로 */
+.brow .nm > * { white-space: nowrap; }
 .brow .sc { font-family: 'Jua', sans-serif; font-size: 17px; }
 .brow .sc small { font-family: 'Gowun Dodum'; color: var(--soft); font-size: 12px; margin-left: 6px; }
 .brow.me { background: rgba(255,216,77,.22); outline: 1px solid var(--gold); }
