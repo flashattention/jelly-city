@@ -19,16 +19,16 @@
 ```bash
 cd toss/app
 npm install        # 처음 한 번 (앱인토스 SDK · esbuild)
-npm run build      # 번들(dist/) → SDK 다리 묶기(dist/toss-bridge.js) → toss/app/드림러너.ait
+npm run build      # 번들(dist/) → SDK 다리 묶기(dist/toss-bridge.js) → toss/app/dreamrunner.ait
 ```
 
 - `dist/`는 웹 드림 러너 코드를 그대로 복사한 것이에요 (`tools/toss-bundle.mjs`). 게임은 `public/`만 고치면 돼요.
 - `bridge.js`가 토스 SDK를 게임에 잇는 다리예요: 토스 로그인(`appLogin`) · 보상형 광고(`loadFullScreenAd` / `showFullScreenAd`, 보상은 `userEarnedReward`에서만).
-- `apps-in-toss.config.ts`의 `appName`은 콘솔에 등록한 앱 이름과 같아야 올라가요.
+- `apps-in-toss.config.ts`의 `appName`은 콘솔 '앱 정보'의 앱 ID(`dreamrunner`)와 같아야 올라가요. 한국어 · 영어 앱 이름이 아니에요.
 
 ## 출시 · 업데이트할 때
 
-1. `npm run build`로 `드림러너.ait`를 만들어 콘솔 '앱 번들'에 올리고 '토스앱 테스트'로 확인해요.
+1. `npm run build`로 `dreamrunner.ait`를 만들어 콘솔 '앱 번들'에 올리고 '토스앱 테스트'로 확인해요.
 2. 검수 요청 (평균 2~3일) → 승인되면 '출시하기'.
 3. 보상형 광고: `bridge.js`의 `AD_GROUP`을 콘솔에서 받은 광고 그룹 아이디로 바꿔요 (지금은 개발용 시험 아이디).
 4. 토스 로그인: 서버(Fly) 환경 변수에 mTLS 인증서 · 키를 넣어요.
