@@ -241,7 +241,7 @@ for (const b of $('room-team').children) b.onclick = () => net.send({ t: 'team',
 $('team-btn').onclick = () => net.send({ t: 'switch' });
 game.boardMode = 'speed';
 for (const b of $('board-mode').children) b.onclick = async () => { game.boardMode = b.dataset.m; segSet('board-mode', game.boardMode); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
-$('board-btn').onclick = async () => { game.boardMode = game.pickMode; game.boardDiff = game.pickDiff; game.boardMap = game.pickMap; segSet('board-map', game.boardMap); segSet('board-mode', game.boardMode); segSet('board-diff', game.boardDiff); show('board'); renderAdmin(); renderMyStats(); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff)); };
+$('board-btn').onclick = async () => { game.boardMode = game.pickMode; game.boardDiff = game.pickDiff; game.boardMap = game.pickMap; segSet('board-map', game.boardMap); segSet('board-mode', game.boardMode); segSet('board-diff', game.boardDiff); show('board'); renderAdmin(); renderMyStats(); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
 $('board-close').onclick = () => show('title');
 // 운영자: 확인 대기 기록 승인 · 거절, 수상한 기록 삭제
 async function renderAdmin(d) {
