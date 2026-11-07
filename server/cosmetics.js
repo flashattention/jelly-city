@@ -60,7 +60,7 @@ export class Cosmetics {
   // 조건 하나를 지금 기록으로 확인한다 (cache 는 한 번 계산할 때만 쓴다)
   meets(sub, r, cache = new Map()) {
     const u = this.u(sub), rec = (g) => this.records[g];
-    const dreamRow = (m, d) => { const k = `d:${m}:${d}`; if (!cache.has(k)) cache.set(k, this.dream?.mine(sub, 'speed', d, m) || null); return cache.get(k); };
+    const dreamRow = (m, d) => { const k = `d:${m}:${d}`; if (!cache.has(k)) cache.set(k, this.dream?.mine(sub, 'speed', d, m, false) || null); return cache.get(k); }; // 메달 · 칭호 없이 (칭호 확인이 다시 여기로 돌아오지 않게)
     const recRow = (g, b) => { const k = `r:${g}:${b}`; if (!cache.has(k)) { const R = rec(g), e = R?.data[b]?.[sub]; cache.set(k, e ? { rank: R.sorted(b).findIndex(([x]) => x === sub) + 1, value: e.value } : null); } return cache.get(k); }; // mine() 은 칭호를 다시 물어서 쓰지 않는다
     switch (r.kind) {
       case 'dream': { const m = dreamRow(r.map, r.diff); return !!m && !this.dream.table('speed', r.diff, r.map)[sub]?.u && placed(r, m.rank, Object.keys(this.dream.table('speed', r.diff, r.map)).length); }

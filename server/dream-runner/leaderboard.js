@@ -66,12 +66,12 @@ export class DreamBoard {
   top(mode, diff, map) {
     const all = this.sorted(mode, diff, map), n = all.length, P = this.podium(); return all.slice(0, TOP).map(([sub, e], i) => ({ rank: i + 1, id: sub.slice(-8), ...this.badges(sub, P, mode, diff, map, i + 1, n), name: nameOf(sub, e), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon }));
   }
-  mine(sub, mode, diff, map) {
+  mine(sub, mode, diff, map, badges = true) {
     const T = this.table(mode, diff, map);
     if (!sub || !T[sub]) return null;
     const i = this.sorted(mode, diff, map).findIndex(([s]) => s === sub);
     const e = T[sub];
-    return { rank: i + 1, id: sub.slice(-8), ...this.badges(sub, this.podium(), mode, diff, map, i + 1, Object.keys(T).length), name: nameOf(sub, e), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon };
+    return { rank: i + 1, id: sub.slice(-8), ...(badges ? this.badges(sub, this.podium(), mode, diff, map, i + 1, Object.keys(T).length) : null), name: nameOf(sub, e), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon };
   }
   // 달린 기록: 탈락 · 그만두기 · 팀전 끝 모두 센다 (순위에 올리지 않아도 센다)
   played(sub, b) {
@@ -95,7 +95,7 @@ export class DreamBoard {
     const s = (sub && this.stats[sub]) || { runs: 0, time: 0, by: {} }, diffs = {};
     for (const k of Object.keys(DIFFS)) {
       const row = { runs: s.by[k]?.runs || 0, time: s.by[k]?.time || 0 };
-      for (const mode of ['speed', 'item']) { const m = this.mine(sub, mode, k, map); row[mode] = m ? { rank: m.rank, score: m.score, of: Object.keys(this.table(mode, k, map)).length } : null; }
+      for (const mode of ['speed', 'item']) { const m = this.mine(sub, mode, k, map, false); row[mode] = m ? { rank: m.rank, score: m.score, of: Object.keys(this.table(mode, k, map)).length } : null; }
       diffs[k] = row;
     }
     return { runs: s.runs, time: s.time, diffs };
