@@ -55,6 +55,7 @@ export class Shell {
       ${o.sound ? '<button class="home-btn snd-btn" data-snd title="소리 켜기 · 끄기 (M)">🔊</button>' : ''}
       <div class="logo">${o.title}</div>
       <div class="sub">${o.subtitle || ''}</div>
+      <div class="t-cols"><div class="t-left">
       <div id="login-box" class="hidden">
         <div id="pw-row" class="hidden"><input id="pw" type="password" placeholder="🔒 입장 비밀번호" autocomplete="current-password" /></div>
         <div id="g-btn"></div>
@@ -67,9 +68,11 @@ export class Shell {
       <div id="chars-label" class="label hidden">누구로 할까요?</div>
       <div id="chars"></div>
       <div id="nick-row" class="hidden"><input id="nick" maxlength="14" placeholder="이름 (순위표 · 방에 보여요)" /></div>
+      </div><div class="t-right">
       <div id="title-opts"></div>
       <div class="btns" id="play-btns">${(o.buttons || []).map((b) => `<button id="${b.id}" class="btn big ${b.cls || ''}">${b.label}</button>`).join('')}<button id="multi-btn" class="btn big alt">${o.multiLabel || '👥 같이 하기'} <small>최대 ${o.max || 8}명</small></button></div>
       <div class="row code-row"><input id="code-in" maxlength="6" placeholder="초대 코드 6자리" autocomplete="off" /><button id="code-btn" class="btn alt">🎟️ 코드로 참가</button></div>
+      </div></div>
       <div class="row2" id="title-row2">${(o.extraRow || []).map((b, i) => `<button class="btn ghost" data-extra="${i}">${b.label}</button>`).join('')}<button class="btn ghost" id="cos-btn">🏆 업적 · 치장</button><button class="btn ghost" id="pn-btn">📜 패치노트</button><a href="/" class="btn ghost">🏠 메인으로</a></div>
       <div class="keys">${o.keysHelp || ''}</div>
       <div id="err"></div>

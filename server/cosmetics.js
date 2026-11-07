@@ -21,6 +21,7 @@ let names = null;
 export const setNames = (n) => { names = n; };
 const charByName = (sub, name) => names?.chars(sub).find((c) => c.name === name)?.token || 0;
 export function tagChar(sub, e) { e.char = charByName(sub, e.name); return e; }
+export const nickOf = (sub, fallback) => names?.nick(sub) || fallback; // 게시판 글 · 댓글: 언제나 계정 닉네임
 export function nameOf(sub, e) {
   if (!names) return e.name;
   if (e.char === undefined) e.char = charByName(sub, e.name); // 예전 기록: 지금 캐릭터 이름과 같으면 그 캐릭터로 달린 것

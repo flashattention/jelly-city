@@ -15,6 +15,23 @@ input::placeholder { color: rgba(255,255,255,.5); }
 .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; background: radial-gradient(ellipse at center, rgba(20,8,50,.15), rgba(20,8,50,.55)); overflow-y: auto; }
 .card { width: min(460px, 100%); background: var(--card); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.18); border-radius: 28px; padding: 26px 24px; box-shadow: 0 24px 60px rgba(0,0,0,.4); text-align: center; max-height: calc(100vh - 32px); overflow-y: auto; }
 .card.wide { width: min(620px, 100%); }
+/* 게임 시작 전 화면(처음 · 방 찾기 · 방): 큰 화면에서는 넓게, 작은 화면에서는 화면 폭에 맞게 */
+#title > .card { width: min(1040px, 100%); }
+#lobby > .card, #room > .card { width: min(1100px, 100%); }
+/* 처음 화면: 넓은 화면에서는 왼쪽(계정 · 캐릭터) · 오른쪽(모드 · 시작) 두 칸이라 내리지 않아도 다 보인다. 좁으면 한 줄로 */
+.t-cols, .t-left, .t-right { display: contents; }
+@media (min-width: 860px) {
+  #title > .card { padding: 22px 28px; }
+  .t-cols { display: grid; grid-template-columns: 1fr 1.2fr; gap: 0 30px; align-items: center; margin-top: 6px; }
+  .t-left, .t-right { display: flex; flex-direction: column; align-items: stretch; min-width: 0; }
+  .t-left { padding-right: 30px; border-right: 1px solid rgba(255,255,255,.14); }
+  .t-left #login-box { margin-top: 6px; }
+  .t-right .seg { align-self: center; }
+  .t-right .btns { margin-top: 12px; }
+  /* 왼쪽에 보일 게 없으면(불러오는 중 등) 한 칸으로 */
+  .t-cols:not(:has(> .t-left > :not(.hidden):not(:empty))) { grid-template-columns: 1fr; }
+  .t-cols:not(:has(> .t-left > :not(.hidden):not(:empty))) > .t-left { display: none; }
+}
 .logo { font-family: 'Jua', sans-serif; font-size: clamp(40px, 9vw, 58px); text-shadow: 0 0 24px rgba(255,170,230,.7), 0 4px 0 rgba(0,0,0,.25); }
 h2 { font-family: 'Jua', sans-serif; font-size: 30px; margin: 0 0 6px; }
 h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
