@@ -244,3 +244,18 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .bd-spin { flex: none; width: 18px; height: 18px; border: 3px solid rgba(255,255,255,.25); border-top-color: var(--gold); border-radius: 50%; animation: bd-spin .8s linear infinite; }
 .bd-dots u { text-decoration: none; animation: bd-dot 1.2s infinite; } .bd-dots u:nth-child(2) { animation-delay: .2s; } .bd-dots u:nth-child(3) { animation-delay: .4s; }
 @keyframes bd-spin { to { transform: rotate(360deg); } } @keyframes bd-dot { 0%, 60%, 100% { opacity: .25; } 30% { opacity: 1; } }
+
+/* 드림 러너 카드: 무지개 크롬 테두리 (빙글 도는 무지개 띠 + 표면을 스치는 빛) */
+@property --dr-ang { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.card.dream { isolation: isolate; box-shadow: 0 20px 50px rgba(0,0,0,.35), 0 0 30px rgba(255,120,220,.45), 0 0 60px rgba(120,200,255,.3); }
+.card.dream::before { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 4px; z-index: 3; pointer-events: none;
+  background: conic-gradient(from var(--dr-ang), #ff3b5c, #ff9a2e, #ffe14d, #4fe08a, #3fc8ff, #5b6bff, #c45bff, #ff3b5c);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: drSpin 4s linear infinite; filter: saturate(1.2) brightness(1.1); }
+.card.dream::after { content: ''; position: absolute; inset: 0; border-radius: inherit; z-index: 2; pointer-events: none; mix-blend-mode: screen;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.0) 38%, rgba(255,255,255,.28) 46%, rgba(180,230,255,.22) 50%, rgba(255,190,240,.2) 54%, transparent 62%) no-repeat;
+  background-size: 250% 100%; animation: drSheen 3.6s ease-in-out infinite; }
+.card.dream:hover::before { animation-duration: 1.6s; }
+@keyframes drSpin { to { --dr-ang: 360deg; } }
+@keyframes drSheen { 0% { background-position: 130% 0; } 60%, 100% { background-position: -40% 0; } }
+@media (prefers-reduced-motion: reduce) { .card.dream::before, .card.dream::after { animation: none; } }
