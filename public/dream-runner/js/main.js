@@ -279,7 +279,7 @@ async function loadBoard(mode = 'speed', diff = 'easy', map = 'dream') { try { r
 function renderBoard(el, d, hl) {
   const top = d.top || [], me = d.me;
   const myId = me?.id;
-  const row = (e) => `<div class="brow${e.id === myId ? ' me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.name)}${medalHtml(e.medal, e.title)}${titleHtml(e.title)}${e.guest ? ' <span class="guest">체험판</span>' : e.anon ? ' <span class="guest">비로그인</span>' : ''}</span><span class="sc">${e.score.toLocaleString()}<small>${e.dist.toLocaleString()}m · ⭐${e.stars}</small></span></div>`;
+  const row = (e) => `<div class="brow${e.id === myId ? ' me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.name)}${(e.medals || (e.medal ? [e.medal] : [])).map((m) => medalHtml(m, e.title)).join('')}${titleHtml(e.title)}${e.guest ? ' <span class="guest">체험판</span>' : e.anon ? ' <span class="guest">비로그인</span>' : ''}</span><span class="sc">${e.score.toLocaleString()}<small>${e.dist.toLocaleString()}m · ⭐${e.stars}</small></span></div>`;
   let html = top.slice(0, hl ? 10 : 50).map(row).join('');
   if (me && me.rank > (hl ? 10 : 50)) html += '<div class="brow gap">⋯</div>' + row(me);
   el.innerHTML = html || '<div class="empty">아직 기록이 없어요. 첫 번째 주인공이 되어 보세요!</div>';

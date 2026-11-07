@@ -7,6 +7,7 @@ import { DIFFS, diffOf } from '../../public/dream-runner/js/diff.js';
 import { getCos, boardMedal, nameOf, tagChar } from '../cosmetics.js';
 import crypto from 'node:crypto';
 import { Tickets, ReplayPool, decodeReplay } from './verify.js';
+import { itemById } from '../../public/shared/js/cos-items.js';
 
 // 게임 코드 판: 서버가 다시 돌려 보는 코드와 브라우저 코드가 같아야 기록이 맞는다. 배포로 바뀌면 브라우저가 달리기 전에 새로 고친다
 const JS_DIR = new URL('../../public/dream-runner/js/', import.meta.url);
@@ -47,15 +48,30 @@ export class DreamBoard {
   // map: 'hell' 은 난이도마다 따로 (꿈나라 노멀은 예전 표 그대로)
   table(mode, diff, map = 'dream') { if (map === 'hell') return (this.boards[`hell:${mode}:${diff}`] ||= {}); if (diff !== 'easy') return (this.boards[`${mode}:${diff}`] ||= {}); return mode === 'item' ? this.bestItem : this.best; }
   sorted(mode, diff, map) { return Object.entries(this.table(mode, diff, map)).sort((a, b) => b[1].score - a[1].score || a[1].at - b[1].at); }
+  // 메달: 드림러너 모든 순위표(난이도 × 꿈나라 · 지옥)의 지금 1 ~ 3위 메달을 높은 난이도부터 (같은 난이도면 높은 순위 → 지옥 먼저)
+  podium() {
+    const P = new Map();
+    Object.keys(DIFFS).forEach((diff, di) => { for (const map of ['dream', 'hell']) { const all = this.sorted('speed', diff, map); all.slice(0, 3).forEach(([sub], i) => { const id = boardMedal(`dr.${map}.${diff}`, i + 1, all.length); if (id) { if (!P.has(sub)) P.set(sub, []); P.get(sub).push({ id, k: di * 2 + (map === 'hell' ? 1 : 0), rank: i + 1 }); } }); } });
+    return P;
+  }
+  // 한 줄의 메달 · 칭호: 이 순위표 메달(상위 %)도 넣고, 같은 1위를 말하는 칭호는 메달과 겹치니 뺀다. 다른 게임 칭호는 띄우지 않는다
+  badges(sub, P, mode, diff, map, rank, n) {
+    const L = [...(P.get(sub) || [])], own = mode === 'speed' ? boardMedal(`dr.${map}.${diff}`, rank, n) : null;
+    if (own && !L.some((m) => m.id === own)) L.push({ id: own, k: Object.keys(DIFFS).indexOf(diff) * 2 + (map === 'hell' ? 1 : 0), rank });
+    const medals = L.sort((a, b) => (b.k >> 1) - (a.k >> 1) || a.rank - b.rank || b.k - a.k).map((m) => m.id);
+    let title = getCos()?.titleOf(sub, ['dr.', 'dream-runner.']) || null;
+    if (title && medals.some((id) => { const it = itemById.get(id); return it?.fx.honor === 0 && `title.${it.ach}` === title; })) title = null;
+    return { title, medals, medal: own };
+  }
   top(mode, diff, map) {
-    const all = this.sorted(mode, diff, map), n = all.length; return all.slice(0, TOP).map(([sub, e], i) => ({ rank: i + 1, id: sub.slice(-8), title: getCos()?.titleOf(sub) || null, medal: mode === 'speed' ? boardMedal(`dr.${map}.${diff}`, i + 1, n) : null, name: nameOf(sub, e), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon }));
+    const all = this.sorted(mode, diff, map), n = all.length, P = this.podium(); return all.slice(0, TOP).map(([sub, e], i) => ({ rank: i + 1, id: sub.slice(-8), ...this.badges(sub, P, mode, diff, map, i + 1, n), name: nameOf(sub, e), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon }));
   }
   mine(sub, mode, diff, map) {
     const T = this.table(mode, diff, map);
     if (!sub || !T[sub]) return null;
     const i = this.sorted(mode, diff, map).findIndex(([s]) => s === sub);
     const e = T[sub];
-    return { rank: i + 1, id: sub.slice(-8), name: nameOf(sub, e), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon };
+    return { rank: i + 1, id: sub.slice(-8), ...this.badges(sub, this.podium(), mode, diff, map, i + 1, Object.keys(T).length), name: nameOf(sub, e), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon };
   }
   // 달린 기록: 탈락 · 그만두기 · 팀전 끝 모두 센다 (순위에 올리지 않아도 센다)
   played(sub, b) {

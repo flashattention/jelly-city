@@ -49,7 +49,8 @@ export class Cosmetics {
   u(sub) { return (this.users[sub] ||= { stars: 0, total: 0, owned: [], equip: {}, ach: {}, plays: {}, wins: {}, pvp: {}, fresh: [] }); }
   // 지금 자리여야 쓰는 것(1위 왕관 · 칭호 · 정상의 길)은 자리를 내주면 벗겨진다
   equipOf(sub) { const u = this.users[sub]; if (!u) { const md = sub && this.medalOf(sub); return md ? { medal: md } : null; } const eq = { ...u.equip }; for (const [sl, id] of Object.entries(eq)) { const it = itemById.get(id); if (it && this.live(it) && !this.owns(sub, id)) delete eq[sl]; } delete eq.medal; const md = this.medalOf(sub); if (md) eq.medal = md; return cleanCos(eq); }
-  titleOf(sub) { const id = this.users[sub]?.equip?.title; return id && itemById.has(id) && this.owns(sub, id) ? id : null; }
+  // games: 그 게임 칭호만 (순위표에는 다른 게임 칭호를 띄우지 않는다). 예: ['dr.', 'dream-runner.']
+  titleOf(sub, games) { const id = this.users[sub]?.equip?.title; return id && itemById.has(id) && this.owns(sub, id) && (!games || games.some((g) => id.startsWith(`title.${g}`))) ? id : null; }
   owns(sub, id) { const u = this.users[sub], it = itemById.get(id); if (!u || !it) return false; if (it.shop) return u.owned.includes(id); return this.live(it) ? this.holdsNow(sub, it) : !!u.ach[it.ach]; }
   // 한 판 끝: 별을 지갑에 넣는다 (난이도 · 지옥이면 더 많이)
   earn(sub, stars, diff, map) { const n = starsEarned(Math.min(MAX_STARS_RUN, Math.max(0, stars | 0)), diff, map); if (n <= 0) return 0; const u = this.u(sub); u.stars += n; u.total += n; this.dirty = true; this.refresh(sub); return n; }
