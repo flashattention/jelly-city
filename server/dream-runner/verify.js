@@ -10,7 +10,7 @@ export function decodeReplay(raw) {
   try {
     const text = raw.z ? zlib.gunzipSync(Buffer.from(raw.d, 'base64'), { maxOutputLength: 6 * 1024 * 1024 }).toString('utf8') : raw.d;
     const [a, b = ''] = text.split('|'), dts = a ? a.split(',').map(Number) : [], evs = b ? b.split(',').map((x) => x.split(':').map(Number)) : [];
-    if (!dts.length || dts.length > MAX_FRAMES || dts.some((v) => !Number.isInteger(v) || v < 0 || v > 500)) return null;
+    if (!dts.length || dts.length > MAX_FRAMES || dts.some((v) => !Number.isInteger(v) || v < 0 || v > 600)) return null; // 프레임 시간은 0.05초에서 자르지만 소수점 이월로 501 이 될 수 있다
     if (evs.some(([f, v]) => !Number.isInteger(f) || !Number.isInteger(v) || f < 0 || f >= dts.length || v < 0 || v > 31)) return null;
     return { dts, evs };
   } catch { return null; }
