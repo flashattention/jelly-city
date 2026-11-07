@@ -244,3 +244,5 @@ body.toss #play-btns { grid-template-columns: 1fr; }
 #ad-btn { display: block; width: min(420px, 100%); margin: 14px auto 0; }
 #ad-btn.hidden { display: none; }
 body.toss #toss-login { display: block; width: 100%; margin: 12px 0 4px; background: #3182f6; color: #fff; } body.toss #toss-login.hidden, #toss-login { display: none; }
+body.touch #howto { display: none; } /* 휴대폰 조작 화면: 키보드 안내 대신 버튼 */
+body.toss .keys { display: none; } /* 토스 미니앱(휴대폰): 키보드 안내 줄 없이 */
