@@ -23,6 +23,9 @@ export class Tickets {
     const s = String(tk || ''), i = s.lastIndexOf('.'); if (i < 0) return null; const p = s.slice(0, i); if (this.sign(p) !== s.slice(i + 1)) return null;
     const [at, seed, diff, map, mode, id, room] = p.split('.'); return { at: +at, seed: +seed, diff, map, mode, id, room: room === '1' };
   }
+  // 사용한 출발표: 파일에 저장해 서버를 다시 켜도 같은 판으로 두 번 받지 못하게 (TTL 지난 것은 버린다)
+  dump(ttl) { const now = Date.now(); return [...this.used].filter(([, t]) => now - t < ttl); }
+  load(list) { for (const [k, t] of list || []) this.used.set(k, t); }
   once(id, what) { const k = `${what}:${id}`, now = Date.now(); if (this.used.has(k)) return false; this.used.set(k, now); if (this.used.size > 20000) for (const [q, t] of this.used) if (now - t > 864e5) this.used.delete(q); return true; }
 }
 // 한 스레드에서 차례대로. 밀리거나 고장 나면 null (그 기록은 나중에 사람이 본다, 플레이어를 기다리게 하지 않는다)

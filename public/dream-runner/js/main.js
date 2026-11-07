@@ -302,7 +302,7 @@ function reportPlay(leaving) {
   if (game.playSent || game.runT < 3) return; game.playSent = true;
   const body = { time: game.runT, diff: game.diff, map: game.map, stars: runner.stars, dist: Math.floor(runner.s), tk: game.tk || undefined, anon: logged() ? undefined : anonId() };
   if (leaving) { fetch(apiUrl('/api/dream/played'), { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', ...(account.session ? { Authorization: `Bearer ${account.session}` } : {}) }, body: JSON.stringify(body) }).catch(() => {}); return; }
-  (async () => { for (let i = 0; i < 100; i++) { try { offerAd(await account.api('/api/dream/played', { method: 'POST', body }), body.tk); return; } catch (e) { if (e.status && e.status < 500) return; await new Promise((ok) => setTimeout(ok, 3000)); } } })();
+  (async () => { if (!body.tk && game.tkP) body.tk = await Promise.race([game.tkP, new Promise((ok) => setTimeout(ok, 8000))]) || undefined; for (let i = 0; i < 100; i++) { try { offerAd(await account.api('/api/dream/played', { method: 'POST', body }), body.tk); return; } catch (e) { if (e.status && e.status < 500) return; await new Promise((ok) => setTimeout(ok, 3000)); } } })();
 }
 // 토스 미니앱: 판이 끝나고 별을 받았으면 '광고 보고 별 한 번 더' (보고 싶은 사람만)
 function offerAd(r, tk) {
@@ -415,7 +415,7 @@ async function died(why) {
   const rec = { dist: Math.floor(runner.s), stars: runner.stars, themes: game.dreamsSeen, time: game.runT, name: game.profile.name, color: game.profile.color, mode: game.itemMode ? 'item' : 'speed', diff: game.diff, map: game.map, seed: game.seed, multi: game.multi || undefined };
   if (game.multi) net.send({ t: 'dead', dist: rec.dist, stars: rec.stars, why });
   game.rec = rec;
-  rec.tk = await Promise.race([game.tkP, new Promise((ok) => setTimeout(ok, 800))]) || game.tk || undefined; rec.replay = await encodeReplay(rpNow) || undefined;
+  rec.tk = await Promise.race([game.tkP, new Promise((ok) => setTimeout(ok, 8000))]) || game.tk || undefined; // 출발표가 있어야 기록이 올라간다 rec.replay = await encodeReplay(rpNow) || undefined;
   if (!logged()) { game.submitted = { anonPending: true }; return; } // 비로그인: 탈락 화면에서 임시 닉네임을 정해 남긴다
   try { game.submitted = await postScore(rec, () => { if (game.submitted === null) game.submitted = { waiting: true }; }); } catch (e) { game.submitted = { error: e.message }; }
   if (game.mode === 'over' && !game.multi && game.rec === rec) showOver(); // 점검이 끝나 늦게 올라갔으면 결과 화면을 고친다
