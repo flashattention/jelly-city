@@ -81,14 +81,15 @@ export class Cosmetics {
   }
   // 1위 업적의 왕관 · 칭호는 지금 1위인 동안만 쓴다 (업적 기록은 남는다)
   //   정상의 길(top3)은 그 난이도 순위표(꿈나라 · 지옥 어느 쪽이든) 지금 3위 안인 동안만
-  live(it) { return it.slot === 'medal' || !!it.top3 || ((it.slot === 'crown' || it.slot === 'title') && !!achById.get(it.ach)?.rule.crown); }
+  //   최정상의 길(top1)은 그 맵 초월 순위표 지금 1위인 동안만
+  live(it) { return it.slot === 'medal' || !!it.top3 || !!it.top1 || ((it.slot === 'crown' || it.slot === 'title') && !!achById.get(it.ach)?.rule.crown); }
   // 이름 옆 메달: 지금 자리 중 가장 높은 것 (1위 → 2위 → 3위 → 상위 1% → 5% → 10%, 같으면 어려운 순위표)
   medalOf(sub) {
     if (!sub) return null; const u = this.users[sub] || { ach: {} }, cache = new Map(); let best = null;
     for (const it of [...TOP3, ...Object.keys(u.ach).flatMap((id) => (medalByAch.get(id) || []).filter((m) => !m.rule?.any))]) { if (best && (it.fx.honor > best.fx.honor || (it.fx.honor === best.fx.honor && it.fx.pr <= best.fx.pr))) continue; if (this.holdsNow(sub, it, cache)) best = it; }
     return best?.id || null;
   }
-  holdsNow(sub, it, cache) { if (it.top3) return ['dream', 'hell', 'void'].some((map) => this.meets(sub, { kind: 'dream', map, diff: it.top3, rank: 3, any: true }, cache)); const a = achById.get(it.ach); return !!a && (it.rule?.any || !!this.users[sub]?.ach[a.id]) && this.meets(sub, it.rule || a.rule, cache); }
+  holdsNow(sub, it, cache) { if (it.top1) return this.meets(sub, { kind: 'dream', map: it.top1, diff: 'beyond', rank: 1, any: true }, cache); if (it.top3) return ['dream', 'hell', 'void'].some((map) => this.meets(sub, { kind: 'dream', map, diff: it.top3, rank: 3, any: true }, cache)); const a = achById.get(it.ach); return !!a && (it.rule?.any || !!this.users[sub]?.ach[a.id]) && this.meets(sub, it.rule || a.rule, cache); }
   // 기록 · 순위를 보고 새로 달성한 업적을 적는다 (예전 기록도 여기서 인정된다)
   refresh(sub) {
     const u = this.u(sub), cache = new Map();
