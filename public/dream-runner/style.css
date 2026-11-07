@@ -129,6 +129,11 @@ h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 #touch > div { display: flex; gap: 12px; align-items: flex-end; pointer-events: auto; }
 #touch button { width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); background: rgba(20,8,50,.4); color: #fff; font-size: 26px; touch-action: none; }
 #touch button.big { width: 80px; height: 80px; }
+#joy { position: relative; width: 148px; height: 76px; border-radius: 999px; border: 2px solid rgba(255,255,255,.4); background: rgba(20,8,50,.4); touch-action: none; display: flex; align-items: center; justify-content: center; }
+#joy::before, #joy::after { content: '◀'; position: absolute; left: 12px; color: rgba(255,255,255,.45); font-size: 16px; pointer-events: none; }
+#joy::after { content: '▶'; left: auto; right: 12px; }
+#joy-knob { width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,.85); box-shadow: 0 3px 10px rgba(0,0,0,.35); transition: transform .08s; pointer-events: none; }
+#joy.on #joy-knob { background: #fff; transition: none; }
 @media (max-width: 520px) { .btns { grid-template-columns: 1fr; } #h-score { font-size: 32px; } #h-dream { font-size: 14px; } .hud-c { top: 84px; } }
 
 /* 초대 코드 */

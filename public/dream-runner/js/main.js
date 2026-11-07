@@ -75,8 +75,8 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => keys.delete(e.code));
 window.addEventListener('blur', () => keys.clear());
 function readInput() {
-  const L = keys.has('KeyA') || keys.has('ArrowLeft') || touchHeld.has('left');
-  const Rt = keys.has('KeyD') || keys.has('ArrowRight') || touchHeld.has('right');
+  const L = keys.has('KeyA') || keys.has('ArrowLeft') || joyDir < 0;
+  const Rt = keys.has('KeyD') || keys.has('ArrowRight') || joyDir > 0;
   input.dir = (Rt ? 1 : 0) - (L ? 1 : 0);
   input.slideHeld = keys.has('KeyS') || keys.has('ArrowDown') || touchHeld.has('slide');
 }
@@ -87,6 +87,16 @@ for (const b of document.querySelectorAll('#touch button')) {
   const k = b.dataset.k;
   b.addEventListener('pointerdown', (e) => { e.preventDefault(); unlock(); touchHeld.add(k); if (k === 'jump') input.jump = true; if (k === 'slide') input.slide = true; if (k === 'shove') input.shove = true; if (k === 'item') input.item = true; });
   for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) b.addEventListener(ev, () => touchHeld.delete(k));
+}
+// 휴대폰 조이스틱: 좌우로 밀면 그쪽으로 (입력 기록은 왼쪽 · 가운데 · 오른쪽 셋이라 가운데 조금은 쉬는 자리)
+let joyDir = 0, joyId = null;
+{
+  const joy = $('joy'), knob = $('joy-knob'), R = 46, DEAD = 14;
+  const move = (e) => { const r = joy.getBoundingClientRect(), dx = Math.max(-R, Math.min(R, e.clientX - (r.left + r.width / 2))); knob.style.transform = `translateX(${dx}px)`; joyDir = dx > DEAD ? 1 : dx < -DEAD ? -1 : 0; joy.classList.toggle('on', joyDir !== 0); };
+  const end = (e) => { if (e.pointerId !== joyId) return; joyId = null; joyDir = 0; knob.style.transform = ''; joy.classList.remove('on'); };
+  joy.addEventListener('pointerdown', (e) => { e.preventDefault(); unlock(); joyId = e.pointerId; joy.setPointerCapture(e.pointerId); move(e); });
+  joy.addEventListener('pointermove', (e) => { if (e.pointerId === joyId) move(e); });
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) joy.addEventListener(ev, end);
 }
 let swipe = null;
 $('c').addEventListener('pointerdown', (e) => { unlock(); swipe = { x: e.clientX, y: e.clientY }; });

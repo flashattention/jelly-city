@@ -98,13 +98,19 @@ const R = window.rainState = { drops: [], parts: [], score: 0, level: 1, lives: 
 const DROP_COLS = ['#ff8fc4', '#ffd84d', '#7cf0c8', '#8fd3ff', '#b388ff', '#ff9a62'];
 function startRain() {
   S.unlock(); game.kind = 'rain'; game.mode = 'play';
-  Object.assign(R, { drops: [], parts: [], score: 0, level: 1, lives: 5, hit: 0, spawnT: 1.2, over: false });
+  Object.assign(R, { drops: [], parts: [], score: 0, level: 1, lives: 5, hit: 0, spawnT: 1.2, over: false, H: fieldH() });
   shell.hideScreens(); $('game').classList.add('hidden'); $('rain').classList.remove('hidden');
   $('rain-in').value = ''; rainHud(); $('rain-in').focus(); S.music('apple');
 }
 function rainHud() { $('r-score').textContent = R.score; $('r-level').textContent = R.level; $('r-lives').textContent = '🍮'.repeat(R.lives) + '·'.repeat(5 - R.lives); }
+// 판 높이: 휴대폰 키보드가 올라와도 바뀌지 않는 높이로 떨어뜨린다 (속도 · 거리 그대로). 화면이 커지면(돌리기) 따라 커진다
+const fieldH = () => Math.max(innerHeight, document.documentElement.clientHeight);
+// 키보드가 올라오면 보이는 칸(visualViewport)에 판을 맞추고, 그 안에 줄여서 그린다 (위에 있는 낱말도 보이게)
+function fitRain() { const v = window.visualViewport, el = $('rain'); if (!v) return; el.style.top = `${v.offsetTop}px`; el.style.height = `${v.height}px`; el.style.bottom = 'auto'; el.classList.toggle('short', v.height < 560); }
+window.visualViewport?.addEventListener('resize', fitRain); window.visualViewport?.addEventListener('scroll', fitRain);
 function rainStep(dt) {
-  const W = innerWidth, H = innerHeight, ground = H - 110;
+  R.H = Math.max(R.H || 0, fieldH());
+  const W = innerWidth, H = R.H, ground = H - 110;
   R.spawnT -= dt;
   if (R.spawnT <= 0) {
     R.spawnT = Math.max(0.55, 1.7 - R.level * 0.12);
@@ -127,8 +133,10 @@ function rainStep(dt) {
 }
 function burst(x, y, c) { for (let i = 0; i < 14; i++) R.parts.push({ x, y, vx: (Math.random() - 0.5) * 380, vy: -Math.random() * 360, r: 3 + Math.random() * 4, c, life: 1 }); }
 function rainDraw(t) {
-  const cv = R.cv, dpr = Math.min(2, devicePixelRatio || 1), W = innerWidth, H = innerHeight, g = cv.getContext('2d');
-  if (cv.width !== W * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+  fitRain();
+  const cv = R.cv, dpr = Math.min(2, devicePixelRatio || 1), W = innerWidth, H = $('rain').clientHeight || innerHeight, g = cv.getContext('2d');
+  if (cv.width !== W * dpr || cv.height !== H * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+  const k = (H - 110 + 30) / ((R.H || H) - 110 + 30), sy = (y) => -30 + (y + 30) * k; // 떨어지는 칸을 보이는 높이에 맞게 줄인다
   g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
   // 젤리 둑 (목숨이 줄면 낮아진다)
   const ground = H - 110, gh = 40 + R.lives * 6;
@@ -138,7 +146,7 @@ function rainDraw(t) {
   g.lineTo(W, H); g.lineTo(0, H); g.fill();
   const typed = $('rain-in').value.trim();
   for (const d of R.drops) {
-    g.font = '24px Jua'; const tw = g.measureText(d.w).width, w = tw + 34, h = 46, x = d.x + Math.sin(t / 500 + d.wob) * 6, y = d.y;
+    g.font = '24px Jua'; const tw = g.measureText(d.w).width, w = tw + 34, h = 46, x = d.x + Math.sin(t / 500 + d.wob) * 6, y = sy(d.y);
     const gg = g.createRadialGradient(x - w * 0.2, y - 8, 4, x, y, w * 0.7); gg.addColorStop(0, '#fff'); gg.addColorStop(0.35, d.c); gg.addColorStop(1, d.c);
     g.fillStyle = gg; g.shadowColor = 'rgba(0,0,0,.25)'; g.shadowBlur = 10; g.shadowOffsetY = 4;
     g.beginPath(); g.roundRect(x - w / 2, y - h / 2, w, h, 22); g.fill(); g.shadowColor = 'transparent';
@@ -147,7 +155,7 @@ function rainDraw(t) {
     const hit = typed && d.w.startsWith(typed);
     g.fillStyle = hit ? '#e2006f' : '#3a2350'; g.fillText(d.w, x, y + 2);
   }
-  for (const p of R.parts) { g.globalAlpha = Math.max(0, p.life); g.fillStyle = p.c; g.beginPath(); g.arc(p.x, p.y, p.r, 0, Math.PI * 2); g.fill(); }
+  for (const p of R.parts) { g.globalAlpha = Math.max(0, p.life); g.fillStyle = p.c; g.beginPath(); g.arc(p.x, sy(p.y), p.r, 0, Math.PI * 2); g.fill(); }
   g.globalAlpha = 1;
 }
 $('rain-form').onsubmit = (e) => {
