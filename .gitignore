@@ -1,7 +1,13 @@
-# 비밀 값 (API 키, 비밀번호) — 절대 커밋하지 않기
+# 비밀 값 (API 키, 비밀번호, 인증서) — 절대 커밋하지 않기
 .env
 .env.*
 !.env.example
+# 토스 로그인 mTLS 인증서 · 키 같은 것 (Fly 비밀 값으로만 넣는다)
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
 
 # 의존성
 node_modules/
@@ -30,3 +36,9 @@ toss/web/
 toss/app/dist/
 toss/app/node_modules/
 toss/app/*.ait
+
+# 마이크로소프트 스토어 패키지 (PWABuilder 로 만든다)
+*.msix
+*.msixbundle
+*.appx
+*.appxbundle
