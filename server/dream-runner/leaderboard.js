@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readJson } from '../auth.js';
 import { DIFFS, diffOf } from '../../public/dream-runner/js/diff.js';
-import { getCos, boardMedal, nameOf } from '../cosmetics.js';
+import { getCos, boardMedal, nameOf, tagChar } from '../cosmetics.js';
 import crypto from 'node:crypto';
 import { Tickets, ReplayPool, decodeReplay } from './verify.js';
 
@@ -48,14 +48,14 @@ export class DreamBoard {
   table(mode, diff, map = 'dream') { if (map === 'hell') return (this.boards[`hell:${mode}:${diff}`] ||= {}); if (diff !== 'easy') return (this.boards[`${mode}:${diff}`] ||= {}); return mode === 'item' ? this.bestItem : this.best; }
   sorted(mode, diff, map) { return Object.entries(this.table(mode, diff, map)).sort((a, b) => b[1].score - a[1].score || a[1].at - b[1].at); }
   top(mode, diff, map) {
-    const all = this.sorted(mode, diff, map), n = all.length; return all.slice(0, TOP).map(([sub, e], i) => ({ rank: i + 1, id: sub.slice(-8), title: getCos()?.titleOf(sub) || null, medal: mode === 'speed' ? boardMedal(`dr.${map}.${diff}`, i + 1, n) : null, name: nameOf(sub, e.name), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon }));
+    const all = this.sorted(mode, diff, map), n = all.length; return all.slice(0, TOP).map(([sub, e], i) => ({ rank: i + 1, id: sub.slice(-8), title: getCos()?.titleOf(sub) || null, medal: mode === 'speed' ? boardMedal(`dr.${map}.${diff}`, i + 1, n) : null, name: nameOf(sub, e), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon }));
   }
   mine(sub, mode, diff, map) {
     const T = this.table(mode, diff, map);
     if (!sub || !T[sub]) return null;
     const i = this.sorted(mode, diff, map).findIndex(([s]) => s === sub);
     const e = T[sub];
-    return { rank: i + 1, id: sub.slice(-8), name: nameOf(sub, e.name), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon };
+    return { rank: i + 1, id: sub.slice(-8), name: nameOf(sub, e), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon };
   }
   // 달린 기록: 탈락 · 그만두기 · 팀전 끝 모두 센다 (순위에 올리지 않아도 센다)
   played(sub, b) {
@@ -108,7 +108,7 @@ export class DreamBoard {
   //   red = 서버가 다시 돌려 본 결과와 다름 · 시간이 맞지 않음 · 입력 기록 없음 (상위권)
   report(lvl, sub, mode, diff, map, why, e, r, extra) { this.reports.push({ id: crypto.randomBytes(5).toString('hex'), lvl, sub, mode, diff, map, why, name: e.name, score: e.score, dist: e.dist, stars: e.stars, time: e.time, eat: e.at, r: r ? { dist: r.dist, stars: r.stars } : null, ...extra, at: Date.now(), open: true }); if (this.reports.length > 300) this.reports.splice(0, this.reports.length - 300); this.dirty = true; console.warn(`드림 러너 비상 리포트(${lvl}): ${e.name} ${e.score}점 ${map} ${diff} (${why})`); }
   tkey(mode, diff, map) { return map === 'hell' ? `hell:${mode}:${diff}` : `${mode}:${diff}`; }
-  adminList() { const flagged = []; for (const k of ['best', 'bestItem']) for (const [sub, e] of Object.entries(this[k])) if (e.u) flagged.push({ sub, t: k === 'best' ? 'speed:easy' : 'item:easy', ...e }); for (const [t, T] of Object.entries(this.boards)) for (const [sub, e] of Object.entries(T)) if (e.u) flagged.push({ sub, t, ...e }); for (const f of flagged) f.name = nameOf(f.sub, f.name); return { reports: this.reports.filter((x) => x.open).reverse().map((x) => ({ ...x, name: nameOf(x.sub, x.name), t: this.tkey(x.mode, x.diff, x.map), live: this.table(x.mode, x.diff, x.map)[x.sub]?.at === x.eat })), flagged: flagged.sort((a, b) => b.score - a.score).slice(0, 100), stat: this.vstat }; }
+  adminList() { const flagged = []; for (const k of ['best', 'bestItem']) for (const [sub, e] of Object.entries(this[k])) if (e.u) flagged.push({ sub, t: k === 'best' ? 'speed:easy' : 'item:easy', ...e }); for (const [t, T] of Object.entries(this.boards)) for (const [sub, e] of Object.entries(T)) if (e.u) flagged.push({ sub, t, ...e }); for (const f of flagged) { f.name = nameOf(f.sub, f); delete f.char; } return { reports: this.reports.filter((x) => x.open).reverse().map((x) => ({ ...x, name: nameOf(x.sub, { name: x.name }), t: this.tkey(x.mode, x.diff, x.map), live: this.table(x.mode, x.diff, x.map)[x.sub]?.at === x.eat })), flagged: flagged.sort((a, b) => b.score - a.score).slice(0, 100), stat: this.vstat }; }
   // 정상으로 인정: 확인 안 됨 표시를 지워 업적 · 왕관도 받게 / 삭제: 기록을 지우고 별 · 업적을 거둔다 / 넘기기: 그대로 두고 리포트만 닫는다
   resolve(id, act) {
     const x = this.reports.find((q) => q.id === id); if (!x) throw new Error('없어요'); x.open = false; x.act = act; this.dirty = true;
@@ -136,12 +136,12 @@ export class DreamBoard {
     const color = /^#[0-9a-fA-F]{6}$/.test(b.color || '') ? b.color : '#8a5634';
     const old = T[who.sub];
     const newBest = !old || score > old.score, entry = { name, color, score, dist, stars, themes, time: Math.round(time), at: now, guest: !!who.user.guest, anon: !!who.user.anon, ...(chk.ok ? { v: 1 } : { u: chk.why }) };
+    tagChar(who.sub, entry);
     if (newBest) T[who.sub] = entry;
     // 비상 리포트 (기록은 바로 순위표에 오른다)
     if (newBest) { const higher = Object.values(T).filter((e) => e.score > score).length;
       if (!chk.ok && !chk.soft && higher < TOP_GUARD) this.report('red', who.sub, mode, diff, map, chk.why, entry, chk.r); }
-    else { old.name = name; old.color = color; } // 이름·색은 최근 것으로
-    for (const t of [this.best, this.bestItem, ...Object.values(this.boards)]) if (t[who.sub]) t[who.sub].name = name; // 다른 표의 예전 기록도 새 이름으로 (비로그인 닉네임)
+    else { old.name = name; old.color = color; old.char = entry.char; } // 이름·색은 최근 것으로
     getCos()?.refresh(who.sub); // 업적: 거리 · 순위
     return { score, mode, diff, map, newBest, prev: old?.score || 0, me: this.mine(who.sub, mode, diff, map), top: this.top(mode, diff, map), runs: this.runs };
   }

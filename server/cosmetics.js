@@ -15,10 +15,18 @@ const placed = (r, rank, n) => (r.pct ? n >= PCT_MIN[r.pct] && rank <= Math.max(
 const TOP3 = ITEMS.filter((i) => i.slot === 'medal' && i.rule?.any); // 1 ~ 3위 메달: 업적 없이 지금 순위로
 const medalByAch = new Map(); for (const i of ITEMS) if (i.slot === 'medal') { if (!medalByAch.has(i.ach)) medalByAch.set(i.ach, []); medalByAch.get(i.ach).push(i); }
 export const getCos = () => inst;
-// 순위표 이름: 로그인 계정은 지금 닉네임으로 (닉네임을 바꾸면 예전 기록에도 새 닉네임이 뜬다)
-let nickFn = null;
-export const setNickOf = (fn) => { nickFn = fn; };
-export const nameOf = (sub, fallback) => (nickFn && nickFn(sub)) || fallback;
+// 순위표 이름: 캐릭터로 달린 기록은 그 캐릭터의 지금 이름, 아니면 계정의 지금 닉네임 (이름을 바꾸면 예전 기록에도 새 이름이 뜬다)
+//   names = { nick(sub), chars(sub) → [{ token, name }] }. 기록에는 달린 캐릭터의 토큰(char)을 남긴다 (0 = 캐릭터 아님)
+let names = null;
+export const setNames = (n) => { names = n; };
+const charByName = (sub, name) => names?.chars(sub).find((c) => c.name === name)?.token || 0;
+export function tagChar(sub, e) { e.char = charByName(sub, e.name); return e; }
+export function nameOf(sub, e) {
+  if (!names) return e.name;
+  if (e.char === undefined) e.char = charByName(sub, e.name); // 예전 기록: 지금 캐릭터 이름과 같으면 그 캐릭터로 달린 것
+  if (e.char) return names.chars(sub).find((c) => c.token === e.char)?.name || e.name; // 지운 캐릭터는 그때 이름 그대로
+  return names.nick(sub) || e.name;
+}
 // 순위표 한 줄의 메달: 그 순위표 안 순위로만 (1 ~ 3위는 인원과 상관없이, 그 아래는 상위 %)
 export function boardMedal(base, rank, n) {
   if (rank <= 3) { const id = `medal.${base}.m${rank - 1}`; return itemById.has(id) ? id : null; }
