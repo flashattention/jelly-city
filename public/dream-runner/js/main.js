@@ -101,7 +101,14 @@ $('c').addEventListener('pointerup', (e) => {
 const screens = ['title', 'lobby', 'room', 'over', 'board'];
 // ESC: 순위표 · 방 목록을 닫는다
 addEventListener('keydown', (e) => { if (e.key !== 'Escape' || ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return; if (['board', 'lobby'].some((id) => !document.getElementById(id).classList.contains('hidden'))) show('title'); });
-function show(id) { for (const s of screens) $(s).classList.toggle('hidden', s !== id); }
+function show(id) { for (const s of screens) $(s).classList.toggle('hidden', s !== id); if (id === 'title') renderFame(); }
+// 처음 화면 왼쪽: 명예의 전당 (높은 난이도 1위부터, 한 사람은 한 번만)
+async function renderFame() {
+  let d; try { d = await account.api('/api/dream/fame'); } catch { return; }
+  const row = (f) => `<div class="fame-row"><span class="fame-rk">${['🥇', '🥈', '🥉'][f.rank - 1]}</span><span class="fame-nm"><span class="dot" style="background:${esc(f.color)}"></span>${esc(f.name)}</span><span class="fame-at">${f.map === 'hell' ? '🔥 지옥' : '🌙 꿈나라'} ${esc(DIFFS[f.diff]?.name || f.diff)} ${f.rank}위</span><span class="fame-sc">${f.score.toLocaleString()}</span></div>`;
+  $('fame').innerHTML = `<div class="fame-h">🏆 명예의 전당</div>` + (d.fame.length ? d.fame.map(row).join('') : '<div class="empty">아직 기록이 없어요</div>');
+}
+renderFame(); // 처음 열 때
 function hideScreens() { for (const s of screens) $(s).classList.add('hidden'); }
 function toast(text, ms = 1600) { const t = $('toast'); t.textContent = text; t.classList.remove('hidden'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.add('hidden'), ms); }
 function err(text) { $('err').textContent = text || ''; }
@@ -149,7 +156,7 @@ function renderAccount() {
   $('acct-nick').classList.toggle('hidden', !(on && account.user.needNick) && !game.editNick);
   $('acct-nick-hint').textContent = on && account.user.needNick ? '구글 이름 대신 쓸 닉네임을 정해 주세요 (모든 게임에서 써요)' : '새 닉네임';
   const chars = on ? account.chars || [] : localChars(); // 로그인 안 했으면 이 기기에 만든 캐릭터
-  let sel = store.get(CHAR_KEY) || store.get('jelly.char') || (chars[0]?.token ?? 'default'); // 메인 화면의 대표 캐릭터가 기본
+  let sel = store.get('jelly.char') || store.get(CHAR_KEY) || (chars[0]?.token ?? 'default'); // 메인 화면의 대표 캐릭터로 (고르기는 메인 화면에서)
   if (sel !== 'default' && !chars.some((c) => c.token === sel)) sel = chars[0]?.token ?? 'default';
   const box = $('chars'); box.innerHTML = '';
   const chip = (token, name, color) => {

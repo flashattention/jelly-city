@@ -10,23 +10,20 @@ input::placeholder { color: rgba(255,255,255,.5); }
 
 .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; background: radial-gradient(ellipse at center, rgba(20,8,50,.15), rgba(20,8,50,.55)); overflow-y: auto; }
 .card { position: relative; width: min(460px, 100%); background: var(--card); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.18); border-radius: 28px; padding: 26px 24px; box-shadow: 0 24px 60px rgba(0,0,0,.4); text-align: center; max-height: calc(100vh - 32px); overflow-y: auto; }
-.card.wide { width: min(640px, 100%); }
-/* 게임 시작 전 화면(처음 · 방 찾기 · 방): 큰 화면에서는 넓게, 작은 화면에서는 화면 폭에 맞게 */
+.card.wide { width: min(1040px, 100%); }
+/* 게임 패널(처음 · 방 찾기 · 방 · 순위표 · 결과)은 모두 같은 넓이: 큰 화면은 넓게, 작은 화면은 화면 폭에 맞게 */
 #title > .card { width: min(1040px, 100%); }
-#lobby > .card, #room > .card { width: min(1100px, 100%); }
-/* 처음 화면: 넓은 화면에서는 왼쪽(계정 · 캐릭터) · 오른쪽(모드 · 시작) 두 칸이라 내리지 않아도 다 보인다. 좁으면 한 줄로 */
+/* 처음 화면: 로그인 · 캐릭터 고르기는 메인 화면에서 하니 여기선 숨긴다 (메인 화면의 대표 캐릭터로 한다) */
+#title #login-box, #title #who-row, #title #acct-nick, #title #chars-label, #title #chars { display: none !important; }
 .t-cols, .t-left, .t-right { display: contents; }
 @media (min-width: 860px) {
-  #title > .card { padding: 22px 28px; }
-  .t-cols { display: grid; grid-template-columns: 1fr 1.2fr; gap: 0 30px; align-items: center; margin-top: 6px; }
-  .t-left, .t-right { display: flex; flex-direction: column; align-items: stretch; min-width: 0; }
-  .t-left { padding-right: 30px; border-right: 1px solid rgba(255,255,255,.14); }
-  .t-left #login-box { margin-top: 6px; }
-  .t-right .seg { align-self: center; }
-  .t-right .btns { margin-top: 12px; }
-  /* 왼쪽에 보일 게 없으면(불러오는 중 등) 한 칸으로 */
-  .t-cols:not(:has(> .t-left > :not(.hidden):not(:empty))) { grid-template-columns: 1fr; }
-  .t-cols:not(:has(> .t-left > :not(.hidden):not(:empty))) > .t-left { display: none; }
+  #title > .card { padding: 30px 44px; }
+  #title .picks, #title #title-opts { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px 14px; margin-top: 16px; }
+  #title .picks .seg, #title #title-opts > * { margin: 0; }
+  #title #play-btns { margin-top: 24px; gap: 14px; }
+  #title #play-btns:has(> :nth-child(3):not(.hidden)) { grid-template-columns: repeat(3, 1fr); } /* 버튼 셋이면 한 줄로 */
+  #title .code-row { width: min(640px, 100%); margin: 14px auto 0; }
+  #title .row2 { margin-top: 18px; }
 }
 .logo { font-family: 'Jua', sans-serif; font-size: clamp(40px, 9vw, 58px); text-shadow: 0 0 24px rgba(255,170,230,.7), 0 4px 0 rgba(0,0,0,.25); }
 h2 { font-family: 'Jua', sans-serif; font-size: 30px; margin: 0 0 6px; }

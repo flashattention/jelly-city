@@ -66,6 +66,17 @@ export class DreamBoard {
   top(mode, diff, map) {
     const all = this.sorted(mode, diff, map), n = all.length, P = this.podium(); return all.slice(0, TOP).map(([sub, e], i) => ({ rank: i + 1, id: sub.slice(-8), ...this.badges(sub, P, mode, diff, map, i + 1, n), name: nameOf(sub, e), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon }));
   }
+  // 명예의 전당: 꿈나라 초월 1위 → 지옥 초월 1위 → 꿈나라 광속 1위 → … → 노멀 1위, 다음은 2위 · 3위 차례로. 한 사람은 한 번만 (가장 높은 자리)
+  fame(n = 12) {
+    const order = Object.keys(DIFFS).reverse().flatMap((diff) => [[diff, 'dream'], [diff, 'hell']]), seen = new Set(), out = [];
+    for (let r = 0; r < 3; r++) for (const [diff, map] of order) {
+      if (out.length >= n) return out;
+      const all = this.sorted('speed', diff, map), x = all[r]; if (!x || seen.has(x[0])) continue;
+      const [sub, e] = x; seen.add(sub);
+      out.push({ rank: r + 1, diff, map, id: sub.slice(-8), name: nameOf(sub, e), color: e.color, score: e.score, medal: boardMedal(`dr.${map}.${diff}`, r + 1, all.length) });
+    }
+    return out;
+  }
   mine(sub, mode, diff, map, badges = true) {
     const T = this.table(mode, diff, map);
     if (!sub || !T[sub]) return null;
@@ -169,6 +180,7 @@ export async function dreamApi(req, res, url, who, board, json, isAdmin) {
   const anonId = url.searchParams.get('anon');
   const mode = url.searchParams.get('mode') === 'item' ? 'item' : 'speed', diff = diffOf(url.searchParams.get('diff')), map = url.searchParams.get('map') === 'hell' ? 'hell' : 'dream';
   if (url.pathname === '/api/dream/board') return json(res, 200, { mode, diff, map, top: board.top(mode, diff, map), me: board.mine(who?.sub || (ANON.test(anonId || '') ? 'anon:' + anonId : null), mode, diff, map), runs: board.runs });
+  if (url.pathname === '/api/dream/fame') return json(res, 200, { fame: board.fame() });
   if (url.pathname === '/api/dream/me') return json(res, 200, board.myStats(who?.sub || (ANON.test(anonId || '') ? 'anon:' + anonId : null), map));
   if (url.pathname === '/api/dream/played' && req.method === 'POST') {
     const b = await readJson(req);

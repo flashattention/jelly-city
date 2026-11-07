@@ -224,7 +224,7 @@ export class Shell {
     $('acct-nick').classList.toggle('hidden', !(on && account.user.needNick) && !this.editNick);
     $('acct-nick-hint').textContent = on && account.user.needNick ? '구글 이름 대신 쓸 닉네임을 정해 주세요 (모든 게임에서 써요)' : '새 닉네임';
     const chars = on ? account.chars || [] : localChars(); // 로그인 안 했으면 이 기기에 만든 캐릭터
-    let sel = store.get(this.KEY.char) || store.get(DEFAULT_CHAR_KEY) || chars[0]?.token || 'default';
+    let sel = store.get(DEFAULT_CHAR_KEY) || store.get(this.KEY.char) || chars[0]?.token || 'default'; // 메인 화면의 대표 캐릭터로 (고르기는 메인 화면에서)
     if (sel !== 'default' && !chars.some((c) => c.token === sel)) sel = chars[0]?.token || 'default';
     this.sel = sel;
     const box = $('chars'); box.innerHTML = '';
