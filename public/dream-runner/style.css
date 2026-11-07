@@ -235,3 +235,11 @@ body #chat { bottom: 150px; }
   .fame-nm .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
   .fame-sc { font-family: 'Jua', sans-serif; font-size: 15px; min-width: 52px; text-align: right; }
 }
+
+/* 토스 미니앱: 혼자 달리기만 · 메인 화면 · 같이 달리기 · 패치노트 없이. 계정 칸은 닉네임만 보여 준다 */
+body.toss #multi-btn, body.toss .code-row, body.toss #pn-btn, body.toss a[href="/"], body.toss #logout { display: none !important; }
+body.toss #title #who-row:not(.hidden) { display: flex !important; justify-content: center; }
+body.toss #title #acct-nick:not(.hidden) { display: block !important; }
+body.toss #play-btns { grid-template-columns: 1fr; }
+#ad-btn { display: block; width: min(420px, 100%); margin: 14px auto 0; }
+#ad-btn.hidden { display: none; }

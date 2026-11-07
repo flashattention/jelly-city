@@ -1,5 +1,12 @@
 // 여러 게임이 같이 쓰는 계정: 젤리시티와 같은 로그인 세션(구글 · 체험판)을 쓴다
-export const SESSION_KEY = 'roachcity.session';
+//   토스 미니앱에서는 토스 계정 · 토스 저장소를 따로 쓴다 (웹 계정 · 기록과 섞이지 않는다)
+import { TOSS, API_BASE, bridge } from './platform.js';
+export const SESSION_KEY = TOSS ? 'dreamrunner.toss.session' : 'roachcity.session';
+// 토스 미니앱: 드림 러너 · 치장 API 는 토스 저장소(/api/toss/…)로, 주소는 우리 서버로 (미니앱은 토스 쪽 주소에서 열린다)
+export function apiUrl(path) {
+  if (TOSS) path = path.replace(/^\/api\/(dream|cos)\//, '/api/toss/$1/').replace(/^\/api\/nick$/, '/api/toss/nick');
+  return API_BASE + path;
+}
 
 export const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -11,7 +18,7 @@ export const account = {
   user: null,
   chars: [],
   async api(path, opts = {}) {
-    const res = await fetch(path, {
+    const res = await fetch(apiUrl(path), {
       method: opts.method || 'GET',
       headers: { 'Content-Type': 'application/json', ...(this.session ? { Authorization: `Bearer ${this.session}` } : {}) },
       body: opts.body ? JSON.stringify(opts.body) : undefined,
@@ -20,11 +27,12 @@ export const account = {
     if (!res.ok) { const e = new Error(data.error === 'password' ? '입장 비밀번호가 맞지 않아요' : data.error || `HTTP ${res.status}`); e.status = res.status; e.code = data.error; throw e; }
     return data;
   },
-  status() { return this.api('/api/status'); },
+  status() { return this.api(TOSS ? '/api/toss/status' : '/api/status'); },
   // 저장된 세션이 아직 살아 있으면 내 정보 · 캐릭터 목록
   async restore() {
     if (!this.session) return false;
     try {
+      if (TOSS) { const me = await this.api('/api/toss/me'); this.user = me.user; this.chars = []; this.admin = false; this.setCos(me.cos); return true; }
       const me = await this.api('/api/me');
       this.user = me.user; this.chars = me.chars || []; this.admin = !!me.admin; this.setCos(me.cos);
       if (this.admin) import('./admin-alert.js').then((m) => m.adminAlert()).catch(() => {}); // 운영자: 비상 리포트를 바로 띄운다
@@ -36,10 +44,15 @@ export const account = {
   },
   // body: { credential } (구글) · { guest: true } (체험판) · { dev: 이름 } (개발 서버)
   async login(body) {
-    const r = await this.api('/api/login', { method: 'POST', body: { ...body, password: store.get('roachcity.pw') || '' } });
+    const r = await this.api(TOSS ? '/api/toss/login' : '/api/login', { method: 'POST', body: { ...body, password: store.get('roachcity.pw') || '' } });
     this.session = r.session; store.set(SESSION_KEY, r.session);
     this.user = r.user; this.chars = r.chars || []; this.setCos(r.cos);
     return r;
+  },
+  // 토스 미니앱: 토스 앱 안에서 바로 로그인 (SDK 가 없으면 개발 서버의 시험 계정)
+  async tossLogin() {
+    if (bridge?.appLogin) { const { authorizationCode, referrer } = await bridge.appLogin(); return this.login({ authorizationCode, referrer }); }
+    return this.login({ dev: '토스 시험' });
   },
   async logout() {
     try { await this.api('/api/logout', { method: 'POST' }); } catch { /* 무시 */ }

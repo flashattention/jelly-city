@@ -42,11 +42,13 @@ export function trustLook(look, sub) {
 }
 export class Cosmetics {
   constructor(dataDir) {
-    this.file = path.join(dataDir, 'cosmetics.json'); this.users = {}; this.dream = null; this.records = {};
+    this.file = path.join(dataDir, 'cosmetics.json'); this.users = {}; this.dream = null; this.dreamToss = null; this.records = {};
     try { this.users = JSON.parse(fs.readFileSync(this.file, 'utf8')).users || {}; } catch { /* 처음 */ }
     this.dirty = false; setInterval(() => this.save(), 15000).unref(); inst = this;
   }
   save() { if (!this.dirty) return; this.dirty = false; try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ users: this.users })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('치장 저장 실패', e.message); } }
+  // 토스 미니앱 계정은 토스 드림 러너 순위표로 업적을 잰다 (웹 기록과 섞이지 않게)
+  dreamOf(sub) { return String(sub || '').startsWith('toss') && this.dreamToss ? this.dreamToss : this.dream; }
   u(sub) { return (this.users[sub] ||= { stars: 0, total: 0, owned: [], equip: {}, ach: {}, plays: {}, wins: {}, pvp: {}, fresh: [] }); }
   // 지금 자리여야 쓰는 것(1위 왕관 · 칭호 · 정상의 길)은 자리를 내주면 벗겨진다
   equipOf(sub) { const u = this.users[sub]; if (!u) { const md = sub && this.medalOf(sub); return md ? { medal: md } : null; } const eq = { ...u.equip }; for (const [sl, id] of Object.entries(eq)) { const it = itemById.get(id); if (it && this.live(it) && !this.owns(sub, id)) delete eq[sl]; } delete eq.medal; const md = this.medalOf(sub); if (md) eq.medal = md; return cleanCos(eq); }
@@ -54,6 +56,8 @@ export class Cosmetics {
   titleOf(sub, games) { const id = this.users[sub]?.equip?.title; return id && itemById.has(id) && this.owns(sub, id) && (!games || games.some((g) => id.startsWith(`title.${g}`))) ? id : null; }
   owns(sub, id) { const u = this.users[sub], it = itemById.get(id); if (!u || !it) return false; if (it.shop) return u.owned.includes(id); return this.live(it) ? this.holdsNow(sub, it) : !!u.ach[it.ach]; }
   // 한 판 끝: 별을 지갑에 넣는다 (난이도 · 지옥이면 더 많이)
+  // 이미 계산된 별을 그대로 (토스 미니앱 광고 보너스)
+  earnRaw(sub, n) { n = Math.max(0, Math.min(MAX_STARS_RUN * 10, n | 0)); if (!n) return 0; const u = this.u(sub); u.stars += n; u.total += n; this.dirty = true; this.refresh(sub); return n; }
   earn(sub, stars, diff, map) { const n = starsEarned(Math.min(MAX_STARS_RUN, Math.max(0, stars | 0)), diff, map); if (n <= 0) return 0; const u = this.u(sub); u.stars += n; u.total += n; this.dirty = true; this.refresh(sub); return n; }
   // 방 경기 하나 끝: 판수 · 승리 (pvp = 다른 사람과 함께)
   noteGame(game, sub, won, pvp) { const u = this.u(sub); u.plays[game] = (u.plays[game] || 0) + 1; if (won) { u.wins[game] = (u.wins[game] || 0) + 1; if (pvp) u.pvp[game] = (u.pvp[game] || 0) + 1; } this.dirty = true; this.refresh(sub); }
@@ -61,15 +65,15 @@ export class Cosmetics {
   // 조건 하나를 지금 기록으로 확인한다 (cache 는 한 번 계산할 때만 쓴다)
   meets(sub, r, cache = new Map()) {
     const u = this.u(sub), rec = (g) => this.records[g];
-    const dreamRow = (m, d) => { const k = `d:${m}:${d}`; if (!cache.has(k)) cache.set(k, this.dream?.mine(sub, 'speed', d, m, false) || null); return cache.get(k); }; // 메달 · 칭호 없이 (칭호 확인이 다시 여기로 돌아오지 않게)
+    const dreamRow = (m, d) => { const k = `d:${m}:${d}`; if (!cache.has(k)) cache.set(k, this.dreamOf(sub)?.mine(sub, 'speed', d, m, false) || null); return cache.get(k); }; // 메달 · 칭호 없이 (칭호 확인이 다시 여기로 돌아오지 않게)
     const recRow = (g, b) => { const k = `r:${g}:${b}`; if (!cache.has(k)) { const R = rec(g), e = R?.data[b]?.[sub]; cache.set(k, e ? { rank: R.sorted(b).findIndex(([x]) => x === sub) + 1, value: e.value } : null); } return cache.get(k); }; // mine() 은 칭호를 다시 물어서 쓰지 않는다
     switch (r.kind) {
-      case 'dream': { const m = dreamRow(r.map, r.diff); return !!m && !this.dream.table('speed', r.diff, r.map)[sub]?.u && placed(r, m.rank, Object.keys(this.dream.table('speed', r.diff, r.map)).length); }
-      case 'dreamDist': { const e = this.dream?.table('speed', r.diff, r.map)?.[sub]; return !!e && !e.u && e.dist >= r.value; }
+      case 'dream': { const m = dreamRow(r.map, r.diff); return !!m && !this.dreamOf(sub).table('speed', r.diff, r.map)[sub]?.u && placed(r, m.rank, Object.keys(this.dreamOf(sub).table('speed', r.diff, r.map)).length); }
+      case 'dreamDist': { const e = this.dreamOf(sub)?.table('speed', r.diff, r.map)?.[sub]; return !!e && !e.u && e.dist >= r.value; }
       case 'starTotal': return u.total >= r.value;
       case 'record': { const m = recRow(r.game, r.board); return !!m && placed(r, m.rank, Object.keys(rec(r.game).data[r.board] || {}).length); }
       case 'recordVal': { const m = recRow(r.game, r.board); return !!m && m.value >= r.value; }
-      case 'plays': return (r.game === 'dream-runner' ? this.dream?.stats?.[sub]?.runs || 0 : u.plays[r.game] || 0) >= r.value;
+      case 'plays': return (r.game === 'dream-runner' ? this.dreamOf(sub)?.stats?.[sub]?.runs || 0 : u.plays[r.game] || 0) >= r.value;
       case 'wins': return (u.wins[r.game] || 0) >= r.value;
       case 'pvp': return (u.pvp[r.game] || 0) >= r.value;
       default: return false;
@@ -100,14 +104,14 @@ export class Cosmetics {
     if (!sub) return { stars: 0, total: 0, owned: [], live: [], equip: {}, ach: {}, plays: {}, wins: {}, pvp: {}, fresh: [], best: {} };
     this.refresh(sub);
     const u = this.u(sub), best = {};
-    for (const s of SHOP) if (s.req) { const k = `${s.req.map}:${s.req.diff}`; if (!(k in best)) best[k] = this.dream?.table('speed', s.req.diff, s.req.map)?.[sub]?.dist || 0; }
+    for (const s of SHOP) if (s.req) { const k = `${s.req.map}:${s.req.diff}`; if (!(k in best)) best[k] = this.dreamOf(sub)?.table('speed', s.req.diff, s.req.map)?.[sub]?.dist || 0; }
     const live = []; const cache = new Map(); for (const it of itemById.values()) if (this.live(it) && this.holdsNow(sub, it, cache)) live.push(it.id);
     return { stars: u.stars, total: u.total, owned: u.owned, live, equip: this.equipOf(sub) || {}, ach: u.ach, plays: u.plays, wins: u.wins, pvp: u.pvp, fresh: u.fresh || [], best };
   }
   buy(sub, id) {
     const it = itemById.get(id); if (!it?.shop) throw new Error('살 수 없는 물건이에요');
     const u = this.u(sub); if (u.owned.includes(id)) throw new Error('이미 가지고 있어요');
-    if (it.req && (this.dream?.table('speed', it.req.diff, it.req.map)?.[sub]?.u || (this.dream?.table('speed', it.req.diff, it.req.map)?.[sub]?.dist || 0) < it.req.dist)) throw new Error(`아직 살 수 없어요 (${reqText(it.req)})`);
+    if (it.req && (this.dreamOf(sub)?.table('speed', it.req.diff, it.req.map)?.[sub]?.u || (this.dreamOf(sub)?.table('speed', it.req.diff, it.req.map)?.[sub]?.dist || 0) < it.req.dist)) throw new Error(`아직 살 수 없어요 (${reqText(it.req)})`);
     if (u.stars < it.price) throw new Error('별이 모자라요');
     u.stars -= it.price; u.owned.push(id); this.dirty = true;
   }

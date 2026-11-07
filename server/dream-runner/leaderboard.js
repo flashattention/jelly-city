@@ -22,8 +22,9 @@ const MAPS = ['dream', 'hell', 'void'], mapOf = (m) => (m === 'hell' || m === 'v
 const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n);
 
 export class DreamBoard {
-  constructor(dataDir) {
-    this.file = path.join(dataDir, 'dream-runner.json');
+  // name: 저장 파일 이름 (토스 미니앱은 'dream-runner-toss' 로 따로) · opt.pool: 기록 다시 돌리기 스레드를 같이 쓴다 · opt.ads: 광고 보너스를 주는 순위표
+  constructor(dataDir, name = 'dream-runner', opt = {}) {
+    this.file = path.join(dataDir, `${name}.json`); this.ads = !!opt.ads; this.adGot = new Map(); this.adDay = new Map();
     this.best = {};   // 스피드전: sub → { name, color, score, dist, stars, themes, time, at, guest }
     this.bestItem = {}; // 아이템전
     this.boards = {};   // 노멀(easy) 말고 다른 난이도: 'speed:hard' → { sub → 기록 } (노멀은 위 둘을 그대로 쓴다)
@@ -38,7 +39,7 @@ export class DreamBoard {
       // 예전 '확인 대기' 기록: 순위표에 올리고 비상 리포트로 옮긴다 (더는 기다리게 하지 않는다)
       for (const p of d.pending || []) { this.mig = true; const T = this.table(p.mode, p.diff, p.map); if (!T[p.sub] || p.e.score > T[p.sub].score) T[p.sub] = p.e; this.report('red', p.sub, p.mode, p.diff, p.map, p.why, p.e, p.r); }
     } catch { /* 처음 */ }
-    this.dirty = !!this.mig; this.tickets = new Tickets(this.secret); this.pool = new ReplayPool();
+    this.dirty = !!this.mig; this.tickets = new Tickets(this.secret); this.pool = opt.pool || new ReplayPool();
     setInterval(() => this.save(), 20000).unref();
   }
   save() {
@@ -98,9 +99,18 @@ export class DreamBoard {
     const real = tk ? (now - tk.at) / 1000 : 0, inTime = tk ? dist <= real * 80 * DIFFS[diff].k + 60 : stars <= 300; // 출발표를 못 받았으면(서버 점검) 적게만
     if (stars > 0 && stars <= dist / 2 + 5 && dist <= time * 80 * DIFFS[diff].k + 60 && inTime && (!tk || this.tickets.once(tk.id, 'stars'))) {
       const day = Math.floor(now / 864e5), dk = `${sub}:${day}`, used = this.dayStars.get(dk) || 0; if (this.dayStars.size > 50000) this.dayStars.clear();
-      if (used < DAY_STARS) { const earned = getCos()?.earn(sub, stars, diff, mapOf(b.map)) || 0; this.dayStars.set(dk, used + earned); return { earned }; }
+      if (used < DAY_STARS) { const earned = getCos()?.earn(sub, stars, diff, mapOf(b.map)) || 0; this.dayStars.set(dk, used + earned); if (this.ads && tk && earned > 0) { this.adGot.set(tk.id, { sub, earned, at: now }); if (this.adGot.size > 20000) for (const [k, v] of this.adGot) if (now - v.at > 3600e3) this.adGot.delete(k); } return { earned, ad: this.ads && !!tk && earned > 0 }; }
     }
     getCos()?.refresh(sub); return { earned: 0 };
+  }
+  // 광고 보너스 (토스 미니앱): 그 판에 받은 별만큼 한 번 더. 판마다 한 번 · 하루 40번까지 · 판이 끝나고 한 시간 안
+  adBonus(sub, b) {
+    const tk = this.tickets.read(b.tk), got = tk && this.adGot.get(tk.id), now = Date.now();
+    if (!this.ads || !got || got.sub !== sub || now - got.at > 3600e3) throw new Error('보너스를 받을 수 없는 판이에요');
+    const day = `${sub}:${Math.floor(now / 864e5)}`, n = this.adDay.get(day) || 0; if (n >= 40) throw new Error('오늘 광고 보너스는 다 받았어요');
+    if (!this.tickets.once(tk.id, 'ad')) throw new Error('이미 받았어요');
+    this.adDay.set(day, n + 1); if (this.adDay.size > 50000) this.adDay.clear(); this.adGot.delete(tk.id);
+    return { bonus: getCos()?.earnRaw?.(sub, got.earned) ?? 0 };
   }
   // 내 기록 한눈에: 판수 · 시간 · 난이도 · 모드별 지금 순위
   myStats(sub, map = 'dream') {
@@ -185,6 +195,7 @@ export async function dreamApi(req, res, url, who, board, json, isAdmin) {
   const mode = url.searchParams.get('mode') === 'item' ? 'item' : 'speed', diff = diffOf(url.searchParams.get('diff')), map = mapOf(url.searchParams.get('map'));
   if (url.pathname === '/api/dream/board') return json(res, 200, { mode, diff, map, top: board.top(mode, diff, map), me: board.mine(who?.sub || (ANON.test(anonId || '') ? 'anon:' + anonId : null), mode, diff, map), runs: board.runs });
   if (url.pathname === '/api/dream/fame') return json(res, 200, { fame: board.fame() });
+  if (url.pathname === '/api/dream/adbonus' && req.method === 'POST') { if (!who) return json(res, 401, { error: 'login' }); const b = await readJson(req); try { return json(res, 200, board.adBonus(who.sub, b)); } catch (e) { return json(res, 400, { error: e.message }); } }
   if (url.pathname === '/api/dream/me') return json(res, 200, board.myStats(who?.sub || (ANON.test(anonId || '') ? 'anon:' + anonId : null), map));
   if (url.pathname === '/api/dream/played' && req.method === 'POST') {
     const b = await readJson(req);

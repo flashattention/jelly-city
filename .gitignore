@@ -24,3 +24,6 @@ Thumbs.db
 # 배포 도구가 만드는 로컬 파일
 .fly/
 .render/
+
+# 토스 미니앱 번들 (tools/toss-bundle.mjs 로 만든다)
+toss/web/

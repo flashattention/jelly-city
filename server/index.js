@@ -16,6 +16,7 @@ import { World, isAdmin } from './jelly-city/world.js';
 import { llmEnabled, MODEL } from './jelly-city/llm.js';
 import { GOOGLE_CLIENT_ID, DEV_LOGIN, verifyGoogle, readJson } from './auth.js';
 import { DreamBoard, dreamApi } from './dream-runner/leaderboard.js';
+import { TossAccounts, tossAccountApi, cors as tossCors } from './toss.js';
 import { Board, boardApi } from './board.js';
 import { DreamRooms } from './dream-runner/rooms.js';
 import { DriftRooms } from './jelly-drift/rooms.js';
@@ -65,7 +66,10 @@ try {
 const world = new World({ dataDir: DATA_DIR });
 const dreamBoard = new DreamBoard(DATA_DIR); // 드림 러너 리더보드
 const cosmetics = new Cosmetics(DATA_DIR); cosmetics.dream = dreamBoard; // 치장 · 업적 (모든 게임 공용)
-setNames({ nick: (sub) => world.users[sub]?.nick || null, chars: (sub) => (world.users[sub]?.chars || []).map((token) => ({ token, name: world.accounts[token]?.name })) }); // 순위표에는 지금 닉네임 · 캐릭터 이름
+// 토스 미니앱: 계정 · 드림 러너 기록을 웹과 따로 (같은 서버 · 같은 게임 코드, 파일만 다르다)
+const toss = new TossAccounts(DATA_DIR);
+const dreamToss = new DreamBoard(DATA_DIR, 'dream-runner-toss', { pool: dreamBoard.pool, ads: true }); cosmetics.dreamToss = dreamToss;
+setNames({ nick: (sub) => (sub.startsWith('toss:') ? toss.nickOf(sub) : world.users[sub]?.nick) || null, chars: (sub) => (world.users[sub]?.chars || []).map((token) => ({ token, name: world.accounts[token]?.name })) }); // 순위표에는 지금 닉네임 · 캐릭터 이름
 const board = new Board(DATA_DIR); // 메인 화면 게시판
 const dreamRooms = new DreamRooms((sid) => world.userOf(sid), DATA_DIR); // 드림 러너 같이 달리기 방
 // 젤리드리프트: 방 · 트랙별 최고 기록 (짧을수록 좋다)
@@ -144,6 +148,16 @@ const limited = (req) => {
 
 async function api(req, res, url) {
   const sid = (req.headers.authorization || '').replace(/^Bearer /, '');
+  // 토스 미니앱: /api/toss/... 는 토스 계정으로, 드림 러너 · 치장 API 를 토스 저장소에 그대로 쓴다
+  if (url.pathname.startsWith('/api/toss/')) {
+    tossCors(res);
+    if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+    if (await tossAccountApi(req, res, url, toss, json, { cos: cosmetics, devLogin: DEV_LOGIN })) return;
+    const who = toss.userOf(sid), inner = new URL(url.href); inner.pathname = url.pathname.replace('/api/toss/', '/api/');
+    if (inner.pathname.startsWith('/api/dream/')) return dreamApi(req, res, inner, who, dreamToss, json, () => false);
+    if (inner.pathname.startsWith('/api/cos/')) return cosApi(req, res, inner, who, cosmetics, json);
+    return json(res, 404, { error: 'not found' });
+  }
   if (url.pathname === '/api/status') {
     return json(res, 200, { llm: llmEnabled, model: MODEL, password: !!PASSWORD, players: world.players.size, multiplayer: true, googleClientId: GOOGLE_CLIENT_ID, devLogin: DEV_LOGIN, replay: !!dreamBoard.pool?.ok });
   }
@@ -377,7 +391,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
     world.broadcast({ t: 'sys', text: '🔧 서버가 업데이트돼요! 잠시 후 자동으로 다시 접속해요' });
     try { const n = dreamRooms.maint(); if (n) console.log(`🌙 드림 러너: 달리던 방 ${n}개를 멈춰 적어 뒀어요`); } catch (e) { console.error('드림 러너 멈추기 실패', e); }
     try { world.save(); console.log('💾 세계를 저장했어요'); } catch (e) { console.error('저장 실패', e); }
-    dreamBoard.save(); cosmetics.save(); board.save(); driftRecords.save(); tenRecords.save(); survRecords.save(); wordDict.save(); typeRecords.save(); mergeRecords.save(); slideRecords.save();
+    dreamBoard.save(); dreamToss.save(); toss.save(); cosmetics.save(); board.save(); driftRecords.save(); tenRecords.save(); survRecords.save(); wordDict.save(); typeRecords.save(); mergeRecords.save(); slideRecords.save();
     setTimeout(() => process.exit(0), 500);
   });
 }

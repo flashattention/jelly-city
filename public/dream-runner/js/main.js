@@ -2,7 +2,9 @@
 //   혼자 달리기 · 같이 달리기(방, 최대 12명: 같은 길 · 같은 꿈 · 서로 밀치기) · 최고 기록 순위표
 import * as THREE from 'three';
 import { isPhone, autoRes } from '../../shared/js/perf.js';
-import { account, store } from '../../shared/js/account.js';
+import { account, store, apiUrl } from '../../shared/js/account.js';
+import { TOSS, bridge } from '../../shared/js/platform.js';
+if (TOSS) document.body.classList.add('toss'); // 토스 미니앱: 혼자 달리기 · 토스 로그인 · 광고 보너스 (같이 달리기 · 메인 화면 없음)
 import { localChars, LOCAL_MAX } from '../../shared/js/local-chars.js';
 import { Chat } from '../../shared/js/chat.js';
 import { Env } from './env.js';
@@ -137,7 +139,8 @@ async function boot() {
   let status = {};
   try { status = await account.status(); } catch { err('서버에 연결할 수 없어요'); }
   game.status = status;
-  const ok = await account.restore();
+  let ok = await account.restore();
+  if (TOSS && !ok) { try { await account.tossLogin(); ok = true; } catch (e) { toast(`토스 로그인을 못 했어요 · ${e.message}`, 2600); } } // 토스 앱 안에서는 바로 로그인
   // 점검용: ?autostart&name=이름 (개발 서버에서만)
   const q = new URLSearchParams(location.search);
   if (!ok && q.has('autostart') && status.devLogin) { try { await account.login({ dev: q.get('name') || '러너' }); } catch (e) { err(e.message); } }
@@ -166,7 +169,7 @@ function renderAccount() {
   } else $('me-name').textContent = account.user.name;
   // 구글 계정은 실명 대신 닉네임: 처음이면 정하게 한다
   $('acct-nick').classList.toggle('hidden', !(on && account.user.needNick) && !game.editNick);
-  $('acct-nick-hint').textContent = on && account.user.needNick ? '구글 이름 대신 쓸 닉네임을 정해 주세요 (모든 게임에서 써요)' : '새 닉네임';
+  $('acct-nick-hint').textContent = on && account.user.needNick ? (TOSS ? '순위표에 보일 닉네임을 정해 주세요' : '구글 이름 대신 쓸 닉네임을 정해 주세요 (모든 게임에서 써요)') : '새 닉네임';
   const chars = on ? account.chars || [] : localChars(); // 로그인 안 했으면 이 기기에 만든 캐릭터
   let sel = store.get('jelly.char') || store.get(CHAR_KEY) || (chars[0]?.token ?? 'default'); // 메인 화면의 대표 캐릭터로 (고르기는 메인 화면에서)
   if (sel !== 'default' && !chars.some((c) => c.token === sel)) sel = chars[0]?.token ?? 'default';
@@ -293,8 +296,22 @@ async function renderMyStats() {
 function reportPlay(leaving) {
   if (game.playSent || game.runT < 3) return; game.playSent = true;
   const body = { time: game.runT, diff: game.diff, map: game.map, stars: runner.stars, dist: Math.floor(runner.s), tk: game.tk || undefined, anon: logged() ? undefined : anonId() };
-  if (leaving) { fetch('/api/dream/played', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', ...(account.session ? { Authorization: `Bearer ${account.session}` } : {}) }, body: JSON.stringify(body) }).catch(() => {}); return; }
-  (async () => { for (let i = 0; i < 100; i++) { try { await account.api('/api/dream/played', { method: 'POST', body }); return; } catch (e) { if (e.status && e.status < 500) return; await new Promise((ok) => setTimeout(ok, 3000)); } } })();
+  if (leaving) { fetch(apiUrl('/api/dream/played'), { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', ...(account.session ? { Authorization: `Bearer ${account.session}` } : {}) }, body: JSON.stringify(body) }).catch(() => {}); return; }
+  (async () => { for (let i = 0; i < 100; i++) { try { offerAd(await account.api('/api/dream/played', { method: 'POST', body }), body.tk); return; } catch (e) { if (e.status && e.status < 500) return; await new Promise((ok) => setTimeout(ok, 3000)); } } })();
+}
+// 토스 미니앱: 판이 끝나고 별을 받았으면 '광고 보고 별 한 번 더' (보고 싶은 사람만)
+function offerAd(r, tk) {
+  if (!TOSS || !r?.ad || !tk || game.multi || (bridge && !bridge.showRewardedAd)) return; // 미니앱인데 광고가 아직 안 붙었으면 버튼을 안 보여 준다
+  const b = $('ad-btn'); b.textContent = `📺 광고 보고 별 +${r.earned.toLocaleString()} 더 받기`; b.classList.remove('hidden');
+  b.onclick = async () => {
+    b.disabled = true;
+    try {
+      const seen = bridge?.showRewardedAd ? await bridge.showRewardedAd() : confirm('(시험) 광고를 끝까지 봤다고 칠까요?'); // 웹 시험(?toss=1)에서는 광고 대신 확인 창
+      if (!seen) { toast('광고를 끝까지 봐야 받을 수 있어요'); return; }
+      const g = await account.api('/api/dream/adbonus', { method: 'POST', body: { tk } });
+      b.classList.add('hidden'); toast(`⭐ 별 +${g.bonus.toLocaleString()}!`, 2000); loadCos().catch(() => {});
+    } catch (e) { toast(e.message); b.classList.add('hidden'); } finally { b.disabled = false; }
+  };
 }
 addEventListener('pagehide', () => { if (game.mode === 'run' || game.mode === 'dead') reportPlay(true); });
 async function loadBoard(mode = 'speed', diff = 'easy', map = 'dream') { try { return await account.api(`/api/dream/board?mode=${mode}&diff=${diff}&map=${map}` + (logged() ? '' : `&anon=${anonId()}`)); } catch { return { top: [] }; } }
@@ -325,7 +342,7 @@ function newRun(seed, itemMode = false, diff = 'easy', map = 'dream') {
   runner.reset(0, 0);
   runner.multi = game.multi;
   renderItems(true);
-  game.dream = 0; game.dreamsSeen = 1; game.runT = 0; game.submitted = null; game.playSent = false;
+  game.dream = 0; game.dreamsSeen = 1; game.runT = 0; game.submitted = null; game.playSent = false; $('ad-btn').classList.add('hidden');
   env.setTheme(track.themeOf(0), true);
   setMusic(track.themeOf(0).mus);
   $('h-alive').classList.toggle('hidden', !game.multi);
@@ -342,11 +359,11 @@ async function encodeReplay(R) {
   try { const buf = new Uint8Array(await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()); let s = ''; for (let i = 0; i < buf.length; i += 8192) s += String.fromCharCode(...buf.subarray(i, i + 8192)); return { z: 1, d: btoa(s) }; } catch { return text.length < 600000 ? { d: text } : null; }
 }
 // 새 버전이 배포됐으면 달리기 전에 페이지를 새로 고치고 바로 출발한다 (예전 코드로 달리면 서버 확인과 길이 달라 기록이 '확인 중'에 걸린다)
-game.ver = null; const verOf = () => fetch('/api/dream/ver', { cache: 'no-store' }).then((r) => r.json()).then((j) => j.v).catch(() => null);
+game.ver = null; const verOf = () => fetch(apiUrl('/api/dream/ver'), { cache: 'no-store' }).then((r) => r.json()).then((j) => j.v).catch(() => null);
 verOf().then((v) => { game.ver = v; });
 try { if (sessionStorage.getItem('dreamrunner.autostart')) { sessionStorage.removeItem('dreamrunner.autostart'); const go = (n) => (game.mode === 'title' && runner ? (toast('🆕 새 버전으로 바꿨어요'), startSolo()) : n > 0 && setTimeout(() => go(n - 1), 100)); setTimeout(() => go(80), 300); } } catch { /* 없음 */ }
 async function startSoloFresh() {
-  if (game.ver) { const v = await Promise.race([verOf(), new Promise((ok) => setTimeout(() => ok(null), 700))]); if (v && v !== game.ver) { try { sessionStorage.setItem('dreamrunner.autostart', '1'); } catch { /* 없음 */ } window.onbeforeunload = null; location.reload(); return; } }
+  if (game.ver && !TOSS) { const v = await Promise.race([verOf(), new Promise((ok) => setTimeout(() => ok(null), 700))]); if (v && v !== game.ver) { try { sessionStorage.setItem('dreamrunner.autostart', '1'); } catch { /* 없음 */ } window.onbeforeunload = null; location.reload(); return; } }
   startSolo();
 }
 function startSolo() {
