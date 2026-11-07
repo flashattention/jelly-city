@@ -66,9 +66,9 @@ export class DreamBoard {
   top(mode, diff, map) {
     const all = this.sorted(mode, diff, map), n = all.length, P = this.podium(); return all.slice(0, TOP).map(([sub, e], i) => ({ rank: i + 1, id: sub.slice(-8), ...this.badges(sub, P, mode, diff, map, i + 1, n), name: nameOf(sub, e), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon }));
   }
-  // 명예의 전당: 꿈나라 초월 1위 → 지옥 초월 1위 → 꿈나라 광속 1위 → … → 노멀 1위, 다음은 2위 · 3위 차례로. 한 사람은 한 번만 (가장 높은 자리)
+  // 명예의 전당: 꿈나라 초월 1위 → 지옥 초월 1위 → 꿈나라 광속 1위 → … → 지옥 익스트림 1위, 다음은 2위 · 3위 차례로. 한 사람은 한 번만 (가장 높은 자리)
   fame(n = 12) {
-    const order = Object.keys(DIFFS).reverse().flatMap((diff) => [[diff, 'dream'], [diff, 'hell']]), seen = new Set(), out = [];
+    const order = ['beyond', 'lightspeed', 'extreme'].flatMap((diff) => [[diff, 'dream'], [diff, 'hell']]), seen = new Set(), out = [];
     for (let r = 0; r < 3; r++) for (const [diff, map] of order) {
       if (out.length >= n) return out;
       const all = this.sorted('speed', diff, map), x = all[r]; if (!x || seen.has(x[0])) continue;
