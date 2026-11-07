@@ -13,13 +13,15 @@ import { sfx, setMusic, unlock, toggleMute, sound } from './music.js';
 import { ITEMS } from './items.js';
 import { DIFFS, diffOf } from './diff.js';
 import { HELLS } from './hells.js';
+import { VOIDS } from './voids.js';
 import { openPatchNotes, showWhatsNew } from '../../shared/js/patchnotes.js';
 import { openWardrobe, notifyNew, titleHtml, medalHtml, loadCos } from '../../shared/js/wardrobe.js';
 import { starsEarned } from '../../shared/js/cos-items.js';
 
 const $ = (id) => document.getElementById(id);
 const MODE_KEY = 'dreamrunner.mode', DIFF_KEY = 'dreamrunner.diff', CAM_KEY = 'dreamrunner.cam', MAP_KEY = 'dreamrunner.map';
-const mapOf = (m) => (m === 'hell' ? 'hell' : 'dream'), mapName = (m) => (m === 'hell' ? '🔥 랜덤 지옥' : '🌙 랜덤 꿈나라');
+const mapOf = (m) => (m === 'hell' || m === 'void' ? m : 'dream'), mapName = (m) => (m === 'hell' ? '🔥 랜덤 지옥' : m === 'void' ? '🌌 랜덤 이공간' : '🌙 랜덤 꿈나라');
+const mapTag = (m) => (m === 'hell' ? '🔥 지옥 · ' : m === 'void' ? '🌌 이공간 · ' : ''); // 순위표 · 방 이름 앞에
 const CHAR_KEY = 'dreamrunner.char', NICK_KEY = 'dreamrunner.nick', ANON_KEY = 'dreamrunner.anon';
 // 비로그인: 이 브라우저의 임시 아이디 (순위표에서 내 기록을 찾는 데만 쓴다)
 function anonId() {
@@ -315,7 +317,7 @@ function newRun(seed, itemMode = false, diff = 'easy', map = 'dream') {
   env.clear();
   // 지옥 길은 난이도의 실제 빠르기(가속 포함)에 맞춰 만든다 · 빠를수록 멀리 보이게
   const K = DIFFS[game.diff].k * (1 + BOOST);
-  env.fogK = game.map === 'hell' ? Math.max(1, (K / 1.9) ** 0.7) : 1;
+  env.fogK = game.map !== 'dream' ? Math.max(1, (K / 1.9) ** 0.7) : 1;
   track.reset(seed, itemMode, { map: game.map, K });
   game.camFall = 0; game.camG = null; game.rec = null; game.shake = 0; env.underY = undefined; game.underY = -13;
   game.rp = !itemMode && !game.multi ? { dts: [], evs: [], last: -1 } : null; game.dtCarry = 0;
@@ -410,7 +412,7 @@ async function showOver() {
   $('ov-why').textContent = `💤 ${game.why || '꿈에서 깼어요'}`;
   const fin = game.rec || { dist: Math.floor(runner.s), stars: runner.stars }; // 쓰러진 순간의 기록 (쓰러지는 동안 조금 더 미끄러진 거리는 넣지 않는다 · 순위표와 같은 값)
   $('ov-score').textContent = (fin.dist + fin.stars * 10).toLocaleString();
-  $('ov-detail').textContent = `${fin.dist.toLocaleString()}m 달림 · 별사탕 ${fin.stars}개 (⭐ +${starsEarned(fin.stars, game.diff, game.map).toLocaleString()}) · ${game.map === 'hell' ? '지옥' : '꿈'} ${game.dreamsSeen}개를 지났어요 · ${Math.floor(game.runT)}초`;
+  $('ov-detail').textContent = `${fin.dist.toLocaleString()}m 달림 · 별사탕 ${fin.stars}개 (⭐ +${starsEarned(fin.stars, game.diff, game.map).toLocaleString()}) · ${game.map === 'hell' ? '지옥' : game.map === 'void' ? '이공간' : '꿈'} ${game.dreamsSeen}개를 지났어요 · ${Math.floor(game.runT)}초`;
   const r = game.submitted;
   $('ov-save').classList.toggle('hidden', !r?.anonPending);
   if (r?.anonPending) { $('ov-nick').value = store.get(NICK_KEY) || game.profile.name; $('ov-save-btn').disabled = false; }
@@ -419,7 +421,7 @@ async function showOver() {
   if (r?.newBest) sfx('best');
   $('again-btn').textContent = game.multi ? '👥 방으로 돌아가기' : '🔁 다시 달리기';
   $('ov-board-title').classList.remove('hidden'); $('ov-board').classList.remove('hidden');
-  $('ov-board-title').textContent = `🏆 ${game.map === 'hell' ? '🔥 지옥 · ' : ''}${diffName(game.diff)} · ${modeName(game.itemMode ? 'item' : 'speed')} 최고 기록`;
+  $('ov-board-title').textContent = `🏆 ${mapTag(game.map)}${diffName(game.diff)} · ${modeName(game.itemMode ? 'item' : 'speed')} 최고 기록`;
   renderBoard($('ov-board'), r?.top ? r : await loadBoard(game.itemMode ? 'item' : 'speed', game.diff, game.map), true);
 }
 
@@ -444,11 +446,12 @@ function showDreamCard(d) {
   const th = track.themeOf(d);
   const el = $('dream-card');
   el.classList.add('hidden'); void el.offsetWidth;
-  el.querySelector('.dc-n').textContent = `${th.hell ? 'HELL' : 'DREAM'} ${d + 1}`;
+  el.querySelector('.dc-n').textContent = `${th.hell ? 'HELL' : th.void ? 'VOID' : 'DREAM'} ${d + 1}`;
+  el.querySelector('.dc-tip').textContent = th.tip || '';
   el.querySelector('.dc-e').textContent = th.emoji;
   el.querySelector('.dc-name').textContent = th.name;
   el.classList.remove('hidden');
-  $('h-dream-n').textContent = `${th.hell ? '지옥' : '꿈'} #${d + 1}`;
+  $('h-dream-n').textContent = `${th.hell ? '지옥' : th.void ? '이공간' : '꿈'} #${d + 1}`;
   $('h-dream-name').textContent = `${th.emoji} ${th.name}`;
 }
 function enterDream(d) {
@@ -535,7 +538,7 @@ function renderRooms(list) {
   el.innerHTML = '';
   for (const r of list) {
     const d = document.createElement('div'); d.className = 'room';
-    d.innerHTML = `<span class="nm">${esc(r.name)}</span><span class="meta">${r.team ? '👥 팀전 · ' : ''}${r.map === 'hell' ? '🔥 지옥 · ' : ''}${diffName(r.diff)} · ${modeName(r.mode)} · 👑 ${esc(r.host)} · ${r.n}/${r.max}</span><span class="tag ${r.state === 'run' ? 'run' : ''}">${r.state === 'run' ? '달리는 중' : '기다리는 중'}</span>`;
+    d.innerHTML = `<span class="nm">${esc(r.name)}</span><span class="meta">${r.team ? '👥 팀전 · ' : ''}${mapTag(r.map)}${diffName(r.diff)} · ${modeName(r.mode)} · 👑 ${esc(r.host)} · ${r.n}/${r.max}</span><span class="tag ${r.state === 'run' ? 'run' : ''}">${r.state === 'run' ? '달리는 중' : '기다리는 중'}</span>`;
     const b = document.createElement('button'); b.className = 'btn'; b.textContent = '들어가기';
     b.disabled = r.state === 'run' || r.n >= r.max;
     b.onclick = () => net.send({ t: 'join', id: r.id });
@@ -725,7 +728,7 @@ function frame() {
   if (game.mode === 'title') {
     // 처음 화면: 출발 발판에서 제자리 달리기 + 꿈이 6초마다 바뀌며 빙글 도는 카메라
     game.titleT += dt;
-    if (game.titleT > 6) { game.titleT = 0; const pool = game.pickMap === 'hell' ? HELLS : THEMES, th = pool[Math.floor(Math.random() * pool.length)]; env.setTheme(th); }
+    if (game.titleT > 6) { game.titleT = 0; const pool = game.pickMap === 'hell' ? HELLS : game.pickMap === 'void' ? VOIDS : THEMES, th = pool[Math.floor(Math.random() * pool.length)]; env.setTheme(th); }
     runner.bear.root.position.set(0, 0, z); runner.bear.root.rotation.y = Math.PI;
     runner.bear.update(dt, 8, { noCrawl: true });
     const a = t * 0.18;

@@ -20,7 +20,7 @@ const CSS = `.aa-wrap{position:fixed;inset:0;z-index:100010;display:flex;align-i
 .aa-b{display:flex;gap:6px;flex-wrap:wrap}.aa-b button,.aa-x{padding:6px 12px;border:0;border-radius:9px;font:inherit;font-size:14px;cursor:pointer}.aa-ok{background:#5fe0b0;color:#08261a}.aa-del{background:#ff3b4d;color:#fff}.aa-skip{background:rgba(255,255,255,.14);color:#fff}.aa-x{background:rgba(0,0,0,.25);color:#fff}`;
 
 export function reportRow(x) {
-  const lvl = x.lvl === 'yellow' ? '🟡 검토 권장' : '🔴 조작 의심', where = `드림 러너 ${x.map === 'hell' ? '🔥 지옥' : '🌙 꿈나라'} ${DIFF[x.diff] || x.diff}${x.mode === 'item' ? ' 아이템전' : ''}`;
+  const lvl = x.lvl === 'yellow' ? '🟡 검토 권장' : '🔴 조작 의심', where = `드림 러너 ${x.map === 'hell' ? '🔥 지옥' : x.map === 'void' ? '🌌 이공간' : '🌙 꿈나라'} ${DIFF[x.diff] || x.diff}${x.mode === 'item' ? ' 아이템전' : ''}`;
   const detail = x.why === 'mismatch' && x.r ? ` · 보낸 기록 ${x.dist}m ★${x.stars} / 다시 돌린 결과 ${x.r.dist}m ★${x.r.stars}` : x.why === 'slowmo' && x.real ? ` · 게임 속 ${x.game}초 / 실제 ${x.real}초` : x.why === 'jump' && x.prevTop ? ` · 기존 1위 ${x.prevTop.toLocaleString()}점 → ${x.score.toLocaleString()}점 (${(x.score / x.prevTop).toFixed(1)}배)` : '';
   return `<div class="aa-row ${x.lvl === 'yellow' ? 'yellow' : ''}"><div class="aa-t">${lvl} · <b>${esc(x.name)}</b> ${x.score.toLocaleString()}점 <small>${where} · ${x.dist.toLocaleString()}m · ⭐${x.stars} · ${x.time}초 · ${ago(x.at)}${x.live ? '' : ' · (이미 다른 기록으로 바뀜)'}</small></div>
     <div class="aa-w">${esc(WHY[x.why] || x.why)}${detail}</div>

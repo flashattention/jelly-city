@@ -62,7 +62,7 @@ export class DreamRooms {
       case 'list': return this.send(c, { t: 'rooms', rooms: this.list() });
       case 'create': {
         this.leave(c);
-        const r = { id: this.newCode(), name: clean(m.name, 20) || `${c.name}의 꿈`, players: [], host: c, state: 'wait', seed: 0, startAt: 0, mode: m.mode === 'item' ? 'item' : 'speed', diff: diffOf(m.diff), map: m.map === 'hell' ? 'hell' : 'dream', team: false };
+        const r = { id: this.newCode(), name: clean(m.name, 20) || `${c.name}의 꿈`, players: [], host: c, state: 'wait', seed: 0, startAt: 0, mode: m.mode === 'item' ? 'item' : 'speed', diff: diffOf(m.diff), map: m.map === 'hell' || m.map === 'void' ? m.map : 'dream', team: false };
         this.rooms.set(r.id, r);
         return this.join(c, r);
       }
@@ -135,7 +135,7 @@ export class DreamRooms {
       case 'map': {
         const r = c.room;
         if (!r || r.host !== c || r.state !== 'wait') return;
-        r.map = m.map === 'hell' ? 'hell' : 'dream';
+        r.map = m.map === 'hell' || m.map === 'void' ? m.map : 'dream';
         this.roomUpdate(r); this.broadcastList();
         return;
       }
@@ -255,7 +255,7 @@ export class DreamRooms {
     if (!d?.rooms || Date.now() - d.at > PAUSE_MAX) return;
     for (const x of d.rooms) {
       if (this.rooms.has(x.id) || !Array.isArray(x.players)) continue;
-      const r = { id: x.id, name: x.name, players: [], host: null, hostTok: x.host, state: 'pause', seed: x.seed, startAt: 0, elapsed: x.elapsed, mode: x.mode, diff: diffOf(x.diff), map: x.map === 'hell' ? 'hell' : 'dream', team: !!x.team, chat: x.chat || [], slots: new Map(), deadline: Date.now() + PAUSE_MAX, firstBack: 0 };
+      const r = { id: x.id, name: x.name, players: [], host: null, hostTok: x.host, state: 'pause', seed: x.seed, startAt: 0, elapsed: x.elapsed, mode: x.mode, diff: diffOf(x.diff), map: x.map === 'hell' || x.map === 'void' ? x.map : 'dream', team: !!x.team, chat: x.chat || [], slots: new Map(), deadline: Date.now() + PAUSE_MAX, firstBack: 0 };
       for (const p of x.players) { r.slots.set(p.tok, p); this.nextPid = Math.max(this.nextPid, p.id + 1); }
       this.rooms.set(r.id, r);
     }

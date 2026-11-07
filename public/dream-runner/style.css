@@ -117,6 +117,7 @@ h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 #dream-card .dc-n { font-family: 'Jua', sans-serif; font-size: 18px; letter-spacing: 4px; color: var(--soft); }
 #dream-card .dc-e { font-size: 64px; line-height: 1.1; }
 #dream-card .dc-name { font-family: 'Jua', sans-serif; font-size: clamp(34px, 7vw, 54px); }
+#dream-card .dc-tip { font-family: 'Jua', sans-serif; font-size: clamp(16px, 3.4vw, 22px); color: #fff59d; margin-top: 4px; } #dream-card .dc-tip:empty { display: none; }
 @keyframes card { 0% { opacity: 0; transform: translate(-50%, -40%) scale(.9); filter: blur(8px); } 14% { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: blur(0); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -58%); filter: blur(6px); } }
 #countdown { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-family: 'Jua', sans-serif; font-size: 140px; z-index: 6; pointer-events: none; text-shadow: 0 0 40px rgba(255,170,230,.9), 0 6px 0 rgba(0,0,0,.25); }
 #countdown.pop { animation: pop .9s ease; }
@@ -176,7 +177,7 @@ kbd.wide { min-width: 64px; }
 #mode-pick, #diff-pick, #map-pick { display: flex; width: fit-content; max-width: 100%; }
 #diff-pick, #room-diff, #board-diff { flex-wrap: wrap; justify-content: center; border-radius: 22px; }
 #diff-pick button, #room-diff button, #board-diff button { padding: 7px 11px; font-size: 14px; }
-@media (max-width: 520px) { #diff-pick button, #room-diff button, #board-diff button { padding: 6px 8px; font-size: 13px; } }
+@media (max-width: 520px) { #diff-pick button, #room-diff button, #board-diff button, #map-pick button, #room-map button, #board-map button, #stats-map button { padding: 6px 8px; font-size: 13px; } }
 /* 아이템 칸 */
 #itembar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; z-index: 4; pointer-events: none; }
 #itembar .slot { width: 62px; height: 62px; border-radius: 18px; background: rgba(20,8,50,.55); border: 2px solid rgba(255,255,255,.35); display: flex; align-items: center; justify-content: center; font-size: 34px; }

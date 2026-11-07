@@ -98,11 +98,11 @@ export const SHOP = [
 ];
 // 난이도 · 맵별 별 보상 배수 (어려울수록 많이)
 export const STAR_MULT = { easy: 1, hard: 1.6, extreme: 2.2, lightspeed: 3.2, beyond: 4.5 };
-export const HELL_MULT = 1.5;
-export const starsEarned = (stars, diff, map) => Math.floor((Number(stars) || 0) * (STAR_MULT[diff] || 1) * (map === 'hell' ? HELL_MULT : 1));
+export const HELL_MULT = 1.5, VOID_MULT = 1.8; // 이공간이 가장 어려워서 별도 가장 많이
+export const starsEarned = (stars, diff, map) => Math.floor((Number(stars) || 0) * (STAR_MULT[diff] || 1) * (map === 'hell' ? HELL_MULT : map === 'void' ? VOID_MULT : 1));
 
 // ---------- 업적 ----------
-const DIFF_NAMES = { easy: '노멀', hard: '하드', extreme: '익스트림', lightspeed: '광속', beyond: '초월' }, MAPS = { dream: '꿈나라', hell: '지옥' };
+const DIFF_NAMES = { easy: '노멀', hard: '하드', extreme: '익스트림', lightspeed: '광속', beyond: '초월' }, MAPS = { dream: '꿈나라', hell: '지옥', void: '이공간' };
 export const GAMES = {
   'dream-runner': { name: '드림 러너', emoji: '🌙', color: '#8f7bff' }, 'jelly-guard': { name: '젤리수호대', emoji: '🛡️', color: '#4cc3ff' }, 'jelly-arena': { name: '젤리 아레나', emoji: '⚔️', color: '#ff5c5c' },
   'jelly-tactical': { name: '젤리택티컬', emoji: '🎯', color: '#7ee081' }, 'jelly-drop': { name: '젤리드롭', emoji: '🪂', color: '#ffb347' }, 'jelly-drift': { name: '젤리드리프트', emoji: '🏎️', color: '#ff7ac6' },
@@ -141,9 +141,9 @@ export const TOP3_TRAILS = DIFF_ORDER.map((d, i) => {
   return { id: `trail.top3.${d}`, slot: 'trail', name: `${DIFF_NAMES[d]} 정상의 길`, emoji: st.e, rarity: 'myth', top3: d,
     fx: { shape: i >= 3 ? 'star' : 'glow', colors: cols, size: 0.36 + i * 0.03, life: 1.1 + i * 0.1, rate: 45 + i * 6, ribbon: { w: 1.25 + i * 0.07, life: 1.6 + i * 0.12, colors: [...cols, cols[0]] } } };
 });
-export const top3Text = (it) => `${DIFF_STYLE[it.top3]?.e || ''} ${DIFF_NAMES[it.top3]} 순위표(꿈나라 · 지옥) 지금 3위 안에 있는 동안만 쓸 수 있어요`;
-const styleOf = (r) => { const d = r?.diff && DIFF_STYLE[r.diff]; return d ? { e: d.e, grad: r.map === 'hell' ? [...d.grad, '#ff3a1a'] : d.grad } : null; };
-export const prestigeOf = (r) => (r?.kind === 'dream' ? 1 + Math.max(0, DIFF_ORDER.indexOf(r.diff)) + (r.map === 'hell' ? 0.5 : 0) : r?.kind === 'record' ? 1 : 0);
+export const top3Text = (it) => `${DIFF_STYLE[it.top3]?.e || ''} ${DIFF_NAMES[it.top3]} 순위표(꿈나라 · 지옥 · 이공간) 지금 3위 안에 있는 동안만 쓸 수 있어요`;
+const styleOf = (r) => { const d = r?.diff && DIFF_STYLE[r.diff]; return d ? { e: d.e, grad: r.map === 'hell' ? [...d.grad, '#ff3a1a'] : r.map === 'void' ? [...d.grad, '#7c4dff'] : d.grad } : null; };
+export const prestigeOf = (r) => (r?.kind === 'dream' ? 1 + Math.max(0, DIFF_ORDER.indexOf(r.diff)) + (r.map === 'hell' ? 0.5 : r.map === 'void' ? 0.7 : 0) : r?.kind === 'record' ? 1 : 0);
 const TIER_STEP = ['bronze', 'silver', 'gold', 'platinum', 'legend'];
 const ach = (id, game, name, desc, tier, rule) => ({ id, game, name, desc, tier, rule });
 function buildAch() {

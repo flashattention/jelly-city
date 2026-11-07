@@ -6,6 +6,7 @@ import { isPhone } from '../../shared/js/perf.js';
 import { RNG } from '../../shared/js/utils.js';
 import { THEMES } from './themes.js';
 import { HELLS } from './hells.js';
+import { VOIDS } from './voids.js';
 import { glow, starG } from './kits.js';
 import { buildMonster, buildFist } from './hellkits.js';
 import { G } from '../../shared/js/utils.js';
@@ -105,9 +106,9 @@ export class Track {
     this.root = new THREE.Group(); scene.add(this.root);
     this.reset(seed);
   }
-  // opt.map: 'hell' 이면 랜덤 지옥 · opt.K: 난이도 빠르기 (지옥 길은 시간 기준이라 빠를수록 길어진다)
+  // opt.map: 'hell' 이면 랜덤 지옥 · 'void' 면 랜덤 이공간 · opt.K: 난이도 빠르기 (지옥 · 이공간 길은 시간 기준이라 빠를수록 길어진다)
   reset(seed, itemMode = false, opt = {}) {
-    this.itemMode = itemMode; this.hell = opt.map === 'hell'; this.K = opt.K || 1; this.strikes = []; this.nextStrike = 0; this.lastFloor = 0; this.trend = 0; this.lastPat = '';
+    this.itemMode = itemMode; this.hell = opt.map === 'hell'; this.void = opt.map === 'void'; this.K = opt.K || 1; this.time = 0; this.meteors = []; this.strikes = []; this.nextStrike = 0; this.lastFloor = 0; this.trend = 0; this.lastPat = '';
     this.irng = new RNG(seed ^ 0x2545f491); // 아이템 상자 자리 (길 모양과 따로라서 스피드전 길이 바뀌지 않는다)
     this.nextBox = 120;
     for (const c of [...this.root.children]) this.drop(c);
@@ -116,21 +117,23 @@ export class Track {
     // 꿈 순서: 전부 섞어서 차례로 (다 보면 처음 순서로 다시)
     this.order = new RNG(seed ^ 0x5bd1e995).shuffle([...THEMES.keys()]);
     // 지옥 순서: 올라가는 지옥과 떨어지는 지옥을 번갈아
+    if (this.void) this.order = new RNG(seed ^ 0x6a09e667).shuffle([...VOIDS.keys()]);
     if (this.hell) { const q = new RNG(seed ^ 0x3c6ef372), keys = (l) => q.shuffle([...HELLS.keys()].filter((i) => HELLS[i].layout === l)), a = keys('climb'), b = keys('plunge'); this.order = []; for (let i = 0; i < Math.max(a.length, b.length); i++) this.order.push(a[i % a.length], b[i % b.length]); }
     this.plats = []; this.obs = []; this.stars = []; this.portals = []; this.boxes = []; this.traps = [];
     this.origin = 0;
     this.gs = 0; this.cx = 0; this.cy = 0;
     this.dream = 0;                 // 지금 만들고 있는 꿈 번호
     this.bounds = [0];              // 꿈이 시작하는 거리들
-    this.nextB = DREAM_SEC * speedAt(0) * (this.hell ? this.K : 1) + 20;
+    this.nextB = DREAM_SEC * speedAt(0) * (this.hell || this.void ? this.K : 1) + 20;
     // 출발 발판
     this.plat(-40, 70, 0, 10, 0);
     this.gs = 70;
     this.generate(0);
   }
-  themeOf(dream) { return this.hell ? HELLS[this.order[dream % this.order.length]] : THEMES[this.order[dream % THEMES.length]]; }
+  themeOf(dream) { return this.hell || this.void ? (this.void ? VOIDS : HELLS)[this.order[dream % this.order.length]] : THEMES[this.order[dream % THEMES.length]]; }
   // 이 아래로 떨어지면 탈락 (지옥은 높이가 계속 바뀌니 눈앞 발판을 기준으로)
   deathY(s) {
+    if (this.void) return -9; // 이공간: 한 번 떨어지면 금방 끝
     if (!this.hell) return DEATH_Y;
     const far = s + speedAt(s) * this.K * 1.6 + 20; let m = Infinity;
     for (const p of this.plats) if (p.s1 >= s - 6 && p.s0 <= far && !p.doomed && p.y < m) m = p.y;
@@ -174,7 +177,11 @@ export class Track {
     const w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2;
     const { acc, base, line } = obColors(th);
     const outline = (mesh) => { const o = new THREE.Mesh(G_BOX, OUTLINE_M(line)); o.scale.copy(mesh.scale).addScalar(0.1); o.position.copy(mesh.position); g.add(o); };
-    if (kind === 'bar') {
+    if (kind === 'laser') {
+      // 이공간 빛줄기: 위아래로 오르내린다 (기둥 없이 빛나는 막대 + 양 끝 발사기)
+      const beam = new THREE.Mesh(G_BOX, glow(acc)); beam.scale.set(w, h, depth); beam.position.y = h / 2; g.add(beam);
+      for (const sx of [-1, 1]) { const e = new THREE.Mesh(G_BOX, glow('#ffffff')); e.scale.set(0.4, h + 0.3, depth + 0.3); e.position.set(sx * w / 2, h / 2, 0); g.add(e); }
+    } else if (kind === 'bar') {
       // 숙여서 지나가는 가로대 (밑은 비어 있다)
       const beam = new THREE.Mesh(G_BOX, new THREE.MeshToonMaterial({ map: stripeTex(acc, base) })); beam.scale.set(w, h, depth); beam.position.y = h / 2; g.add(beam); outline(beam);
       for (const sx of [-1, 1]) { const ph = h + 1.0; const post = new THREE.Mesh(G_BOX, glow(shade(th.plat[1], 0.8))); post.scale.set(0.25, ph, 0.25); post.position.set(sx * w / 2, -1.0 + ph / 2, 0); g.add(post); } // 기둥: 발판(가로대 1m 아래)부터
@@ -186,6 +193,7 @@ export class Track {
     g.userData.s = s;
     this.root.add(g);
     const o = { kind, s0: s - depth / 2, s1: s + depth / 2, x0, x1, y0, y1, mesh: g };
+    if (this.void && th.R?.dark) o.dark = true;
     this.obs.push(o);
     return o;
   }
@@ -222,10 +230,10 @@ export class Track {
 
   // 앞쪽 길을 미리 만든다
   generate(playerS) {
-    const ahead = this.hell ? Math.max(AHEAD, speedAt(playerS) * this.K * 2.4) : AHEAD; // 내리치기 예고가 보일 만큼 앞을 만든다
+    const ahead = this.hell || this.void ? Math.max(AHEAD, speedAt(playerS) * this.K * 2.4) : AHEAD; // 내리치기 예고가 보일 만큼 앞을 만든다
     while (this.gs < playerS + ahead) {
       if (this.gs >= this.nextB) { this.newDream(); continue; }
-      if (this.hell) this.hellPattern(); else this.pattern();
+      if (this.hell) this.hellPattern(); else if (this.void) this.voidPattern(); else this.pattern();
     }
     // 지나간 것 치우기
     const cut = playerS - BEHIND;
@@ -236,19 +244,20 @@ export class Track {
     this.boxes = this.boxes.filter((o) => { if (o.s < cut) { this.root.remove(o.mesh); return false; } return true; });
     this.traps = this.traps.filter((o) => { if (o.s < cut) { this.root.remove(o.mesh); return false; } return true; });
     this.strikes = this.strikes.filter((o) => { if (o.s < cut) { this.root.remove(o.g); return false; } return true; });
+    this.meteors = this.meteors.filter((o) => { if (o.s < cut) { this.root.remove(o.g); return false; } return true; });
   }
   drop(m) { this.root.remove(m); if (m.userData?.keepGeo) return; m.traverse?.((o) => { if (o.geometry && !o.isSprite && o.geometry !== G_BOX && o.geometry !== G_EDGE && o.geometry !== G_PUFF && o.geometry !== G_HANG && o.geometry !== G_SHADOW && o.geometry.type !== 'ExtrudeGeometry') o.geometry.dispose(); }); }
 
   // 꿈이 바뀌는 곳: 넓은 발판 + 빛나는 문
   newDream() {
-    const v = speedAt(this.gs) * (this.hell ? this.K : 1);
+    const v = speedAt(this.gs) * (this.hell || this.void ? this.K : 1);
     const gap = this.gs > 0 ? v * 0.22 : 0;
     const s0 = this.gs + gap;
     this.dream++;
     this.bounds.push(s0 + 14); this.trend = 0;
     this.nextB = s0 + 14 + DREAM_SEC * v;
-    this.cx *= 0.5;
-    const len = this.hell ? Math.max(34, v * 0.8) : 34; // 빠른 난이도의 지옥은 숨 돌릴 자리도 같은 시간만큼
+    this.cx *= 0.5; if (this.void) this.cy = 0;
+    const len = this.hell || this.void ? Math.max(34, v * 0.8) : 34; // 빠른 난이도의 지옥은 숨 돌릴 자리도 같은 시간만큼
     this.plat(s0, s0 + len, this.cx, 10, this.cy);
     this.portal(s0 + 14, this.cx, this.cy, 10);
     this.starLine(s0 + 20, s0 + 32, this.cx, this.cy, 5);
@@ -510,10 +519,241 @@ export class Track {
     }
   }
 
+  // ---------- 랜덤 이공간 ----------
+  //   모두 일자(높이 0) 길. 맵마다 물리 규칙(R)이 달라서, 틈 · 장애물 간격은 그 맵의 점프 시간으로 잰다 (조작만 잘하면 늘 깰 수 있게)
+  vR(d = this.dream) { return this.themeOf(d).R || NOR; }
+  // 그 맵의 점프: 한 번 점프 시간 T1 · 높이 H1 · 점프를 다 쓴 가장 긴 체공 T (중력이 바뀌는 맵은 가장 무거울 때로 잰다)
+  vPhys(R) {
+    const g = 30 * (R.gpulse ? R.gpulse[1] : R.grav || 1), J = 11.5 * (R.jump || 1), J2 = 10.5 * (R.jump || 1), n = R.jumps ?? 2;
+    const T1 = (2 * J) / g, H1 = (J * J) / (2 * g);
+    let t = J / g, h = H1, T = T1;
+    for (let k = 2; k <= n; k++) { t += J2 / g; h += (J2 * J2) / (2 * g); T = t + Math.sqrt((2 * h) / g); }
+    return { g, J, T1, H1, T, side: 8.5 * (R.side || 1) * (R.ice ? 0.55 : 1) };
+  }
+  // 맵 안에서 얼마나 왔나 (0~1): 점점 빨라지는 맵 · 점점 세지는 끌림에 쓴다
+  dreamProg(s, d) { const a = this.bounds[d] ?? 0, b = this.bounds[d + 1] ?? this.nextB; return Math.max(0, Math.min(1, (s - a) / Math.max(1, b - a))); }
+  // 곰돌이가 지금 받는 이공간 규칙 (같은 씨앗 · 같은 시계라 다시 돌려 봐도 같다)
+  mod(s) {
+    if (!this.void) return null;
+    const d = this.dreamAt(s), R = this.vR(d), p = this.dreamProg(s, d);
+    let grav = R.grav || 1;
+    if (R.gpulse) { const [lo, hi, per] = R.gpulse; grav = lo + (hi - lo) * (0.5 - 0.5 * Math.cos((this.time / per) * Math.PI * 2)); }
+    const wind = R.wind ? R.wind[0] * Math.sin(s / R.wind[1] + d) : R.pull ? R.pull * (0.6 + p) * (d % 2 ? 1 : -1) : 0;
+    return { grav, jump: R.jump || 1, jumps: R.jumps ?? 2, side: R.side || 1, ice: R.ice || 0, inv: !!R.inv, speed: (R.speed || 1) * (R.ramp ? 1 + R.ramp * p : 1), bounce: R.bounce || 0, wind };
+  }
+  voidPattern() {
+    const r = this.rng, th = this.themeOf(this.dream), R = th.R || NOR, P = this.vPhys(R);
+    const vv = speedAt(this.gs) * this.K * (R.speed || 1) * (R.ramp ? 1 + R.ramp * this.dreamProg(this.gs, this.dream) : 1);
+    const pick = r.weighted(th.pats.map(([k, w]) => [k, k === this.lastPat && th.pats.length > 1 ? w * 0.3 : w]), (x) => x[1])[0]; this.lastPat = pick;
+    this.cy = 0;
+    const start = this.gs; this.gs = this[`vp_${pick}`](r, vv, P, R); (this.patLog ||= []).push([start, pick]); if (this.patLog.length > 60) this.patLog.shift();
+  }
+  // 이공간 발판 (높이 0). extra: blink · br · qx · crumble · pad · inv 같은 성질
+  vp(s0, s1, x, w, extra) {
+    const p = this.plat(s0, s1, x, w, 0, { thin: true, mv: extra?.mv, beacon: extra?.beacon });
+    p.w0 = w; if (this.vR().dark) p.dark = true;
+    if (extra) { const { mv, ...rest } = extra; Object.assign(p, rest); void mv; }
+    if (extra?.inv || extra?.pad) { const m = glow(extra.pad ? '#7dff5a' : '#ff2bd6'); for (const c of p.mesh.children) if (c.geometry === G_EDGE) c.material = m; } // 분홍 = 좌우 반대 · 초록 = 발사대
+    return p;
+  }
+  vx(d) { this.cx = Math.max(-8, Math.min(8, this.cx + d)); return this.cx; }
+  // 길 위 장애물: 다음 조작까지 '바쁜 시간'(점프 체공 · 숙이기 · 옆으로 비키기)에 짧은 반응 시간만 더해서 꿈나라보다 훨씬 빽빽하게
+  vObs(r, vv, P, s0, s1, cx, w, kinds, gapK = 1) {
+    let at = s0;
+    const tall = P.H1 > 1.8;
+    while (at < s1 - vv * Math.max(0.8, P.T1)) {
+      const L = cx - w / 2, Rr = cx + w / 2, ok = kinds.filter((k) => (k !== 'wall' && k !== 'combo' && k !== 'lanes') || w >= 4.4).filter((k) => k !== 'tall' || tall), k = r.pick(ok.length ? ok : ['hurdle']);
+      let busy = 0.4;
+      if (k === 'hurdle') { this.obstacle('hurdle', at, L, Rr, 0, r.range(0.5, Math.min(0.75, P.H1 * 0.45))); busy = P.T1; }
+      else if (k === 'tall') { this.obstacle('hurdle', at, L, Rr, 0, Math.min(1.25, P.H1 * 0.6), 0.7); busy = P.T1 * 1.05; }
+      else if (k === 'bar') { this.obstacle('bar', at, L, Rr, 1, 2, 0.5); busy = 0.35; }
+      else if (k === 'wall') { const half = w * r.range(0.5, 0.6), right = r.chance(0.5); this.obstacle('wall', at, right ? Rr - half : L, right ? Rr : L + half, 0, 1.6, 1.2); this.star(at, right ? L + (w - half) / 2 : Rr - (w - half) / 2, 1); busy = 0.45 / (P.side / 8.5); }
+      else if (k === 'combo') { const half = w * r.range(0.5, 0.56), right = r.chance(0.5), a = right ? Rr - half : L, b = right ? Rr : L + half; this.obstacle('wall', at, a, b, 0, 1.6, 1.2); this.obstacle('bar', at, right ? L : b, right ? a : Rr, 1, 2, 0.5); busy = 0.55 / (P.side / 8.5); }
+      else { const lane = r.range(L + 1.3, Rr - 1.3); if (lane - 0.8 > L) this.obstacle('hurdle', at, L, lane - 0.8, 0, 0.45, 1.2); if (lane + 0.8 < Rr) this.obstacle('hurdle', at, lane + 0.8, Rr, 0, 0.45, 1.2); this.star(at, lane, 1); busy = Math.min(P.T1, 0.5); }
+      at += vv * (busy + r.range(0.14, 0.32) * gapK);
+    }
+  }
+  vp_obst(r, vv, P, R) { const w = r.range(4.6, 7), p = this.vp(this.gs, this.gs + vv * r.range(3.5, 5.5), this.vx(r.range(-2, 2)), w); this.vObs(r, vv, P, p.s0 + vv * 0.5, p.s1, this.cx, w, R.bounce ? ['bar', 'hurdle', 'bar'] : ['hurdle', 'bar', 'wall', 'combo', 'lanes', 'tall']); this.starLine(p.s0 + 2, p.s0 + vv * 0.4, this.cx, 0, 3); return p.s1; }
+  // 매트릭스: 느린 대신 숨 돌릴 틈이 거의 없다
+  vp_dense(r, vv, P) { const w = r.range(5, 7), p = this.vp(this.gs, this.gs + vv * r.range(4, 6), this.vx(r.range(-2, 2)), w); this.vObs(r, vv, P, p.s0 + vv * 0.5, p.s1, this.cx, w, ['hurdle', 'bar', 'wall', 'combo', 'lanes'], 0.35); return p.s1; }
+  // 틈 건너기: 한 번 점프(dbl 이면 점프를 다 써서) 체공의 절반 남짓
+  vGaps(r, vv, P, T, n, wR, lR) {
+    let at = this.gs;
+    for (let i = 0; i < n; i++) {
+      const gap = vv * T * r.range(0.48, 0.66), x0 = this.cx, a0 = at; this.vx(r.range(-1, 1) * Math.min(3.2, P.side * T * 0.3));
+      at += gap; const len = vv * r.range(lR[0], lR[1]); this.vp(at, at + len, this.cx, r.range(wR[0], wR[1]));
+      this.starArc(a0 - 1, at + 1, x0, 0, 0, this.cx); at += len;
+    }
+    return at;
+  }
+  vp_gaps(r, vv, P) { return this.vGaps(r, vv, P, P.T1, r.int(3, 5), [3, 5], [0.45, 0.8]); }
+  vp_dgaps(r, vv, P) { return this.vGaps(r, vv, P, P.T, r.int(2, 4), [3.2, 5], [0.55, 0.9]); }
+  // 토성 고리: 띄엄띄엄 떠 있는 운석. 점프를 다 써야 닿고, 한 번 빠지면 끝
+  vp_stones(r, vv, P) {
+    let at = this.gs;
+    for (let i = 0, n = r.int(4, 7); i < n; i++) {
+      const T = i % 3 === 2 ? P.T1 : P.T, gap = vv * T * r.range(0.5, 0.66), x0 = this.cx, a0 = at; this.vx((i % 2 ? 1 : -1) * r.range(1.4, Math.min(3.6, P.side * T * 0.32)));
+      at += gap; const len = vv * r.range(0.34, 0.46); this.vp(at, at + len, this.cx, r.range(2.3, 3.2), { rock: true });
+      this.starArc(a0 - 1, at + 1, x0, 0, 0, this.cx); at += len;
+    }
+    const p = this.vp(at, at + vv * 0.8, this.cx, 4); return p.s1;
+  }
+  // 좁고 구불구불한 길 (난간 없음)
+  vp_narrow(r, vv, P) {
+    let at = this.gs; const ph = r.range(0, 6), turn = Math.min(1.1, P.side * 0.12);
+    for (let i = 0, n = r.int(10, 16); i < n; i++) {
+      if (i > 2 && r.chance(0.16)) at += vv * P.T1 * r.range(0.38, 0.5);
+      const len = vv * 0.3; this.vx(Math.sin(ph + i * 0.7) * turn); this.vp(at, at + len, this.cx, r.range(1.9, 2.4)); if (i % 2) this.star(at + len / 2, this.cx, 1); at += len;
+    }
+    return at;
+  }
+  vp_zig(r, vv, P) {
+    let at = this.gs; const sh = Math.min(1.6, P.side * 0.5 * 0.38);
+    for (let i = 0, n = r.int(5, 8); i < n; i++) { const len = vv * 0.5; this.vx((i % 2 ? 1 : -1) * sh * 2 * (i ? 1 : 0.5)); this.vp(at, at + len, this.cx, 2.6); this.star(at + len / 2, this.cx, 1); at += len; }
+    return at;
+  }
+  // 은하 소용돌이: 좌우로 흔들리는 발판을 연달아
+  vp_movers(r, vv, P) {
+    let at = this.gs;
+    for (let i = 0, n = r.int(3, 5); i < n; i++) { at += vv * P.T1 * r.range(0.32, 0.45); const len = vv * r.range(0.6, 0.8); this.vp(at, at + len, this.cx, 3, { mv: { amp: r.range(2, 3.4), f: r.range(0.9, 1.5), ph: r.range(0, 6) } }); this.star(at + len / 2, this.cx, 1); at += len; }
+    const p = this.vp(at + vv * 0.25, at + vv * 0.95, this.cx, 5); return p.s1;
+  }
+  // 섬광: 발판이 박자에 맞춰 꺼졌다 켜진다. 꺼지기 전에 깜빡이고, 꺼진 시간은 점프 한 번보다 짧다
+  vp_blink(r, vv, P) {
+    const per = r.range(1.5, 1.9), off = Math.min(0.5, P.T1 * 0.6), len = vv * r.range(4, 6), p = this.vp(this.gs, this.gs + len, this.vx(r.range(-2, 2)), r.range(4, 5.5), { blink: [per, per - off, r.range(0, per)] });
+    this.starLine(p.s0 + 2, p.s1 - 2, this.cx, 0, 6); return p.s1 + vv * 0.1;
+  }
+  // 빛과 어둠: 두 줄이 번갈아 단단해진다 (바뀔 때 잠깐 둘 다 있다)
+  vp_yinyang(r, vv, P) {
+    const per = r.range(1.9, 2.3), on = per / 2 + 0.15, ph = r.range(0, per), len = vv * r.range(4, 6), cx = this.vx(r.range(-1.5, 1.5));
+    this.vp(this.gs, this.gs + len, cx - 1.8, 2.4, { blink: [per, on, ph] }); this.vp(this.gs, this.gs + len, cx + 1.8, 2.4, { blink: [per, on, ph + per / 2] });
+    const end = this.gs + len, p = this.vp(end, end + vv * 0.6, cx, 6); return p.s1;
+  }
+  // 모든 게 시작된 곳: 발판이 숨 쉬듯 넓어졌다 좁아지며 흔들린다
+  vp_breathe(r, vv, P) {
+    let at = this.gs;
+    for (let i = 0, n = r.int(2, 3); i < n; i++) { if (i) at += vv * P.T1 * r.range(0.35, 0.48); const len = vv * r.range(1.6, 2.4); this.vp(at, at + len, this.cx, 7, { br: [1.8, 7, r.range(2.4, 3.2), r.range(0, 6)], mv: { amp: 1.2, f: r.range(0.7, 1), ph: r.range(0, 6) } }); this.starLine(at + 2, at + len - 2, this.cx, 0, 4); at += len; }
+    return at;
+  }
+  // 초신성: 밟은 조각은 잠깐 뒤 무너진다 → 계속 뛰어 넘어간다
+  vp_crumble(r, vv, P, R) {
+    let at = this.gs;
+    for (let i = 0, n = r.int(6, 10); i < n; i++) { if (i > 1 && r.chance(0.2)) at += vv * P.T1 * r.range(0.35, 0.45); const len = vv * r.range(0.6, 0.8); this.vp(at, at + len, this.vx(r.range(-0.8, 0.8)), r.range(4, 5.5), { crumble: R.crumble || 0.42 }); this.star(at + len * 0.6, this.cx, 2); at += len; }
+    const p = this.vp(at, at + vv * 0.7, this.cx, 5); return p.s1;
+  }
+  // 웜홀: 초록 발사대를 밟으면 하늘 높이 튀어 올라 큰 틈을 건넌다 (발사대 전에 뛰면 못 건넌다)
+  vp_pads(r, vv, P) {
+    const run = this.vp(this.gs, this.gs + vv * r.range(0.8, 1.2), this.cx, 5), pv = P.J * 2.6, Tp = (2 * pv) / P.g, pad = this.vp(run.s1, run.s1 + vv * 0.35, this.cx, 5, { pad: pv });
+    const x0 = this.cx; this.vx(r.pick([-1, 1]) * r.range(2, Math.min(4.5, P.side * Tp * 0.3)));
+    const s0 = pad.s0 + vv * Tp * 0.72, p = this.vp(s0, pad.s1 + vv * (Tp + 0.9), this.cx, 4.5, { beacon: true });
+    this.starArc(pad.s0, s0 + 2, x0, 0, 0, this.cx); return p.s1;
+  }
+  // 디지털 그리드: 세 줄 길. 벽이 두 줄을 막으니 열린 줄로 옮겨 탄다
+  vp_lanes(r, vv, P) {
+    const cx = this.vx(r.range(-1, 1) * 1.5), len = vv * r.range(4, 6), s0 = this.gs, xs = [cx - 3.2, cx, cx + 3.2];
+    for (const x of xs) this.vp(s0, s0 + len, x, 2.1);
+    let at = s0 + vv * 0.6, open = r.int(0, 2);
+    while (at < s0 + len - vv * 0.5) {
+      for (let i = 0; i < 3; i++) if (i !== open) this.obstacle('wall', at, xs[i] - 1.05, xs[i] + 1.05, 0, 2.6, 1); else this.star(at, xs[i], 1);
+      const next = r.int(0, 2), d = Math.abs(next - open); open = next; at += vv * (d * 0.4 / (P.side / 8.5) + r.range(0.22, 0.4));
+    }
+    const p = this.vp(s0 + len, s0 + len + vv * 0.5, cx, 9); return p.s1;
+  }
+  // 퀘이사 빔: 빛줄기가 위아래로 오르내린다 → 낮으면 뛰어넘고, 높으면 숙이거나 그냥 지나간다
+  vp_lasers(r, vv, P) {
+    const w = 6, p = this.vp(this.gs, this.gs + vv * r.range(4, 6), this.vx(r.range(-1.5, 1.5)), w);
+    for (let at = p.s0 + vv * 0.6; at < p.s1 - vv * 0.8; at += vv * (P.T1 + r.range(0.18, 0.36))) { const o = this.obstacle('laser', at, this.cx - w / 2, this.cx + w / 2, 0, 0.3, 0.4); o.osc = [0.1, 2.3, r.range(2.6, 3.6), r.range(0, 6)]; }
+    return p.s1;
+  }
+  // 소행성대: 운석이 길을 가로질러 오간다 (옆으로 피하거나 뛰어넘는다)
+  vp_asteroids(r, vv, P) {
+    const w = 9, p = this.vp(this.gs, this.gs + vv * r.range(4, 6), this.vx(r.range(-1, 1)), w);
+    for (let at = p.s0 + vv * 0.6; at < p.s1 - vv * 0.6; at += vv * (P.T1 * 0.9 + r.range(0.12, 0.3))) { const o = this.obstacle('wall', at, this.cx - 0.8, this.cx + 0.8, 0, 1, 1.4); o.bx0 = o.x0; o.bx1 = o.x1; o.mvx = [3.2, r.range(1, 1.6), r.range(0, 6)]; }
+    this.starLine(p.s0 + 2, p.s0 + vv * 0.5, this.cx, 0, 3); return p.s1;
+  }
+  // 최후의 날: 넓은 길 위로 운석이 쉴 새 없이 떨어진다. 떨어질 자리에는 점선이 먼저 보인다
+  vp_meteor(r, vv, P) {
+    const w = 8, p = this.vp(this.gs, this.gs + vv * r.range(4.5, 6.5), this.vx(r.range(-1, 1)), w);
+    let lastX = this.cx;
+    for (let at = p.s0 + vv * 0.7; at < p.s1 - vv * 0.4; at += vv * r.range(0.42, 0.66)) { const rr = r.range(1, 1.5); let x = this.cx + r.range(-w / 2 + rr, w / 2 - rr); if (Math.abs(x - lastX) < 1) x = this.cx + (x > this.cx ? -1 : 1) * r.range(1, w / 2 - rr); lastX = x; this.meteor(at, x, rr); }
+    this.starLine(p.s0 + 2, p.s0 + vv * 0.6, this.cx, 0, 3); return p.s1;
+  }
+  // 양자 터널: 발판이 두 자리 사이를 순간 이동한다 (바뀌기 전에 깜빡인다)
+  vp_quantum(r, vv, P) {
+    let at = this.gs;
+    for (let i = 0, n = r.int(3, 5); i < n; i++) { if (i) at += vv * P.T1 * r.range(0.3, 0.4); const len = vv * r.range(1, 1.4); this.vp(at, at + len, this.vx(r.range(-0.6, 0.6)), 3.2, { qx: [-1.8, 1.8, r.range(1.3, 1.7), r.range(0, 2)] }); this.star(at + len / 2, this.cx, 2.4); at += len; }
+    const p = this.vp(at + vv * 0.25, at + vv * 0.9, this.cx, 6); return p.s1;
+  }
+  // 좌우로 번갈아 막는 벽 (거울 · 얼음 · 반전 맵에서 특히 어렵다)
+  vp_slalom(r, vv, P, R) {
+    // 얼음: 미끄러져 멈추는 데까지 시간을 더 준다
+    const w = R.ice ? 8 : 7, p = this.vp(this.gs, this.gs + vv * r.range(4, 6), this.vx(r.range(-1.5, 1.5)), w, R.flip ? { inv: true } : undefined);
+    let side = r.chance(0.5) ? 1 : -1;
+    for (let at = p.s0 + vv * 0.6; at < p.s1 - vv * 0.5; at += vv * ((R.ice ? 1.35 : 0.55 / (P.side / 8.5)) + r.range(0.15, 0.3))) { const half = w * 0.55, x0 = side > 0 ? this.cx + w / 2 - half : this.cx - w / 2; this.obstacle('wall', at, x0, x0 + half, 0, 2.6, 1); this.star(at, side > 0 ? this.cx - w / 2 + (w - half) / 2 : this.cx + w / 2 - (w - half) / 2, 1); side = -side; }
+    return p.s1;
+  }
+  // 끝없는 반전: 분홍 발판 위에서는 좌우가 반대 (발판마다 바뀐다)
+  vp_flipzone(r, vv, P, R) {
+    let at = this.gs;
+    for (let i = 0, n = r.int(3, 4); i < n; i++) {
+      const inv = i % 2 === 1, w = 6.5, len = vv * r.range(1.6, 2.2), p = this.vp(at, at + len, this.vx(r.range(-1.5, 1.5)), w, inv ? { inv: true } : undefined);
+      let side = r.chance(0.5) ? 1 : -1;
+      for (let s = p.s0 + vv * 0.55; s < p.s1 - vv * 0.3; s += vv * (0.6 + r.range(0.15, 0.3))) { const half = w * 0.55, x0 = side > 0 ? this.cx + w / 2 - half : this.cx - w / 2; this.obstacle('wall', s, x0, x0 + half, 0, 2.6, 1); side = -side; }
+      at = p.s1 + vv * P.T1 * r.range(0.3, 0.4);
+    }
+    const p = this.vp(at, at + vv * 0.6, this.cx, 6); void R; return p.s1;
+  }
+  // 프리즘 다리: 아주 좁은 빛 다리를 옆으로 뛰어 옮겨 탄다
+  vp_beams(r, vv, P) {
+    let at = this.gs;
+    for (let i = 0, n = r.int(4, 6); i < n; i++) { const x0 = this.cx, a0 = at; at += vv * P.T1 * r.range(0.25, 0.4); this.vx((i % 2 ? 1 : -1) * r.range(2.2, Math.min(3.4, P.side * P.T1 * 0.4))); const len = vv * r.range(0.7, 1); this.vp(at, at + len, this.cx, 1.5); this.starArc(a0 - 1, at + 1, x0, 0, 0, this.cx); at += len; }
+    const p = this.vp(at, at + vv * 0.6, this.cx, 5); return p.s1;
+  }
+  // 운석 하나: 판정은 처음부터 그 자리에 있다 (곰돌이가 닿기 전에 반드시 먼저 떨어지니 누구에게나 같다)
+  meteor(s, x, rr) {
+    const th = this.themeOf(this.dream), col = th.P?.a || '#ff7a1f', g = new THREE.Group(); g.position.set(x, 0, this.z(s)); g.userData.s = s; g.userData.keepGeo = true; this.root.add(g);
+    const dots = new THREE.Group(), dm = glow(col, 0.9); // 떨어질 자리: 점선 동그라미
+    for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2, d = new THREE.Mesh(G_BOX, dm); d.scale.set(0.34, 0.05, 0.14); d.position.set(Math.cos(a) * rr, 0.06, Math.sin(a) * rr); d.rotation.y = -a; dots.add(d); }
+    g.add(dots);
+    const rock = new THREE.Group(), body = new THREE.Mesh(G_ROCK, new THREE.MeshToonMaterial({ color: th.P?.rock || '#3a2a20' })); body.scale.setScalar(rr * 0.85); rock.add(body);
+    for (let i = 0; i < 6; i++) { const f = new THREE.Mesh(G_PUFF, glow(i % 2 ? col : '#ffd166', 0.8 - i * 0.1)); f.scale.setScalar(rr * (0.8 - i * 0.1)); f.position.set(i * 0.9, i * 1.4, 0); rock.add(f); }
+    rock.visible = false; g.add(rock);
+    const o = { kind: 'meteor', s0: s - rr * 0.8, s1: s + rr * 0.8, x0: x - rr * 0.8, x1: x + rr * 0.8, y0: 0, y1: 1.1, mesh: g };
+    this.obs.push(o); this.meteors.push({ s, g, rock, dots, landed: false, side: this.rng.chance(0.5) ? 1 : -1 });
+  }
+  updateVoid(t, playerS, v, dt) {
+    const fl = Math.sin(t * 40) > 0;
+    for (const p of this.plats) {
+      if (p.blink) { const [per, on, ph] = p.blink, c = (((t + ph) % per) + per) % per; p.off = c >= on; p.mesh.visible = !p.off && (c < on - 0.35 || fl); }
+      if (p.br) { const [lo, hi, f, ph] = p.br; p.w = lo + (hi - lo) * (0.5 + 0.5 * Math.sin(t * f + ph)); p.mesh.scale.x = p.w / p.w0; }
+      if (p.qx) { const [a, b, per, ph] = p.qx, c = (((t + ph) % per) + per) % per, half = per / 2, nx = p.x + (c < half ? a : b); p.dx = 0; p.cx = nx; p.mesh.position.x = nx; p.mesh.visible = (c < half ? half - c : per - c) > 0.35 || fl; }
+      if (p.crumble && p.touchT != null && !p.doomed) { if (t - p.touchT > p.crumble) p.doomed = true; else p.mesh.position.x = p.cx + Math.sin(t * 70) * 0.06; }
+      if (p.crumble && p.doomed) { p.fallV = (p.fallV || 0) + 40 * dt; p.mesh.position.y -= p.fallV * dt; }
+      if (p.dark) p.mesh.visible = p.s0 - playerS < 26;
+    }
+    for (const o of this.obs) {
+      if (o.mvx) { const [amp, f, ph] = o.mvx, dx = Math.sin(t * f + ph) * amp; o.x0 = o.bx0 + dx; o.x1 = o.bx1 + dx; o.mesh.position.x = (o.x0 + o.x1) / 2; }
+      if (o.osc) { const [lo, hi, f, ph] = o.osc, h = o.y1 - o.y0, y = lo + (hi - lo) * (0.5 + 0.5 * Math.sin(t * f + ph)); o.y0 = y; o.y1 = y + h; o.mesh.position.y = y; }
+      if (o.dark) o.mesh.visible = o.s0 - playerS < 26;
+    }
+    // 운석: 닿기 1.4초 전부터 비스듬히 떨어져서 0.55초 전에 땅에 박힌다
+    const vs = Math.max(v || 0, 1);
+    for (const m of this.meteors) {
+      const eta = (m.s - playerS) / vs;
+      m.dots.visible = !m.landed && (eta > 1.4 || fl);
+      if (m.landed || !v || eta > 1.4) continue;
+      const k = Math.max(0, Math.min(1, (1.4 - eta) / 0.85));
+      m.rock.visible = true; m.rock.position.set(m.side * 26 * (1 - k), 0.6 + 44 * (1 - k) * (1 - k), -10 * (1 - k)); m.rock.rotation.set(t * 3, t * 2, 0);
+      if (k >= 1) { m.landed = true; for (let i = 1; i < m.rock.children.length; i++) m.rock.children[i].visible = false; this.onSlam?.(m, m.s - playerS); }
+    }
+  }
+
   // ---------- 판정 ----------
   // 움직이는 발판 위치 갱신 (모두 같은 시계 t 로 움직여서 모두에게 같은 자리)
   update(t, playerS, v = 0, dt = 0) {
+    this.time = t;
     if (this.hell) this.updateStrikes(t, playerS, v, dt);
+    if (this.void) this.updateVoid(t, playerS, v, dt);
     for (const p of this.plats) {
       if (!p.mv) continue;
       const nx = p.x + Math.sin(t * p.mv.f + p.mv.ph) * p.mv.amp;
@@ -530,7 +770,7 @@ export class Track {
   ground(s, x, y) {
     let best = null;
     for (const p of this.plats) {
-      if (p.doomed || s < p.s0 - 0.2 || s > p.s1 + 0.2 || Math.abs(x - p.cx) > p.w / 2 + 0.3) continue;
+      if (p.doomed || p.off || s < p.s0 - 0.2 || s > p.s1 + 0.2 || Math.abs(x - p.cx) > p.w / 2 + 0.3) continue;
       if (p.y <= y + 0.45 && (!best || p.y > best.y)) best = p;
     }
     return best;
@@ -538,7 +778,7 @@ export class Track {
   // 앞을 막는 발판 옆면 (위로 0.9m 안이면 훌쩍 올라선다)
   wall(s0, s1, x, y) {
     for (const p of this.plats) {
-      if (p.doomed || p.s0 < s0 - 0.01 || p.s0 > s1 + 0.01 || Math.abs(x - p.cx) > p.w / 2) continue;
+      if (p.doomed || p.off || p.s0 < s0 - 0.01 || p.s0 > s1 + 0.01 || Math.abs(x - p.cx) > p.w / 2) continue;
       if (y < p.y - 0.45 && y + 1.3 > p.y - p.th) return p;
     }
     return null;
@@ -625,6 +865,8 @@ const STAR_M = new THREE.MeshToonMaterial({ color: '#ffd23f', emissive: '#7a5200
 const STAR_RIM = new THREE.MeshBasicMaterial({ color: '#a8560a', side: THREE.BackSide });
 const STAR_HALO = new THREE.SpriteMaterial({ map: (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,240,170,.9)'); g.addColorStop(1, 'rgba(255,220,120,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })(), transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending });
 const G_SHADOW = new THREE.CircleGeometry(1, 20);
+const G_ROCK = new THREE.DodecahedronGeometry(1, 0);
+const NOR = {};
 const outlineCache = new Map();
 const OUTLINE_M = (c) => { if (!outlineCache.has(c)) outlineCache.set(c, new THREE.MeshBasicMaterial({ color: c, side: THREE.BackSide })); return outlineCache.get(c); };
 const SHADOW_M = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.28, depthWrite: false });

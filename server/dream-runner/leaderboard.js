@@ -18,6 +18,7 @@ const TOP = 50;
 const STAR_PTS = 10;       // 별사탕 하나 = 10점
 const TOP_GUARD = 10, DAY_STARS = 300000; // 확인 안 된 기록이 이 순위 안에 들면 비상 리포트 · 하루에 벌 수 있는 별 (사람이 닿지 못할 만큼 넉넉하게)
 
+const MAPS = ['dream', 'hell', 'void'], mapOf = (m) => (m === 'hell' || m === 'void' ? m : 'dream'); // 꿈나라 · 지옥 · 이공간
 const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n);
 
 export class DreamBoard {
@@ -46,19 +47,19 @@ export class DreamBoard {
     try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ best: this.best, bestItem: this.bestItem, boards: this.boards, stats: this.stats, runs: this.runs, reports: this.reports, secret: this.secret })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('드림 러너 저장 실패', e); }
   }
   // map: 'hell' 은 난이도마다 따로 (꿈나라 노멀은 예전 표 그대로)
-  table(mode, diff, map = 'dream') { if (map === 'hell') return (this.boards[`hell:${mode}:${diff}`] ||= {}); if (diff !== 'easy') return (this.boards[`${mode}:${diff}`] ||= {}); return mode === 'item' ? this.bestItem : this.best; }
+  table(mode, diff, map = 'dream') { if (map === 'hell' || map === 'void') return (this.boards[`${map}:${mode}:${diff}`] ||= {}); if (diff !== 'easy') return (this.boards[`${mode}:${diff}`] ||= {}); return mode === 'item' ? this.bestItem : this.best; }
   sorted(mode, diff, map) { return Object.entries(this.table(mode, diff, map)).sort((a, b) => b[1].score - a[1].score || a[1].at - b[1].at); }
   // 메달: 드림러너 모든 순위표(난이도 × 꿈나라 · 지옥)의 지금 1 ~ 3위 메달. 익스트림 이상 먼저(1위 → 2위 → 3위, 같은 순위면 높은 난이도 · 지옥 먼저), 그다음 익스트림 아래
   podium() {
     const P = new Map();
-    Object.keys(DIFFS).forEach((diff, di) => { for (const map of ['dream', 'hell']) { const all = this.sorted('speed', diff, map); all.slice(0, 3).forEach(([sub], i) => { const id = boardMedal(`dr.${map}.${diff}`, i + 1, all.length); if (id) { if (!P.has(sub)) P.set(sub, []); P.get(sub).push({ id, k: di * 2 + (map === 'hell' ? 1 : 0), rank: i + 1 }); } }); } });
+    Object.keys(DIFFS).forEach((diff, di) => { MAPS.forEach((map, mi) => { const all = this.sorted('speed', diff, map); all.slice(0, 3).forEach(([sub], i) => { const id = boardMedal(`dr.${map}.${diff}`, i + 1, all.length); if (id) { if (!P.has(sub)) P.set(sub, []); P.get(sub).push({ id, di, mi, rank: i + 1 }); } }); }); });
     return P;
   }
   // 한 줄의 메달 · 칭호: 이 순위표 메달(상위 %)도 넣고, 같은 1위를 말하는 칭호는 메달과 겹치니 뺀다. 다른 게임 칭호는 띄우지 않는다
   badges(sub, P, mode, diff, map, rank, n) {
     const L = [...(P.get(sub) || [])], own = mode === 'speed' ? boardMedal(`dr.${map}.${diff}`, rank, n) : null;
-    if (own && !L.some((m) => m.id === own)) L.push({ id: own, k: Object.keys(DIFFS).indexOf(diff) * 2 + (map === 'hell' ? 1 : 0), rank });
-    const hi = (m) => ((m.k >> 1) >= 2 ? 0 : 1), medals = L.sort((a, b) => hi(a) - hi(b) || a.rank - b.rank || b.k - a.k).map((m) => m.id);
+    if (own && !L.some((m) => m.id === own)) L.push({ id: own, di: Object.keys(DIFFS).indexOf(diff), mi: MAPS.indexOf(map), rank });
+    const hi = (m) => (m.di >= 2 ? 0 : 1), medals = L.sort((a, b) => hi(a) - hi(b) || a.rank - b.rank || b.di - a.di || b.mi - a.mi).map((m) => m.id); // 같은 순위 · 난이도면 이공간 → 지옥 → 꿈나라
     let title = getCos()?.titleOf(sub, ['dr.', 'dream-runner.']) || null;
     if (title && medals.some((id) => { const it = itemById.get(id); return it?.fx.honor === 0 && `title.${it.ach}` === title; })) title = null;
     return { title, medals, medal: own };
@@ -68,7 +69,7 @@ export class DreamBoard {
   }
   // 명예의 전당: 꿈나라 초월 1위 → 지옥 초월 1위 → 꿈나라 광속 1위 → … → 지옥 익스트림 1위, 다음은 2위 · 3위 차례로. 한 사람은 한 번만 (가장 높은 자리)
   fame(n = 12) {
-    const order = ['beyond', 'lightspeed', 'extreme'].flatMap((diff) => [[diff, 'dream'], [diff, 'hell']]), seen = new Set(), out = [], P = this.podium();
+    const order = ['beyond', 'lightspeed', 'extreme'].flatMap((diff) => MAPS.map((map) => [diff, map])), seen = new Set(), out = [], P = this.podium();
     for (let r = 0; r < 3; r++) for (const [diff, map] of order) {
       if (out.length >= n) return out;
       const all = this.sorted('speed', diff, map), x = all[r]; if (!x || seen.has(x[0])) continue;
@@ -97,7 +98,7 @@ export class DreamBoard {
     const real = tk ? (now - tk.at) / 1000 : 0, inTime = tk ? dist <= real * 80 * DIFFS[diff].k + 60 : stars <= 300; // 출발표를 못 받았으면(서버 점검) 적게만
     if (stars > 0 && stars <= dist / 2 + 5 && dist <= time * 80 * DIFFS[diff].k + 60 && inTime && (!tk || this.tickets.once(tk.id, 'stars'))) {
       const day = Math.floor(now / 864e5), dk = `${sub}:${day}`, used = this.dayStars.get(dk) || 0; if (this.dayStars.size > 50000) this.dayStars.clear();
-      if (used < DAY_STARS) { const earned = getCos()?.earn(sub, stars, diff, b.map === 'hell' ? 'hell' : 'dream') || 0; this.dayStars.set(dk, used + earned); return { earned }; }
+      if (used < DAY_STARS) { const earned = getCos()?.earn(sub, stars, diff, mapOf(b.map)) || 0; this.dayStars.set(dk, used + earned); return { earned }; }
     }
     getCos()?.refresh(sub); return { earned: 0 };
   }
@@ -132,12 +133,12 @@ export class DreamBoard {
       if (real - sum > Math.max(15, real * 0.25) && capped < 0.1) { this.vstat.slow = (this.vstat.slow || 0) + 1; console.warn(`드림 러너 느리게 돌리기 의심: 게임 ${sum.toFixed(1)}초 / 실제 ${real.toFixed(1)}초 (${diff} ${map})`); return { ok: false, why: 'slowmo', r, game: sum, real }; } }
     this.vstat.ok++; return { ok: true, r, ticket: !!tk };
   }
-  ticket(b) { return this.tickets.issue({ seed: Number(b.seed) | 0, diff: diffOf(b.diff), map: b.map === 'hell' ? 'hell' : 'dream', mode: b.mode === 'item' ? 'item' : 'speed' }); }
+  ticket(b) { return this.tickets.issue({ seed: Number(b.seed) | 0, diff: diffOf(b.diff), map: mapOf(b.map), mode: b.mode === 'item' ? 'item' : 'speed' }); }
   // 사람이 볼 목록 · 승인 · 삭제 (삭제하면 그 계정의 드림 러너 업적을 다시 계산하고 별을 거둔다)
   // 비상 리포트: 조작(AI) 의심 기록. 순위표에는 바로 올라가고, 운영자가 접속하면 크게 뜬다
   //   red = 서버가 다시 돌려 본 결과와 다름 · 시간이 맞지 않음 · 입력 기록 없음 (상위권)
   report(lvl, sub, mode, diff, map, why, e, r, extra) { this.reports.push({ id: crypto.randomBytes(5).toString('hex'), lvl, sub, mode, diff, map, why, name: e.name, score: e.score, dist: e.dist, stars: e.stars, time: e.time, eat: e.at, r: r ? { dist: r.dist, stars: r.stars } : null, ...extra, at: Date.now(), open: true }); if (this.reports.length > 300) this.reports.splice(0, this.reports.length - 300); this.dirty = true; console.warn(`드림 러너 비상 리포트(${lvl}): ${e.name} ${e.score}점 ${map} ${diff} (${why})`); }
-  tkey(mode, diff, map) { return map === 'hell' ? `hell:${mode}:${diff}` : `${mode}:${diff}`; }
+  tkey(mode, diff, map) { return map === 'hell' || map === 'void' ? `${map}:${mode}:${diff}` : `${mode}:${diff}`; }
   adminList() { const flagged = []; for (const k of ['best', 'bestItem']) for (const [sub, e] of Object.entries(this[k])) if (e.u) flagged.push({ sub, t: k === 'best' ? 'speed:easy' : 'item:easy', ...e }); for (const [t, T] of Object.entries(this.boards)) for (const [sub, e] of Object.entries(T)) if (e.u) flagged.push({ sub, t, ...e }); for (const f of flagged) { f.name = nameOf(f.sub, f); delete f.char; } return { reports: this.reports.filter((x) => x.open).reverse().map((x) => ({ ...x, name: nameOf(x.sub, { name: x.name }), t: this.tkey(x.mode, x.diff, x.map), live: this.table(x.mode, x.diff, x.map)[x.sub]?.at === x.eat })), flagged: flagged.sort((a, b) => b.score - a.score).slice(0, 100), stat: this.vstat }; }
   // 정상으로 인정: 확인 안 됨 표시를 지워 업적 · 왕관도 받게 / 삭제: 기록을 지우고 별 · 업적을 거둔다 / 넘기기: 그대로 두고 리포트만 닫는다
   resolve(id, act) {
@@ -148,8 +149,8 @@ export class DreamBoard {
     for (const q of this.reports) if (q.open && q.sub === x.sub && act === 'del') q.open = false; // 지운 사람의 다른 리포트도 닫는다
   }
   verifyRecord(sub, t) { const e = this.tableOf(t)?.[sub]; if (!e) throw new Error('없어요'); delete e.u; e.v = 1; this.dirty = true; for (const q of this.reports) if (q.open && q.sub === sub && this.tkey(q.mode, q.diff, q.map) === t) { q.open = false; q.act = 'ok'; } getCos()?.refresh(sub); }
-  tableOf(t) { const [a, b] = String(t).split(':'); return a === 'hell' ? this.boards[t] : b === 'easy' ? (a === 'item' ? this.bestItem : this.best) : this.boards[`${a}:${b}`]; }
-  removeRecord(sub, t) { const [a, b, c] = String(t).split(':'), T = a === 'hell' ? this.boards[t] : b === 'easy' ? (a === 'item' ? this.bestItem : this.best) : this.boards[`${a}:${b}`]; if (T?.[sub]) { delete T[sub]; this.dirty = true; } getCos()?.punish(sub, 'dr.'); void c; }
+  tableOf(t) { const [a, b] = String(t).split(':'); return a === 'hell' || a === 'void' ? this.boards[t] : b === 'easy' ? (a === 'item' ? this.bestItem : this.best) : this.boards[`${a}:${b}`]; }
+  removeRecord(sub, t) { const [a, b, c] = String(t).split(':'), T = a === 'hell' || a === 'void' ? this.boards[t] : b === 'easy' ? (a === 'item' ? this.bestItem : this.best) : this.boards[`${a}:${b}`]; if (T?.[sub]) { delete T[sub]; this.dirty = true; } getCos()?.punish(sub, 'dr.'); void c; }
   // 한 판 끝: 말이 안 되는 기록은 거르고, 점수는 서버가 다시 계산한다
   async submit(who, b) {
     const now = Date.now();
@@ -157,7 +158,7 @@ export class DreamBoard {
     this.lastPost.set(who.sub, now);
     const time = Number(b.time), dist = Math.floor(Number(b.dist)), stars = Math.floor(Number(b.stars)), themes = Math.floor(Number(b.themes));
     if (![time, dist, stars, themes].every(Number.isFinite) || time < 1 || time > 4 * 3600 || dist < 0 || stars < 0 || themes < 1) throw new Error('기록이 이상해요');
-    const mode = b.mode === 'item' ? 'item' : 'speed', diff = diffOf(b.diff), map = b.map === 'hell' ? 'hell' : 'dream', T = this.table(mode, diff, map), k = DIFFS[diff].k;
+    const mode = b.mode === 'item' ? 'item' : 'speed', diff = diffOf(b.diff), map = mapOf(b.map), T = this.table(mode, diff, map), k = DIFFS[diff].k;
     if (dist > time * (mode === 'item' ? MAX_SPEED_ITEM : MAX_SPEED) * k + 60 || stars > dist / 2 + 5 || themes > (time / 15) * k * 1.5 + 3) throw new Error('기록이 이상해요');
     const score = dist + stars * STAR_PTS;
     this.runs++; this.dirty = true;
@@ -181,7 +182,7 @@ export class DreamBoard {
 const ANON = /^[a-f0-9]{16,40}$/;
 export async function dreamApi(req, res, url, who, board, json, isAdmin) {
   const anonId = url.searchParams.get('anon');
-  const mode = url.searchParams.get('mode') === 'item' ? 'item' : 'speed', diff = diffOf(url.searchParams.get('diff')), map = url.searchParams.get('map') === 'hell' ? 'hell' : 'dream';
+  const mode = url.searchParams.get('mode') === 'item' ? 'item' : 'speed', diff = diffOf(url.searchParams.get('diff')), map = mapOf(url.searchParams.get('map'));
   if (url.pathname === '/api/dream/board') return json(res, 200, { mode, diff, map, top: board.top(mode, diff, map), me: board.mine(who?.sub || (ANON.test(anonId || '') ? 'anon:' + anonId : null), mode, diff, map), runs: board.runs });
   if (url.pathname === '/api/dream/fame') return json(res, 200, { fame: board.fame() });
   if (url.pathname === '/api/dream/me') return json(res, 200, board.myStats(who?.sub || (ANON.test(anonId || '') ? 'anon:' + anonId : null), map));

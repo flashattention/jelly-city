@@ -39,7 +39,7 @@
       <button id="b-quit" title="그만 달리기">✕</button>
     </div>
   </div>
-  <div id="dream-card" class="hidden"><div class="dc-n"></div><div class="dc-e"></div><div class="dc-name"></div></div>
+  <div id="dream-card" class="hidden"><div class="dc-n"></div><div class="dc-e"></div><div class="dc-name"></div><div class="dc-tip"></div></div>
   <div id="countdown" class="hidden"></div>
   <div id="speedlines"></div>
   <div id="itembar" class="hidden"><div class="slot" id="slot0"></div><div class="slot" id="slot1"></div><div class="key">Q</div></div>
@@ -82,7 +82,7 @@
         <div id="nick-row" class="hidden"><input id="nick" maxlength="14" placeholder="달리기 이름 (순위표 · 방에 보여요)" /></div>
       </div><div class="t-right">
         <div class="picks">
-        <div class="seg" id="map-pick"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button></div>
+        <div class="seg" id="map-pick"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button><button data-m="void">🌌 랜덤 이공간</button></div>
         <div class="seg" id="mode-pick"><button data-m="speed">⚡ 스피드전</button><button data-m="item">🎁 아이템전</button></div>
         <div class="seg" id="diff-pick"></div>
         </div>
@@ -122,7 +122,7 @@
       <h2 id="room-title"></h2>
       <div class="seg" id="room-team"><button data-t="0">🏃 개인전</button><button data-t="1">👥 팀전 <small>3분</small></button></div>
       <div class="seg" id="room-mode"><button data-m="speed">⚡ 스피드전</button><button data-m="item">🎁 아이템전</button></div>
-      <div class="seg" id="room-map"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button></div>
+      <div class="seg" id="room-map"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button><button data-m="void">🌌 랜덤 이공간</button></div>
       <div class="seg" id="room-diff"></div>
       <div id="room-code"><span>초대 코드</span><b id="code-txt"></b><button id="copy-link" class="btn alt">🔗 링크 복사</button><button id="copy-code" class="btn ghost">코드 복사</button></div>
       <div class="note">링크를 보내거나 코드를 알려 주면 로그인 안 한 친구도 들어올 수 있어요</div>
@@ -156,7 +156,7 @@
   <div id="board" class="screen hidden">
     <div class="card wide">
       <h2>🏆 최고 기록</h2>
-      <div class="seg" id="board-map"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button></div>
+      <div class="seg" id="board-map"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button><button data-m="void">🌌 랜덤 이공간</button></div>
       <div class="seg" id="board-mode"><button data-m="speed">⚡ 스피드전</button><button data-m="item">🎁 아이템전</button></div>
       <div class="seg" id="board-diff"></div>
       <div class="sub">점수 = 달린 거리(m) + 별사탕 × 10</div>
@@ -170,7 +170,7 @@
   <div id="stats" class="screen hidden">
     <div class="card wide">
       <h2>📊 내 기록</h2>
-      <div class="seg" id="stats-map"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button></div>
+      <div class="seg" id="stats-map"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button><button data-m="void">🌌 랜덤 이공간</button></div>
       <div id="my-stats"></div>
       <div class="row2"><button id="stats-close" class="btn ghost">닫기</button></div>
     </div>

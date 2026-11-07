@@ -84,7 +84,7 @@ export class Cosmetics {
     for (const it of [...TOP3, ...Object.keys(u.ach).flatMap((id) => (medalByAch.get(id) || []).filter((m) => !m.rule?.any))]) { if (best && (it.fx.honor > best.fx.honor || (it.fx.honor === best.fx.honor && it.fx.pr <= best.fx.pr))) continue; if (this.holdsNow(sub, it, cache)) best = it; }
     return best?.id || null;
   }
-  holdsNow(sub, it, cache) { if (it.top3) return ['dream', 'hell'].some((map) => this.meets(sub, { kind: 'dream', map, diff: it.top3, rank: 3, any: true }, cache)); const a = achById.get(it.ach); return !!a && (it.rule?.any || !!this.users[sub]?.ach[a.id]) && this.meets(sub, it.rule || a.rule, cache); }
+  holdsNow(sub, it, cache) { if (it.top3) return ['dream', 'hell', 'void'].some((map) => this.meets(sub, { kind: 'dream', map, diff: it.top3, rank: 3, any: true }, cache)); const a = achById.get(it.ach); return !!a && (it.rule?.any || !!this.users[sub]?.ach[a.id]) && this.meets(sub, it.rule || a.rule, cache); }
   // 기록 · 순위를 보고 새로 달성한 업적을 적는다 (예전 기록도 여기서 인정된다)
   refresh(sub) {
     const u = this.u(sub), cache = new Map();

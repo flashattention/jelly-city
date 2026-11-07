@@ -99,10 +99,10 @@ export class Runner {
     this.items = []; this.eff = { rocket: 0, shield: 0, cloud: 0, magnet: 0, ghost: 0, slow: 0 }; this.rocketK = 0; this.cloudY = 0; this.lastGroundY = 0;
     // 팀전: 마지막으로 안전하게 밟은 곳 · 부활 뒤 멈춤 · 무적
     this.safe = { s, x, y: 0 }; this.frozen = 0; this.invul = 0;
-    Object.assign(this, { s, x, y: 0, boost: 1, vx: 0, vy: 0, knock: 0, onGround: true, jumps: 0, coyote: 0, jbuf: 0, slideBuf: 0, slideT: 0, flipT: 0, shoveT: 0, alive: true, dead: null, stars: 0, plat: null, t: 0 });
+    Object.assign(this, { s, x, y: 0, boost: 1, vx: 0, vy: 0, knock: 0, onGround: true, jumps: 0, coyote: 0, jbuf: 0, slideBuf: 0, slideT: 0, flipT: 0, shoveT: 0, alive: true, dead: null, stars: 0, plat: null, t: 0, vmul: 1, flipInv: false });
     this.bear.inner.rotation.set(0, 0, 0); this.bear.root.scale.setScalar(1); this.bear.root.visible = true;
   }
-  get v() { return speedAt(this.s) * (this.speedK || 1) * (1 + BOOST * this.boost) * (1 + 0.8 * this.rocketK) * (this.eff.slow > 0 ? 0.6 : 1); }
+  get v() { return speedAt(this.s) * (this.speedK || 1) * (1 + BOOST * this.boost) * (1 + 0.8 * this.rocketK) * (this.eff.slow > 0 ? 0.6 : 1) * (this.vmul || 1); }
   get h() { return this.slideT > 0 ? H_SLIDE : H_STAND; }
 
   // input: { dir(-1~1), jump(눌림), slide(눌림), slideHeld }
@@ -116,17 +116,21 @@ export class Runner {
     // 아이템 효과 시간
     for (const k in this.eff) this.eff[k] = Math.max(0, this.eff[k] - dt);
     this.rocketK += ((this.eff.rocket > 0 ? 1 : 0) - this.rocketK) * Math.min(1, dt * 4);
+    // 이공간 규칙: 중력 · 점프 · 좌우 반대 · 미끄러움 · 바람 · 빠르기 (지옥 · 꿈나라는 M 이 없다)
+    const M = track.mod?.(this.s), JM = M?.jump || 1, NJ = M?.jumps ?? 2;
+    this.vmul = M ? M.speed : 1;
     this.s += this.v * dt;
-    // 좌우: 손 떼면 바로 멈추는 느낌 + 밀쳐진 힘은 서서히 줄어든다
-    this.vx += ((input.dir || 0) * SIDE - this.vx) * Math.min(1, dt * 14);
+    // 좌우: 손 떼면 바로 멈추는 느낌 + 밀쳐진 힘은 서서히 줄어든다 (얼음이면 천천히 붙고 천천히 멈춘다)
+    const inv = M && (M.inv || this.flipInv) ? -1 : 1;
+    this.vx += ((input.dir || 0) * inv * SIDE * (M?.side || 1) - this.vx) * Math.min(1, dt * (M?.ice || 14));
     this.knock *= Math.exp(-dt * 2.6);
-    this.x += (this.vx + this.knock) * dt;
+    this.x += (this.vx + this.knock + (M?.wind || 0)) * dt;
     // 점프 (땅에서 떨어진 직후 0.1초 · 누른 직후 0.12초는 봐준다)
     if (input.jump) this.jbuf = 0.12;
     this.jbuf -= dt; this.coyote -= dt;
     if (this.jbuf > 0) {
-      if (this.onGround || this.coyote > 0) { this.vy = JUMP; this.jumps = 1; this.onGround = false; this.coyote = 0; this.jbuf = 0; this.slideT = 0; this.slideBuf = 0; fx?.('jump'); }
-      else if (this.jumps < 2) { this.vy = JUMP2; this.jumps = 2; this.jbuf = 0; this.slideBuf = 0; this.flipT = FLIP_T; fx?.('jump2'); }
+      if (this.onGround || this.coyote > 0) { this.vy = JUMP * JM; this.jumps = 1; this.onGround = false; this.coyote = 0; this.jbuf = 0; this.slideT = 0; this.slideBuf = 0; fx?.('jump'); }
+      else if (this.jumps < NJ) { this.vy = JUMP2 * JM; this.jumps++; this.jbuf = 0; this.slideBuf = 0; this.flipT = FLIP_T; fx?.('jump2'); }
     }
     // 숙이기 (공중에서 누르면 빨리 내려오고, 착지하는 순간 숙인다)
     if (input.slide) { if (this.onGround) { if (this.slideT <= 0) fx?.('slide'); this.slideT = 0.75; } else { this.vy = Math.min(this.vy, -14); this.slideBuf = 0.45; } }
@@ -134,7 +138,7 @@ export class Runner {
     if (input.slideHeld && this.onGround && this.slideT > 0) this.slideT = Math.max(this.slideT, 0.15);
     this.slideT -= dt;
     // 떨어짐
-    this.vy -= GRAV * dt;
+    this.vy -= GRAV * (M?.grav || 1) * dt;
     this.y += this.vy * dt;
     // 땅
     const was = this.onGround;
@@ -146,6 +150,11 @@ export class Runner {
       this.lastGroundY = g.y;
       if (!g.mv && this.s > g.s0 + 0.5 && this.s < g.s1 - 0.5) this.safe = { s: this.s, x: Math.max(g.cx - g.w / 2 + 0.6, Math.min(g.cx + g.w / 2 - 0.6, this.x)), y: g.y };
       if (g.mv && !this.substep) this.x += g.dx; // 움직이는 발판에 실려 간다 (한 프레임에 한 번만)
+      if (g.crumble && g.touchT == null) g.touchT = track.time; // 무너지는 발판: 밟은 때부터 잰다
+      if (M) this.flipInv = !!g.inv;
+      // 발사대는 밟자마자 · 통통 바닥은 내려앉을 때마다 튀어 오른다 (숙이기를 누르고 있으면 안 튄다)
+      if (g.pad) { this.vy = g.pad; this.onGround = false; this.jumps = 1; fx?.('jump2'); }
+      else if (M?.bounce && !was && !input.slideHeld && this.slideBuf <= 0) { this.vy = JUMP * JM * M.bounce; this.onGround = false; this.jumps = 1; }
     }
     // 구름발판: 떨어지지 않고 마지막 발판 높이에 떠 있는다
     if (!this.onGround && this.eff.cloud > 0 && this.vy <= 0 && this.y <= this.cloudY) { this.y = this.cloudY; this.vy = 0; this.onGround = true; this.jumps = 0; }
@@ -162,7 +171,7 @@ export class Runner {
     // 장애물
     const o = this.eff.ghost > 0 || this.invul > 0 ? null : track.hit(this.s, this.x, this.y, this.h);
     if (o && this.eff.shield > 0) { this.eff.shield = 0; track.breakOne(o); fx?.('shieldbreak'); }
-    else if (o) return this.die(o.kind === 'slam' ? '괴물의 일격에 맞았어요' : o.kind === 'bar' ? (track.hell ? '괴물의 팔에 머리를 쿵!' : '가로대에 머리를 쿵!') : '장애물에 부딪혔어요', track);
+    else if (o) return this.die(o.kind === 'meteor' ? '운석에 맞았어요' : o.kind === 'laser' ? '빛줄기에 닿았어요' : o.kind === 'slam' ? '괴물의 일격에 맞았어요' : o.kind === 'bar' ? (track.hell ? '괴물의 팔에 머리를 쿵!' : '가로대에 머리를 쿵!') : '장애물에 부딪혔어요', track);
     // 별사탕
     // 아이템전: ? 상자 · 함정 · 자석
     if (track.itemMode) {
@@ -175,7 +184,7 @@ export class Runner {
     const n = track.takeStars(this.s, this.x, this.y);
     if (n) { this.stars += n; fx?.('star', n); }
     // 꿈 밖으로 떨어짐
-    if (this.y < track.deathY(this.s)) return this.die(track.hell ? '지옥 끝까지 떨어졌어요' : '꿈속 깊이 떨어졌어요', track);
+    if (this.y < track.deathY(this.s)) return this.die(track.hell ? '지옥 끝까지 떨어졌어요' : track.void ? '이공간 너머로 떨어졌어요' : '꿈속 깊이 떨어졌어요', track);
     this.flipT = Math.max(0, this.flipT - dt);
     this.shoveT = Math.max(0, this.shoveT - dt);
   }
