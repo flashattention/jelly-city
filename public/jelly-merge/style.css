@@ -12,7 +12,7 @@
 #ladder canvas.got { opacity: 1; filter: none; }
 #ladder canvas.new { animation: bump .5s ease-out 2; }
 #jar-wrap { position: relative; flex: 0 1 auto; display: flex; align-items: stretch; gap: 10px; }
-#jar { display: block; touch-action: none; cursor: none; }
+#jar { display: block; touch-action: none; cursor: crosshair; }
 #timebar { width: 16px; border-radius: 999px; background: rgba(255,255,255,.14); display: flex; align-items: flex-end; overflow: hidden; border: 2px solid rgba(255,255,255,.25); margin: 30px 0; }
 #timebar i { display: block; width: 100%; height: 100%; border-radius: 999px; background: linear-gradient(0deg, #ff6b8b, #ffd84d 50%, #7cf0c8); transition: height .25s linear; }
 #timebar.hurry i { animation: blink .5s steps(2) infinite; }
