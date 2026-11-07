@@ -6,7 +6,7 @@ export const SLOTS = {
   sash: { name: '휘장', emoji: '🎗️', sub: '업적으로만 얻는 어깨띠' }, crown: { name: '왕관', emoji: '👑', sub: '지금 1위인 동안만 쓰는 왕관' }, medal: { name: '훈장', emoji: '🎖️', sub: '지금 가장 높은 순위(🥇 1위 → 🥈 2위 → 🥉 3위 → 상위 1% → 5% → 10%)가 이름 옆에 저절로 붙어요', auto: true }, title: { name: '칭호', emoji: '🏷️', sub: '이름 옆에 빛나는 글자' },
 };
 export const RARITY = {
-  common: { name: '일반', color: '#c8d0dc' }, rare: { name: '희귀', color: '#5fb6ff' }, epic: { name: '영웅', color: '#c77dff' }, legend: { name: '전설', color: '#ffc93c' }, myth: { name: '신화', color: '#ff5c8a' },
+  common: { name: '일반', color: '#c8d0dc' }, rare: { name: '희귀', color: '#5fb6ff' }, epic: { name: '영웅', color: '#c77dff' }, legend: { name: '전설', color: '#ffc93c' }, myth: { name: '신화', color: '#ff5c8a' }, apex: { name: '초월', color: '#7fe9ff' },
 };
 // 업적 등급: 숫자가 클수록 더 많이 빛난다
 export const TIERS = {
@@ -95,6 +95,19 @@ export const SHOP = [
   it('land', 'jelly', '젤리 튀김', '🍮', 200, 'common', { shape: 'bubble', colors: ['#ff9ed1', '#7fe9ff'], n: 10, size: 0.32 }),
   it('land', 'quake', '땅 울림', '🌍', 1000, 'rare', { shape: 'glow', colors: ['#ffc93c'], n: 14, size: 0.34, ring: '#ffc93c' }),
   it('land', 'meteor', '운석 충돌', '☄️', 12000, 'legend', { shape: 'flame', colors: ['#ff8a3d', '#ffd27a'], n: 26, size: 0.5, ring: '#ff5a1f' }, R('extreme', 1500)),
+  // 초월 도전: 맵마다 초월 난이도 2,500m(전설) · 5,000m(신화) · 10,000m(초월 등급). 높을수록 크고 화려하다
+  //   🌙 꿈나라 — 달빛 · 꿈결 (파스텔 · 무지개)
+  it('aura', 'dreamb', '꿈결 오로라', '🌙', 55000, 'legend', { shape: 'star', colors: ['#ffe8a8', '#c8b6ff', '#a8e8ff'], n: 38, size: 0.32, ring: '#c8b6ff', ring2: '#ffe8a8', rise: 1 }, R('beyond', 2500)),
+  it('back', 'dreamb', '달빛 꿈의 날개', '🦋', 150000, 'myth', { kind: 'wing', color: '#c8b6ff', glow: RAIN, big: 1 }, R('beyond', 5000)),
+  it('trail', 'dreamb', '꿈의 끝 은하 융단', '🌌', 300000, 'apex', { shape: 'star', colors: RAIN, size: 0.5, life: 1.6, rate: 70, ribbon: { w: 1.6, life: 2.2, colors: ['#1b1450', '#ff7aa8', '#ffe8a8', '#ffffff', '#a8e8ff', '#c8b6ff', '#1b1450'] } }, R('beyond', 10000)),
+  //   🔥 지옥 — 업화 · 마왕
+  it('jump', 'hellb', '업화의 포효', '🐲', 60000, 'legend', { shape: 'flame', colors: ['#ff2b2b', '#ff8a3d', '#ffd27a'], n: 44, size: 0.62, ring: '#ff2b2b' }, R('beyond', 2500, 'hell')),
+  it('boost', 'hellb', '염화 질주', '☄️', 160000, 'myth', { shape: 'flame', colors: ['#5a0a0a', '#ff2b2b', '#ff8a3d', '#ffd27a'], size: 0.7, life: 0.7, rate: 110 }, R('beyond', 5000, 'hell')),
+  it('aura', 'hellb', '마왕의 화염 왕좌', '👹', 320000, 'apex', { shape: 'flame', colors: ['#1a0000', '#ff2b2b', '#ff8a3d', '#ffd27a'], n: 56, size: 0.46, ring: '#ff2b2b', ring2: '#ffd27a', rise: 4, dark: true }, R('beyond', 10000, 'hell')),
+  //   🌌 이공간 — 차원 · 특이점
+  it('land', 'voidb', '차원 균열 착지', '🌀', 65000, 'legend', { shape: 'rune', colors: ['#b28bff', '#7fe9ff', '#ffffff'], n: 30, size: 0.52, ring: '#b28bff' }, R('beyond', 2500, 'void')),
+  it('shoes', 'voidb', '사건의 지평선', '🕳️', 170000, 'myth', { color: '#06040e', sole: '#b28bff', wing: '#7fe9ff', flame: '#b28bff', shine: '#ffffff' }, R('beyond', 5000, 'void')),
+  it('back', 'voidb', '특이점의 날개', '✴️', 350000, 'apex', { kind: 'wing', color: '#06040e', glow: RAIN, big: 1, sharp: 1 }, R('beyond', 10000, 'void')),
 ];
 // 난이도 · 맵별 별 보상 배수 (어려울수록 많이)
 export const STAR_MULT = { easy: 1, hard: 1.6, extreme: 2.2, lightspeed: 3.2, beyond: 4.5 };
