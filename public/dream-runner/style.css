@@ -81,10 +81,14 @@ h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 .ms-row > span:first-child { white-space: nowrap; }
 @media (max-width: 480px) { .ms-row { grid-template-columns: 1.25fr 1fr 1.4fr 1.4fr; font-size: 12px; padding: 4px 6px; gap: 4px; } }
 .board { display: flex; flex-direction: column; gap: 4px; text-align: left; max-height: 340px; overflow-y: auto; }
-.brow { display: grid; grid-template-columns: 38px 1fr auto; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,.06); font-size: 15px; }
+.brow { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,.06); font-size: 15px; }
 .brow .rk { font-family: 'Jua', sans-serif; text-align: center; }
-.brow .nm { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; } /* 메달이 많으면 다음 줄로 */
-.brow .nm > * { white-space: nowrap; }
+.brow .nm { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brow .nm-t { display: flex; align-items: center; gap: 6px; flex-shrink: 0; white-space: nowrap; } /* 이름은 제자리(세로 가운데) */
+.brow .md { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; } /* 메달은 이름 오른쪽에서만, 넘치면 다음 줄로 */
+.brow .md:empty { display: none; }
+.brow .md > * { white-space: nowrap; }
+@media (max-width: 560px) { .brow .nm { flex-wrap: wrap; gap: 6px; } .brow .md { flex-basis: 100%; } .brow .md > * { font-size: 11px; } } /* 좁은 화면: 이름 줄은 비워 두고 메달은 그 아래 줄부터 */
 .brow .sc { font-family: 'Jua', sans-serif; font-size: 17px; }
 .brow .sc small { font-family: 'Gowun Dodum'; color: var(--soft); font-size: 12px; margin-left: 6px; }
 .brow.me { background: rgba(255,216,77,.22); outline: 1px solid var(--gold); }
@@ -216,11 +220,12 @@ body #chat { bottom: 150px; }
   #title .t-left, #title .t-right { display: flex; flex-direction: column; min-width: 0; }
   #title .t-left { padding-right: 32px; border-right: 1px solid rgba(255,255,255,.14); }
   #title .t-right .picks { margin-top: 0; }
-  #fame { display: flex; flex-direction: column; gap: 5px; text-align: left; }
+  #fame { display: flex; flex-direction: column; gap: 5px; text-align: left; max-height: min(52vh, 460px); overflow-y: auto; padding-right: 4px; }
   .fame-h { font-family: 'Jua', sans-serif; font-size: 20px; text-align: center; margin-bottom: 6px; color: var(--gold); }
-  .fame-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 12px; background: rgba(255,255,255,.07); font-size: 14px; }
+  .fame-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 4px 8px; padding: 6px 10px; border-radius: 12px; background: rgba(255,255,255,.07); font-size: 14px; }
+  .fame-md { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 4px; } /* 메달 모두, 넘치면 다음 줄로 */
+  .fame-md > * { white-space: nowrap; font-size: 12px; }
   .fame-nm { display: flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: bold; }
   .fame-nm .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-  .fame-at { font-size: 12px; color: var(--soft); white-space: nowrap; }
   .fame-sc { font-family: 'Jua', sans-serif; font-size: 15px; min-width: 52px; text-align: right; }
 }

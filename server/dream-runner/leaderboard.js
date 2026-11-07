@@ -68,12 +68,12 @@ export class DreamBoard {
   }
   // 명예의 전당: 꿈나라 초월 1위 → 지옥 초월 1위 → 꿈나라 광속 1위 → … → 지옥 익스트림 1위, 다음은 2위 · 3위 차례로. 한 사람은 한 번만 (가장 높은 자리)
   fame(n = 12) {
-    const order = ['beyond', 'lightspeed', 'extreme'].flatMap((diff) => [[diff, 'dream'], [diff, 'hell']]), seen = new Set(), out = [];
+    const order = ['beyond', 'lightspeed', 'extreme'].flatMap((diff) => [[diff, 'dream'], [diff, 'hell']]), seen = new Set(), out = [], P = this.podium();
     for (let r = 0; r < 3; r++) for (const [diff, map] of order) {
       if (out.length >= n) return out;
       const all = this.sorted('speed', diff, map), x = all[r]; if (!x || seen.has(x[0])) continue;
       const [sub, e] = x; seen.add(sub);
-      out.push({ rank: r + 1, diff, map, id: sub.slice(-8), name: nameOf(sub, e), color: e.color, score: e.score, medal: boardMedal(`dr.${map}.${diff}`, r + 1, all.length) });
+      out.push({ rank: r + 1, diff, map, id: sub.slice(-8), name: nameOf(sub, e), color: e.color, score: e.score, medals: this.badges(sub, P, 'speed', diff, map, r + 1, all.length).medals }); // 그 사람의 메달 모두 (순위표와 같은 순서)
     }
     return out;
   }

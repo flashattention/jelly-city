@@ -105,7 +105,7 @@ function show(id) { for (const s of screens) $(s).classList.toggle('hidden', s !
 // 처음 화면 왼쪽: 명예의 전당 (높은 난이도 1위부터, 한 사람은 한 번만)
 async function renderFame() {
   let d; try { d = await account.api('/api/dream/fame'); } catch { return; }
-  const row = (f) => `<div class="fame-row"><span class="fame-rk">${['🥇', '🥈', '🥉'][f.rank - 1]}</span><span class="fame-nm"><span class="dot" style="background:${esc(f.color)}"></span>${esc(f.name)}</span><span class="fame-at">${f.map === 'hell' ? '🔥 지옥' : '🌙 꿈나라'} ${esc(DIFFS[f.diff]?.name || f.diff)} ${f.rank}위</span><span class="fame-sc">${f.score.toLocaleString()}</span></div>`;
+  const row = (f) => `<div class="fame-row"><span class="fame-rk">${['🥇', '🥈', '🥉'][f.rank - 1]}</span><span class="fame-nm"><span class="dot" style="background:${esc(f.color)}"></span>${esc(f.name)}</span><span class="fame-sc">${f.score.toLocaleString()}</span><span class="fame-md">${(f.medals || []).map((m) => medalHtml(m)).join('')}</span></div>`;
   $('fame').innerHTML = `<div class="fame-h">🏆 명예의 전당</div>` + (d.fame.length ? d.fame.map(row).join('') : '<div class="empty">아직 기록이 없어요</div>');
 }
 renderFame(); // 처음 열 때
@@ -289,7 +289,7 @@ async function loadBoard(mode = 'speed', diff = 'easy', map = 'dream') { try { r
 function renderBoard(el, d, hl) {
   const top = d.top || [], me = d.me;
   const myId = me?.id;
-  const row = (e) => `<div class="brow${e.id === myId ? ' me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.name)}${(e.medals || (e.medal ? [e.medal] : [])).map((m) => medalHtml(m, e.title)).join('')}${titleHtml(e.title)}${e.guest ? ' <span class="guest">체험판</span>' : e.anon ? ' <span class="guest">비로그인</span>' : ''}</span><span class="sc">${e.score.toLocaleString()}<small>${e.dist.toLocaleString()}m · ⭐${e.stars}</small></span></div>`;
+  const row = (e) => `<div class="brow${e.id === myId ? ' me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="nm-t"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.name)}${e.guest ? ' <span class="guest">체험판</span>' : e.anon ? ' <span class="guest">비로그인</span>' : ''}</span><span class="md">${(e.medals || (e.medal ? [e.medal] : [])).map((m) => medalHtml(m, e.title)).join('')}${titleHtml(e.title)}</span></span><span class="sc">${e.score.toLocaleString()}<small>${e.dist.toLocaleString()}m · ⭐${e.stars}</small></span></div>`;
   let html = top.slice(0, hl ? 10 : 50).map(row).join('');
   if (me && me.rank > (hl ? 10 : 50)) html += '<div class="brow gap">⋯</div>' + row(me);
   el.innerHTML = html || '<div class="empty">아직 기록이 없어요. 첫 번째 주인공이 되어 보세요!</div>';
