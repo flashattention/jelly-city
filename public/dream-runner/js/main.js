@@ -4,7 +4,10 @@ import * as THREE from 'three';
 import { isPhone, autoRes } from '../../shared/js/perf.js';
 import { account, store, apiUrl } from '../../shared/js/account.js';
 import { TOSS, bridge } from '../../shared/js/platform.js';
-if (TOSS) document.body.classList.add('toss'); // 토스 미니앱: 혼자 달리기 · 토스 로그인 · 광고 보너스 (같이 달리기 · 메인 화면 없음)
+// 토스 미니앱: 혼자 달리기 · 토스 로그인 · 광고 보너스 (같이 달리기 · 메인 화면 없음)
+// 웹: PWA 로 설치할 수 있게 (마이크로소프트 스토어 등). 토스 미니앱은 토스가 담아 주니 서비스 워커를 안 쓴다
+if (TOSS) document.body.classList.add('toss');
+else if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 import { localChars, LOCAL_MAX } from '../../shared/js/local-chars.js';
 import { Chat } from '../../shared/js/chat.js';
 import { Env } from './env.js';

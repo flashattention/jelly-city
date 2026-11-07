@@ -1,0 +1,21 @@
+{
+  "id": "/dream-runner/",
+  "name": "드림 러너",
+  "short_name": "드림 러너",
+  "description": "잠든 곰돌이가 꿈속을 끝없이 달리는 3D 러너 게임. 꿈나라 · 지옥 · 이공간 3가지 맵과 5단계 난이도, 순위표와 치장까지.",
+  "lang": "ko",
+  "dir": "ltr",
+  "start_url": "/dream-runner/",
+  "scope": "/dream-runner/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#1a0a3a",
+  "theme_color": "#2b1a6e",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

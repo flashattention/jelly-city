@@ -55,7 +55,7 @@ const PASSWORD = process.env.GAME_PASSWORD || '';
 const TICK = 1 / 20;
 const SNAP_EVERY = 2; // 10Hz
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
 
 // 서버 이전용: 데이터 폴더에 import.json 이 있으면 그걸로 세계를 복원하고 지운다
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
