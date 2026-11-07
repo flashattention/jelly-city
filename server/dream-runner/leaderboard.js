@@ -127,6 +127,9 @@ export class DreamBoard {
     // 브라우저마다 소수점 끝자리가 조금 달라도 괜찮게 약간의 오차는 넘어간다
     const dOk = r.dead && Math.abs(r.dist - Number(b.dist)) <= Math.max(3, r.dist * 0.01), sOk = Math.abs(r.stars - Number(b.stars)) <= Math.max(1, r.stars * 0.02);
     if (!dOk || !sOk) { this.vstat.bad++; console.warn(`드림 러너 기록 불일치: 보냄 ${b.dist}m ★${b.stars} / 재생 ${r.dist}m ★${r.stars} (${diff} ${map}, ${rp.dts.length}프레임)`); return { ok: false, why: 'mismatch', r }; }
+    // 느리게 돌리기(게임 시계를 늦추는 조작): 기록된 게임 시간이 실제로 지난 시간보다 한참 짧은데, 느린 기기처럼 프레임이 막힌(0.05초) 흔적도 없으면 의심
+    if (tk) { const real = (now - tk.at) / 1000, capped = rp.dts.filter((v) => v >= 500).length / rp.dts.length;
+      if (real - sum > Math.max(15, real * 0.25) && capped < 0.1) { this.vstat.slow = (this.vstat.slow || 0) + 1; console.warn(`드림 러너 느리게 돌리기 의심: 게임 ${sum.toFixed(1)}초 / 실제 ${real.toFixed(1)}초 (${diff} ${map})`); return { ok: false, why: 'slowmo', r, game: sum, real }; } }
     this.vstat.ok++; return { ok: true, r, ticket: !!tk };
   }
   ticket(b) { return this.tickets.issue({ seed: Number(b.seed) | 0, diff: diffOf(b.diff), map: b.map === 'hell' ? 'hell' : 'dream', mode: b.mode === 'item' ? 'item' : 'speed' }); }
@@ -167,7 +170,7 @@ export class DreamBoard {
     if (newBest) T[who.sub] = entry;
     // 비상 리포트 (기록은 바로 순위표에 오른다)
     if (newBest) { const higher = Object.values(T).filter((e) => e.score > score).length;
-      if (!chk.ok && !chk.soft && higher < TOP_GUARD) this.report('red', who.sub, mode, diff, map, chk.why, entry, chk.r); }
+      if (!chk.ok && !chk.soft && higher < TOP_GUARD) this.report('red', who.sub, mode, diff, map, chk.why, entry, chk.r, chk.why === 'slowmo' ? { game: Math.round(chk.game), real: Math.round(chk.real) } : undefined); }
     else { old.name = name; old.color = color; old.char = entry.char; } // 이름·색은 최근 것으로
     getCos()?.refresh(who.sub); // 업적: 거리 · 순위
     return { score, mode, diff, map, newBest, prev: old?.score || 0, me: this.mine(who.sub, mode, diff, map), top: this.top(mode, diff, map), runs: this.runs };

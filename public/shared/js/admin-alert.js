@@ -4,7 +4,7 @@ import { account } from './account.js';
 
 const DIFF = { easy: '🙂 노멀', hard: '🔥 하드', extreme: '💀 익스트림', lightspeed: '⚡ 광속', beyond: '🌌 초월' };
 const WHY = {
-  mismatch: '서버가 입력을 다시 돌려 본 결과와 다름', time: '실제로 지난 시간보다 긴 기록', noreplay: '입력 기록 없이 올라옴',
+  mismatch: '서버가 입력을 다시 돌려 본 결과와 다름', slowmo: '게임을 느리게 돌린 것 같음 (게임 속 시간이 실제로 지난 시간보다 한참 짧음)', time: '실제로 지난 시간보다 긴 기록', noreplay: '입력 기록 없이 올라옴',
   jump: '재생은 맞지만 기존 1위를 갑자기 크게 앞섬 (진짜 키를 누르는 프로그램일 수 있어요)',
 };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -21,7 +21,7 @@ const CSS = `.aa-wrap{position:fixed;inset:0;z-index:100010;display:flex;align-i
 
 export function reportRow(x) {
   const lvl = x.lvl === 'yellow' ? '🟡 검토 권장' : '🔴 조작 의심', where = `드림 러너 ${x.map === 'hell' ? '🔥 지옥' : '🌙 꿈나라'} ${DIFF[x.diff] || x.diff}${x.mode === 'item' ? ' 아이템전' : ''}`;
-  const detail = x.why === 'mismatch' && x.r ? ` · 보낸 기록 ${x.dist}m ★${x.stars} / 다시 돌린 결과 ${x.r.dist}m ★${x.r.stars}` : x.why === 'jump' && x.prevTop ? ` · 기존 1위 ${x.prevTop.toLocaleString()}점 → ${x.score.toLocaleString()}점 (${(x.score / x.prevTop).toFixed(1)}배)` : '';
+  const detail = x.why === 'mismatch' && x.r ? ` · 보낸 기록 ${x.dist}m ★${x.stars} / 다시 돌린 결과 ${x.r.dist}m ★${x.r.stars}` : x.why === 'slowmo' && x.real ? ` · 게임 속 ${x.game}초 / 실제 ${x.real}초` : x.why === 'jump' && x.prevTop ? ` · 기존 1위 ${x.prevTop.toLocaleString()}점 → ${x.score.toLocaleString()}점 (${(x.score / x.prevTop).toFixed(1)}배)` : '';
   return `<div class="aa-row ${x.lvl === 'yellow' ? 'yellow' : ''}"><div class="aa-t">${lvl} · <b>${esc(x.name)}</b> ${x.score.toLocaleString()}점 <small>${where} · ${x.dist.toLocaleString()}m · ⭐${x.stars} · ${x.time}초 · ${ago(x.at)}${x.live ? '' : ' · (이미 다른 기록으로 바뀜)'}</small></div>
     <div class="aa-w">${esc(WHY[x.why] || x.why)}${detail}</div>
     <div class="aa-b"><button class="aa-ok" data-ok="${esc(x.id)}">✅ 정상 인정</button><button class="aa-del" data-del="${esc(x.id)}">🗑️ 기록 삭제 · 별 몰수</button><button class="aa-skip" data-skip="${esc(x.id)}">⏭️ 넘기기</button></div></div>`;
