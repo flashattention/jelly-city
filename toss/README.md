@@ -14,28 +14,26 @@
 - 미니앱 요청은 `/api/toss/…`로 와요. 서버는 같은 드림 러너 · 치장 API를 토스 저장소에 써요 (`server/index.js`, `server/toss.js`).
 - 게임 코드는 `window.__TOSS__`가 있으면 토스 모드로 돌아요 (`public/shared/js/platform.js`).
 
-## 번들 만들기
+## .ait 만들기
 
 ```bash
-node tools/toss-bundle.mjs   # → toss/web/ (정적 파일, git 에는 안 올라간다)
+cd toss/app
+npm install        # 처음 한 번 (앱인토스 SDK · esbuild)
+npm run build      # 번들(dist/) → SDK 다리 묶기(dist/toss-bridge.js) → toss/app/dream-runner.ait
 ```
 
-- `toss/web/index.html`은 게임보다 먼저 `./toss-bridge.js`(토스 SDK 다리)를 불러와요.
-- `toss/bridge.js`가 있으면 그걸 다리로 넣고, 없으면 시험용 다리(서버 주소만 있음)를 넣어요.
+- `dist/`는 웹 드림 러너 코드를 그대로 복사한 것이에요 (`tools/toss-bundle.mjs`). 게임은 `public/`만 고치면 돼요.
+- `bridge.js`가 토스 SDK를 게임에 잇는 다리예요: 토스 로그인(`appLogin`) · 보상형 광고(`loadFullScreenAd` / `showFullScreenAd`, 보상은 `userEarnedReward`에서만).
+- `apps-in-toss.config.ts`의 `appName`은 콘솔에 등록한 앱 이름과 같아야 올라가요.
 
-## 처음 출시할 때 할 일
+## 출시 · 업데이트할 때
 
-1. 앱인토스 콘솔 가입 · 미니앱 등록 (게임 미니앱이면 게임물 등급분류 확인).
-2. 앱인토스 개발자센터의 WebView 가이드대로 미니앱 프로젝트를 만들고, `toss/web/` 파일을 그 프로젝트에 넣어요.
-3. `toss/bridge.example.js`를 `toss/bridge.js`로 복사해서 채워요.
-   - 토스 로그인: `appLogin()`
-   - 보상형 광고: `showRewardedAd()` (끝까지 보면 `true`)
-   - SDK 함수 이름 · 모양은 개발자센터 문서로 확인해요. `showRewardedAd`가 없으면 광고 버튼은 보이지 않아요.
-4. 서버(Fly) 환경 변수에 토스 로그인용 mTLS 인증서 · 키를 넣어요.
+1. `npm run build`로 `dream-runner.ait`를 만들어 콘솔 '앱 번들'에 올리고 '토스앱 테스트'로 확인해요.
+2. 검수 요청 (평균 2~3일) → 승인되면 '출시하기'.
+3. 보상형 광고: `bridge.js`의 `AD_GROUP`을 콘솔에서 받은 광고 그룹 아이디로 바꿔요 (지금은 개발용 시험 아이디).
+4. 토스 로그인: 서버(Fly) 환경 변수에 mTLS 인증서 · 키를 넣어요.
    - `TOSS_MTLS_CERT`, `TOSS_MTLS_KEY`: PEM 글자 그대로 또는 base64
-   - 토스 파트너 API 주소 · 경로가 문서와 다르면 `TOSS_API_BASE`, `TOSS_TOKEN_PATH`, `TOSS_ME_PATH`로 맞춰요.
-   - 키가 없으면 서버는 "토스 로그인을 준비하고 있어요"라고 답해요.
-5. 번들을 콘솔에 올리고 검수(평균 2~3일) → 출시.
+   - 키가 없으면 서버는 "토스 로그인을 준비하고 있어요"라고 답해요 (로그인 없이 달리기는 돼요).
 
 ## 웹에서 미니앱 화면 시험하기
 

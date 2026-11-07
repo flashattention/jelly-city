@@ -1,0 +1,15 @@
+{
+  "name": "dream-runner-toss",
+  "version": "1.0.0",
+  "description": "드림 러너 토스 미니앱 (앱인토스)",
+  "scripts": {
+    "bundle": "node ../../tools/toss-bundle.mjs",
+    "bridge": "esbuild bridge.js --bundle --format=esm --minify --outfile=dist/toss-bridge.js",
+    "build": "npm run bundle && npm run bridge && ait build"
+  },
+  "dependencies": {
+    "@apps-in-toss/web-framework": "^3.10.0",
+    "esbuild": "^0.28.2"
+  },
+  "private": true
+}

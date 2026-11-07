@@ -25,5 +25,8 @@ Thumbs.db
 .fly/
 .render/
 
-# 토스 미니앱 번들 (tools/toss-bundle.mjs 로 만든다)
+# 토스 미니앱: 번들 · SDK · 빌드한 .ait (toss/app 에서 npm run build 로 만든다)
 toss/web/
+toss/app/dist/
+toss/app/node_modules/
+toss/app/*.ait

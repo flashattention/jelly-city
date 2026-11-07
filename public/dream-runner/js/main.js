@@ -139,8 +139,7 @@ async function boot() {
   let status = {};
   try { status = await account.status(); } catch { err('서버에 연결할 수 없어요'); }
   game.status = status;
-  let ok = await account.restore();
-  if (TOSS && !ok) { try { await account.tossLogin(); ok = true; } catch (e) { toast(`토스 로그인을 못 했어요 · ${e.message}`, 2600); } } // 토스 앱 안에서는 바로 로그인
+  const ok = await account.restore();
   // 점검용: ?autostart&name=이름 (개발 서버에서만)
   const q = new URLSearchParams(location.search);
   if (!ok && q.has('autostart') && status.devLogin) { try { await account.login({ dev: q.get('name') || '러너' }); } catch (e) { err(e.message); } }
@@ -153,7 +152,10 @@ async function boot() {
     joinByCode(inv); // 링크로 들어오면 바로 그 방으로
   }
 }
+// 토스 미니앱: '토스로 시작하기' 를 눌러야 토스 로그인 (토스 정책: 사용자가 누를 때 부른다). 로그인 전에도 달릴 수 있다
+$('toss-login').onclick = async () => { const b = $('toss-login'); b.disabled = true; try { await account.tossLogin(); renderAccount(); toast('😊 토스로 들어왔어요'); } catch (e) { toast(`토스 로그인을 못 했어요 · ${e.message}`, 2600); } finally { b.disabled = false; } };
 function renderAccount() {
+  $('toss-login').classList.toggle('hidden', !TOSS || !!account.user);
   const on = logged();
   $('login-box').classList.toggle('hidden', on);
   $('who-row').classList.toggle('hidden', !on);
