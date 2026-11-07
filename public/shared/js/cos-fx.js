@@ -69,33 +69,50 @@ class Spray {
   }
 }
 
-// 바닥에 깔리는 띠 (무지개 길): 발자국 자리를 이어 폭이 있는 띠를 그리고 뒤로 갈수록 옅어진다
-let rainTex = null;
-function rainbowTex() {
-  if (rainTex) return rainTex; const c = document.createElement('canvas'); c.width = 64; c.height = 4; const x = c.getContext('2d'), g = x.createLinearGradient(0, 0, 64, 0);
-  ['#ff3b5c', '#ff9a2e', '#ffe14d', '#4fe08a', '#3fc8ff', '#5b6bff', '#c45bff'].forEach((col, i) => { g.addColorStop(0.04 + i * 0.153, col); });
+// 바닥에 깔리는 띠 (무지개 길 · 리본 길들): 발자국 자리를 이어 폭이 있는 띠를 그리고 뒤로 갈수록 옅어진다
+//   띠는 가로로 색이 나뉜다 (colors 순서대로, 없으면 무지개 7색)
+const RAIN7 = ['#ff3b5c', '#ff9a2e', '#ffe14d', '#4fe08a', '#3fc8ff', '#5b6bff', '#c45bff'];
+const ribTex = {};
+function ribbonTex(cols = RAIN7) {
+  const key = cols.join(); if (ribTex[key]) return ribTex[key];
+  const c = document.createElement('canvas'); c.width = 64; c.height = 4; const x = c.getContext('2d'), g = x.createLinearGradient(0, 0, 64, 0);
+  cols.forEach((col, i) => { g.addColorStop(cols.length > 1 ? 0.04 + i * (0.92 / (cols.length - 1)) : 0.5, col); });
   x.fillStyle = g; x.fillRect(0, 0, 64, 4); const e = x.createLinearGradient(0, 0, 64, 0); e.addColorStop(0, 'rgba(0,0,0,1)'); e.addColorStop(0.08, 'rgba(0,0,0,0)'); e.addColorStop(0.92, 'rgba(0,0,0,0)'); e.addColorStop(1, 'rgba(0,0,0,1)'); x.globalCompositeOperation = 'destination-out'; x.fillStyle = e; x.fillRect(0, 0, 64, 4);
-  rainTex = new THREE.CanvasTexture(c); rainTex.colorSpace = THREE.SRGBColorSpace; return rainTex;
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return (ribTex[key] = t);
 }
+// 이만큼 벌어지면 띠를 끊는다: 트랙이 1500m 마다 앞으로 옮겨질 때 · 되살아날 때 · 다른 사람 위치가 순간이동할 때 · 높은 곳에 내려앉을 때 · 공중에 오래 있을 때
+//   (끊지 않으면 마지막 자리와 새 자리가 한 띠로 이어져서 트랙 위로 앞뒤로 쭉 늘어나거나 위아래로 벽처럼 선다)
+const RIB_JUMP = 6, RIB_RISE = 1.2, RIB_GAP = 0.35;
 class Ribbon {
   constructor(root, o) {
-    this.root = root; this.w = o.w || 0.9; this.life = o.life || 1.2; this.N = 48; this.pts = []; this.acc = 0;
+    this.root = root; this.w = o.w || 0.9; this.life = o.life || 1.2; this.N = 48; this.pts = []; this.acc = 0; this.off = 0;
     const g = new THREE.BufferGeometry(), n = this.N * 2; this.pos = new Float32Array(n * 3); this.col = new Float32Array(n * 4); const uv = new Float32Array(n * 2), idx = [];
     for (let i = 0; i < this.N; i++) { uv.set([0, i / this.N, 1, i / this.N], i * 4); if (i) { const a = (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } }
     g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(this.col, 4)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(idx);
-    this.mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: rainbowTex(), vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide })); // 밝은 바닥에서도 색이 날아가지 않게 보통 섞기 + 꼭짓점 투명도
+    this.mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: ribbonTex(o.colors), vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide })); // 밝은 바닥에서도 색이 날아가지 않게 보통 섞기 + 꼭짓점 투명도
     this.mesh.frustumCulled = false; root.add(this.mesh);
   }
   update(dt, on, x, y, z) {
     for (const p of this.pts) { p.a += dt; p.x += DR.x * dt; p.z += DR.z * dt; }
     while (this.pts.length && this.pts[0].a > this.life) this.pts.shift();
-    this.acc += dt; if (on && this.acc > 0.025) { this.acc = 0; this.pts.push({ x, y: y + 0.04, z, a: 0 }); if (this.pts.length > this.N) this.pts.shift(); }
+    this.off = on ? 0 : this.off + dt;
+    this.acc += dt; if (on && this.acc > 0.025) {
+      this.acc = 0;
+      const L = this.pts[this.pts.length - 1];
+      // 벌어졌으면 끊는다: 앞 띠 끝과 새 띠 시작에 투명한 자리를 하나씩 끼워 그 사이 조각이 안 보이게
+      if (L && !L.cut && (Math.hypot(x - L.x, z - L.z) > RIB_JUMP || Math.abs(y + 0.04 - L.y) > RIB_RISE || this.offAt > RIB_GAP)) { this.pts.push({ ...L, cut: true }, { x, y: y + 0.04, z, a: 0, cut: true }); }
+      this.pts.push({ x, y: y + 0.04, z, a: 0 }); this.offAt = 0;
+      while (this.pts.length > this.N) this.pts.shift();
+    }
+    if (!on) this.offAt = this.off;
     const P = this.pts, n = P.length; this.mesh.visible = n > 1; if (n < 2) return;
     this.root.updateMatrixWorld();
     for (let i = 0; i < this.N; i++) {
-      const j = Math.min(n - 1, i), p = P[j], q = P[Math.min(n - 1, j + 1)], o = P[Math.max(0, j - 1)];
-      let dx = q.x - o.x, dz = q.z - o.z; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
-      const k = i < n ? Math.max(0, 1 - p.a / this.life) : 0, hw = this.w * 0.5 * (0.55 + 0.45 * k);
+      const j = Math.min(n - 1, i), p = P[j];
+      // 방향은 끊긴 자리를 건너지 않고 같은 띠 안의 이웃으로만
+      const q = P[Math.min(n - 1, j + 1)].cut && !p.cut ? p : P[Math.min(n - 1, j + 1)], o = P[Math.max(0, j - 1)].cut && !p.cut ? p : P[Math.max(0, j - 1)];
+      let dx = q.x - o.x, dz = q.z - o.z; const L = Math.hypot(dx, dz); if (L > 1e-4) { dx /= L; dz /= L; } else { dx = 0; dz = 1; }
+      const k = i < n && !p.cut ? Math.max(0, 1 - p.a / this.life) : 0, hw = this.w * 0.5 * (0.55 + 0.45 * k);
       for (let sd = 0; sd < 2; sd++) { const sgn = sd ? 1 : -1; WV2.set(p.x - dz * hw * sgn, p.y, p.z + dx * hw * sgn); this.root.worldToLocal(WV2); this.pos.set([WV2.x, WV2.y, WV2.z], (i * 2 + sd) * 3); this.col.set([1, 1, 1, Math.min(0.92, k * 1.1)], (i * 2 + sd) * 4); }
     }
     const a = this.mesh.geometry.attributes; a.position.needsUpdate = true; a.color.needsUpdate = true;

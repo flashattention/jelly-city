@@ -63,6 +63,17 @@ export const SHOP = [
   it('trail', 'bolt', '번개 자국', '⚡', 6000, 'epic', { shape: 'bolt', colors: ['#7ff0ff', '#ffffff'], size: 0.42, life: 0.35 }),
   it('trail', 'rainbow', '무지개 길', '🌈', 22000, 'legend', { shape: 'star', colors: RAIN, size: 0.42, life: 1.1, rate: 55, ribbon: { w: 1.25, life: 1.6 } }, R('extreme', 2000)), // 바닥에 깔리는 무지개 띠 + 반짝이
   it('trail', 'skull', '해골 발자국', '💀', 30000, 'legend', { shape: 'skull', colors: ['#e8e0c8', '#ff3b4d'], size: 0.38, life: 0.8 }, R('hard', 3000, 'hell')),
+  // 리본 길: 무지개 길처럼 바닥에 띠가 깔린다 (ribbon.colors = 띠의 가로 색)
+  it('trail', 'candyrib', '사탕 리본 길', '🍭', 1800, 'rare', { shape: 'star', colors: ['#ff9ed1', '#fff3b0', '#7fe9ff'], size: 0.3, life: 0.8, rate: 30, ribbon: { w: 0.95, life: 1.1, colors: ['#ff9ed1', '#fff3b0', '#7fe9ff', '#ff9ed1'] } }),
+  it('trail', 'mintrib', '민트 바람 길', '🍃', 2600, 'rare', { shape: 'petal', colors: ['#5fe0b0', '#b8f5c8'], size: 0.28, life: 0.9, rate: 28, ribbon: { w: 1, life: 1.2, colors: ['#2fbf8f', '#5fe0b0', '#b8f5c8', '#4cc3ff'] } }),
+  it('trail', 'sakurarib', '벚꽃 비단길', '🌸', 3600, 'epic', { shape: 'petal', colors: ['#ffb7d2', '#ffd9e6', '#ff8fc0'], size: 0.32, life: 1.2, rate: 34, ribbon: { w: 1.05, life: 1.3, colors: ['#ff8fc0', '#ffd9e6', '#ffffff', '#ffb7d2'] } }),
+  it('trail', 'wave', '파도 물결 길', '🌊', 4800, 'epic', { shape: 'bubble', colors: ['#c8f1ff', '#7fe9ff'], size: 0.3, life: 1, rate: 30, ribbon: { w: 1.1, life: 1.3, colors: ['#1f5fff', '#3fc8ff', '#7fe9ff', '#e6fbff'] } }),
+  it('trail', 'goldrib', '황금 융단', '✨', 7500, 'epic', { shape: 'coin', colors: ['#ffc93c', '#fff0a0'], size: 0.28, life: 0.9, rate: 36, ribbon: { w: 1.1, life: 1.4, colors: ['#b37a10', '#ffc93c', '#fff0a0', '#ffc93c', '#b37a10'] } }),
+  it('trail', 'neonrib', '네온 레이저 길', '💠', 11000, 'epic', { shape: 'bolt', colors: ['#00f5ff', '#ff2bd6'], size: 0.34, life: 0.45, rate: 40, ribbon: { w: 0.9, life: 1.2, colors: ['#ff2bd6', '#101428', '#00f5ff', '#101428', '#ff2bd6'] } }, R('hard', 2500)),
+  it('trail', 'aurora', '오로라 길', '🌌', 26000, 'legend', { shape: 'star', colors: ['#5fe0b0', '#7fe9ff', '#c77dff'], size: 0.38, life: 1.2, rate: 45, ribbon: { w: 1.3, life: 1.7, colors: ['#5fe0b0', '#7fe9ff', '#9f7bff', '#c77dff'] } }, R('extreme', 2500)),
+  it('trail', 'lava', '용암 강', '🌋', 34000, 'legend', { shape: 'flame', colors: ['#ff5a1f', '#ffd27a'], size: 0.42, life: 0.6, rate: 48, ribbon: { w: 1.3, life: 1.5, colors: ['#5a0a0a', '#ff2b2b', '#ff8a3d', '#ffd27a', '#ff2b2b'] } }, R('extreme', 2000, 'hell')),
+  it('trail', 'milky', '은하수 길', '🌠', 70000, 'myth', { shape: 'star', colors: ['#ffffff', '#b28bff', '#7fe9ff'], size: 0.4, life: 1.3, rate: 55, ribbon: { w: 1.35, life: 1.8, colors: ['#1b1450', '#6a4dff', '#ffffff', '#7fe9ff', '#1b1450'] } }, R('lightspeed', 2000)),
+  it('trail', 'dawn', '여명의 길', '🌅', 140000, 'myth', { shape: 'glow', colors: ['#ffe27a', '#ff9a6b', '#ffffff'], size: 0.46, life: 1.3, rate: 55, ribbon: { w: 1.4, life: 1.9, colors: ['#3a2a8a', '#ff5c8a', '#ff9a6b', '#ffe27a', '#ffffff'] } }, R('beyond', 2000)),
   // 2단 점프
   it('jump', 'puff', '뭉게구름', '☁️', 60, 'common', { shape: 'glow', colors: ['#ffffff'], n: 12, size: 0.5 }),
   it('jump', 'star', '별 터짐', '⭐', 180, 'common', { shape: 'star', colors: ['#ffe066', '#fff3b0'], n: 14, size: 0.36 }),
@@ -123,6 +134,14 @@ export const DIFF_STYLE = {
   easy: { e: '🙂', grad: ['#5fe0b0', '#b8f5c8', '#4cc3ff'] }, hard: { e: '🔥', grad: ['#ff5c3a', '#ffa23a', '#ffd27a'] }, extreme: { e: '💀', grad: ['#ff2e63', '#b026ff', '#ff7ab0'] },
   lightspeed: { e: '⚡', grad: ['#ffee70', '#7ff0ff', '#4d7cff'] }, beyond: { e: '🌌', grad: ['#ff5c8a', '#ffc93c', '#5fe0b0', '#7fe9ff', '#c77dff'] },
 };
+// 정상의 길: 드림 러너 난이도마다 하나. 그 난이도 순위표(꿈나라 · 지옥 어느 쪽이든) 지금 3위 안에 있는 동안만 쓴다 (사지 않는다)
+//   띠 · 반짝이 색은 그 난이도 아이콘 색(DIFF_STYLE.grad)이고, 어려운 난이도일수록 띠가 넓고 반짝이가 많다
+export const TOP3_TRAILS = DIFF_ORDER.map((d, i) => {
+  const st = DIFF_STYLE[d], cols = st.grad;
+  return { id: `trail.top3.${d}`, slot: 'trail', name: `${DIFF_NAMES[d]} 정상의 길`, emoji: st.e, rarity: 'myth', top3: d,
+    fx: { shape: i >= 3 ? 'star' : 'glow', colors: cols, size: 0.36 + i * 0.03, life: 1.1 + i * 0.1, rate: 45 + i * 6, ribbon: { w: 1.25 + i * 0.07, life: 1.6 + i * 0.12, colors: [...cols, cols[0]] } } };
+});
+export const top3Text = (it) => `${DIFF_STYLE[it.top3]?.e || ''} ${DIFF_NAMES[it.top3]} 순위표(꿈나라 · 지옥) 지금 3위 안에 있는 동안만 쓸 수 있어요`;
 const styleOf = (r) => { const d = r?.diff && DIFF_STYLE[r.diff]; return d ? { e: d.e, grad: r.map === 'hell' ? [...d.grad, '#ff3a1a'] : d.grad } : null; };
 export const prestigeOf = (r) => (r?.kind === 'dream' ? 1 + Math.max(0, DIFF_ORDER.indexOf(r.diff)) + (r.map === 'hell' ? 0.5 : 0) : r?.kind === 'record' ? 1 : 0);
 const TIER_STEP = ['bronze', 'silver', 'gold', 'platinum', 'legend'];
@@ -178,7 +197,7 @@ function rewardItems() {
   }
   return out;
 }
-export const ITEMS = [...SHOP, ...rewardItems()];
+export const ITEMS = [...SHOP, ...TOP3_TRAILS, ...rewardItems()];
 export const itemById = new Map(ITEMS.map((i) => [i.id, i]));
 // 착용 정보 다듬기: 없는 아이템 · 칸이 맞지 않는 것은 뺀다 (서버 · 브라우저 공용)
 export function cleanCos(c) {

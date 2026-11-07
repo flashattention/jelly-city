@@ -35,7 +35,8 @@ export class Cosmetics {
   }
   save() { if (!this.dirty) return; this.dirty = false; try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ users: this.users })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('치장 저장 실패', e.message); } }
   u(sub) { return (this.users[sub] ||= { stars: 0, total: 0, owned: [], equip: {}, ach: {}, plays: {}, wins: {}, pvp: {}, fresh: [] }); }
-  equipOf(sub) { const u = this.users[sub]; if (!u) { const md = sub && this.medalOf(sub); return md ? { medal: md } : null; } const eq = { ...u.equip }; for (const sl of ['crown', 'title']) if (eq[sl] && !this.owns(sub, eq[sl])) delete eq[sl]; delete eq.medal; const md = this.medalOf(sub); if (md) eq.medal = md; return cleanCos(eq); }
+  // 지금 자리여야 쓰는 것(1위 왕관 · 칭호 · 정상의 길)은 자리를 내주면 벗겨진다
+  equipOf(sub) { const u = this.users[sub]; if (!u) { const md = sub && this.medalOf(sub); return md ? { medal: md } : null; } const eq = { ...u.equip }; for (const [sl, id] of Object.entries(eq)) { const it = itemById.get(id); if (it && this.live(it) && !this.owns(sub, id)) delete eq[sl]; } delete eq.medal; const md = this.medalOf(sub); if (md) eq.medal = md; return cleanCos(eq); }
   titleOf(sub) { const id = this.users[sub]?.equip?.title; return id && itemById.has(id) && this.owns(sub, id) ? id : null; }
   owns(sub, id) { const u = this.users[sub], it = itemById.get(id); if (!u || !it) return false; if (it.shop) return u.owned.includes(id); return this.live(it) ? this.holdsNow(sub, it) : !!u.ach[it.ach]; }
   // 한 판 끝: 별을 지갑에 넣는다 (난이도 · 지옥이면 더 많이)
@@ -61,14 +62,15 @@ export class Cosmetics {
     }
   }
   // 1위 업적의 왕관 · 칭호는 지금 1위인 동안만 쓴다 (업적 기록은 남는다)
-  live(it) { return it.slot === 'medal' || ((it.slot === 'crown' || it.slot === 'title') && !!achById.get(it.ach)?.rule.crown); }
+  //   정상의 길(top3)은 그 난이도 순위표(꿈나라 · 지옥 어느 쪽이든) 지금 3위 안인 동안만
+  live(it) { return it.slot === 'medal' || !!it.top3 || ((it.slot === 'crown' || it.slot === 'title') && !!achById.get(it.ach)?.rule.crown); }
   // 이름 옆 메달: 지금 자리 중 가장 높은 것 (1위 → 2위 → 3위 → 상위 1% → 5% → 10%, 같으면 어려운 순위표)
   medalOf(sub) {
     if (!sub) return null; const u = this.users[sub] || { ach: {} }, cache = new Map(); let best = null;
     for (const it of [...TOP3, ...Object.keys(u.ach).flatMap((id) => (medalByAch.get(id) || []).filter((m) => !m.rule?.any))]) { if (best && (it.fx.honor > best.fx.honor || (it.fx.honor === best.fx.honor && it.fx.pr <= best.fx.pr))) continue; if (this.holdsNow(sub, it, cache)) best = it; }
     return best?.id || null;
   }
-  holdsNow(sub, it, cache) { const a = achById.get(it.ach); return !!a && (it.rule?.any || !!this.users[sub]?.ach[a.id]) && this.meets(sub, it.rule || a.rule, cache); }
+  holdsNow(sub, it, cache) { if (it.top3) return ['dream', 'hell'].some((map) => this.meets(sub, { kind: 'dream', map, diff: it.top3, rank: 3, any: true }, cache)); const a = achById.get(it.ach); return !!a && (it.rule?.any || !!this.users[sub]?.ach[a.id]) && this.meets(sub, it.rule || a.rule, cache); }
   // 기록 · 순위를 보고 새로 달성한 업적을 적는다 (예전 기록도 여기서 인정된다)
   refresh(sub) {
     const u = this.u(sub), cache = new Map();
