@@ -556,6 +556,8 @@ export class Track {
     if (extra?.inv || extra?.pad) { const m = glow(extra.pad ? '#7dff5a' : '#ff2bd6'); for (const c of p.mesh.children) if (c.geometry === G_EDGE) c.material = m; } // 분홍 = 좌우 반대 · 초록 = 발사대
     return p;
   }
+  // 분홍(좌우 반대) 발판의 바닥 영역 위에 있나: 앞뒤 · 좌우가 발판 안이고 높이는 발판 윗면 이상 (뛰어올라도 그 위면 반대, 벗어나면 원래대로)
+  overFlip(s, x, y) { for (const p of this.plats) if (p.inv && !p.doomed && s >= p.s0 && s <= p.s1 && Math.abs(x - p.cx) <= p.w / 2 && y >= p.y - 0.05) return true; return false; }
   vx(d) { this.cx = Math.max(-8, Math.min(8, this.cx + d)); return this.cx; }
   // 길 위 장애물: 다음 조작까지 '바쁜 시간'(점프 체공 · 숙이기 · 옆으로 비키기)에 짧은 반응 시간만 더해서 꿈나라보다 훨씬 빽빽하게
   vObs(r, vv, P, s0, s1, cx, w, kinds, gapK = 1) {

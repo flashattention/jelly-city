@@ -99,7 +99,7 @@ export class Runner {
     this.items = []; this.eff = { rocket: 0, shield: 0, cloud: 0, magnet: 0, ghost: 0, slow: 0 }; this.rocketK = 0; this.cloudY = 0; this.lastGroundY = 0;
     // 팀전: 마지막으로 안전하게 밟은 곳 · 부활 뒤 멈춤 · 무적
     this.safe = { s, x, y: 0 }; this.frozen = 0; this.invul = 0;
-    Object.assign(this, { s, x, y: 0, boost: 1, vx: 0, vy: 0, knock: 0, onGround: true, jumps: 0, coyote: 0, jbuf: 0, slideBuf: 0, slideT: 0, flipT: 0, shoveT: 0, alive: true, dead: null, stars: 0, plat: null, t: 0, vmul: 1, flipInv: false });
+    Object.assign(this, { s, x, y: 0, boost: 1, vx: 0, vy: 0, knock: 0, onGround: true, jumps: 0, coyote: 0, jbuf: 0, slideBuf: 0, slideT: 0, flipT: 0, shoveT: 0, alive: true, dead: null, stars: 0, plat: null, t: 0, vmul: 1 });
     this.bear.inner.rotation.set(0, 0, 0); this.bear.root.scale.setScalar(1); this.bear.root.visible = true;
   }
   get v() { return speedAt(this.s) * (this.speedK || 1) * (1 + BOOST * this.boost) * (1 + 0.8 * this.rocketK) * (this.eff.slow > 0 ? 0.6 : 1) * (this.vmul || 1); }
@@ -121,7 +121,7 @@ export class Runner {
     this.vmul = M ? M.speed : 1;
     this.s += this.v * dt;
     // 좌우: 손 떼면 바로 멈추는 느낌 + 밀쳐진 힘은 서서히 줄어든다 (얼음이면 천천히 붙고 천천히 멈춘다)
-    const inv = M && (M.inv || this.flipInv) ? -1 : 1;
+    const inv = M && (M.inv || track.overFlip(this.s, this.x, this.y)) ? -1 : 1; // 끝없는 반전: 분홍 발판과 그 위쪽 공간에 있을 때만
     this.vx += ((input.dir || 0) * inv * SIDE * (M?.side || 1) - this.vx) * Math.min(1, dt * (M?.ice || 14));
     this.knock *= Math.exp(-dt * 2.6);
     this.x += (this.vx + this.knock + (M?.wind || 0)) * dt;
@@ -151,7 +151,6 @@ export class Runner {
       if (!g.mv && this.s > g.s0 + 0.5 && this.s < g.s1 - 0.5) this.safe = { s: this.s, x: Math.max(g.cx - g.w / 2 + 0.6, Math.min(g.cx + g.w / 2 - 0.6, this.x)), y: g.y };
       if (g.mv && !this.substep) this.x += g.dx; // 움직이는 발판에 실려 간다 (한 프레임에 한 번만)
       if (g.crumble && g.touchT == null) g.touchT = track.time; // 무너지는 발판: 밟은 때부터 잰다
-      if (M) this.flipInv = !!g.inv;
       // 발사대는 밟자마자 · 통통 바닥은 내려앉을 때마다 튀어 오른다 (숙이기를 누르고 있으면 안 튄다)
       if (g.pad) { this.vy = g.pad; this.onGround = false; this.jumps = 1; fx?.('jump2'); }
       else if (M?.bounce && !was && !input.slideHeld && this.slideBuf <= 0) { this.vy = JUMP * JM * M.bounce; this.onGround = false; this.jumps = 1; }
