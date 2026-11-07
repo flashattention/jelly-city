@@ -249,8 +249,9 @@ async function renderAdmin(d) {
   try { d ||= await account.api('/api/dream/admin/list'); } catch { return; }
   const { reportRow, bindReports } = await import('../../shared/js/admin-alert.js');
   const row = (t, btns) => `<div class="brow"><span class="nm">${t}</span>${btns}</div>`;
-  el.innerHTML = `<h3>🛡️ 기록 확인 · 정상 ${d.stat.ok} / 불일치 ${d.stat.bad} / 기록 없음 ${d.stat.none}</h3>` + (d.reports.length ? `<h3>🚨 비상 리포트 ${d.reports.length}건</h3>` + d.reports.map(reportRow).join('') : '') + d.flagged.slice(0, 30).map((f) => row(`⚠️ ${esc(f.name)} ${f.score.toLocaleString()}점 ${esc(f.t)} (${esc(f.u)})`, `<button class="mini" data-s="${esc(f.sub)}" data-t="${esc(f.t)}">삭제 · 별 몰수</button>`)).join('');
+  el.innerHTML = `<h3>🛡️ 기록 확인 · 정상 ${d.stat.ok} / 불일치 ${d.stat.bad} / 기록 없음 ${d.stat.none}</h3>` + (d.reports.length ? `<h3>🚨 비상 리포트 ${d.reports.length}건</h3>` + d.reports.map(reportRow).join('') : '') + d.flagged.slice(0, 30).map((f) => row(`⚠️ ${esc(f.name)} ${f.score.toLocaleString()}점 ${esc(f.t)} (${esc(f.u)})`, `<button class="mini" data-ok-s="${esc(f.sub)}" data-t="${esc(f.t)}">정상 인정</button><button class="mini" data-s="${esc(f.sub)}" data-t="${esc(f.t)}">삭제 · 별 몰수</button>`)).join('');
   bindReports(el, (n) => renderAdmin(n));
+  for (const b of el.querySelectorAll('[data-ok-s]')) b.onclick = async () => renderAdmin(await account.api('/api/dream/admin/verify', { method: 'POST', body: { sub: b.dataset.okS, t: b.dataset.t } }));
   for (const b of el.querySelectorAll('[data-s]')) b.onclick = async () => { if (confirm('이 기록을 지우고 드림 러너 업적과 별을 거둘까요?')) renderAdmin(await account.api('/api/dream/admin/remove', { method: 'POST', body: { sub: b.dataset.s, t: b.dataset.t } })); };
 }
 $('home-btn').onclick = () => { if (game.multi) { net.send({ t: 'leave' }); game.multi = false; } toTitle(); };

@@ -15,6 +15,10 @@ const placed = (r, rank, n) => (r.pct ? n >= PCT_MIN[r.pct] && rank <= Math.max(
 const TOP3 = ITEMS.filter((i) => i.slot === 'medal' && i.rule?.any); // 1 ~ 3위 메달: 업적 없이 지금 순위로
 const medalByAch = new Map(); for (const i of ITEMS) if (i.slot === 'medal') { if (!medalByAch.has(i.ach)) medalByAch.set(i.ach, []); medalByAch.get(i.ach).push(i); }
 export const getCos = () => inst;
+// 순위표 이름: 로그인 계정은 지금 닉네임으로 (닉네임을 바꾸면 예전 기록에도 새 닉네임이 뜬다)
+let nickFn = null;
+export const setNickOf = (fn) => { nickFn = fn; };
+export const nameOf = (sub, fallback) => (nickFn && nickFn(sub)) || fallback;
 // 순위표 한 줄의 메달: 그 순위표 안 순위로만 (1 ~ 3위는 인원과 상관없이, 그 아래는 상위 %)
 export function boardMedal(base, rank, n) {
   if (rank <= 3) { const id = `medal.${base}.m${rank - 1}`; return itemById.has(id) ? id : null; }

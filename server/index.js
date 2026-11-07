@@ -39,7 +39,7 @@ import { ArenaRooms } from './jelly-arena/rooms.js';
 import { normWord } from '../public/jelly-draw/js/prompts.js';
 import { complete } from './jelly-city/llm.js';
 import { Records } from './shared/records.js';
-import { Cosmetics, cosApi } from './cosmetics.js';
+import { Cosmetics, cosApi, setNickOf } from './cosmetics.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
@@ -65,6 +65,7 @@ try {
 const world = new World({ dataDir: DATA_DIR });
 const dreamBoard = new DreamBoard(DATA_DIR); // 드림 러너 리더보드
 const cosmetics = new Cosmetics(DATA_DIR); cosmetics.dream = dreamBoard; // 치장 · 업적 (모든 게임 공용)
+setNickOf((sub) => world.users[sub]?.nick || null); // 순위표에는 지금 닉네임
 const board = new Board(DATA_DIR); // 메인 화면 게시판
 const dreamRooms = new DreamRooms((sid) => world.userOf(sid), DATA_DIR); // 드림 러너 같이 달리기 방
 // 젤리드리프트: 방 · 트랙별 최고 기록 (짧을수록 좋다)
