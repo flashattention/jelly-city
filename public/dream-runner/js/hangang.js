@@ -553,6 +553,8 @@ export class Hangang {
       const set = sets[type], s = ringArea(ring) > 0 ? 1 : -1, base = () => set.P.length / 3, FH = FLOOR[type] * 8, BW = BAY[type] * 8;
       // 위로 갈수록 좁아지는 건물 (63빌딩): 꼭대기 외곽선을 긴 축 방향으로 줄인다. scale 은 위아래 모두 줄인다 (꼭대기 왕관 조각)
       const LM = LANDMARKS[name], top = LM?.taper && h > (LM.taper.minH || 0) ? scaleRing(ring, LM.taper.long, LM.taper.short) : LM?.scale ? scaleRing(ring, LM.scale.long, LM.scale.short) : ring, bot = LM?.scale ? top : ring;
+      // 달걀 모양 건물 (전경련 컨퍼런스센터): 상자 벽 대신 은색 타원 지붕만 (덧붙이는 곳에서 만든다), 부딪힘은 외곽선대로
+      if (LM?.egg) { const xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); this.addFoot({ ring, h, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), name, type: 'glass', noClimb: true }); continue; }
       let acc = 0;
       for (let i = 0; i < ring.length; i++) {
         const a = bot[i], c2 = bot[(i + 1) % ring.length], ta = top[i], tc = top[(i + 1) % ring.length], dx = c2[0] - a[0], dz = c2[1] - a[1], L = Math.hypot(dx, dz); if (L < 0.05) continue;
@@ -1428,6 +1430,17 @@ export const LANDMARKS = {
   전경련회관: { facade: 'glass', color: '#9bb0aa', crown: { rise: 18, dir: [0, -1] }, rimLight: true },
   LG트윈타워: { facade: 'gold', color: '#d9b27c', topSign: { text: 'LG', color: '#c4003a', bg: '#ffffff' } },
   'KBS 본관': { facade: 'stone', color: '#bfae92' },
+  //   전경련 컨퍼런스센터: 은색 금속 달걀 / 성모병원: 크림색 석조 · 민트 지붕 / 메리어트파크센터: 흰 석조 세로 프레임 / 오투타워 · 신한금융투자: 짙은 유리
+  '전경련회관 컨퍼런스센터': { facade: 'glass', color: '#cfd6dc', egg: true },
+  '카톨릭대학교 여의도성모병원': { facade: 'stone', color: '#ece6da', roof: '#6db894' },
+  여의도메리어트파크센터: { facade: 'stone', color: '#f0ece4', crown: { rise: 6, dir: [1, 0] } },
+  오투타워: { facade: 'glass', color: '#8fa6b8' },
+  신한금융투자타워: { facade: 'glass', color: '#8d9aa6', roof: '#6db894' },
+  KB금융타워: { facade: 'glass', color: '#9fb2c0' },
+  'The-K타워': { facade: 'glass', color: '#a9c2d4' },
+  한화손해보험빌딩: { facade: 'glass', color: '#b8c6cf' },
+  KRX한국거래소서울사무소: { facade: 'stone', color: '#e4e0d6' },
+  '천주교 여의도성당': { facade: 'church', color: '#c98f6a', roof: '#7a4a3a' },
   //   국회도서관: 흰 석조 · 청록 동판 지붕 / 국회의원회관: 흰 석조 · 청록 지붕
   국회도서관: { facade: 'assembly', color: '#f1ede4', roof: '#4f8f7c' },
   국회의원회관: { facade: 'assembly', color: '#ece8de', roof: '#5a9482' },
@@ -1499,6 +1512,12 @@ function buildLandmarkExtras(hg, { name, ring, h, L }) {
   const parts = [{ ring, h }, ...(hg.lmParts?.[name] || [])];
   if (L.rimLight) { const m = new THREE.LineBasicMaterial({ color: '#fff4e0', transparent: true, opacity: 0.3 }); for (const q of parts) { const pts = [...q.ring, q.ring[0]].map(([x, z]) => new THREE.Vector3(x, q.h + 0.2, z)); hg.scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), m)); } (hg.lmLights ||= []).push(m); }
   if (L.crown) buildCrown(hg, ring, h, L);
+  if (L.egg) { // 은색 타원 지붕: 외곽선의 긴 축 · 짧은 축에 맞춘 반타원체
+    const xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); let xx = 0, zz = 0, xz = 0; for (const [x, z] of ring) { const dx = x - cx, dz = z - cz; xx += dx * dx; zz += dz * dz; xz += dx * dz; } const ang = 0.5 * Math.atan2(2 * xz, xx - zz), ux = Math.cos(ang), uz = Math.sin(ang); let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity; for (const [x, z] of ring) { const a = (x - cx) * ux + (z - cz) * uz, b = -(x - cx) * uz + (z - cz) * ux; a0 = Math.min(a0, a); a1 = Math.max(a1, a); b0 = Math.min(b0, b); b1 = Math.max(b1, b); } void xs; void zs;
+    const e = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshPhongMaterial({ color: '#cdd4da', shininess: 70, specular: '#8a96a2', emissive: '#bcd2ff', emissiveIntensity: 0 })); e.scale.set((a1 - a0) / 2, Math.max(h, 12), (b1 - b0) / 2); e.rotation.y = -ang; e.position.set(cx + ux * (a0 + a1) / 2 - uz * (b0 + b1) / 2, 0, cz + uz * (a0 + a1) / 2 + ux * (b0 + b1) / 2); hg.scene.add(e); (hg.lmCrowns ||= []).push(e.material);
+    // 금속 띠 무늬
+    for (let k = 1; k < 6; k++) { const rr = new THREE.Mesh(new THREE.TorusGeometry(1, 0.004, 4, 48), new THREE.MeshLambertMaterial({ color: '#9aa4ae' })); const t = k / 6, rad = Math.cos(t * Math.PI / 2); rr.scale.set(e.scale.x * rad, e.scale.z * rad, 1); rr.rotation.x = Math.PI / 2; rr.rotation.z = ang; rr.position.set(e.position.x, Math.sin(t * Math.PI / 2) * e.scale.y, e.position.z); hg.scene.add(rr); }
+  }
   if (L.skylight) { // 지붕: 초록 정원 칸과 유리 천창 띠 (위성사진 모습)
     const cv = document.createElement('canvas'); cv.width = cv.height = 256; const c2 = cv.getContext('2d'); c2.fillStyle = '#7d8e86'; c2.fillRect(0, 0, 256, 256);
     for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { const x = i * 64, y = j * 64; c2.fillStyle = (i + j) % 2 ? '#6f8f62' : '#8a9aa0'; c2.fillRect(x + 6, y + 6, 52, 52); c2.strokeStyle = 'rgba(255,255,255,.35)'; c2.lineWidth = 2; c2.beginPath(); c2.moveTo(x + 6, y + 6); c2.lineTo(x + 58, y + 58); c2.moveTo(x + 58, y + 6); c2.lineTo(x + 6, y + 58); c2.stroke(); c2.fillStyle = 'rgba(210,235,245,.75)'; c2.fillRect(x + 26, y + 26, 12, 12); }
