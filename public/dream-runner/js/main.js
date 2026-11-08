@@ -982,6 +982,7 @@ async function startHangang(pos = null) {
   runner.shadow.visible = false; hg.enter(runner.bear, pos ? { s: pos.s } : {}); if (pos) hg.teleport(pos.s, pos.lat);
   renderer.shadowMap.enabled = !isPhone; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
   $('hg-hud').classList.remove('hidden'); if (document.body.classList.contains('touch')) $('touch').classList.remove('hidden');
+  $('t-shove').textContent = '💨';
   setMusic(['pent', 62, 66, 'sine']); hgRun.tk = null; hgRun.sent = 0; hgRun.sendT = 20;
   account.api('/api/dream/hangang/start', { method: 'POST', body: logged() ? {} : { anon: anonId() } }).then((r) => { hgRun.tk = r.tk; }).catch(() => {});
   toast(`🌉 ${hg.map.name} · ${SEASONS[hg.state.season]} · ${WEATHERS[hg.state.weather]}`, 2600);
@@ -994,7 +995,7 @@ function hgReport(final = false) {
 }
 function leaveHangang() {
   hgReport(true); if (document.pointerLockElement) document.exitPointerLock?.(); $('hg-labels').innerHTML = '';
-  hg.leave(); document.body.classList.remove('hg');
+  hg.leave(); document.body.classList.remove('hg'); $('t-shove').textContent = '🫸';
   $('hg-hud').classList.add('hidden'); $('hg-set').classList.add('hidden');
   camera.far = 1600; camera.fov = 62; camera.updateProjectionMatrix();
   renderer.shadowMap.enabled = false; renderer.toneMapping = THREE.NoToneMapping; renderer.toneMappingExposure = 1;
@@ -1036,7 +1037,7 @@ function hgFrame(dt) {
   const L = keys.has('KeyA') || keys.has('ArrowLeft'), R = keys.has('KeyD') || keys.has('ArrowRight');
   const U = keys.has('KeyW') || keys.has('ArrowUp'), D = keys.has('KeyS') || keys.has('ArrowDown');
   const look = hgLook; hgLook = { yaw: 0, pitch: 0 };
-  const inp = { mx: (R ? 1 : 0) - (L ? 1 : 0) + joyX, mz: (U ? 1 : 0) - (D ? 1 : 0) + joyY, yaw: look.yaw, pitch: look.pitch, jump: input.jump, sprint: keys.has('ShiftLeft') || keys.has('ShiftRight'), slide: keys.has('KeyC') || keys.has('ControlLeft') || touchHeld.has('slide') };
+  const inp = { mx: (R ? 1 : 0) - (L ? 1 : 0) + joyX, mz: (U ? 1 : 0) - (D ? 1 : 0) + joyY, yaw: look.yaw, pitch: look.pitch, jump: input.jump, sprint: keys.has('ShiftLeft') || keys.has('ShiftRight') || touchHeld.has('shove'), slide: keys.has('KeyC') || keys.has('ControlLeft') || touchHeld.has('slide') };
   if (!$('hg-set').classList.contains('hidden')) { inp.mx = inp.mz = 0; inp.jump = false; }
   hg.update(dt, inp, camera);
   input.jump = input.slide = input.shove = input.item = false;
@@ -1052,7 +1053,7 @@ function hgFrame(dt) {
   const h = hg.state.hour, icon = h >= 5.3 && h < 6.9 ? '🌅' : h >= 17.9 && h < 19.4 ? '🌇' : h >= 20 || h < 5.3 ? '🌙' : '☀️';
   $('hg-clock').textContent = `${icon} ${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
   $('hg-season-c').textContent = SEASONS[hg.state.season]; $('hg-weather-c').textContent = WEATHERS[hg.state.weather];
-  $('hg-pace-name').textContent = SPEEDS[hgSpeedIdx()][0];
+  $('hg-pace-name').textContent = hg.boosting ? '💨 가속 중!' : SPEEDS[hgSpeedIdx()][0];
   $('hg-bar').style.width = `${Math.round(((hg.v - V_MIN) / (V_MAX - V_MIN)) * 100)}%`;
   hgRun.sendT -= 0.2; if (hgRun.sendT <= 0) { hgRun.sendT = 20; hgReport(); hgSavePos(); }
 }

@@ -625,8 +625,9 @@ export class Hangang {
     const fx0 = Math.sin(this.camYaw), fz0 = Math.cos(this.camYaw);
     let mx = fx0 * (inp.mz || 0) - fz0 * (inp.mx || 0), mz = fz0 * (inp.mz || 0) + fx0 * (inp.mx || 0); const ml = Math.hypot(mx, mz);
     if (ml > 1) { mx /= ml; mz /= ml; }
-    const want = Math.min(V_MAX, this.target * Math.min(1, ml) * (inp.sprint ? 1.35 : 1));
-    this.v += (want - this.v) * Math.min(1, dt * (want > this.v ? 1.8 : 4));
+    // Shift(휴대폰은 💨 버튼)를 누르는 동안 가속: 지금 단계보다 확 빨라진다
+    const boost = !!inp.sprint && ml > 0.05, want = Math.min(V_MAX, this.target * Math.min(1, ml) * (boost ? 1.8 : 1) + (boost ? 3 : 0));
+    this.v += (want - this.v) * Math.min(1, dt * (want > this.v ? (boost ? 4.5 : 1.8) : 4)); this.boosting = boost;
     let ds = 0;
     if (ml > 0.05) { this.mdx = mx / ml; this.mdz = mz / ml; }
     if (this.v > 0.02 && this.mdx != null) {
