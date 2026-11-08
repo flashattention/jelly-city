@@ -491,6 +491,7 @@ export class Hangang {
     if (M.kind === 'street') { this.buildNeon(r); this.buildAlleys(P2, r); }
     if (this.id === 'banpo') this.buildBanpo(P2);
     this.shopFronts = buildShopFronts(this, M.shops || [], M.scale); this.shopGrid = new Map(); this.shopFronts.forEach((F, i) => { const k = `${Math.floor(F.x / 40)},${Math.floor(F.z / 40)}`; if (!this.shopGrid.has(k)) this.shopGrid.set(k, []); this.shopGrid.get(k).push(i); });
+    if (M.kind === 'street') this.buildStreetSigns(P2, r);
     this.buildLights(r);
     this.buildSkyStuff(r);
     this.buildPeople();
@@ -594,6 +595,29 @@ export class Hangang {
     const sim = mk(scG, new THREE.MeshLambertMaterial({ color: '#ffffff' }), scoot, ([x, z, ry]) => { o.position.set(x, 0, z); o.rotation.set(0, ry, 0); }); if (sim) { const c = new THREE.Color(); scoot.forEach((sc, i) => sim.setColorAt(i, c.set(['#e8e4dc', '#d8352a', '#2f6bff', '#1d1d1f', '#7be07b'][sc[3]]))); }
     for (const [x, z] of scoot) this.addCircle(x, z, 0.45, 1);
     const bg = new THREE.IcosahedronGeometry(0.32, 1); bg.scale(1, 0.85, 1); bg.translate(0, 0.27, 0); const bim = mk(bg, new THREE.MeshLambertMaterial({ color: '#ffffff' }), bags.flatMap(([x, z]) => [[x, z], [x + 0.4, z + 0.2], [x - 0.1, z + 0.45]]), ([x, z]) => { o.position.set(x, 0, z); o.rotation.set(0, 0, 0); o.scale.setScalar(0.8 + Math.random() * 0.4); }); if (bim) { const c = new THREE.Color(); for (let i = 0; i < bim.count; i++) bim.setColorAt(i, c.set(i % 3 === 1 ? '#1d1d1f' : '#f2f0ea')); } o.scale.set(1, 1, 1);
+  }
+  // 거리 지역 간판: 길을 바라보는 낮은 상가 벽마다 1층 간판 띠 + 2 · 3층 가로 간판 (그 동네 실제 가게 이름, 스타일 여러 가지)
+  buildStreetSigns(P2, r) {
+    const M = this.map, segs = new Map(), G = 20, addSeg = (a, b, hw) => { const k = `${Math.floor((a[0] + b[0]) / 2 / G)},${Math.floor((a[1] + b[1]) / 2 / G)}`; if (!segs.has(k)) segs.set(k, []); segs.get(k).push([a, b, hw]); };
+    for (const rd of M.roads) { const p = P2(rd.slice(2)); for (let i = 1; i < p.length; i++) { const L = Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]), n = Math.max(1, Math.ceil(L / 15)); for (let k = 0; k < n; k++) addSeg([p[i - 1][0] + (p[i][0] - p[i - 1][0]) * k / n, p[i - 1][1] + (p[i][1] - p[i - 1][1]) * k / n], [p[i - 1][0] + (p[i][0] - p[i - 1][0]) * (k + 1) / n, p[i - 1][1] + (p[i][1] - p[i - 1][1]) * (k + 1) / n], rd[0] / 2); } }
+    for (const [w, ...f] of M.alleys || []) { const p = P2(f); for (let i = 1; i < p.length; i++) addSeg(p[i - 1], p[i], w / 2); }
+    const nearRoad = (x, z) => { let best = Infinity; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const [A, B, hw] of segs.get(`${Math.floor(x / G) + a},${Math.floor(z / G) + b}`) || []) { const dx = B[0] - A[0], dz = B[1] - A[1], L2 = dx * dx + dz * dz || 1, t = clamp(((x - A[0]) * dx + (z - A[1]) * dz) / L2, 0, 1); best = Math.min(best, Math.hypot(A[0] + dx * t - x, A[1] + dz * t - z) - hw); } return best; };
+    const pool = (M.shops || []).map((s2) => s2[0]).filter((n) => n.length >= 2); if (!pool.length) return;
+    const list = [];
+    for (const f of this.foot || []) { if (!(f.type === 'street' || f.type === 'street2') || f.h < 4) continue; const ring = f.ring, sg = ringArea(ring) > 0 ? 1 : -1;
+      for (let k = 0; k < ring.length; k++) { const a = ring[k], c = ring[(k + 1) % ring.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]); if (L < 3.5) continue; const nx = (sg > 0 ? c[1] - a[1] : a[1] - c[1]) / L, nz = (sg > 0 ? a[0] - c[0] : c[0] - a[0]) / L, mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2;
+        if (nearRoad(mx + nx * 2, mz + nz * 2) > 9) continue; const q = this.project(mx, mz); if (Math.abs(q.lat) > 350) continue;
+        const tx = (c[0] - a[0]) / L, tz = (c[1] - a[1]) / L, W1 = Math.min(L * 0.88, 10);
+        list.push({ x: mx + nx * 0.14, z: mz + nz * 0.14, tx, tz, w: W1, y0: 3.0, y1: 3.75, n: pool[Math.floor(r() * pool.length)], st: Math.floor(r() * 5) });
+        for (let fl = 1; fl <= 2; fl++) if (f.h > 3.4 * (fl + 1) && r() < (fl === 1 ? 0.55 : 0.3)) { const w2 = Math.min(L * 0.6, 6.5), off = (r() - 0.5) * (L - w2) * 0.8; list.push({ x: mx + tx * off + nx * 0.12, z: mz + tz * off + nz * 0.12, tx, tz, w: w2, y0: 3.4 * fl + 1.6, y1: 3.4 * fl + 2.4, n: pool[Math.floor(r() * pool.length)], st: Math.floor(r() * 5) }); }
+        if (list.length > 1500) break; } if (list.length > 1500) break; }
+    // 글씨 그림: 256 × 32 칸, 2048 × 1024 한 장에 256 개
+    const PER = 256; for (let s0 = 0; s0 < list.length; s0 += PER) { const part = list.slice(s0, s0 + PER), cv = document.createElement('canvas'); cv.width = 2048; cv.height = 1024; const c = cv.getContext('2d');
+      const BG = [['#c0392b', '#ffffff'], ['#ffffff', '#1f4fa8'], ['#1b1820', '#ffd23f'], ['#2f7a5a', '#ffffff'], ['#fff3d6', '#7a3b2e']];
+      part.forEach((S, j) => { const x = (j % 8) * 256, y = Math.floor(j / 8) * 32, [bg, fg] = BG[S.st]; c.fillStyle = bg; c.fillRect(x, y, 256, 32); c.fillStyle = fg; c.font = `bold ${S.st === 2 ? 22 : 21}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(S.n, x + 128, y + 17, 240); if (S.st === 2) { c.strokeStyle = fg; c.lineWidth = 2; c.strokeRect(x + 3, y + 3, 250, 26); } });
+      const P = [], U = [], I = []; part.forEach((S, j) => { const u0 = (j % 8) / 8, v1 = 1 - Math.floor(j / 8) / 32, v0 = v1 - 1 / 32, k = P.length / 3, hx = S.tx * S.w / 2, hz = S.tz * S.w / 2; P.push(S.x - hx, S.y0, S.z - hz, S.x + hx, S.y0, S.z + hz, S.x + hx, S.y1, S.z + hz, S.x - hx, S.y1, S.z - hz); U.push(u0 + 1 / 8, v0, u0, v0, u0, v1, u0 + 1 / 8, v1); I.push(k, k + 1, k + 2, k, k + 2, k + 3); });
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); g.setIndex(I); g.computeVertexNormals();
+      const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; const m = new THREE.MeshLambertMaterial({ map: t, emissive: '#ffffff', emissiveMap: t, emissiveIntensity: 0.15, side: THREE.DoubleSide }); (this.shopSignMs ||= []).push(m); this.scene.add(new THREE.Mesh(g, m)); }
   }
   tickSignals(t) { if (!this.sigM) return; const cyc = t % 60, A = cyc < 27 ? 'g' : cyc < 30 ? 'y' : 'r', B = cyc >= 30 && cyc < 57 ? 'g' : cyc >= 57 ? 'y' : 'r'; for (const [k, v] of Object.entries(this.sigM)) { const on = (k[1] === '0' ? A : B) === k[0]; v.m.color.copy(on ? v.col : new THREE.Color('#2a2a2a')); } }
   // 다리: 물 위는 14m 높이로 띄우고, 교각 · 난간 · 밤 조명. 서강대교는 밤섬 위에 붉은 아치
