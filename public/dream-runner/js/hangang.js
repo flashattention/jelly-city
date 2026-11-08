@@ -303,9 +303,6 @@ export class Hangang {
     for (const f of c.foot) { f.key ??= key; this.addFoot(f); } c.foot = this.foot; c.footGrid = this.footGrid; for (let k = d0; k < this.decks.length; k++) this.decks[k].key = key;
     const tb1 = performance.now(); await idle(); this.maskWater(key); this.drape(c); await idle(); this.mergeChunk(c); await idle(); c.scene.userData.chunk = key; c.buildMs = [Math.round(tb1 - tb0), Math.round(performance.now() - tb1)]; // 만들기 · 지형 얹기+묶기 (ms)
     c.applySeason(); this.scene.add(c.scene);
-    // 멈춰 있는 덩어리(건물 · 길 · 간판 …)는 그래픽 카드에 올린 뒤 메모리의 꼭짓점 배열을 놓는다 (칸 9개에 500MB 넘던 메모리를 줄인다). 움직이거나 다시 고치는 것(인스턴스 · 사람 · 차)은 그대로
-    const free = function () { this.array = null; };
-    c.scene.traverse((o) => { if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || o.userData.npc || o.userData.keepArr) return; const g = o.geometry; if (!g || g.userData.freeSet) return; g.userData.freeSet = true; if (!g.boundingSphere) g.computeBoundingSphere(); for (const a of Object.values(g.attributes)) a.onUpload(free); g.index?.onUpload(free); });
     return c;
   }
   unloadChunk(key) {
