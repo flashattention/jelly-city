@@ -316,3 +316,7 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .ody .ovirus { position: absolute; right: 9%; top: 18px; font-size: 30px; filter: hue-rotate(60deg) drop-shadow(0 0 10px #3dff74); animation: wob 2s ease-in-out infinite; }
 .ody .ofire { position: absolute; right: 24%; bottom: 14px; font-size: 26px; filter: drop-shadow(0 0 8px #ff8a3a); }
 .ody .new { position: absolute; right: 14px; bottom: 12px; padding: 4px 12px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-size: 13px; }
+/* 젤리 서울 산책 카드: 드림 러너 서울 사진 */
+.card.seoul .art { background: url(/hub/img/dr-hangang.webp) center / cover; }
+.card.seoul .art .stag { position: absolute; left: 10px; bottom: 10px; padding: 3px 10px; border-radius: 999px; background: rgba(15, 23, 38, 0.72); color: #fff; font-size: 13px; }
+.card.seoul .new { position: absolute; right: 14px; top: 12px; padding: 4px 12px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-family: 'Jua', sans-serif; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.25); }

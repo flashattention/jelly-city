@@ -341,3 +341,5 @@ body.touch #hg-subway { top: 200px; }
 
 #hg-regions button.last { grid-column: 1 / -1; border-color: #8fd18a; background: rgba(143, 209, 138, .18); display: flex; flex-direction: column; align-items: center; gap: 2px; }
 #hg-regions button.last small { font-family: 'Gowun Dodum'; font-size: 11px; opacity: .8; }
+/* 젤리 서울 산책(/seoul-walk/): 러너 타이틀 화면은 숨기고 서울 산책 시작 화면만 */
+body.sw #title { visibility: hidden; }

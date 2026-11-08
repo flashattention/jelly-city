@@ -949,7 +949,7 @@ function hud() {
 
 boot();
 frame();
-setTimeout(() => { if (game.mode === 'title' && !new URLSearchParams(location.search).has('room')) showWhatsNew('dream-runner'); }, 900);
+setTimeout(() => { if (game.mode === 'title' && !window.SEOUL_WALK && !new URLSearchParams(location.search).has('room')) showWhatsNew('dream-runner'); }, 900);
 
 // ---------- 🌉 한강 러닝 ----------
 //   장애물 · 탈락 없이 내 속도로 달리는 힐링 맵. 거리 · 순간(노을 · 비 · 눈 …)은 서버에 모여 업적이 된다
@@ -1083,7 +1083,7 @@ function leaveHangang() {
   $('hg-hud').classList.add('hidden'); $('hg-set').classList.add('hidden');
   camera.far = 1600; camera.fov = 62; camera.updateProjectionMatrix();
   renderer.shadowMap.enabled = false; renderer.toneMapping = THREE.NoToneMapping; renderer.toneMappingExposure = 1;
-  hgSavePos();
+  hgSavePos(); if (window.SEOUL_WALK) setTimeout(() => $('hg-btn').onclick(), 300);
   runner.shadow.visible = true; scene.add(runner.bear.root);
   if (hg.dist > 50) toast(`🌉 ${(hg.dist / 1000).toFixed(2)}km · ${hgTime(hg.time)} 달렸어요. 수고했어요!`, 3000);
   toTitle();
@@ -1144,6 +1144,8 @@ function hgFrame(dt) {
 addEventListener('pagehide', () => { if (game.mode === 'hangang') hgReport(true); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && game.mode === 'hangang') hgReport(true); });
 // 바로 가기: /dream-runner/#hangang 으로 들어오면 한강 러닝부터
+// 젤리 서울 산책(/seoul-walk/): 러너 타이틀 없이 바로 서울 산책 시작 화면. 닫기 = 메인으로, 산책을 마치면 다시 시작 화면
+if (window.SEOUL_WALK) { document.body.classList.add('sw'); $('hg-start-x').textContent = '🏠 젤리게임즈로'; $('hg-start-x').onclick = () => { location.href = '/'; }; if (location.hash !== '#hangang') setTimeout(() => { if (game.mode === 'title') $('hg-btn').onclick(); }, 300); }
 if (location.hash === '#hangang') setTimeout(() => { if (game.mode === 'title') { const p = hgLastPos(); if (p) hgUse(p.region); startHangang(p); } }, 700);
 
 // 한강: 마우스로 시점 (화면을 누르면 마우스가 잠기고, Esc 로 풀린다) · 휴대폰은 화면을 끌어서
