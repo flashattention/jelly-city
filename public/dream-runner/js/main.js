@@ -957,6 +957,8 @@ let hg = new Hangang();
 // 지역마다 따로 (여의도 한강 · 홍대 거리 …): 화면 쪽 연결(on…)은 처음 것에서 그대로 옮겨 단다
 const HG_REGIONS = { yeouido: { label: '🌉 여의도 한강', start: '🚩 서강대교에서 시작' }, hongdae: { label: '🎸 홍대 거리', start: '🚩 상수역에서 시작' }, namsan: { label: '🗼 남산타워', start: '🚩 정상 한양도성 길에서 시작' }, itaewon: { label: '🌍 이태원 거리', start: '🚩 녹사평역에서 시작' }, banpo: { label: '🌈 반포 한강', start: '🚩 동작대교에서 시작' }, ttukseom: { label: '🏙️ 뚝섬 한강', start: '🚩 영동대교에서 시작' }, seongsu: { label: '☕ 성수 거리', start: '🚩 서울숲역에서 시작' }, gangnam: { label: '🏙️ 강남역', start: '🚩 신논현역에서 시작' }, jamsil: { label: '🎡 석촌호수 · 잠실', start: '🚩 석촌호수 서호에서 시작' }, myeongdong: { label: '🛍️ 명동', start: '🚩 명동역에서 시작' }, insadong: { label: '🏮 인사동 · 종로', start: '🚩 안국역에서 시작' }, bukchon: { label: '🏯 북촌 한옥마을', start: '🚩 안국역에서 시작' }, sinchon: { label: '🎓 신촌', start: '🚩 신촌역에서 시작' } };
 const hgInst = { yeouido: hg }; let hgRegion = 'yeouido';
+// 점검용 (콘솔 · 시험): 지금 쓰는 서울 산책 엔진
+Object.defineProperty(game, 'hg', { get: () => hg });
 // 지역을 옮길 때 넘길 시각 · 계절 · 날씨 (한 번 산책을 시작하면 그 뒤로는 유지)
 let hgKeep = null;
 function hgKeepNow() { if (hg?.bear) hgKeep = { opt: { ...hg.opt }, state: { ...hg.state }, weatherT: hg.weatherT }; }

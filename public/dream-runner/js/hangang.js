@@ -1053,12 +1053,14 @@ export class Hangang {
     //   그 건물의 꼭짓점들에 바닥 높이(Y)를 적어 두고, drape 가 땅 높이 대신 이 값을 더한다 (NaN = 예전처럼 그 자리 땅 높이)
     const useBase = M.kind === 'tile' && !!(this.terr || this.host?.terr), groupsY = [...Object.values(sets), extras, signs]; for (const G of groupsY) G.Y = [];
     let curY = NaN; const fillY = () => { for (const G of groupsY) { const n = G.P.length / 3; while (G.Y.length < n) G.Y.push(curY); } for (const a of this.aptMarks || []) if (a.by === undefined) a.by = curY; for (const a of this.hanokRoofs || []) if (a.by === undefined) a.by = curY; for (const a of this.helis || []) if (a.by === undefined) a.by = curY; for (const a of this.slateRoofs || []) if (a.by === undefined) a.by = curY; };
+    // 궁궐 안(경복궁 · 창덕궁 · 덕수궁 · 창경궁 · 경희궁 · 종묘): 건축물대장에 없는 작은 전각 · 문 · 행각은 낮은 한옥으로 (아무 벽돌 상자가 되지 않게)
+    const palaces = []; { const PN = /^(경복궁|창덕궁|덕수궁|창경궁|경희궁|종묘)/; for (const b2 of M.buildings) { const nm = M.names[b2[4]] || ''; if (PN.test(nm)) palaces.push([b2[7] * M.scale, b2[8] * M.scale]); } }
     for (const [bi, b] of M.buildings.entries()) {
       fillY(); curY = NaN;
       const info = M.binfo?.[bi] || null;
       const [h0, mh, km, ci, ni, rci, dome] = b, kind = km >> 1, glassTag = km & 1, ring = P2(b.slice(7)); if (ring.length < 3) continue;
       // 돔 지붕 부분: 벽은 돔 아래까지, 그 위에 돔 (높이 · 색은 지도 데이터대로)
-      const domeR = dome ? Math.sqrt(Math.abs(ringArea(ring)) / Math.PI) : 0, domeH = dome ? (dome > 1 ? dome : domeR * 0.6) : 0, h = LANDMARKS[ni >= 0 ? M.names[ni] : '']?.height || Math.min(Math.max(mh + 0.5, h0 - domeH), (M.kind === 'summit' || (towerC && Math.hypot(b[7] * M.scale - towerC[0], b[8] * M.scale - towerC[1]) < 160)) && M.names[ni] !== '남산서울타워' ? 12 : 1e9);
+      const palaceHanok = (!info || !info[0]) && !LANDMARKS[ni >= 0 ? M.names[ni] : ''] && h0 <= 14 && Math.abs(ringArea(ring)) < 1500 && palaces.some(([x, z]) => Math.hypot(b[7] * M.scale - x, b[8] * M.scale - z) < 420), domeR = dome ? Math.sqrt(Math.abs(ringArea(ring)) / Math.PI) : 0, domeH = dome ? (dome > 1 ? dome : domeR * 0.6) : 0, h = palaceHanok ? 4.5 : LANDMARKS[ni >= 0 ? M.names[ni] : '']?.height || Math.min(Math.max(mh + 0.5, h0 - domeH), (M.kind === 'summit' || (towerC && Math.hypot(b[7] * M.scale - towerC[0], b[8] * M.scale - towerC[1]) < 160)) && M.names[ni] !== '남산서울타워' ? 12 : 1e9);
       const name = ni >= 0 ? M.names[ni] : '', cTag = ci >= 0 ? M.colors[ci] : '';
       // 외벽 종류
       let type = kind === 1 ? (h > 14 ? 'apt' : r() < 0.5 ? 'brick' : 'stone') : kind === 4 ? (r() < 0.6 ? 'brick' : 'stone') : kind === 5 ? 'brick' : kind === 3 ? 'stone' : kind === 2 || kind === 0 ? (glassTag || h > 55 || (h > 30 && r() < 0.5) ? 'glass' : 'stone') : 'stone';
@@ -1079,6 +1081,7 @@ export class Hangang {
       if (useBase && !LANDMARKS[name] && M.kind !== 'summit' && !(towerC && Math.hypot(ring[0][0] - towerC[0], ring[0][1] - towerC[1]) < 200)) { let lo = Infinity; for (const [x, z] of ring) lo = Math.min(lo, this.terrAt(x, z, true)); curY = lo - 0.15; }
       // 실제 건축물 정보(용도 · 구조 · 사용승인 연도)로 외벽을 정한다 (틀 찍어내기 대신 그 건물의 실제 정보대로)
       if (info && !c && !LANDMARKS[name] && type !== 'church' && type !== 'gold' && type !== 'assembly') { const st = styleOf(info, h, r); if (st) { type = st[0]; c = st[1]; } }
+      if (palaceHanok) { type = 'hanok'; c = '#efe6d6'; }
       // 한옥 마을(북촌 · 인사동): 정보가 없는 단층 작은 집도 한옥으로
       if (!info && (this.regionHere === 'bukchon' || this.regionHere === 'insadong') && h <= 5 && Math.abs(ringArea(ring)) < 350 && !name) { type = 'hanok'; c = '#f2ece0'; }
       // 거리 지역(홍대 · 이태원 등) 낮은 상가: 외벽 색 · 창 무늬 · 층 높이를 건물마다 다르게
@@ -1096,6 +1099,8 @@ export class Hangang {
       // 달걀 모양 건물 (전경련 컨퍼런스센터): 상자 벽 대신 은색 타원 지붕만 (덧붙이는 곳에서 만든다), 부딪힘은 외곽선대로
       if (M.kind === 'summit' && /봉수대/.test(name)) continue;
       if (name === '남산서울타워' && mh > 1) continue; // 타워 위쪽 조각은 따로 만든 실제 모양으로
+      // 도성 문 (숭례문 · 흥인지문 · 광화문): 실제 바닥 방향대로 돌 축대 + 홍예문 + 2층 문루 + 겹처마 지붕 (따로 만든 모양), 부딪힘은 축대 높이
+      if (LM?.gate) { const xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); if (!(this.gateDone ||= new Set()).has(LM)) { this.gateDone.add(LM); this.scene.add(buildGate(ring, LM)); } this.addFoot({ ring, h: LM.gate.base || 7, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), name, type: 'stone' }); continue; }
       if (LM?.egg || LM?.jbug) { const xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); this.addFoot({ ring, h, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), name, type: 'glass', noClimb: true }); continue; }
       let acc = 0;
       for (let i = 0; i < ring.length; i++) {
@@ -2074,6 +2079,29 @@ function batchStatic(scene, roots, out = null) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); g.computeBoundingSphere(); const me = new THREE.Mesh(g, m); scene.add(me); out?.push(me); }
   if (out) for (const r of roots) r.traverse((o) => { if (o.isMesh && o.parent) out.push(o); });
 }
+// 도성 문 모양: 바닥 외곽선의 긴 축 방향으로 돌 축대 · 홍예(어두운 문 굴) · 붉은 문루 2층 · 단청 띠 · 짙은 기와 겹처마
+function buildGate(ring, LM) {
+  const G = LM.gate; let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length;
+  let xx = 0, zz = 0, xz = 0; for (const [x, z] of ring) { const dx = x - cx, dz = z - cz; xx += dx * dx; zz += dz * dz; xz += dx * dz; } const ang = 0.5 * Math.atan2(2 * xz, xx - zz), ux = Math.cos(ang), uz = Math.sin(ang);
+  let a = 0, b = 0; for (const [x, z] of ring) { a = Math.max(a, Math.abs((x - cx) * ux + (z - cz) * uz)); b = Math.max(b, Math.abs(-(x - cx) * uz + (z - cz) * ux)); }
+  // 흥인지문처럼 옹성(반달 성벽)까지 외곽선에 들어 있으면 문 자체는 더 작게
+  if (G.ong) { a *= 0.62; b *= 0.5; } a = Math.min(a, 22); b = Math.min(b, 9); b = Math.max(b, a * 0.38);
+  const P = [], N = [], C = [], col = new THREE.Color();
+  const add = (g, c) => { const q = g.index ? g.toNonIndexed() : g; q.rotateY(-ang); q.translate(cx, 0, cz); const p = q.attributes.position, n = q.attributes.normal; col.set(c); for (let i = 0; i < p.count; i++) { P.push(p.getX(i), p.getY(i), p.getZ(i)); N.push(n.getX(i), n.getY(i), n.getZ(i)); C.push(col.r, col.g, col.b); } };
+  const box = (w, h, d, y, c, ox = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.translate(ox, y + h / 2, 0); add(g, c); };
+  const roof = (w, d, y, h, top, c) => { const g = new THREE.CylinderGeometry(top, 1, h, 4, 1); g.rotateY(Math.PI / 4); g.scale((w / 2) * Math.SQRT2, 1, (d / 2) * Math.SQRT2); g.translate(0, y + h / 2, 0); add(g, c); };
+  const B = G.base || 7, W = a * 2, D = b * 2, STONE = '#bfb7a6', RED = '#8e2f26', DAN = '#3f7a6a', TILE = '#4a4e56';
+  box(W, B, D, 0, STONE); box(W * 1.01, 0.5, D * 1.01, B - 0.5, '#a9a191');
+  const n = G.arches || 1; for (let k = 0; k < n; k++) { const off = (k - (n - 1) / 2) * W * 0.22; box(n > 1 ? 4.2 : 5.2, B * 0.62, D + 0.2, 0, '#2a2420', off); box(n > 1 ? 4.6 : 5.6, 0.6, D + 0.25, B * 0.62, '#9a9282', off); }
+  // 1층 문루 + 처마
+  box(W * 0.74, 4, D * 0.66, B, RED); box(W * 0.76, 0.5, D * 0.68, B + 3.5, DAN);
+  roof(W * 0.96, D * 1.05, B + 4, 2.2, 0.62, TILE);
+  // 2층 문루 + 겹처마 지붕
+  box(W * 0.58, 3.4, D * 0.5, B + 6.2, RED); box(W * 0.6, 0.45, D * 0.52, B + 9.1, DAN);
+  roof(W * 0.92, D * 1.0, B + 9.6, 4.2, 0.22, TILE); box(W * 0.46, 0.7, 0.9, B + 13.6, '#3a3d44');
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+  return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
+}
 function mergeGeos(list) {
   const P = [], N = [], I = []; let base = 0;
   for (const g0 of list) { const g = g0.index ? g0.toNonIndexed() : g0; const p = g.attributes.position, n = g.attributes.normal; for (let i = 0; i < p.count; i++) { P.push(p.getX(i), p.getY(i), p.getZ(i)); N.push(n.getX(i), n.getY(i), n.getZ(i)); I.push(base + i); } base += p.count; }
@@ -2150,6 +2178,7 @@ function dress(b, role, r, env = {}) {
 //   전경련회관(FKI 타워): 짙은 회녹색 유리 · 비스듬히 깎인 꼭대기
 //   LG트윈타워: 금빛 브론즈 유리 두 동 · 계단식 모서리(지도 데이터) · 꼭대기 LG 로고
 //   KBS 본관: 넓고 낮은 베이지 · 갈색 콘크리트
+const GATE_SN = { facade: 'hanok', gate: { base: 7, tiers: 2 } };
 export const LANDMARKS = {
   //   63빌딩: 금빛 반사 유리 · 넓은 면이 위로 갈수록 좁아지는 사다리꼴 옆모습 · 꼭대기 왕관(63스퀘어)도 그만큼 작게
   '63빌딩': { facade: 'gold', color: '#f0bf5c', taper: { long: 0.6, short: 0.92, minH: 150 } },
@@ -2200,6 +2229,10 @@ export const LANDMARKS = {
   '신세계백화점 본점 더 헤리티지': { facade: 'stone', color: '#e8dcc0' }, '한국은행 화폐박물관': { facade: 'assembly', color: '#e0d2b8' },
   롯데시티호텔: { facade: 'glass', color: '#a9b8c2', topSign: { text: 'LOTTE', color: '#e8102c', bg: '#ffffff' } },
   // 종로 · 북촌: 경복궁 · 건춘문 · 조계사 (한옥, 큰 기와지붕)
+  // 도성 문 (돌 축대 위 2층 문루 · 실제 높이 약 20m): 축대 색 돌 + 기와 우진각 지붕
+  숭례문: GATE_SN, '숭례문(남대문)': GATE_SN, 흥인지문: { facade: 'hanok', gate: { base: 6, tiers: 2, ong: true } }, 광화문: { facade: 'hanok', gate: { base: 8, tiers: 2, arches: 3 } },
+  // 서울시청 새 청사 (유리 파도) · DDP (은빛 알루미늄 패널) · 국립중앙박물관 (긴 화강석 건물)
+  서울특별시청: { facade: 'glass', color: '#a9c8dc', height: 52 }, 동대문디자인플라자: { facade: 'panels', color: '#c9ccd0', height: 29 }, 국립중앙박물관: { facade: 'stone', color: '#d9d2c4', height: 26 },
   경복궁: { facade: 'hanok', color: '#e8dccb', height: 9, roofH: 7 }, '경복궁 건춘문': { facade: 'hanok', color: '#e8dccb', height: 9, roofH: 5 }, 조계사: { facade: 'hanok', color: '#e8dccb', roofH: 7 },
   여의도순복음교회: { facade: 'panels', color: '#5d4f48', campus: 160, campusFacade: 'stone', campusColor: '#a08a7a', front: { w: 16, d: 9, up: 13, face: 'west', screen: true, cross: true, sign: '여의도순복음교회' }, rimLight: true },
 };
