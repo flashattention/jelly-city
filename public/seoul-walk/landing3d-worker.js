@@ -46,12 +46,12 @@ async function loadMap(id) {
   } catch (e) { post({ type: 'log', msg: 'loadMap ' + id + ' ' + (e?.stack || e) }); if (!firstDone) post({ type: 'fail' }); }
   loading = null;
 }
+// 워커는 메인 스레드를 막지 않으니 스크롤 중에도 가까운 장면부터 지도를 미리 불러 둔다 (예전엔 멈췄을 때만 → 계속 내리면 그림만 보였다). 약한 기기만 3개까지
 setInterval(() => {
-  if (!renderer || loading) return; const i = sceneIdx(), want = wantMaps(i), now = performance.now();
-  for (const id of [...maps.keys()]) if (!want.includes(id) && maps.size > 2) dropMap(id);
-  const need = want.find((id) => !maps.has(id)); if (!need) return;
-  if (need === SCENES[i].map || !firstDone || now - lastActive > 500) loadMap(need);
-}, 250);
+  if (!renderer || loading) return; const i = sceneIdx(), order = SCENES.map((S, k) => [Math.abs(k - i) + (k < i ? 0.5 : 0), S.map]).sort((a, b) => a[0] - b[0]).map((x) => x[1]), want = [...new Set(order)];
+  const keep = Q.maxFps <= 20 ? 3 : want.length; for (const id of [...maps.keys()]) if (want.indexOf(id) >= keep) dropMap(id);
+  const need = want.slice(0, keep).find((id) => !maps.has(id)); if (need) loadMap(need);
+}, 200);
 
 // ---------- 카메라 길 ----------
 const lmCenter = (hg, name) => { const fs = (hg.foot || []).filter((f) => f.name === name); if (!fs.length) return null; let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9, h = 0; for (const f of fs) { x0 = Math.min(x0, f.x0); x1 = Math.max(x1, f.x1); z0 = Math.min(z0, f.z0); z1 = Math.max(z1, f.z1); h = Math.max(h, f.h); } return { x: (x0 + x1) / 2, z: (z0 + z1) / 2, h }; };

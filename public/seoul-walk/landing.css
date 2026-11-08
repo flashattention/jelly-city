@@ -172,3 +172,24 @@ body.light .bar nav { color: rgba(28, 33, 51, .62); } body.light .bar nav a:hove
 @keyframes sky-sun { from { offset-distance: 0%; fill: #ffb89e; } to { offset-distance: 100%; fill: #b9a6ff; } }
 @media (prefers-reduced-motion: reduce) { .skyline .line { animation: none; stroke-dashoffset: 0; } .skyline .sun { animation: none; } }
 .api code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 11.5px; letter-spacing: 0; }
+
+/* ===== 밤하늘로 (파스텔 취소): 아래 섹션 · 마지막 장 · 불러오기 ===== */
+main, .foot { --fg: #f3eee6; --mute: rgba(243, 238, 230, .66); --dim: rgba(243, 238, 230, .42); --line: rgba(243, 238, 230, .14); --gold: #f2cf8a; color: var(--fg); }
+main { background:
+  radial-gradient(1.2px 1.2px at 12% 18%, rgba(255, 255, 255, .8), transparent 60%), radial-gradient(1px 1px at 38% 42%, rgba(255, 255, 255, .6), transparent 60%), radial-gradient(1.4px 1.4px at 72% 12%, rgba(255, 236, 190, .85), transparent 60%), radial-gradient(1px 1px at 88% 58%, rgba(255, 255, 255, .55), transparent 60%), radial-gradient(1.2px 1.2px at 22% 76%, rgba(255, 255, 255, .6), transparent 60%), radial-gradient(1px 1px at 60% 88%, rgba(255, 236, 190, .6), transparent 60%),
+  linear-gradient(180deg, #05070c 0%, #0a1024 22%, #10173a 55%, #0c1230 80%, #080b1c 100%);
+  background-size: 520px 520px, 610px 610px, 470px 470px, 690px 690px, 560px 560px, 640px 640px, 100% 100%; }
+.foot { background: #070a18; }
+.end { color: var(--fg); background: radial-gradient(1.2px 1.2px at 20% 30%, rgba(255, 255, 255, .8), transparent 60%), radial-gradient(1px 1px at 70% 20%, rgba(255, 236, 190, .8), transparent 60%), radial-gradient(1.2px 1.2px at 40% 70%, rgba(255, 255, 255, .6), transparent 60%), radial-gradient(ellipse at 50% 120%, rgba(90, 70, 150, .45), transparent 60%), linear-gradient(180deg, rgba(5, 7, 12, .55), rgba(10, 16, 40, .95)); background-size: 380px 380px, 450px 450px, 520px 520px, 100% 100%, 100% 100%; }
+.end h2 { color: #f3eee6; }
+body.light .bar { color: #f3eee6; background: linear-gradient(180deg, rgba(7, 10, 24, .9), rgba(7, 10, 24, 0)); } body.light .bar nav { color: rgba(243, 238, 230, .64); } body.light .bar nav a:hover, body.light .bar nav .go { color: #f3eee6; }
+.loader { color: #f3eee6; background: radial-gradient(1.2px 1.2px at 15% 25%, rgba(255, 255, 255, .8), transparent 60%), radial-gradient(1px 1px at 65% 15%, rgba(255, 255, 255, .6), transparent 60%), radial-gradient(1.3px 1.3px at 40% 70%, rgba(255, 236, 190, .7), transparent 60%), radial-gradient(1px 1px at 85% 55%, rgba(255, 255, 255, .55), transparent 60%), radial-gradient(ellipse at 50% 110%, rgba(80, 60, 140, .4), transparent 60%), linear-gradient(180deg, #05070c, #0d1434 70%, #111a40);
+  background-size: 300px 300px, 360px 360px, 420px 420px, 480px 480px, 100% 100%, 100% 100%; }
+.loader .ld-t { color: #f3eee6; } .loader .ld-s { color: rgba(243, 238, 230, .55); } .loader .ld-bar { background: rgba(243, 238, 230, .12); } .loader .ld-bar i { background: #ffd98a; box-shadow: 0 0 8px #ffd98a; }
+/* 별자리 스카이라인: 노란 선이 이어 그려지고, 꼭짓점 별이 반짝인다 */
+.skyline .line { stroke: #ffd98a; stroke-width: 1.4; filter: drop-shadow(0 0 3px rgba(255, 217, 138, .9)); }
+.skyline .sun { display: none; }
+.skyline .st { fill: #fff3c8; filter: drop-shadow(0 0 4px #ffd98a); animation: twinkle 1.8s ease-in-out infinite; }
+.skyline .st:nth-child(3n) { animation-delay: .4s; } .skyline .st:nth-child(3n + 1) { animation-delay: .9s; } .skyline .st:nth-child(4n) { animation-delay: 1.3s; }
+@keyframes twinkle { 0%, 100% { opacity: .35; transform: scale(.7); } 50% { opacity: 1; transform: scale(1.15); } }
+.skyline .st { transform-box: fill-box; transform-origin: center; }
