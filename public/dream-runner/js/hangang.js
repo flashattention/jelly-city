@@ -301,7 +301,7 @@ export class Hangang {
     // 몰 문(더현대 · IFC몰)은 칸에서 만들지만 들어가기 검사는 주인이 한다
     for (const D of c.malls || []) { D.key = key; (this.malls ||= []).push(D); }
     for (const f of c.foot) { f.key ??= key; this.addFoot(f); } c.foot = this.foot; c.footGrid = this.footGrid; for (let k = d0; k < this.decks.length; k++) this.decks[k].key = key;
-    const tb1 = performance.now(); await idle(); this.maskWater(key); this.drape(c); await idle(); this.mergeChunk(c); await idle(); c.scene.userData.chunk = key; c.buildMs = [Math.round(tb1 - tb0), Math.round(performance.now() - tb1)]; // 만들기 · 지형 얹기+묶기 (ms)
+    const tb1 = performance.now(); await idle(); this.maskWater(key); const tw = performance.now(); { let t0 = performance.now(); for (const _ of this.drapeGen(c)) if (performance.now() - t0 > 8) { await idle(); t0 = performance.now(); } } const td = performance.now(); await idle(); const tm = performance.now(); this.mergeChunk(c); const tm2 = performance.now(); await idle(); c.scene.userData.chunk = key; c.buildMs = [Math.round(tb1 - tb0), Math.round(performance.now() - tb1)]; c.stepMs = [Math.round(tw - tb1), Math.round(td - tw), Math.round(tm2 - tm)]; // 만들기 · 지형 얹기+묶기 (ms)
     c.applySeason(); this.scene.add(c.scene);
     return c;
   }
@@ -359,7 +359,9 @@ export class Hangang {
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (T.h[j * T.nx + i] > 0 && this.inWater(T.x0 + i * T.step, T.z0 + j * T.step)) T.h[j * T.nx + i] = 0;
   }
   // 칸 하나를 지형 위에 얹는다: 넓은 것(땅 · 길 · 묶은 건물)은 꼭짓점마다, 작은 것(간판 · 출구)은 통째로, 나무 같은 인스턴스는 하나씩
-  drape(c) {
+  drape(c) { for (const _ of this.drapeGen(c)); }
+  // 쉬어 가며 얹기: 덩어리 하나 얹을 때마다 멈출 수 있게 (칸을 다 만든 순간 화면이 0.1 ~ 0.3초 멈췄다)
+  *drapeGen(c) {
     if (!this.terr) return; const H = (x, z) => this.terrAt(x, z, true), m4 = new THREE.Matrix4(), m4i = new THREE.Matrix4(), v = new THREE.Vector3(), done = (this.draped ||= new WeakSet());
     const flatLike = (o) => { const ms = Array.isArray(o.material) ? o.material : [o.material]; return ms.some((m) => m?.userData?.order !== undefined); };
     const vertices = (o) => {
@@ -381,7 +383,7 @@ export class Hangang {
       if (o.isMesh || o.isLine || o.isPoints) return vertices(o);
       for (const ch of [...o.children]) visit(ch);
     };
-    c.scene.updateMatrixWorld(true); for (const o of [...c.scene.children]) visit(o);
+    c.scene.updateMatrixWorld(true); for (const o of [...c.scene.children]) { visit(o); yield; }
     // 땅: 칸마다 지형 격자 그대로 (바탕 도시 땅은 높이 0 이라 언덕 아래로 숨는다)
     const S = this.world0.tile, [ti, tj] = c.chunkKey.split('_').map(Number), n = Math.round(S / this.terr.step), g = new THREE.PlaneGeometry(S, S, n, n); g.rotateX(-Math.PI / 2); g.translate((ti + 0.5) * S, 0, (tj + 0.5) * S);
     { const p = g.attributes.position; for (let k = 0; k < p.count; k++) p.setY(k, H(p.getX(k), p.getZ(k)) - 0.05); g.computeVertexNormals(); }
