@@ -251,7 +251,7 @@ export class Hangang {
     // 땅 바탕 (도시)
     const landTex = groundTex('city'); landTex.repeat.set(26000 / 9, 26000 / 9); const land = new THREE.Mesh(new THREE.PlaneGeometry(26000, 26000), flatMat('#a3a39f', -60, { map: landTex })); land.receiveShadow = true; land.rotation.x = -Math.PI / 2; land.renderOrder = -60; land.material.depthTest = true; land.material.depthWrite = true; sc.add(land); this.landM = land.material;
     // 물: 반짝이는 물결 · 하늘 색 반사 · 밤에는 도시 불빛이 비친다
-    this.waterU = { time: { value: 0 }, sunDir: this.skyU.sunDir, sunCol: this.skyU.sunCol, hor: this.skyU.hor, top: this.skyU.top, night: this.skyU.night, rain: { value: 0 }, fogCol: { value: C('#bcdcf4') }, fogD: { value: 0.00022 }, deep: { value: C('#2c5866') } };
+    this.waterU = { time: { value: 0 }, sunDir: this.skyU.sunDir, sunCol: this.skyU.sunCol, hor: this.skyU.hor, top: this.skyU.top, night: this.skyU.night, rain: { value: 0 }, fogCol: { value: C('#bcdcf4') }, fogD: { value: 0.00022 }, deep: { value: C('#2f7a88') } };
     const waterM = new THREE.ShaderMaterial({ uniforms: this.waterU, depthWrite: false, depthTest: false, side: THREE.DoubleSide,
       vertexShader: 'varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }',
       fragmentShader: `uniform float time, night, rain, fogD; uniform vec3 sunDir, sunCol, hor, top, fogCol, deep; varying vec3 vW;
@@ -264,6 +264,7 @@ export class Hangang {
           vec3 c = mix(deep * (0.35 + 0.65 * (1.0 - night)), mix(hor, top, 0.25), clamp(0.25 + fr * 0.85, 0.0, 1.0));
           vec3 rf = reflect(-v, n); float sp = pow(max(dot(rf, sunDir), 0.0), 220.0) * step(0.0, sunDir.y); c += sunCol * sp * 3.0;
           c += sunCol * pow(max(dot(rf, sunDir), 0.0), 18.0) * 0.18 * step(0.0, sunDir.y);
+          vec2 gq = floor(p * 0.9 + g * 3.0); float gl = step(0.9965, fract(sin(dot(gq + floor(t * 1.5), vec2(12.99, 78.23))) * 43758.5)); c += sunCol * gl * 1.4 * (1.0 - night) * step(0.0, sunDir.y);
           float lights = smoothstep(0.55, 1.0, sin(p.x * 0.09 + g.x * 2.0) * sin(p.x * 0.31) ) * night * smoothstep(40.0, 700.0, length(cameraPosition.xz - p));
           c += vec3(1.0, 0.72, 0.4) * lights * 0.35;
           float d = length(cameraPosition - vW); float f = 1.0 - exp(-pow(fogD * d, 2.0)); c = mix(c, fogCol, f);
@@ -406,6 +407,7 @@ export class Hangang {
         const u0 = acc / BW, u1 = (acc + L) / BW, v0 = mh / FH, v1 = h / FH; acc += L;
         set.U.push(u0, v0, u1, v0, u1, v1, u0, v1);
         if (s < 0) set.I.push(k, k + 1, k + 2, k, k + 2, k + 3); else set.I.push(k, k + 2, k + 1, k, k + 3, k + 2);
+        if (type !== 'glass' && type !== 'gold' && h - mh > 6) { const o = 0.18, q0 = extras.P.length / 3, cc = col.clone().lerp(new THREE.Color('#ffffff'), 0.45); extras.P.push(a[0] + nx * o, h - 0.9, a[1] + nz * o, c2[0] + nx * o, h - 0.9, c2[1] + nz * o, c2[0] + nx * o, h + 0.35, c2[1] + nz * o, a[0] + nx * o, h + 0.35, a[1] + nz * o); for (let t2 = 0; t2 < 4; t2++) { extras.N.push(nx, 0, nz); extras.Cl.push(cc.r, cc.g, cc.b); } if (s < 0) extras.I.push(q0, q0 + 1, q0 + 2, q0, q0 + 2, q0 + 3); else extras.I.push(q0, q0 + 2, q0 + 1, q0, q0 + 3, q0 + 2); }
         // 낮은 상가: 1층 간판 띠 (밤에 빛난다)
         if ((kind === 2 || kind === 0) && h < 30 && mh < 1 && L > 4 && r() < 0.55) { const sc = new THREE.Color(['#ff5a5f', '#ffd23f', '#3db8ff', '#7be07b', '#ff9ec0', '#ffffff', '#ff8a3d'][Math.floor(r() * 7)]), q = signs.P.length / 3, o = 0.08; signs.P.push(a[0] + nx * o, 3.1, a[1] + nz * o, c2[0] + nx * o, 3.1, c2[1] + nz * o, c2[0] + nx * o, 3.9, c2[1] + nz * o, a[0] + nx * o, 3.9, a[1] + nz * o); for (let t = 0; t < 4; t++) { signs.N.push(nx, 0, nz); signs.Cl.push(sc.r, sc.g, sc.b); } if (s < 0) signs.I.push(q, q + 1, q + 2, q, q + 2, q + 3); else signs.I.push(q, q + 2, q + 1, q, q + 3, q + 2); }
       }
@@ -683,7 +685,7 @@ export class Hangang {
   }
   applySeason() {
     const s = this.state.season, r = rnd(4242), c = new THREE.Color(), N = this.trees.length;
-    const pal = { spring: ['#ffe0ec', '#ffeaf2', '#ffd3e4', '#fff6fa', '#ffc9dd'], summer: ['#3f8a3a', '#4f9a40', '#2f7a34', '#5aa548', '#3a7f40'], autumn: ['#e8742a', '#f2b233', '#c8402a', '#d9902a', '#9aa83a', '#f0c84a'], winter: ['#ffffff'] }[s];
+    const pal = { spring: ['#ffc9de', '#ffd6e6', '#ffb9d3', '#ffe3ee', '#ffc0d8'], summer: ['#3f8a3a', '#4f9a40', '#2f7a34', '#5aa548', '#3a7f40'], autumn: ['#e8742a', '#f2b233', '#c8402a', '#d9902a', '#9aa83a', '#f0c84a'], winter: ['#ffffff'] }[s];
     void N;
     for (const set of this.crownSets) {
       if (!set) continue; const { crowns, idx, pine } = set;
