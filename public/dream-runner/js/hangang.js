@@ -155,7 +155,7 @@ function foliageTex(blossom) {
   const inBlob = (x, y) => { const dx = x - 128, dy = y - 128, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx); return d < 104 + Math.sin(a * 7) * 10 + Math.sin(a * 13) * 6; };
   for (let i = 0; i < (blossom ? 260 : 520); i++) {
     const x = 18 + r() * 220, y = 18 + r() * 220; if (!inBlob(x, y)) continue;
-    const d = Math.hypot(x - 128, y - 128) / 110, v = Math.round(255 - d * 70 - r() * 40);
+    const d = Math.hypot(x - 128, y - 128) / 110, v = Math.round(255 - d * (blossom ? 35 : 70) - r() * (blossom ? 22 : 40));
     if (blossom) { const rad = 7 + r() * 7, rot = r() * 6.28; g.fillStyle = `rgb(${v},${Math.round(v * (0.82 + r() * 0.1))},${Math.round(v * (0.88 + r() * 0.08))})`; for (let k = 0; k < 5; k++) { const a = rot + (k / 5) * Math.PI * 2; g.beginPath(); g.ellipse(x + Math.cos(a) * rad * 0.55, y + Math.sin(a) * rad * 0.55, rad * 0.55, rad * 0.38, a, 0, 7); g.fill(); } g.fillStyle = `rgba(${Math.round(v * 0.75)},${Math.round(v * 0.45)},${Math.round(v * 0.55)},.9)`; g.beginPath(); g.arc(x, y, rad * 0.2, 0, 7); g.fill(); }
     else { const L = 9 + r() * 9, a = r() * 6.28; g.fillStyle = `rgb(${v},${v},${v})`; g.beginPath(); g.ellipse(x, y, L, L * 0.45, a, 0, 7); g.fill(); g.strokeStyle = `rgba(0,0,0,.12)`; g.beginPath(); g.moveTo(x - Math.cos(a) * L * 0.8, y - Math.sin(a) * L * 0.8); g.lineTo(x + Math.cos(a) * L * 0.8, y + Math.sin(a) * L * 0.8); g.stroke(); }
   }
@@ -486,7 +486,7 @@ export class Hangang {
         const cx = bx + nx * d, cy = by + ny * d * 0.85, cz = bz + nz * d, sz = size * (0.75 + rr() * 0.6);
         // 카드 방향: 아무렇게나 (사방에서 볼 때 덩어리처럼)
         const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rr() * 6.28, rr() * 6.28, rr() * 6.28)), ax = new THREE.Vector3(1, 0, 0).applyQuaternion(q), ay = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
-        const base = P.length / 3, shade = 0.62 + (ny * 0.5 + 0.5) * 0.45 + (d / br - 0.55) * 0.25;
+        const base = P.length / 3, shade = 0.78 + (ny * 0.5 + 0.5) * 0.35 + (d / br - 0.55) * 0.2;
         for (const [u, v] of [[0, 0], [1, 0], [1, 1], [0, 1]]) { const ox = (u - 0.5) * sz, oy = (v - 0.5) * sz; P.push(cx + ax.x * ox + ay.x * oy, cy + ax.y * ox + ay.y * oy, cz + ax.z * ox + ay.z * oy); N.push(nx, ny * 0.9 + 0.1, nz); U.push(u, v); Cl.push(shade, shade, shade); }
         I.push(base, base + 1, base + 2, base, base + 2, base + 3);
       }
@@ -502,7 +502,7 @@ export class Hangang {
       const m = mergeGeos(parts), pp = m.attributes.position, cl = []; for (let k = 0; k < pp.count; k++) { const v = 0.7 + Math.min(1, pp.getY(k) / h) * 0.35; cl.push(v, v * 0.92, v * 0.86); } m.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3)); return m;
     };
     const SHAPES = [
-      { crown: cardCrown([[0, 4.3, 0, 2.1], [1.6, 3.8, 0.5, 1.5], [-1.5, 3.9, -0.6, 1.55], [0.4, 3.7, -1.6, 1.4], [-0.5, 3.6, 1.6, 1.4], [0.2, 5.3, 0.2, 1.4]], isPhone ? 70 : 120, 1.9), trunk: trunkGeo(3.6, 0.32, 0.25, [[0.3, 0.75, 1.9, 0.62], [2.4, 0.8, 1.7, 0.7], [4.4, 0.7, 1.8, 0.66]]), cherry: true },
+      { crown: cardCrown([[0, 4.3, 0, 2.1], [1.6, 3.8, 0.5, 1.5], [-1.5, 3.9, -0.6, 1.55], [0.4, 3.7, -1.6, 1.4], [-0.5, 3.6, 1.6, 1.4], [0.2, 5.3, 0.2, 1.4]], isPhone ? 90 : 170, 1.85), trunk: trunkGeo(3.6, 0.32, 0.25, [[0.3, 0.75, 1.9, 0.62], [2.4, 0.8, 1.7, 0.7], [4.4, 0.7, 1.8, 0.66]]), cherry: true },
       { crown: cardCrown([[0, 4.8, 0, 1.4], [0.5, 6.0, 0.3, 1.1], [-0.5, 4.0, -0.3, 1.15], [0.2, 6.9, 0, 0.8]], isPhone ? 50 : 85, 1.5), trunk: trunkGeo(4.0, 0.24, 0.12, [[1, 0.5, 1.4, 0.7], [3.5, 0.55, 1.3, 0.78]]) },
       { crown: (() => { const gs = [[3.0, 2.0, 2.0], [4.3, 1.6, 1.7], [5.4, 1.15, 1.4], [6.3, 0.7, 1.1]].map(([y, rr2, hh]) => { const g = new THREE.ConeGeometry(rr2, hh, 9, 2); g.translate(0, y, 0); const p = g.attributes.position; for (let k = 0; k < p.count; k++) { const a = Math.atan2(p.getZ(k), p.getX(k)); const w = 1 + Math.sin(a * 9) * 0.08; p.setX(k, p.getX(k) * w); p.setZ(k, p.getZ(k) * w); } g.computeVertexNormals(); return g; }); const m = mergeGeos(gs), p = m.attributes.position, cl = []; for (let k = 0; k < p.count; k++) { const v = 0.62 + (p.getY(k) - 2) / 6 * 0.42; cl.push(v, v, v); } m.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3)); return m; })(), trunk: trunkGeo(3.0, 0.2, 0.05, []), pine: true },
     ];
@@ -683,11 +683,11 @@ export class Hangang {
   }
   applySeason() {
     const s = this.state.season, r = rnd(4242), c = new THREE.Color(), N = this.trees.length;
-    const pal = { spring: ['#ffc6da', '#ffd9e6', '#ffb3cc', '#fff0f5', '#9ccc6a'], summer: ['#3f8a3a', '#4f9a40', '#2f7a34', '#5aa548', '#3a7f40'], autumn: ['#e8742a', '#f2b233', '#c8402a', '#d9902a', '#9aa83a', '#f0c84a'], winter: ['#ffffff'] }[s];
+    const pal = { spring: ['#ffe0ec', '#ffeaf2', '#ffd3e4', '#fff6fa', '#ffc9dd'], summer: ['#3f8a3a', '#4f9a40', '#2f7a34', '#5aa548', '#3a7f40'], autumn: ['#e8742a', '#f2b233', '#c8402a', '#d9902a', '#9aa83a', '#f0c84a'], winter: ['#ffffff'] }[s];
     void N;
     for (const set of this.crownSets) {
       if (!set) continue; const { crowns, idx, pine } = set;
-      idx.forEach((si, q) => { if (pine) c.set(['#2f5d3a', '#355f3c', '#2a5233'][si % 3]).offsetHSL(0, 0, s === 'winter' ? 0.04 : 0); else { c.set(pal[Math.floor(r() * pal.length)]); if (s === 'spring' && si % 4 === 3) c.set('#9ccc6a'); } c.offsetHSL(0, 0, (r() - 0.5) * 0.06); crowns.setColorAt(q, c); });
+      idx.forEach((si, q) => { if (pine) c.set(['#2f5d3a', '#355f3c', '#2a5233'][si % 3]).offsetHSL(0, 0, s === 'winter' ? 0.04 : 0); else { c.set(pal[Math.floor(r() * pal.length)]); if (s === 'spring' && si % 6 === 5) c.set('#b9de8c'); } c.offsetHSL(0, 0, (r() - 0.5) * 0.06); crowns.setColorAt(q, c); });
       crowns.instanceColor.needsUpdate = true; crowns.visible = pine || s !== 'winter';
     }
     for (const tw of this.twigSets) tw.visible = s === 'winter';
