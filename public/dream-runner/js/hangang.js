@@ -153,6 +153,19 @@ function facadeTex(type, lit, seed) {
   const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
 // 땅 무늬: 잔디(회색조라 계절 색이 곱해진다) · 도시 바닥 · 아스팔트(가장자리 흰 선) · 러닝 트랙(붉은 우레탄) · 호안 돌
+// 숲 지붕 그림 (산을 멀리서 보면 나무 꼭대기들이 빽빽이 겹친 모습): 계절마다 한 장, 이어 붙여도 이음매가 없게 가장자리를 감싼다
+//   uv 는 7m 마다 1 이라 repeat 0.16 이면 그림 한 장이 약 45m (나무 지붕 하나 5 ~ 9m)
+const CANOPY = {}, CANOPY_K = { spring: '#e8e8e8', summer: '#f4f4f4', autumn: '#cfcfcf', winter: '#dcdcdc' };
+function canopyTex(season) {
+  if (CANOPY[season]) return CANOPY[season];
+  const P = { spring: ['#3a5230', ['#6a9450', '#7fa85a', '#5d8448', '#d8b4c0', '#93b870', '#4f7a40', '#73a052']], summer: ['#2c4428', ['#4a7a3e', '#5a8a48', '#3e6a3a', '#669a50', '#365e34', '#4f7f42', '#5f9248']], autumn: ['#2e281e', ['#9a4a2e', '#b07a3a', '#a8883e', '#7a3a28', '#3f5a36', '#8a5a32', '#6a6a38', '#c09848']], winter: ['#443f38', ['#5e5750', '#6a625a', '#766c62', '#33503a', '#385438', '#82786c', '#5a534c']] }[season] || ['#22361f', ['#355a33']];
+  const N = 256, cv = document.createElement('canvas'); cv.width = cv.height = N; const g = cv.getContext('2d'), r = rnd(season.length * 977 + 3);
+  g.fillStyle = P[0]; g.fillRect(0, 0, N, N);
+  for (let i = 0; i < 420; i++) { const x = r() * N, y = r() * N, rr = 7 + r() * 12, c = P[1][Math.floor(r() * P[1].length)];
+    for (const [ox, oy] of [[0, 0], [N, 0], [-N, 0], [0, N], [0, -N], [N, N], [-N, -N], [N, -N], [-N, N]]) { const cx = x + ox, cy = y + oy; if (cx < -rr || cx > N + rr || cy < -rr || cy > N + rr) continue;
+      const gr = g.createRadialGradient(cx - rr * 0.3, cy - rr * 0.35, rr * 0.1, cx, cy, rr); gr.addColorStop(0, c); gr.addColorStop(0.62, c); gr.addColorStop(1, 'rgba(0,0,0,0.45)'); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, rr, 0, 7); g.fill(); } }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.repeat.set(0.085, 0.085); CANOPY[season] = t; return t;
+}
 function groundTex(kind) {
   const N = kind === 'city' ? 128 : 256, cv = document.createElement('canvas'); cv.width = cv.height = N; const g = cv.getContext('2d'), r = rnd(kind.length * 31 + 7);
   const noise = (base, amp, n, sz) => { g.fillStyle = base; g.fillRect(0, 0, N, N); for (let i = 0; i < n; i++) { const v = (r() - 0.5) * amp; g.fillStyle = v > 0 ? `rgba(255,255,255,${v})` : `rgba(0,0,0,${-v})`; g.fillRect(r() * N, r() * N, sz * (0.5 + r()), sz * (0.5 + r())); } };
@@ -653,7 +666,7 @@ export class Hangang {
     this.greenPolys = [...greens.grass, ...greens.wood, ...greens.wild];
     this.greenM = {};
     for (const [k, col, o] of [['grass', '#8db86a', -53], ['wild', '#94a96a', -52.5], ['wood', '#5f8a4a', -52], ['pitch', '#6aa860', -51.5], ['sand', '#d9c79a', -51]]) {
-      if (!greens[k].length) continue; const m = flatMat(col, o, k === 'sand' ? {} : { map: this.grassTex ||= groundTex('grass') }); if (k !== 'sand') patchy(m); this.greenM[k] = m; const me = new THREE.Mesh(fillGeo(greens[k], 0, 7), m); me.renderOrder = o; me.receiveShadow = true; sc.add(me);
+      if (!greens[k].length) continue; const m = flatMat(k === 'wood' ? CANOPY_K[this.state?.season || 'summer'] : col, o, k === 'sand' ? {} : { map: k === 'wood' ? canopyTex(this.state?.season || 'summer') : (this.grassTex ||= groundTex('grass')) }); if (k !== 'sand') patchy(m); this.greenM[k] = m; const me = new THREE.Mesh(fillGeo(greens[k], 0, 7), m); me.renderOrder = o; me.receiveShadow = true; sc.add(me);
     }
     yield;
     // 길 · 철길
@@ -1715,7 +1728,7 @@ export class Hangang {
     for (const tw of this.twigSets) tw.visible = s === 'winter';
     this.blossomTex ||= foliageTex(true); for (const m of this.cardMats || []) { m.map = s === 'spring' ? this.blossomTex : this.leafTex; m.needsUpdate = true; }
     const grass = { spring: '#9cbf7c', summer: '#86ab68', autumn: '#97a65e', winter: '#b3b89a' }[s];
-    this.greenM.grass?.color.set(grass); for (const m of this.wideM || []) m.color.set(grass); this.stripM?.color.set(grass); this.greenM.wild?.color.set(grass).offsetHSL(0, -0.05, -0.03); this.greenM.wood?.color.set({ spring: '#6f9a52', summer: '#4f7f40', autumn: '#a8763a', winter: '#8a8270' }[s]); this.islandM.color.set(grass).offsetHSL(0, 0, -0.06);
+    this.greenM.grass?.color.set(grass); for (const m of this.wideM || []) m.color.set(grass); this.stripM?.color.set(grass); this.greenM.wild?.color.set(grass).offsetHSL(0, -0.05, -0.03); if (this.greenM.wood) { this.greenM.wood.color.set(CANOPY_K[s] || '#e0e0e0'); this.greenM.wood.map = canopyTex(s); this.greenM.wood.needsUpdate = true; } this.islandM.color.set(grass).offsetHSL(0, 0, -0.06);
     const tc = new THREE.Color(); for (let i = 0; i < this.tufts.count; i++) { tc.setHSL(s === 'autumn' ? 0.12 + r() * 0.05 : s === 'winter' ? 0.14 : s === 'summer' ? 0.26 + r() * 0.05 : 0.23 + r() * 0.06, s === 'winter' ? 0.18 : 0.55, s === 'winter' ? 0.62 : 0.4 + r() * 0.14); this.tufts.setColorAt(i, tc); } if (this.tufts.instanceColor) this.tufts.instanceColor.needsUpdate = true;
     this.flowers.visible = s === 'spring' || s === 'summer';
   }
