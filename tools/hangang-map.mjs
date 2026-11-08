@@ -32,6 +32,14 @@ const COURSES = {
     labels: [], arches: [],
     far: [['남산서울타워', 37.5512, 126.9882, 236, 'tower'], ['롯데월드타워', 37.5126, 127.1025, 555, 'lotte']],
   },
+  // 반포 한강공원: 동작대교 → 반포대교(달빛무지개분수 · 잠수교) · 세빛섬 → 한남대교 쪽
+  banpo: {
+    name: '한강 반포 코스', sub: '동작대교 → 세빛섬 · 반포대교 무지개분수 → 한남대교',
+    bbox: [37.495, 126.960, 37.535, 127.030], path: '한강남자전거길', lon: [126.979, 127.012], gap: 40, preClip: true,
+    marks: [['동작대교', 37.5085, 126.9815], ['세빛섬', 37.5113, 126.9946], ['반포대교', 37.5147, 126.9960], ['서래섬', 37.5085, 126.9890]],
+    labels: [], arches: [],
+    far: [['남산서울타워', 37.5512, 126.9882, 236, 'tower'], ['롯데월드타워', 37.5126, 127.1025, 555, 'lotte']],
+  },
   // 이태원: 녹사평역 → 이태원로 → 이태원역 → 한강진 (세계 음식 거리 · 루프탑 · 해밀톤호텔)
   itaewon: {
     name: '이태원 거리 산책', sub: '녹사평 → 이태원로 → 이태원역 → 한강진',
@@ -136,7 +144,7 @@ function chain(ways) {
     for (let grew = true; grew;) {
       grew = false;
       for (let i = 0; i < rest.length; i++) {
-        const w = rest[i], end = r[r.length - 1], near = (a, b) => d2(a, b) < 4;
+        const w = rest[i], end = r[r.length - 1], near = (a, b) => d2(a, b) < (C.gap || 2) ** 2;
         if (near(end, w[0])) r = r.concat(w.slice(1)); else if (near(end, w[w.length - 1])) r = r.concat([...w].reverse().slice(1)); else if (near(r[0], w[w.length - 1])) r = w.concat(r.slice(1)); else if (near(r[0], w[0])) r = [...w].reverse().concat(r.slice(1)); else continue;
         rest.splice(i, 1); grew = true; break;
       }
@@ -146,8 +154,9 @@ function chain(ways) {
   }
   return best;
 }
-let route = chain(pathWays);
 const [xa] = P(37.53, C.lon[0]), [xb] = P(37.53, C.lon[1]);
+// preClip: 범위 안 조각만 먼저 골라 잇는다 (자전거길이 여러 갈래로 끊긴 곳)
+let route = chain(C.preClip ? pathWays.filter((w) => w.some((p) => p[0] >= xa - 150 && p[0] <= xb + 150)) : pathWays);
 if (route[0][0] > route[route.length - 1][0]) route.reverse(); // 서쪽 → 동쪽
 route = route.filter((p) => p[0] >= xa && p[0] <= xb);
 route = simplify(route, 0.6);
