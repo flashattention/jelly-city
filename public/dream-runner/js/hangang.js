@@ -80,6 +80,11 @@ function windowTex(glass, lit, seed) {
 function facadeTex(type, lit, seed) {
   const cv = document.createElement('canvas'); cv.width = cv.height = 256; const g = cv.getContext('2d'), r = rnd(seed + type.length * 7), C = 32;
   const wall = { apt: '#f4f2ee', glass: '#d6dde4', stone: '#e6e1d8', brick: '#d7d0c8', gold: '#f0e2c0', assembly: '#f6f3ec' }[type];
+  if (type === 'factory') { // 벽돌 공장 · 창고: 벽돌 줄눈 + 위가 둥근 큰 철제 창(격자) · 밤엔 카페 불빛
+    g.fillStyle = lit ? '#000' : '#d8cfc6'; g.fillRect(0, 0, 256, 256);
+    if (!lit) for (let y = 0; y < 256; y += 6) for (let x = (y / 6) % 2 ? 0 : 6; x < 256; x += 12) { g.fillStyle = `rgba(0,0,0,${0.05 + r() * 0.08})`; g.fillRect(x, y, 11, 5); }
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { const x = i * 64 + 12, y = j * 64 + 10; g.beginPath(); g.moveTo(x, y + 48); g.lineTo(x, y + 14); g.arc(x + 20, y + 14, 20, Math.PI, 0); g.lineTo(x + 40, y + 48); g.closePath(); if (lit) { g.fillStyle = r() < 0.55 ? `hsl(${34 + r() * 10},85%,${60 + r() * 12}%)` : '#000'; g.fill(); } else { g.fillStyle = '#2d3238'; g.fill(); g.strokeStyle = '#4a4f55'; g.lineWidth = 2; g.stroke(); g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(x + 2, y + 16, 36, 4); g.fillStyle = '#4a4f55'; for (let k = 1; k < 3; k++) g.fillRect(x + k * 13, y + 2, 2, 46); g.fillRect(x, y + 30, 40, 2); } }
+    const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
   if (type === 'street' || type === 'street2') { // 거리 상가: 1층(그림 맨 아래 줄)은 통유리 가게, 위층은 창틀 창(street) / 가로 띠창(street2)
     g.fillStyle = lit ? '#000' : '#ece8e2'; g.fillRect(0, 0, 256, 256);
     for (let j = 0; j < 8; j++) { const y = j * 32, ground = j === 7;
@@ -670,7 +675,7 @@ export class Hangang {
     const nearRoad = (x, z) => { let best = Infinity; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const [A, B, hw] of segs.get(`${Math.floor(x / G) + a},${Math.floor(z / G) + b}`) || []) { const dx = B[0] - A[0], dz = B[1] - A[1], L2 = dx * dx + dz * dz || 1, t = clamp(((x - A[0]) * dx + (z - A[1]) * dz) / L2, 0, 1); best = Math.min(best, Math.hypot(A[0] + dx * t - x, A[1] + dz * t - z) - hw); } return best; };
     const pool = (M.shops || []).filter((s2) => s2[0].length >= 2); if (!pool.length) return; const doors = [];
     const list = [];
-    for (const f of this.foot || []) { if (!(f.type === 'street' || f.type === 'street2') || f.h < 4) continue; const ring = f.ring, sg = ringArea(ring) > 0 ? 1 : -1;
+    for (const f of this.foot || []) { if (!(f.type === 'street' || f.type === 'street2' || f.type === 'factory') || f.h < 4) continue; const ring = f.ring, sg = ringArea(ring) > 0 ? 1 : -1;
       for (let k = 0; k < ring.length; k++) { const a = ring[k], c = ring[(k + 1) % ring.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]); if (L < 3.5) continue; const nx = (sg > 0 ? c[1] - a[1] : a[1] - c[1]) / L, nz = (sg > 0 ? a[0] - c[0] : c[0] - a[0]) / L, mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2;
         if (nearRoad(mx + nx * 2, mz + nz * 2) > 9) continue; const q = this.project(mx, mz); if (Math.abs(q.lat) > (M.kind === 'street' ? 350 : 900)) continue;
         // 바깥에서 볼 때 글씨가 왼쪽 → 오른쪽으로 읽히게 (벽을 마주 본 사람의 오른쪽 = (nz, -nx))
@@ -761,12 +766,12 @@ export class Hangang {
   //   아파트(흰 벽 · 발코니 띠) · 유리 오피스(색 유리 · 멀리온) · 석재 오피스(창이 뚫린 돌벽) · 벽돌(학교 · 주택) · 금빛 유리(63빌딩)
   //   랜드마크: 63빌딩 금빛 유리 · 파크원 빨간 철골 기둥 · LG트윈타워 청동빛 유리 · IFC 푸른 유리 · 전경련회관 짙은 유리 · 국회의사당 흰 기둥 + 초록 돔
   buildBuildings(P2) {
-    const M = this.map, r = rnd(99), types = ['apt', 'glass', 'stone', 'brick', 'gold', 'assembly', 'church', 'panels', 'fins', 'street', 'street2'];
+    const M = this.map, r = rnd(99), types = ['apt', 'glass', 'stone', 'brick', 'gold', 'assembly', 'church', 'panels', 'fins', 'street', 'street2', 'factory'];
     const sets = Object.fromEntries(types.map((t) => [t, { P: [], N: [], U: [], Cl: [], I: [] }]));
     const extras = { P: [], N: [], Cl: [], I: [] }, domes = [], signs = { P: [], N: [], Cl: [], I: [] }, crosses = [];
     const col = new THREE.Color(), roofC = new THREE.Color();
     const GLASS = ['#6f8fb2', '#5f9aa2', '#8a96a4', '#6d9a86', '#9a8a70', '#55626f', '#7aa0c8', '#8fa8b8'], STONE = ['#d8cfbf', '#c9c4bc', '#b8b2a8', '#d9c8ae', '#a99c88', '#e2ddd2'], BRICK = ['#a8573e', '#9a4a36', '#b8694a', '#8a4a3a', '#c07a55'], APT = ['#f1ede4', '#ece4d4', '#e8e8e4', '#f2e9da', '#e4dccd', '#dfe3e6'];
-    const FLOOR = { apt: 2.9, glass: 3.9, stone: 3.6, brick: 3.2, gold: 3.9, assembly: 6, church: 7, panels: 8, fins: 3.9, street: 3.4, street2: 3.6 }, BAY = { apt: 3.4, glass: 1.6, stone: 2.6, brick: 2.4, gold: 1.6, assembly: 3.5, church: 4.5, panels: 5, fins: 1.6, street: 2.6, street2: 3.2 };
+    const FLOOR = { apt: 2.9, glass: 3.9, stone: 3.6, brick: 3.2, gold: 3.9, assembly: 6, church: 7, panels: 8, fins: 3.9, street: 3.4, street2: 3.6, factory: 5 }, BAY = { apt: 3.4, glass: 1.6, stone: 2.6, brick: 2.4, gold: 1.6, assembly: 3.5, church: 4.5, panels: 5, fins: 1.6, street: 2.6, street2: 3.2, factory: 4 };
     const box = (x, y, z, w, h, d, c, rotY = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.rotateY(rotY); g.translate(x, y, z); const k = extras.P.length / 3, p = g.attributes.position, n = g.attributes.normal; for (let i = 0; i < p.count; i++) { extras.P.push(p.getX(i), p.getY(i), p.getZ(i)); extras.N.push(n.getX(i), n.getY(i), n.getZ(i)); extras.Cl.push(c.r, c.g, c.b); } for (const ix of g.index.array) extras.I.push(k + ix); };
     const campus = []; for (const [nm, L] of Object.entries(LANDMARKS)) { if (!L.campus) continue; const ni2 = M.names.indexOf(nm); const b2 = M.buildings.find((q) => q[4] === ni2); if (!b2) continue; let x = 0, z = 0, n = 0; for (let k = 7; k < b2.length; k += 2) { x += b2[k] * M.scale; z += b2[k + 1] * M.scale; n++; } campus.push({ x: x / n, z: z / n, r: L.campus, L, nm, kind: b2[2] >> 1, ring: P2(b2.slice(7)), self: b2 }); }
     this.lmParts = {}; const touches = (cp, b, ring) => cp.self !== b && (ring.some(([x, z]) => inRing(x, z, cp.ring)) || cp.ring.some(([x, z]) => inRing(x, z, ring)));
@@ -1264,7 +1269,7 @@ export class Hangang {
       if (this.trainSeen.size > 400) this.trainSeen.clear();
     } catch { this.liveTrains = false; }
     try { const j = await this.api('/api/seoul/bus/pos'); this.busData = j.buses || []; } catch { /* 버스 정보 없음 */ }
-    if (!this.cityAt || Date.now() - this.cityAt > 300000) { this.cityAt = Date.now(); try { this.city = await this.api('/api/seoul/city?area=' + encodeURIComponent(this.id === 'hongdae' ? '홍대 관광특구' : this.id === 'namsan' ? '남산공원' : this.id === 'itaewon' ? '이태원 관광특구' : this.id === 'banpo' ? '반포한강공원' : this.id === 'ttukseom' ? '뚝섬한강공원' : '여의도')); this.onCity?.(this.city); } catch { /* 도시 정보 없음 */ } }
+    if (!this.cityAt || Date.now() - this.cityAt > 300000) { this.cityAt = Date.now(); try { this.city = await this.api('/api/seoul/city?area=' + encodeURIComponent(this.id === 'hongdae' ? '홍대 관광특구' : this.id === 'namsan' ? '남산공원' : this.id === 'itaewon' ? '이태원 관광특구' : this.id === 'banpo' ? '반포한강공원' : this.id === 'ttukseom' ? '뚝섬한강공원' : this.id === 'seongsu' ? '성수카페거리' : '여의도')); this.onCity?.(this.city); } catch { /* 도시 정보 없음 */ } }
   }
   tickTransit(dt, px, pz) {
     if (!this.trains) return;
@@ -1490,7 +1495,7 @@ export class Hangang {
     // 시간대별 켜진 정도: 집은 저녁 7 ~ 11시가 가장 밝고 새벽엔 거의 꺼짐, 회사는 퇴근 무렵 밝다가 밤이 깊으면 거의 꺼짐
     const hr = h, home = hr >= 17 && hr < 19 ? 0.6 : hr >= 19 && hr < 23 ? 1 : hr >= 23 || hr < 1 ? 0.55 : hr < 5 ? 0.12 : hr < 7 ? 0.3 : 0.2;
     const work = hr >= 17 && hr < 20 ? 1 : hr >= 20 && hr < 22 ? 0.55 : hr >= 22 || hr < 6 ? 0.08 : hr < 8 ? 0.35 : 0.3;
-    for (const [t, m] of Object.entries(this.bldByType || {})) m.emissiveIntensity = lit * (t.startsWith('street') ? (hr >= 2 && hr < 7 ? 0.3 : 1) : t === 'apt' || t === 'brick' ? home : work) * 0.5;
+    for (const [t, m] of Object.entries(this.bldByType || {})) m.emissiveIntensity = lit * (t.startsWith('street') || t === 'factory' ? (hr >= 2 && hr < 7 ? 0.3 : 1) : t === 'apt' || t === 'brick' ? home : work) * 0.5;
     if (this.signM) this.signM.emissiveIntensity = lit * (hr >= 1 && hr < 6 ? 0.15 : 0.45);
     if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; if (this.summit) tickSummit(this, dt, lit); for (const m of this.neonMs || []) m.emissiveIntensity = 0.2 + lit * 1.2; if (this.jbugM) this.jbugM.emissiveIntensity = 0.15 + lit * 0.7; if (this.id === 'banpo') this.tickBanpo(dt, lit); if (this.mfount) this.tickMusicFountain(dt, lit); for (const b of this.picnic || []) b.update(dt, 0, { noCrawl: true }); for (const m of this.shopSignMs || []) m.emissiveIntensity = 0.25 + lit * 0.85; for (const m of this.shopWinM || []) m.emissiveIntensity = 0.1 + lit * 0.42; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.35 * Math.max(0.2, (h >= 18 && h < 24 ? 1 : 0.4));
     this.lampGlow.material.opacity = lit; if (this.lampHeadM) this.lampHeadM.emissiveIntensity = 0.2 + lit * 2.2; this.bridgeLights.material.opacity = lit; this.carPts.material.opacity = 0.25 + lit * 0.75;
@@ -1909,6 +1914,9 @@ function skyGlass(m, skyU, gold) {
 function styleOf([use, st, yr], h, r) {
   const pick2 = (a) => a[Math.floor(r() * a.length)], masonry = st >= 11 && st <= 19, steel = st >= 31 && st <= 39, era = yr ? (yr < 1990 ? 0 : yr < 2005 ? 1 : 2) : 1;
   if (use === 6) return ['church', '#efe9de'];
+  // 공장 · 창고 (성수 붉은 벽돌 공장 카페 등): 짙은 붉은 벽돌 + 큰 공장 창
+  if ((use === 17 || use === 18) && h > 22) return ['glass', pick2(['#9fb2c0', '#a9bccb', '#b8c6cf'])]; // 지식산업센터 (공장 용도인 높은 유리 빌딩)
+  if (use === 17 || use === 18) return ['factory', pick2(['#8a3f2e', '#9a4a36', '#7a3a2c', '#a5523e', '#6b6f73'])];
   if (use === 2 && h > 24) return null; // 아파트 단지는 아파트 모습 그대로
   if (masonry) return ['brick', era === 0 ? pick2(['#8a4a36', '#7a3f30', '#9a5a44']) : era === 1 ? pick2(['#a5523e', '#b0604a', '#9c4f3a']) : pick2(['#b8735a', '#c9a27a', '#a8866a'])];
   if (steel && h > 15) return ['glass', pick2(['#9fb6c8', '#a9bccb', '#8fa6b8'])];
