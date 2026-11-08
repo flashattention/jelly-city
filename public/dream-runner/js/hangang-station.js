@@ -120,9 +120,11 @@ export function buildStation(hg, st, si, exitRefs) {
     spawnPlatform(li) { const p = plats[li] || plats[0]; return { x: O.x - p.PL / 2 + 6, z: p.pz, face: Math.PI / 2 }; },
     spawnConcourse(li) { const z = zones.find((q) => q.kind === 'down' && q.li === li) || zones.find((q) => q.kind === 'down'); return { x: z.x - 3.5, z: z.z, face: -Math.PI / 2 }; },
     zoneAt(x, z) { return zones.find((q) => Math.hypot(x - q.x, z - q.z) < q.r) || null; },
-    tick(dt, arrivals) {
+    tick(dt, arrivals, at) {
       for (const p of plats) for (const T of p.trains) {
         T.t -= dt; const half = p.PL / 2 + 120;
+        // 실제 도착 정보: "○○방면" 이 다음 역이면 이쪽 선로, 이전 역이면 반대쪽. 남은 초에 맞춰 들어온다
+        if (T.phase === 'gone' && arrivals?.length) { const want = T.sd > 0 ? p.next : p.prev, a = arrivals.find((q) => String(q.line).startsWith(String(p.l)) && new RegExp(`${want}\\s*방면`).test(`${q.to || ''} ${q.msg || ''}`)); if (a) { const rem = (a.sec || 0) - (Date.now() - (at || Date.now())) / 1000; if (/도착|진입/.test(a.msg || '') && !/전역|후/.test(a.msg || '')) T.t = Math.min(T.t, 0); else if (rem > 0) T.t = Math.max(0, rem - 9); } }
         if (T.phase === 'gone' && T.t <= 0) { T.phase = 'in'; T.t = 9; T.tr.visible = true; }
         if (T.phase === 'in') { const k = Math.max(0, T.t / 9); T.tr.position.x = -T.sd * half * k * k; if (T.t <= 0) { T.phase = 'stop'; T.t = 22; setDoors(T.tr, 1); } }
         else if (T.phase === 'stop') { if (T.t < 3) setDoors(T.tr, Math.max(0, T.t / 3)); if (T.t <= 0) { T.phase = 'out'; T.t = 9; setDoors(T.tr, 0); } }

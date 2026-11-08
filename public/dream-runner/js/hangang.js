@@ -285,7 +285,7 @@ export class Hangang {
   }
   tickInside(dt) {
     if (this.ride) return this.tickRide(dt);
-    const I = this.inside, S = I.S; S.tick(dt, this.arrivals);
+    const I = this.inside, S = I.S; S.tick(dt, this.arrivals, this.arrivalsAt);
     { const dtn = S.doorTrain(this.px, this.pz); if (dtn && !(this.zoneCool > 0)) return this.startRide(dtn.p, dtn.T); }
     const z = S.zoneAt(this.px, this.pz); if (!z || (this.zoneCool || 0) > 0) { this.zoneCool = Math.max(0, (this.zoneCool || 0) - dt); return; }
     this.zoneCool = 1.2;
