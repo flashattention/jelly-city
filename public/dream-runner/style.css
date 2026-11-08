@@ -385,3 +385,5 @@ body.sw #hg-how .how { max-height: 560px; padding: 0 16px 14px; }
 body.sw #hg-regions button { transition: transform .15s, background .2s; } body.sw #hg-regions button:hover { transform: translateY(-2px); }
 @media (max-width: 860px) { body.sw .hg-card { grid-template-columns: 1fr; padding: 20px 18px; gap: 18px; } body.sw #hg-how .how { max-height: none; } #sw-bg .cap { left: 16px; bottom: 16px; } #sw-bg .dots { right: 16px; bottom: 22px; } }
 @media (max-width: 860px) { #sw-bg .cap, #sw-bg .dots { display: none; } }
+/* 서울 산책은 따로 된 게임(카드 · /seoul-walk/)으로 — 드림 러너 타이틀의 서울 산책 단추는 숨김 (#hangang 주소는 그대로 열린다) */
+#hg-btn { display: none !important; }
