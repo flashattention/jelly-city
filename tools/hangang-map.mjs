@@ -189,6 +189,30 @@ for (const e of bJ.elements) {
   const t = e.tags || {}, part = !!t['building:part'] && !t.building;
   for (const pp of polysOf(e)) { const o = pp.o; if (o.length < 3) continue; items.push({ t, part, o, c: centroid(o) }); }
 }
+// 브이월드 건물 데이터 (국가 공식 · 키는 환경변수 VWORLD_KEY, 없으면 건너뜀): OSM 에 높이 · 층수가 없으면 공식 지상 층수로 높이를, 이름이 없으면 공식 이름(단지명 + 동)을
+const VW = await (async () => {
+  const f = path.join(CACHE, 'vworld.json'); if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf8'));
+  const key = process.env.VWORLD_KEY; if (!key) { console.log('VWORLD_KEY 없음: 브이월드 건너뜀'); return []; }
+  const [la0, lo0, la1, lo1] = C.bbox, out2 = [], STEP = 0.008;
+  for (let la = la0; la < la1; la += STEP) for (let lo = lo0; lo < lo1; lo += STEP) {
+    for (let page = 1; page < 40; page++) {
+      const u = `https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_SPBD&key=${key}&domain=jelly-city.fly.dev&geomFilter=BOX(${lo},${la},${Math.min(lo + STEP, lo1)},${Math.min(la + STEP, la1)})&size=1000&page=${page}&format=json&crs=EPSG:4326&geometry=true&attribute=true`;
+      let j; for (let tr = 0; tr < 3; tr++) { try { j = await (await fetch(u, { signal: AbortSignal.timeout(30000) })).json(); break; } catch { await new Promise((r) => setTimeout(r, 2000)); } }
+      const fs2 = j?.response?.result?.featureCollection?.features || [];
+      for (const ft of fs2) { const pr = ft.properties || {}, g = ft.geometry; if (!g) continue; const polys = g.type === 'MultiPolygon' ? g.coordinates : [g.coordinates]; for (const pl of polys) { const ring = (pl[0] || []).map(([lon, lat]) => P(lat, lon)); if (ring.length > 2) out2.push({ fl: +pr.gro_flo_co || 0, nm: pr.buld_nm || '', dc: pr.buld_nm_dc || '', ring }); } }
+      if (+(j?.response?.page?.total || 1) <= page) break;
+    }
+    process.stdout.write('.');
+  }
+  fs.mkdirSync(CACHE, { recursive: true }); fs.writeFileSync(f, JSON.stringify(out2)); console.log(`\n브이월드 건물 ${out2.length}`); return out2;
+})();
+{ const grid = new Map(), G = 50; VW.forEach((v, i) => { let x = 0, z = 0; for (const p of v.ring) { x += p[0]; z += p[1]; } v.c = [x / v.ring.length, z / v.ring.length]; const k = `${Math.floor(v.c[0] / G)},${Math.floor(v.c[1] / G)}`; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(i); });
+  let hit = 0, named = 0; const BAD = /^(주택|단독주택|다가구주택|근린생활시설|창고|.*\d+-\d+)$/;
+  for (const b of items) { if (b.part) continue; const [cx, cz] = b.c; let v = null; for (let a = -1; a <= 1 && !v; a++) for (let c2 = -1; c2 <= 1 && !v; c2++) for (const i of grid.get(`${Math.floor(cx / G) + a},${Math.floor(cz / G) + c2}`) || []) if (inPoly(b.c, VW[i].ring)) { v = VW[i]; break; }
+    if (!v) continue; hit++;
+    if (!b.t.height && !b.t['building:levels'] && v.fl > 0) b.t = { ...b.t, 'building:levels': String(v.fl), _vw: '1' };
+    if (!b.t.name && v.nm && !BAD.test(v.nm)) { const dc = /\d+동$/.test(v.dc) ? ` ${v.dc}` : ''; b.t = { ...b.t, name: `${v.nm}${dc}` }; named++; } }
+  console.log(`브이월드 맞춘 건물 ${hit} · 이름 채움 ${named}`); }
 // 부분(building:part)이 들어 있는 건물 외곽선은 그리지 않는다 (OSM 3D 규칙)
 const parts = items.filter((b) => b.part);
 // 부분으로 그려진 건물: 외곽선의 이름 · 종류를 안쪽 부분들에 물려준다 (국회의사당 · 63빌딩처럼 이름표와 모습이 맞게)
