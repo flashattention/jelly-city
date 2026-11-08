@@ -394,3 +394,9 @@ body.swplay:not(.swready) #sw-load { display: flex; position: fixed; inset: 0; z
 #sw-load .in { display: flex; flex-direction: column; align-items: center; gap: 10px; font-family: 'Gowun Dodum', sans-serif; }
 #sw-load svg { width: 54px; height: 54px; fill: #f2c27b; animation: sw-breathe 1.6s ease-in-out infinite; } #sw-load b { font-family: 'Jua', sans-serif; font-weight: normal; font-size: 26px; letter-spacing: .02em; } #sw-load span { font-size: 13px; opacity: .7; }
 @keyframes sw-breathe { 50% { transform: scale(1.12); opacity: .8; } }
+
+/* 서울 러너 게임 불러오기 덮개: 파스텔 빛 번짐 · 도는 고리 (랜딩과 같게) */
+body.swplay:not(.swready) #sw-load { color: #1c2133; background: radial-gradient(42vw 34vw at 18% 20%, rgba(255, 196, 170, .7), transparent 70%), radial-gradient(40vw 32vw at 84% 26%, rgba(199, 184, 255, .65), transparent 70%), radial-gradient(46vw 36vw at 28% 84%, rgba(170, 232, 214, .55), transparent 70%), radial-gradient(44vw 34vw at 82% 80%, rgba(255, 186, 214, .6), transparent 70%), #fbf6f1; }
+#sw-load .in { gap: 16px; } #sw-load b { color: #1c2133; } #sw-load span:not(.sw-spin) { color: rgba(28, 33, 51, .6); opacity: 1; }
+.sw-spin { width: 50px; height: 50px; border-radius: 50%; background: conic-gradient(from 0deg, rgba(255, 184, 158, 0), #ffb89e 30%, #f59cc2 60%, #b9a6ff 95%); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px)); mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px)); animation: sw-spin 1s linear infinite; }
+@keyframes sw-spin { to { transform: rotate(360deg); } }

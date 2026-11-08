@@ -131,7 +131,7 @@ main { position: relative; background:
   radial-gradient(48vw 36vw at 20% 92%, rgba(255, 226, 168, .5), transparent 70%),
   #fbf6f1; }
 /* 장면(어둠)에서 아래(빛)로 부드럽게 */
-main::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 46vh; background: linear-gradient(180deg, #05070c 0%, #231d33 22%, rgba(120, 96, 140, .55) 52%, rgba(232, 200, 214, .35) 76%, rgba(251, 246, 241, 0) 100%); pointer-events: none; }
+/* (장면 → 아래 사이의 어두운 그라데이션은 없앴다: 바로 파스텔) */
 main .story { border-top: 0; position: relative; }
 
 .foot { background: #f6efe8; }
@@ -140,3 +140,19 @@ main .story { border-top: 0; position: relative; }
 .bar { transition: color .4s, background .4s; }
 body.light .bar { color: #1c2133; background: linear-gradient(180deg, rgba(251, 246, 241, .92), rgba(251, 246, 241, 0)); }
 body.light .bar nav { color: rgba(28, 33, 51, .62); } body.light .bar nav a:hover, body.light .bar nav .go { color: #1c2133; }
+
+/* 첫 화면 오른쪽 출발: 파스텔 판 · 짙은 남색 글자 */
+.start { padding: 24px 24px 20px; color: #1c2133; background: linear-gradient(150deg, rgba(255, 222, 206, .9) 0%, rgba(248, 214, 230, .88) 48%, rgba(222, 214, 255, .9) 100%); box-shadow: 0 30px 80px rgba(0, 0, 0, .28); }
+.start .lab { color: #b9783e; } .start .lab span { color: rgba(28, 33, 51, .45); }
+.start .hoods { border-top-color: rgba(28, 33, 51, .14); } .start .hoods a { border-bottom-color: rgba(28, 33, 51, .12); color: #1c2133; } .start .hoods a i { color: rgba(28, 33, 51, .4); } .start .hoods a em { color: #c0567e; }
+.start .hoods a:hover { color: #c0567e; }
+.start .resume { border-top-color: #c0567e; border-bottom-color: rgba(28, 33, 51, .14); } .start .resume span { color: #c0567e; } .start .resume small { color: rgba(28, 33, 51, .62); }
+.start .btn { background: linear-gradient(110deg, #ffb89e 0%, #f59cc2 52%, #b9a6ff 100%); color: #1c2133; box-shadow: 0 10px 26px rgba(185, 166, 255, .35); }
+.start .link { color: rgba(28, 33, 51, .7); border-bottom-color: rgba(28, 33, 51, .25); } .start .link:hover { color: #1c2133; border-color: #1c2133; }
+.start .acct { color: rgba(28, 33, 51, .5); }
+
+/* 불러오기: 파스텔 빛 번짐 바탕 · 도는 파스텔 고리 */
+.loader { color: #1c2133; background: radial-gradient(42vw 34vw at 18% 20%, rgba(255, 196, 170, .7), transparent 70%), radial-gradient(40vw 32vw at 84% 26%, rgba(199, 184, 255, .65), transparent 70%), radial-gradient(46vw 36vw at 28% 84%, rgba(170, 232, 214, .55), transparent 70%), radial-gradient(44vw 34vw at 82% 80%, rgba(255, 186, 214, .6), transparent 70%), #fbf6f1; }
+.loader .ld-t { color: #1c2133; } .loader .ld-s { color: rgba(28, 33, 51, .55); } .loader .ld-bar { background: rgba(28, 33, 51, .12); } .loader .ld-bar i { background: linear-gradient(90deg, #ffb89e, #f59cc2, #b9a6ff); }
+.spin { width: 54px; height: 54px; border-radius: 50%; background: conic-gradient(from 0deg, rgba(255, 184, 158, 0), #ffb89e 30%, #f59cc2 60%, #b9a6ff 95%); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px)); mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px)); animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
