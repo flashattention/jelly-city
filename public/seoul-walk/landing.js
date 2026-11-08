@@ -7,16 +7,16 @@ const PLAY = '/seoul-walk/play/', cl = (v, a = 0, b = 1) => Math.min(b, Math.max
 
 // ---------- 장 (landing3d.js 의 장면과 같은 순서) ----------
 const CH = [
-  ['c1', '여의도 한강', '북위 37.5198° · 동경 126.9405°', '오후 6:09 · 여름', '63빌딩', '63빌딩을 등지고 달리는 저녁. 한강 러닝 코스 위로 곰들이 하나둘 지나가요.'],
-  ['c2', '석촌호수 · 잠실', '북위 37.5126° · 동경 127.1025°', '오후 1:36 · 봄', '석촌 호수', '벚꽃이 호수를 두르는 봄날 낮, 555m 롯데월드타워가 맑은 하늘을 찔러요.'],
-  ['c5', '홍대', '북위 37.5563° · 동경 126.9236°', '오후 6:33 · 노을', '노을 골목', '해가 기우는 골목. 간판에 하나둘 불이 들어오고, 거리에 사람들이 모여들어요.'],
-  ['c7', '종로 · 인사동', '북위 37.5740° · 동경 126.9850°', '오후 5:18 · 눈', '종로', '오래된 골목에 눈이 내려요. 처마 끝 등불 아래로 발자국이 이어져요.'],
-  ['c3', '남산', '북위 37.5512° · 동경 126.9882°', '오후 8:36 · 가을', '남산 타워', '진짜 산 위, 해발 262m. 밤이면 N서울타워에 불이 켜지고 서울이 발아래에서 반짝여요.'],
-  ['c6', '여의도 한강', '북위 37.5265° · 동경 126.9340°', '오후 8:48 · 여름', '여의도', '강물 위로 도시의 불빛이 흔들려요. 실제 열차가 다리를 건너는 그 순간, 여기서도.'],
+  ['c1', '여의도 한강', '', '여름 저녁', '63빌딩', '해가 유리벽에 마지막 빛을 걸어 두는 시간. 강바람을 따라 천천히 달려요.'],
+  ['c2', '잠실', '', '봄 한낮', '석촌 호수', '호숫가가 온통 분홍빛이에요. 꽃잎 사이로 롯데월드타워가 하늘에 닿아요.'],
+  ['c5', '홍대', '', '해 질 무렵', '노을 골목', '간판에 하나둘 불이 켜지고, 골목 끝 어딘가에서 노래가 흘러나와요.'],
+  ['c7', '인사동', '', '눈 오는 저녁', '종로', '처마 끝에 눈이 소복이 쌓여요. 등불 아래로 발자국이 길게 이어져요.'],
+  ['c3', '남산', '', '가을밤', '남산 타워', '산길을 올라 타워 아래 서면, 서울이 별처럼 발아래에서 반짝여요.'],
+  ['c6', '한강', '', '여름밤', '여의도와 한강', '강물 위로 불빛이 흔들려요. 다리 위로 열차가 지나가는 그 순간까지.'],
 ];
 const film = $('film'), N = CH.length; film.style.setProperty('--n', N);
 const frames = CH.map(([f]) => { const d = document.createElement('div'); d.className = 'f'; d.dataset.src = `/seoul-walk/img/${f}.webp`; $('frames').appendChild(d); return d; });
-const chaps = CH.map(([, place, co, when, title, txt], i) => { const d = document.createElement('div'); d.className = 'chap'; d.innerHTML = `<p class="lab"><b>${String(i + 1).padStart(2, '0')}</b><span>${place}</span><span>${when}</span></p><h3>${title}</h3><p>${txt}</p><p class="co">${co}</p>`; $('chaps').appendChild(d); return d; });
+const chaps = CH.map(([, place, co, when, title, txt], i) => { const d = document.createElement('div'); d.className = 'chap'; d.innerHTML = `<p class="lab"><b>${String(i + 1).padStart(2, '0')}</b><span>${place} · ${when}</span></p><h3>${title}</h3><p>${txt}</p>`; $('chaps').appendChild(d); return d; });
 let use3d = false; // 3D 가 돌면 그림은 쓰지 않는다 (불러오기 전 · 휴대폰 · 약한 기기만 그림)
 const loadImg = (k) => { const d = frames[k]; if (d && !d.style.backgroundImage) d.style.backgroundImage = `url(${d.dataset.src})`; };
 let ticking = false, lastP = -1;
@@ -35,7 +35,7 @@ function filmTick() {
 }
 addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(filmTick); } }, { passive: true });
 addEventListener('resize', () => { lastP = -1; filmTick(); });
-{ const f = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', hour: 'numeric', minute: '2-digit' }), tick = () => { $('clock').textContent = `지금 ${f.format(new Date())}`; }; tick(); setInterval(tick, 15000); }
+{ const f = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', hour: 'numeric', minute: '2-digit' }), tick = () => { $('clock').textContent = `지금 서울은 ${f.format(new Date())}`; }; tick(); setInterval(tick, 15000); }
 
 // ---------- 불러오기: 컴퓨터는 첫 3D 장면이 그려지면, 아니면 첫 그림이 오면 걷는다 ----------
 const loader = { set: (k, s) => { $('ld-bar').style.width = `${Math.round(k * 100)}%`; if (s) $('ld-s').textContent = s; }, done: () => $('loader').classList.add('done') };
@@ -54,10 +54,10 @@ const posAll = () => { try { const v = JSON.parse(store.get(POS_KEY) || 'null');
 const visits = () => { try { return new Set(JSON.parse(store.get(VISIT_KEY) || '[]')); } catch { return new Set(); } };
 
 // ---------- 출발: 모든 동네 ----------
-const HOODS = [['yeouido', '여의도 한강'], ['banpo', '반포 한강'], ['ttukseom', '뚝섬 한강'], ['namsan', '남산타워'], ['hongdae', '홍대'], ['sinchon', '신촌'], ['itaewon', '이태원'], ['myeongdong', '명동'], ['insadong', '인사동 · 종로'], ['bukchon', '북촌 한옥마을'], ['seongsu', '성수'], ['gangnam', '강남역'], ['jamsil', '석촌호수 · 잠실']];
+const HOODS = [['yeouido', '여의도 한강', '🌉'], ['banpo', '반포 한강', '🌈'], ['ttukseom', '뚝섬 한강', '🎶'], ['namsan', '남산타워', '🗼'], ['hongdae', '홍대', '🎸'], ['sinchon', '신촌', '🎓'], ['itaewon', '이태원', '🌍'], ['myeongdong', '명동', '🛍️'], ['insadong', '인사동 · 종로', '🏮'], ['bukchon', '북촌 한옥마을', '🏯'], ['seongsu', '성수', '☕'], ['gangnam', '강남역', '🏙️'], ['jamsil', '석촌호수', '🌸']];
 function renderStart() {
   const A = posAll();
-  $('hoods').innerHTML = HOODS.map(([id, name], i) => `<li><a href="${PLAY}?r=${id}&go=${A.regions[id] ? 'resume' : 'start'}"><i>${String(i + 1).padStart(2, '0')}</i>${name}${A.regions[id] ? '<em>이어서</em>' : ''}</a></li>`).join('');
+  $('hoods').innerHTML = HOODS.map(([id, name, ic]) => `<li><a href="${PLAY}?r=${id}&go=${A.regions[id] ? 'resume' : 'start'}"><i>${ic}</i><span>${name}</span>${A.regions[id] ? '<em>이어서</em>' : ''}</a></li>`).join('');
   const last = A.last && A.regions[A.last] ? A.regions[A.last] : null; $('resume').classList.toggle('hidden', !last);
   if (last) { $('resume').href = `${PLAY}?go=last`; $('resume-sub').textContent = last.where || ''; }
   for (const id of ['go-now', 'go-end', 'go-last', 'bar-go']) $(id).href = last ? `${PLAY}?go=last` : `${PLAY}?r=yeouido&go=start`;
@@ -68,7 +68,7 @@ function renderStart() {
 let map = null, pick = null, mapRAF = 0;
 async function openMap(e) {
   e?.preventDefault(); $('mapbox').classList.remove('hidden');
-  if (!map) { const d = await (await fetch('/dream-runner/hangang/seoul.json')).json(); map = new SeoulMap(d, Object.fromEntries(HOODS)); map.allOpen = true; }
+  if (!map) { const d = await (await fetch('/dream-runner/hangang/seoul.json')).json(); map = new SeoulMap(d, Object.fromEntries(HOODS.map(([id, n]) => [id, n]))); map.allOpen = true; }
   const cv = $('seoul'), ctx = cv.getContext('2d'), here = () => { const A = posAll(), p = A.last && A.regions[A.last]; return p && p.x != null ? { x: p.x, z: p.z } : null; };
   const draw = (t) => { if ($('mapbox').classList.contains('hidden')) return; map.draw(ctx, cv.width, cv.height, { here: here(), pick: pick ? { ...pick, region: pick.region || 'x' } : null, t: t / 1000 }); mapRAF = requestAnimationFrame(draw); };
   cancelAnimationFrame(mapRAF); mapRAF = requestAnimationFrame(draw);
