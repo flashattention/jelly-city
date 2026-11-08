@@ -70,12 +70,14 @@ jobs:
           fetch-depth: 0 # 패치노트를 커밋 기록에서 만든다
       - name: 패치노트에 새 커밋 추가
         run: node tools/patchnotes.mjs && node tools/patchnotes.mjs --check
-      # flyctl 내려받기: 받는 서버가 가끔 504 를 내서 배포가 통째로 실패하던 것 → 5번까지 다시 시도
-      - name: flyctl 설치 (다시 시도)
-        run: |
-          for i in 1 2 3 4 5; do curl -fsSL https://fly.io/install.sh | sh && break; echo "다시 시도 $i"; sleep $((i * 10)); done
-          echo "$HOME/.fly/bin" >> "$GITHUB_PATH"
-      - name: 배포 (다시 시도)
-        run: for i in 1 2 3; do flyctl deploy --remote-only && exit 0; echo "다시 시도 $i"; sleep 20; done; exit 1
+      # flyctl: GitHub 릴리스 내려받기가 504 로 자주 실패해서(2026-11-08), 공식 Docker 이미지(Docker Hub)로 배포한다.
+      #   빌드는 Fly 원격 빌더가 하므로(--remote-only) 이미지 안에서 flyctl 만 돌리면 된다. 3번까지 다시 시도, 끝내 실패하면 실패로 끝낸다
+      - name: 배포 (flyctl Docker 이미지 · 다시 시도)
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          for i in 1 2 3; do
+            docker run --rm -e FLY_API_TOKEN -v "$PWD:/app" -w /app flyio/flyctl:latest deploy --remote-only && exit 0
+            echo "다시 시도 $i"; sleep 30
+          done
+          exit 1
