@@ -32,6 +32,14 @@ const COURSES = {
     labels: [], arches: [],
     far: [['남산서울타워', 37.5512, 126.9882, 236, 'tower'], ['롯데월드타워', 37.5126, 127.1025, 555, 'lotte']],
   },
+  // 남산 정상: 해발 243m 정상 광장 (N서울타워 · 팔각정 · 봉수대 · 사랑의 자물쇠). 정상 둘레만 가까운 지도로, 서울은 발아래(-235m) 먼 경치로
+  namsan: {
+    name: '남산 정상 산책', sub: '한양도성 길 → N서울타워 · 팔각정',
+    kind: 'summit', R: 260, bbox: [37.543, 126.976, 37.559, 127.000], path: '서울한양도성 3코스 남산구간', lon: [126.9862, 126.9902], minLen: 200,
+    marks: [['N서울타워', 37.55117, 126.98823], ['팔각정', 37.55093, 126.98745], ['봉수대', 37.55060, 126.98842]],
+    labels: [], arches: [],
+    far: [['롯데월드타워', 37.5126, 127.1025, 555, 'lotte']],
+  },
 };
 
 const id = process.argv[2] || 'yeouido', C = COURSES[id];
@@ -138,7 +146,7 @@ route = simplify(route, 0.6);
 const routeLen = route.reduce((a, p, i) => a + (i ? Math.sqrt(d2(p, route[i - 1])) : 0), 0);
 if (routeLen < (C.minLen || 1000)) throw new Error(`코스 길이가 이상해요 (${routeLen}m): 자전거길 이름 · 경도를 확인해 주세요`);
 const center = centroid(route).map(Math.round);
-const R = 2600, rect = [center[0] - R, center[1] - R, center[0] + R, center[1] + R];
+const R = C.R || 2600, rect = [center[0] - R, center[1] - R, center[0] + R, center[1] + R];
 const near = (p, lim) => { let m = Infinity; for (let i = 1; i < route.length; i++) { const a = route[i - 1], b = route[i], dx = b[0] - a[0], dz = b[1] - a[1], t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / (dx * dx + dz * dz || 1))); m = Math.min(m, Math.hypot(a[0] + dx * t - p[0], a[1] + dz * t - p[1])); if (m < lim) return m; } return m; };
 
 // 좌표는 코스 중심 기준 0.1m 정수로 줄여 담는다

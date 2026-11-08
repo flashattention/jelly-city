@@ -954,7 +954,7 @@ setTimeout(() => { if (game.mode === 'title' && !new URLSearchParams(location.se
 //   장애물 · 탈락 없이 내 속도로 달리는 힐링 맵. 거리 · 순간(노을 · 비 · 눈 …)은 서버에 모여 업적이 된다
 let hg = new Hangang();
 // 지역마다 따로 (여의도 한강 · 홍대 거리 …): 화면 쪽 연결(on…)은 처음 것에서 그대로 옮겨 단다
-const HG_REGIONS = { yeouido: { label: '🌉 여의도 한강', start: '🚩 서강대교에서 시작' }, hongdae: { label: '🎸 홍대 거리', start: '🚩 상수역에서 시작' } };
+const HG_REGIONS = { yeouido: { label: '🌉 여의도 한강', start: '🚩 서강대교에서 시작' }, hongdae: { label: '🎸 홍대 거리', start: '🚩 상수역에서 시작' }, namsan: { label: '🗼 남산타워', start: '🚩 정상 한양도성 길에서 시작' } };
 const hgInst = { yeouido: hg }; let hgRegion = 'yeouido';
 function hgUse(id) { if (!HG_REGIONS[id]) id = 'yeouido'; if (!hgInst[id]) { const n = new Hangang(); for (const k of Object.keys(hg)) if (/^on[A-Z]|^api$/.test(k) && typeof hg[k] === 'function') n[k] = hg[k]; hgInst[id] = n; } hg = hgInst[id]; hgRegion = id; }
 hg.api = (path) => account.api(path);
