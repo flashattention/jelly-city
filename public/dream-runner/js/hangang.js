@@ -264,11 +264,12 @@ export class Hangang {
     const res = await fetch(new URL(`../seoul/t_${key}.json`, import.meta.url)); if (!res.ok) throw new Error('칸 없음'); const M = await res.json();
     const c = new Hangang(); c.host = this; c.isChunk = true; c.chunkKey = key; c.map = M; c.id = 'seoul'; c.scene = new THREE.Group(); c.state = this.state; c.opt = this.opt;
     for (const k of ['skyU', 'windU', 'waterU', 'grassTex', 'dot', 'waterSets']) c[k] = this[k];
-    c.foot = this.foot ||= []; c.footGrid = this.footGrid ||= new Map(); c.decks = this.decks ||= []; c.deckGrid = this.deckGrid ||= new Map(); c.circGrid = this.circGrid ||= new Map(); c.shopFronts = this.shopFronts ||= []; c.shopGrid = this.shopGrid ||= new Map();
+    // 건물 목록은 칸이 만들어지는 동안 따로 (네온 · 몰 문 · LED 같은 것이 다른 칸 건물까지 또 만들지 않게), 다 만들고 합친다
+    this.foot ||= []; this.footGrid ||= new Map(); c.foot = []; c.footGrid = new Map(); c.decks = this.decks ||= []; c.deckGrid = this.deckGrid ||= new Map(); c.circGrid = this.circGrid ||= new Map(); c.shopFronts = this.shopFronts ||= []; c.shopGrid = this.shopGrid ||= new Map();
     c.inWater = this.inWater; c.routeSetup();
     const f0 = this.foot.length, d0 = this.decks.length, [i, j] = key.split('_').map(Number);
     c.buildContent(rnd(((i * 73856093) ^ (j * 19349663)) >>> 0));
-    for (let k = f0; k < this.foot.length; k++) this.foot[k].key ??= key; for (let k = d0; k < this.decks.length; k++) this.decks[k].key = key;
+    for (const f of c.foot) { f.key ??= key; this.addFoot(f); } c.foot = this.foot; c.footGrid = this.footGrid; for (let k = d0; k < this.decks.length; k++) this.decks[k].key = key;
     this.maskWater(key); this.drape(c); c.scene.userData.chunk = key;
     c.applySeason(); this.scene.add(c.scene); return c;
   }
@@ -653,16 +654,21 @@ export class Hangang {
     if (M.kind === 'summit') this.summit = buildSummit(this);
     // 서울 전체: 남산 칸이면 진짜 지형 위에 N서울타워 · 케이블카 · 전망대
     else if (this.isChunk && M.names?.includes('남산서울타워')) this.summit = buildSummit(this, { world: true });
-    if (this.id === 'hongdae') this.buildForestPath(r);
+    // 서울 전체 칸: 손으로 만든 것은 그 칸이 가까운 지역(예전 코스, 1.4km 안)을 보고 · 이름 · 실제 자리로 찾아서
+    if (this.isChunk) { const [ti, tj] = this.chunkKey.split('_').map(Number), T0 = this.host.world0.tile, nr = this.host.nearRegion((ti + 0.5) * T0, (tj + 0.5) * T0); this.regionHere = nr && nr.d < 1400 ? nr.id : null; } else this.regionHere = this.id;
+    const RH = this.regionHere;
+    if (RH === 'hongdae' || this.isChunk) this.buildForestPath(r);
     this.buildPlants(inWater, r);
     // 큰 몰 정문: 더현대 서울 (가장 긴 벽 가운데, 바깥을 본다)
     this.malls = []; for (const [want, mallName] of [['더현대 서울', '더현대 서울'], ['IFC mall (South Gate)', 'IFC몰'], ['IFC mall (North Gate)', 'IFC몰']]) { const fs2 = (this.foot || []).filter((f) => f.name === want); const f = fs2.sort((a, b) => Math.abs(ringArea(b.ring)) - Math.abs(ringArea(a.ring)))[0]; if (f) { const ring = f.ring, sg = ringArea(ring) > 0 ? 1 : -1; let best = null; for (let k = 0; k < ring.length; k++) { const a = ring[k], c = ring[(k + 1) % ring.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]); if (!best || L > best.L) best = { L, x: (a[0] + c[0]) / 2, z: (a[1] + c[1]) / 2, nx: (sg > 0 ? c[1] - a[1] : a[1] - c[1]) / L, nz: (sg > 0 ? a[0] - c[0] : c[0] - a[0]) / L }; } const D2 = { name: mallName, x: best.x + best.nx * 0.1, z: best.z + best.nz * 0.1, nx: best.nx, nz: best.nz }; this.malls.push(D2);
       const gd = new THREE.Group(); gd.position.set(D2.x, 0, D2.z); gd.rotation.y = Math.atan2(D2.nx, D2.nz); const glass = new THREE.Mesh(new THREE.PlaneGeometry(8, 5), new THREE.MeshPhongMaterial({ color: '#cfe2ee', emissive: '#ffe8c8', emissiveIntensity: 0.25, shininess: 100 })); glass.position.set(0, 2.5, 0.12); gd.add(glass); const fr = new THREE.Mesh(new THREE.BoxGeometry(8.6, 5.4, 0.12), new THREE.MeshLambertMaterial({ color: '#d9d4cc' })); fr.position.set(0, 2.7, 0.02); gd.add(fr); const cv = document.createElement('canvas'); cv.width = 512; cv.height = 96; const c2 = cv.getContext('2d'); c2.fillStyle = '#f4f1ea'; c2.fillRect(0, 0, 512, 96); c2.fillStyle = '#2f3a2f'; c2.font = 'bold 54px serif'; c2.textAlign = 'center'; c2.textBaseline = 'middle'; c2.fillText(mallName, 256, 50); const st = new THREE.CanvasTexture(cv); st.colorSpace = THREE.SRGBColorSpace; const sg2 = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.7), new THREE.MeshLambertMaterial({ map: st, emissive: '#ffffff', emissiveMap: st, emissiveIntensity: 0.3 })); sg2.position.set(0, 6.4, 0.1); gd.add(sg2); this.scene.add(gd); } }
     this.buildGates();
-    if (M.kind === 'street') this.buildNeon(r);
+    if (M.kind === 'street' || (this.isChunk && ['hongdae', 'itaewon', 'gangnam', 'sinchon', 'myeongdong', 'seongsu', 'jamsil'].includes(RH))) this.buildNeon(r);
     if (M.kind !== 'summit') this.buildAlleys(P2, r);
-    if (this.id === 'hongdae') this.buildMurals(r);
-    if (this.id === 'banpo') this.buildBanpo(P2);
+    if (RH === 'hongdae') this.buildMurals(r);
+    if (RH === 'banpo' || this.isChunk) this.buildBanpo(P2);
+    // 뚝섬 음악분수 (실제 자리, 강가 광장)
+    if (this.isChunk) { const [fx, fz] = this.ll(37.5294, 127.0697), [ti, tj] = this.chunkKey.split('_').map(Number), T0 = this.host.world0.tile; if (Math.floor(fx / T0) === ti && Math.floor(fz / T0) === tj) { let p = [fx, fz]; for (let k = 0; k < 12 && this.inWater(p[0], p[1]); k++) p = [fx, fz - 10 * (k + 1)]; this.buildMusicFountain(p); } }
     if (this.id === 'ttukseom') { const m = (M.marks || []).find(([n]) => /자벌레/.test(n)); if (m) { let p = this.world(m[1] + 60, 40); for (const lat of [40, -40, 70, -70, 25, -25]) { p = this.world(m[1] + 60, lat); if (!this.inWater(p[0], p[1])) break; } this.buildMusicFountain(p); } }
     this.addShopFronts(buildShopFronts(this, M.shops || [], M.scale));
     if (M.kind !== 'summit') this.buildStreetSigns(P2, r);
@@ -972,7 +978,7 @@ export class Hangang {
       // 실제 건축물 정보(용도 · 구조 · 사용승인 연도)로 외벽을 정한다 (틀 찍어내기 대신 그 건물의 실제 정보대로)
       if (info && !c && !LANDMARKS[name] && type !== 'church' && type !== 'gold' && type !== 'assembly') { const st = styleOf(info, h, r); if (st) { type = st[0]; c = st[1]; } }
       // 한옥 마을(북촌 · 인사동): 정보가 없는 단층 작은 집도 한옥으로
-      if (!info && (this.id === 'bukchon' || this.id === 'insadong') && h <= 5 && Math.abs(ringArea(ring)) < 350 && !name) { type = 'hanok'; c = '#f2ece0'; }
+      if (!info && (this.regionHere === 'bukchon' || this.regionHere === 'insadong') && h <= 5 && Math.abs(ringArea(ring)) < 350 && !name) { type = 'hanok'; c = '#f2ece0'; }
       // 거리 지역(홍대 · 이태원 등) 낮은 상가: 외벽 색 · 창 무늬 · 층 높이를 건물마다 다르게
       if ((M.kind === 'street' || ((!M.kind || M.kind === 'river') && (kind === 2 || kind === 0) && h < 26 && M.shops?.length)) && h < 32 && type !== 'apt' && type !== 'church' && type !== 'glass' && !LANDMARKS[name] && !c) { type = r() < 0.62 ? 'street' : 'street2'; c = ['#f4f1ea', '#efe3cf', '#b5654a', '#a29e98', '#f2c6cf', '#bfe3d6', '#c8dcef', '#2f2f33', '#e8d9b5', '#8a5a44', '#d9cfc2', '#fff7e8'][Math.floor(r() * 12)]; }
       if (!c) c = type === 'apt' ? APT[Math.floor(r() * APT.length)] : type === 'glass' ? GLASS[Math.floor(r() * GLASS.length)] : type === 'brick' ? BRICK[Math.floor(r() * BRICK.length)] : STONE[Math.floor(r() * STONE.length)];
@@ -1328,8 +1334,9 @@ export class Hangang {
           else if (area === 'home') roles = x < 0.25 ? ['grandma'] : x < 0.5 ? ['stroll', 'kid'] : x < 0.65 ? ['stroll', 'stroll', 'kid'] : x < 0.82 ? ['stroll'] : ['stroll', 'stroll'];
           else roles = x < 0.3 ? ['stroll', 'stroll'] : x < 0.5 ? ['stroll', 'stroll', 'stroll'] : x < 0.7 ? ['stroll'] : x < 0.85 ? ['office'] : ['stroll', 'stroll', 'stroll', 'stroll'];
           // 홍대: 스트리트 패션 · 코스프레 무리 · 친구 · 연인이 많다
-          if (this.id === 'itaewon') { const y = r(); roles = y < 0.3 ? ['street', 'street'] : y < 0.55 ? ['stroll', 'stroll'] : y < 0.7 ? ['stroll', 'stroll', 'stroll'] : y < 0.85 ? ['street'] : ['stroll', 'street', 'stroll']; }
-          if (this.id === 'hongdae') { const y = r(); roles = y < 0.32 ? ['street', 'street', ...(r() < 0.5 ? ['street'] : [])] : y < 0.47 ? ['cosplay', 'cosplay', ...(r() < 0.4 ? ['cosplay'] : [])] : y < 0.6 ? ['street'] : y < 0.78 ? ['stroll', 'stroll'] : y < 0.9 ? ['stroll', 'street'] : ['stroll', 'stroll', 'stroll']; }
+          const RID = this.chunks ? ((q) => (q && q.d < 1400 ? q.id : ''))(this.nearRegion(this.px, this.pz)) : this.id; // 서울 전체: 곰이 있는 동네
+          if (RID === 'itaewon') { const y = r(); roles = y < 0.3 ? ['street', 'street'] : y < 0.55 ? ['stroll', 'stroll'] : y < 0.7 ? ['stroll', 'stroll', 'stroll'] : y < 0.85 ? ['street'] : ['stroll', 'street', 'stroll']; }
+          if (RID === 'hongdae') { const y = r(); roles = y < 0.32 ? ['street', 'street', ...(r() < 0.5 ? ['street'] : [])] : y < 0.47 ? ['cosplay', 'cosplay', ...(r() < 0.4 ? ['cosplay'] : [])] : y < 0.6 ? ['street'] : y < 0.78 ? ['stroll', 'stroll'] : y < 0.9 ? ['stroll', 'street'] : ['stroll', 'stroll', 'stroll']; }
           if (rain) roles = roles.slice(0, 2);
           const sameTop = roles.length === 2 && r() < 0.3 ? TOPS_CASUAL[Math.floor(r() * TOPS_CASUAL.length)] : null;
           this.walkers.push({ L, d: pk.d, dir: r() < 0.5 ? 1 : -1, side, v: 1.0 + r() * 0.5, bears: roles.map((ro) => this.mkBear(ro, r, ro === 'kid' ? 0.6 : 0.95 + r() * 0.1, sameTop ? { top: sameTop } : {})), kind: 'walker' });
@@ -1682,7 +1689,7 @@ export class Hangang {
   tickLit(lit, hr, home, work, dt) {
     for (const [t, m] of Object.entries(this.bldByType || {})) m.emissiveIntensity = lit * (t.startsWith('street') || t === 'factory' ? (hr >= 2 && hr < 7 ? 0.3 : 1) : t === 'apt' || t === 'brick' ? home : work) * 0.5;
     if (this.signM) this.signM.emissiveIntensity = lit * (hr >= 1 && hr < 6 ? 0.15 : 0.45);
-    if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; if (this.summit) tickSummit(this, dt, lit); for (const m of this.neonMs || []) m.emissiveIntensity = 0.2 + lit * 1.2; if (this.jbugM) this.jbugM.emissiveIntensity = 0.15 + lit * 0.7; if (this.id === 'banpo') this.tickBanpo(dt, lit); if (this.mfount) this.tickMusicFountain(dt, lit); for (const b of this.picnic || []) b.update(dt, 0, { noCrawl: true }); for (const m of this.shopSignMs || []) m.emissiveIntensity = 0.25 + lit * 0.85; for (const m of this.shopWinM || []) m.emissiveIntensity = 0.1 + lit * 0.42; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.35 * Math.max(0.2, (hr >= 18 && hr < 24 ? 1 : 0.4));
+    if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; if (this.summit) tickSummit(this, dt, lit); for (const m of this.neonMs || []) m.emissiveIntensity = 0.2 + lit * 1.2; if (this.jbugM) this.jbugM.emissiveIntensity = 0.15 + lit * 0.7; if (this.id === 'banpo' || this.fountain || this.sebit) this.tickBanpo(dt, lit); if (this.mfount) this.tickMusicFountain(dt, lit); for (const b of this.picnic || []) b.update(dt, 0, { noCrawl: true }); for (const m of this.shopSignMs || []) m.emissiveIntensity = 0.25 + lit * 0.85; for (const m of this.shopWinM || []) m.emissiveIntensity = 0.1 + lit * 0.42; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.35 * Math.max(0.2, (hr >= 18 && hr < 24 ? 1 : 0.4));
     if (this.bridgeLights) this.bridgeLights.material.opacity = lit;
   }
   tickEnv(dt, camera, px, pz) {
