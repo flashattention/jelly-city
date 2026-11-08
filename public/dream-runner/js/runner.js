@@ -136,7 +136,6 @@ export class Runner {
     if (input.slide) { if (this.onGround) { if (this.slideT <= 0) fx?.('slide'); this.slideT = 0.75; } else { this.vy = Math.min(this.vy, -14); this.slideBuf = 0.45; } }
     this.slideBuf = Math.max(0, this.slideBuf - dt);
     if (input.slideHeld && this.onGround && this.slideT > 0) this.slideT = Math.max(this.slideT, 0.15);
-    if (!input.slideHeld && this.slideT > 0.1) this.slideT = 0.1; // 누르고 있을 때만 숙인다: 떼면 곧바로 일어선다
     this.slideT -= dt;
     // 떨어짐
     this.vy -= GRAV * (M?.grav || 1) * dt;
