@@ -99,6 +99,8 @@ export function virusMesh(kind) {
   const face = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.94), K.stealth ? FACE.clone() : FACE);
   face.position.set(0, kind === 'bear' ? 1.66 : kind === 'giant' ? 1.95 : kind === 'king' ? 2.75 : 1.12, kind === 'bear' ? 0.55 : kind === 'giant' ? 1.7 : kind === 'king' ? 1.45 : 1.05); face.renderOrder = 5; body.add(face); g.userData.face = face;
   if (kind === 'giant' || kind === 'king') face.scale.setScalar(kind === 'king' ? 1.5 : 1.7);
+  // 웜은 조각이 적고 작아 몸이 가늘다: 얼굴을 몸에 붙게 (예전엔 몸 앞 허공에 떠 있었다)
+  if (kind === 'worm') { face.position.set(0, 1.02, 0.62); face.scale.setScalar(0.78); }
   // 방패 (트로이 병사): 육각 판
   if (K.guard) { const s = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.08, 6), new THREE.MeshStandardMaterial({ color: '#0b3a1a', emissive: '#30ff70', emissiveIntensity: 0.35, metalness: 0.6, roughness: 0.3 })); s.rotation.set(Math.PI / 2, 0, 0.9); s.position.set(0.85, 0.85, 0.45); body.add(s); g.userData.shield = s; }
   // 네온 빛 무리

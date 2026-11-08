@@ -240,8 +240,8 @@ function setupBoss() {
   const Z = W.gods.find((g) => g.id === 'zeuron');
   k.cables = [-1, -0.35, 0.35, 1].map((s, i) => {
     const node = { x: s * 6.5, z: -46.5 + Math.abs(s) * 1.5, hp: 160 * D().ehp, max: 160 * D().ehp, alive: true };
-    const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.55, 0), new THREE.MeshStandardMaterial({ color: '#0c4a20', emissive: '#3dff74', emissiveIntensity: 1.6 })); m.position.set(node.x, PLAT.h + 0.8, node.z); scene.add(m); node.mesh = m;
-    node.tube = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ color: '#0c3a18', emissive: '#2bff63', emissiveIntensity: 1.1 })); scene.add(node.tube); node.chip = new THREE.Vector3(Z.x + s * 1.5, PLAT.h + Z.top - 1, Z.z + 1);
+    const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.55, 0), new THREE.MeshStandardMaterial({ color: '#0c4a20', emissive: '#3dff74', emissiveIntensity: 0.85 })); m.position.set(node.x, PLAT.h + 0.8, node.z); scene.add(m); node.mesh = m;
+    node.tube = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ color: '#0c3a18', emissive: '#2bff63', emissiveIntensity: 0.45 })); scene.add(node.tube); node.chip = new THREE.Vector3(Z.x + s * 1.5, PLAT.h + Z.top - 1, Z.z + 1);
     return node;
   });
   k.stagger = 0; k.regrow = 0; k.attack = null; k.atkCd = 3;
@@ -581,7 +581,7 @@ function virusAI(dt) {
 function kingAI(k, dt) {
   const me = game.me; k.y = groundAt(k.x, k.z); k.atkCd -= dt;
   const alive = k.cables.filter((c) => c.alive);
-  for (const c of k.cables) { c.mesh.visible = c.alive; c.tube.visible = c.alive; if (c.alive) { c.mesh.rotation.y += dt * 2; const a = c.chip, b = new THREE.Vector3(k.x, k.y + 2.4, k.z - 0.6), mid = new THREE.Vector3(c.x, PLAT.h + 0.8, c.z); c.tube.geometry.dispose(); c.tube.geometry = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([a, new THREE.Vector3((a.x + mid.x) / 2, a.y - 1, (a.z + mid.z) / 2), mid, new THREE.Vector3((mid.x + b.x) / 2, PLAT.h + 1.6, (mid.z + b.z) / 2), b]), 24, 0.16, 6); } }
+  for (const c of k.cables) { c.mesh.visible = c.alive; c.tube.visible = c.alive; if (c.alive) { c.mesh.rotation.y += dt * 2; const a = c.chip, b = new THREE.Vector3(k.x, k.y + 2.4, k.z - 0.6), mid = new THREE.Vector3(c.x, PLAT.h + 0.8, c.z); c.tube.geometry.dispose(); c.tube.geometry = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([a, new THREE.Vector3((a.x + mid.x) / 2, a.y - 1, (a.z + mid.z) / 2), mid, new THREE.Vector3((mid.x + b.x) / 2, PLAT.h + 1.6, (mid.z + b.z) / 2), b]), 24, 0.1, 6); } }
   if (alive.length === 0 && k.stagger <= 0 && !k.staggered) { k.stagger = 9; k.staggered = true; toast('💥 사슬이 모두 끊겼다! 빛나는 핵을 쳐요!', 2.5); sfx('bigboom'); sting('stagger'); shake(0.4); }
   if (k.stagger > 0) { k.stagger -= dt; k.mesh.userData.heart.scale.setScalar(1.6 + Math.sin(game.t * 10) * 0.3); k.mesh.rotation.z = Math.sin(game.t * 6) * 0.05; if (k.stagger <= 0) { k.staggered = false; if (k.hp > k.max * 0.25) { const n = k.hp > k.max * 0.6 ? 4 : 2; k.cables.slice(0, n).forEach((c) => { c.alive = true; c.hp = c.max * 0.7; }); toast('⛓️ 바이러스 왕이 사슬을 다시 꽂았다!', 2); } } return; }
   k.mesh.userData.heart.scale.setScalar(alive.length ? 0.5 : 1.2);
@@ -762,6 +762,7 @@ if (params.has('t')) {
   }, 50);
 }
 // ---------- 시험용 자동 조종 (?auto=1): 처음부터 끝까지 빨리 돌려 막이 이어지는지 · 오류가 없는지 본다 ----------
+// 신상은 지금 서 있는 쪽에서 풀러 간다 (반대쪽 자리로 가려다 신상에 막혀 헤파볼트에서 멈췄다 · 쪽은 매번 다시 고른다: 적을 쫓다 반대편으로 갈 수 있다)
 const ROUTE = { colonnade: [[-15.7, 6], [-14.2, -9], [-15.7, -14], [-14.2, -27], [-15.7, -33], [-15.7, -46]], altars: [[-15.7, -50], [-15.7, -57.5], [15.7, -57.5], [15.7, -50], [15.7, -10], [15.7, 6], [0, 5], [0, -6], [0, -16], [0, -11]] };
 function autoStep(dt) {
   const me = game.me; if (!me) return; me.hp = me.max; keys.clear();
@@ -772,15 +773,21 @@ function autoStep(dt) {
   let goal = null;
   if (game.phase === 'stealth') { const g = foes.find((v) => v.sleep || !v.alert); goal = g && Math.hypot(g.x - me.x, g.z - me.z) < 30 && game.autoK < 3 ? [g.x, g.z] : [W.winch.x, W.winch.z]; tgt = null; if (g && Math.hypot(g.x - me.x, g.z - me.z) < 2) { swordSwing(); game.autoK = (game.autoK || 0) + 1; } }
   else if (game.phase === 'assault') goal = game.waves || foes.length ? null : [W.gods[0].x - 5.5, W.gods[0].z];
-  else if (ROUTE[game.phase] && !tgt) { const R0 = ROUTE[game.phase]; game.ri ||= {}; let i = game.ri[game.phase] || 0; const w = R0[Math.min(i, R0.length - 1)]; const gw = W.gods.find((g) => !g.freed && Math.hypot(g.x - w[0], g.z - w[1]) < 1); if (gw) goal = [gw.x, gw.z + 3]; else { const fw = W.gods.some((g) => g.freed && Math.hypot(g.x - w[0], g.z - w[1]) < 1); if ((fw || Math.hypot(w[0] - me.x, w[1] - me.z) < 1.2) && i < R0.length - 1) game.ri[game.phase] = ++i; goal = R0[Math.min(i, R0.length - 1)]; } if (gw && gw.freed === false && Math.hypot(gw.x - me.x, gw.z + 3 - me.z) < 1.5 && $('prompt').classList.contains('hidden') && !foes.length) game.ri[game.phase] = i; }
+  else if (ROUTE[game.phase] && !tgt) { const R0 = ROUTE[game.phase]; game.ri ||= {}; let i = game.ri[game.phase] || 0; const w = R0[Math.min(i, R0.length - 1)]; const gw = W.gods.find((g) => !g.freed && Math.hypot(g.x - w[0], g.z - w[1]) < 1); if (gw) { gw.side = me.z < gw.z ? -3 : 3; goal = [gw.x, gw.z + gw.side]; } else { const fw = W.gods.some((g) => g.freed && Math.hypot(g.x - w[0], g.z - w[1]) < 1); if ((fw || Math.hypot(w[0] - me.x, w[1] - me.z) < 1.2) && i < R0.length - 1) game.ri[game.phase] = ++i; goal = R0[Math.min(i, R0.length - 1)]; } if (gw && gw.freed === false && Math.hypot(gw.x - me.x, gw.z + (gw.side ?? 3) - me.z) < 1.5 && $('prompt').classList.contains('hidden') && !foes.length) game.ri[game.phase] = i; }
   const aim = tgt && (bd < 18 || !goal) ? [tgt.x, tgt.z] : goal;
   if (aim) { look.yaw = Math.atan2(aim[0] - me.x, aim[1] - me.z) - Math.PI; const d = Math.hypot(aim[0] - me.x, aim[1] - me.z); if (d > (tgt ? 2.0 : 0.6)) keys.add('KeyW'); }
+  // 막히면(목표가 3m 넘게 남았는데 걸으려 해도 1초 동안 거의 못 움직이면) 옆걸음 — 같은 쪽으로 점점 길게, 세 번 안 되면 반대쪽 (기둥 · 신상 · 목마에 정면으로 박혀 멈추던 것. 번갈아 하면 제자리로 돌아온다)
+  { const A = (game.autoMv ||= { x: me.x, z: me.z, t: 0, side: 0, dir: 1, n: 0, free: 0 }), moved = Math.hypot(me.x - A.x, me.z - A.z);
+    if (A.side > 0) { A.side -= dt; keys.add(A.dir > 0 ? 'KeyD' : 'KeyA'); }
+    else if (keys.has('KeyW') && aim && Math.hypot(aim[0] - me.x, aim[1] - me.z) > 3 && moved < 0.05) { A.t += dt; A.free = 0; if (A.t > 1) { A.t = 0; A.n++; if (A.n % 3 === 0) A.dir = -A.dir; A.side = 0.8 * (1 + (A.n % 3)); } }
+    else { A.t = 0; if ((A.free += dt) > 2) A.n = 0; }
+    A.x = me.x; A.z = me.z; }
   if (tgt && bd < 2.8 + (tgt.K ? tgt.K.size * 0.6 : 0)) swordSwing();
   if (!$('prompt').classList.contains('hidden')) { keys.add('KeyF'); keys.delete('KeyW'); }
 }
 if (params.has('auto')) {
   const secs = +params.get('auto'), step = 1 / 30; let simT = 0; const log = [];
   setTimeout(() => { try { for (let i = 0; i < secs / step; i++) { if (game.mode === 'play' && !game.cut) { autoStep(step); tick(step); } else if (game.cut) runCut(step); else runTimers(); W.update(step, (game.t += step), camera); updateFx(step); for (const v of game.viruses) { v.mesh.position.set(v.x, v.y, v.z); } simT += step; if (log[log.length - 1] !== game.phase + game.mode) log.push(game.phase + game.mode); if (game.mode === 'over') break; }
-    document.title = `AUTO ${simT.toFixed(0)}s ${log.join('>')} kills=${game.kills} lost=${game.lost} freed=${W.gods.filter((g) => g.freed).length} me=${Math.round(game.me?.x ?? 0)},${Math.round(game.me?.z ?? 0)} viruses=${game.viruses.length} obj=${$('obj').textContent}`; } catch (e) { document.title = `AUTO ERROR ${e.message} @${game.phase} ${e.stack.split('\n')[1]}`; } }, 1500);
+    document.title = `AUTO ${simT.toFixed(0)}s ${log.join('>')} kills=${game.kills} lost=${game.lost} freed=${W.gods.filter((g) => g.freed).length} me=${Math.round(game.me?.x ?? 0)},${Math.round(game.me?.z ?? 0)} viruses=${game.viruses.length} [${game.viruses.filter((v) => v.state === 'ok').slice(0, 6).map((v) => `${v.kind}@${Math.round(v.x)},${Math.round(v.z)}:${Math.round(v.hp)}${v.guard ? 'g' : ''}${v.sleep ? 's' : ''}`).join(' ')}] obj=${$('obj').textContent}`; } catch (e) { document.title = `AUTO ERROR ${e.message} @${game.phase} ${e.stack.split('\n')[1]}`; } }, 1500);
 }
 requestAnimationFrame((n) => { last = n; frame(n); });
