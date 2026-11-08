@@ -24,6 +24,14 @@ const COURSES = {
     arches: [['서강대교', 37.538472, 126.925972, 150]],
     far: [['남산서울타워', 37.5512, 126.9882, 236, 'tower'], ['롯데월드타워', 37.5126, 127.1025, 555, 'lotte']],
   },
+  // 홍대: 상수역 → 어울마당로(걷고싶은거리 · 클럽 거리 · 버스킹) → 홍대입구역
+  hongdae: {
+    name: '홍대 거리 산책', sub: '상수 → 어울마당로 → 홍대입구',
+    kind: 'street', bbox: [37.538, 126.900, 37.572, 126.948], path: '어울마당로', lon: [126.914, 126.934], minLen: 700,
+    marks: [['상수역', 37.5478, 126.9229], ['홍대 놀이터', 37.5513, 126.9218], ['걷고싶은거리', 37.5545, 126.9230], ['홍대입구역', 37.5572, 126.9245]],
+    labels: [], arches: [],
+    far: [['남산서울타워', 37.5512, 126.9882, 236, 'tower'], ['롯데월드타워', 37.5126, 127.1025, 555, 'lotte']],
+  },
 };
 
 const id = process.argv[2] || 'yeouido', C = COURSES[id];
@@ -35,7 +43,8 @@ async function overpass(file, body) {
   const f = path.join(CACHE, file);
   if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf8'));
   const B = C.bbox.join(',');
-  const r = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', headers: { 'User-Agent': 'jelly-games-hangang-map/1.0', 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(`[out:json][timeout:170];(${body.replaceAll('$B', B)});out geom;`) });
+  // 요청이 많으면(429 · 504) 잠깐 쉬었다가 다시 (최대 6번)
+  let r; for (let tr = 0; tr < 6; tr++) { r = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', headers: { 'User-Agent': 'jelly-games-hangang-map/1.0', 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(`[out:json][timeout:170];(${body.replaceAll('$B', B)});out geom;`) }); if (r.ok || (r.status !== 429 && r.status !== 504)) break; await new Promise((res) => setTimeout(res, 20000 * (tr + 1))); }
   if (!r.ok) throw new Error(`Overpass ${r.status}`);
   const j = await r.json(); fs.writeFileSync(f, JSON.stringify(j)); return j;
 }
@@ -127,7 +136,7 @@ if (route[0][0] > route[route.length - 1][0]) route.reverse(); // 서쪽 → 동
 route = route.filter((p) => p[0] >= xa && p[0] <= xb);
 route = simplify(route, 0.6);
 const routeLen = route.reduce((a, p, i) => a + (i ? Math.sqrt(d2(p, route[i - 1])) : 0), 0);
-if (routeLen < 1000) throw new Error(`코스 길이가 이상해요 (${routeLen}m): 자전거길 이름 · 경도를 확인해 주세요`);
+if (routeLen < (C.minLen || 1000)) throw new Error(`코스 길이가 이상해요 (${routeLen}m): 자전거길 이름 · 경도를 확인해 주세요`);
 const center = centroid(route).map(Math.round);
 const R = 2600, rect = [center[0] - R, center[1] - R, center[0] + R, center[1] + R];
 const near = (p, lim) => { let m = Infinity; for (let i = 1; i < route.length; i++) { const a = route[i - 1], b = route[i], dx = b[0] - a[0], dz = b[1] - a[1], t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / (dx * dx + dz * dz || 1))); m = Math.min(m, Math.hypot(a[0] + dx * t - p[0], a[1] + dz * t - p[1])); if (m < lim) return m; } return m; };
@@ -135,7 +144,7 @@ const near = (p, lim) => { let m = Infinity; for (let i = 1; i < route.length; i
 // 좌표는 코스 중심 기준 0.1m 정수로 줄여 담는다
 const q = (p) => [Math.round((p[0] - center[0]) * 10), Math.round((p[1] - center[1]) * 10)];
 const flat = (pts) => pts.flatMap(q);
-const out = { id, name: C.name, sub: C.sub, origin: [LAT0, LON0], center, scale: 0.1, len: Math.round(routeLen), attribution: '© OpenStreetMap contributors', route: flat(route) };
+const out = { id, kind: C.kind || 'river', name: C.name, sub: C.sub, origin: [LAT0, LON0], center, scale: 0.1, len: Math.round(routeLen), attribution: '© OpenStreetMap contributors', route: flat(route) };
 
 // ---------- 물 · 섬 · 녹지 ----------
 const polyOut = (pp, eps = 1.5) => { const o = clipRect(simplify(pp.o, eps), rect); if (o.length < 3 || Math.abs(area(o)) < 30) return null; return [flat(o), ...pp.h.map((h) => clipRect(simplify(h, eps), rect)).filter((h) => h.length > 2 && Math.abs(area(h)) > 30).map(flat)]; };
@@ -260,7 +269,8 @@ out.tall = [];
 // 가게 (실제 이름 · 종류): 카페 · 식당 · 분식 · 빵집 · 편의점 · 술집 → 건물 1층에 문과 간판을 달고 들어가서 주문할 수 있게
 { const pJ = await overpass('pois.json', 'node["amenity"~"^(cafe|restaurant|fast_food|bar|pub|ice_cream|food_court)$"]["name"]($B);node["shop"~"^(convenience|bakery|pastry|supermarket|deli)$"]["name"]($B);');
   const kindOf = (t) => { const a = t.amenity, sh = t.shop, cu = String(t.cuisine || ''); if (sh === 'convenience' || sh === 'supermarket') return 'mart'; if (sh === 'bakery' || sh === 'pastry') return 'bakery'; if (a === 'cafe' || a === 'ice_cream') return 'cafe'; if (a === 'bar' || a === 'pub') return 'pub'; if (/chicken/.test(cu)) return 'chicken'; if (/pizza/.test(cu)) return 'pizza'; if (/burger/.test(cu) || a === 'fast_food') return 'burger'; if (/chinese/.test(cu)) return 'chinese'; if (/japanese|sushi|ramen/.test(cu)) return 'japanese'; return 'korean'; };
-  out.shops = []; for (const e of pJ.elements) { if (e.type !== 'node') continue; const [x, z] = P(e.lat, e.lon); if (x < rect[0] || x > rect[2] || z < rect[1] || z > rect[3]) continue; if (near([x, z], 1800) > 1800) continue; out.shops.push([String(e.tags.name).slice(0, 24), kindOf(e.tags), ...q([x, z])]); }
+  out.shops = []; for (const e of pJ.elements) { if (e.type !== 'node') continue; const [x, z] = P(e.lat, e.lon); if (x < rect[0] || x > rect[2] || z < rect[1] || z > rect[3]) continue; const dd = near([x, z], 700); if (dd > 700) continue; out.shops.push([String(e.tags.name).slice(0, 24), kindOf(e.tags), ...q([x, z]), dd]); }
+  out.shops = out.shops.sort((a, b) => a[4] - b[4]).slice(0, 1000).map((sh) => sh.slice(0, 4));
   console.log(`가게 ${out.shops.length}`); }
 out.stations = []; out.entrances = [];
 {

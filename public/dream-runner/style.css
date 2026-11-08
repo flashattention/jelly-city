@@ -333,3 +333,8 @@ body.touch #hg-subway { top: 200px; }
 #hg-shop .menu button i { font-style: normal; font-size: 11px; opacity: .55; text-align: center; border: 1px solid rgba(255,255,255,.35); border-radius: 6px; }
 #hg-shop .mode { display: flex; gap: 14px; margin-top: 10px; font-size: 13px; }
 #hg-shop .mode label { display: flex; gap: 5px; align-items: center; cursor: pointer; }
+
+/* 한강 산책 지역 고르기 */
+#hg-regions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 4px 0 6px; }
+#hg-regions button { padding: 8px 14px; border-radius: 999px; border: 2px solid rgba(255,255,255,.25); background: rgba(255,255,255,.08); color: inherit; font-family: 'Jua'; font-size: 15px; cursor: pointer; }
+#hg-regions button.on { border-color: #ffd98a; background: rgba(255, 217, 138, .22); }

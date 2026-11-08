@@ -952,7 +952,11 @@ setTimeout(() => { if (game.mode === 'title' && !new URLSearchParams(location.se
 
 // ---------- 🌉 한강 러닝 ----------
 //   장애물 · 탈락 없이 내 속도로 달리는 힐링 맵. 거리 · 순간(노을 · 비 · 눈 …)은 서버에 모여 업적이 된다
-const hg = new Hangang();
+let hg = new Hangang();
+// 지역마다 따로 (여의도 한강 · 홍대 거리 …): 화면 쪽 연결(on…)은 처음 것에서 그대로 옮겨 단다
+const HG_REGIONS = { yeouido: { label: '🌉 여의도 한강', start: '🚩 서강대교에서 시작' }, hongdae: { label: '🎸 홍대 거리', start: '🚩 상수역에서 시작' } };
+const hgInst = { yeouido: hg }; let hgRegion = 'yeouido';
+function hgUse(id) { if (!HG_REGIONS[id]) id = 'yeouido'; if (!hgInst[id]) { const n = new Hangang(); for (const k of Object.keys(hg)) if (/^on[A-Z]|^api$/.test(k) && typeof hg[k] === 'function') n[k] = hg[k]; hgInst[id] = n; } hg = hgInst[id]; hgRegion = id; }
 hg.api = (path) => account.api(path);
 // 지하철 출입구 앞: 그 역 실시간 도착 (20초마다)
 const LCOL = { '1호선': '#0052A4', '2호선': '#00A84D', '5호선': '#996CAC', '6호선': '#CD7C2F', '9호선': '#BDB092', 경의중앙선: '#77C4A3', 공항철도: '#0090D2', 신림선: '#6789CA' };
@@ -991,11 +995,12 @@ addEventListener('resize', () => hgPost?.setSize(innerWidth, innerHeight));
 // 입장: 이어 달리기 · 서강대교에서 · 지도에서 고르기
 const HG_POS_KEY = 'dreamrunner.hangang.pos';
 function hgSavedPos() { try { return JSON.parse(store.get(HG_POS_KEY) || 'null'); } catch { return null; } }
-$('hg-btn').onclick = () => { unlock(); const p = hgSavedPos(); $('hg-resume').classList.toggle('hidden', !p); if (p) $('hg-resume-sub').textContent = p.where || ''; $('hg-start').classList.remove('hidden'); };
+function hgRegionUI() { $('hg-regions').innerHTML = Object.entries(HG_REGIONS).map(([id, r]) => `<button data-r="${id}" class="${id === hgRegion ? 'on' : ''}">${r.label}</button>`).join(''); $('hg-regions').querySelectorAll('button').forEach((b) => { b.onclick = () => { hgUse(b.dataset.r); hgRegionUI(); }; }); $('hg-from-start').textContent = HG_REGIONS[hgRegion].start; }
+$('hg-btn').onclick = () => { unlock(); hgRegionUI(); const p = hgSavedPos(); $('hg-resume').classList.toggle('hidden', !p); if (p) $('hg-resume-sub').textContent = p.where || ''; $('hg-start').classList.remove('hidden'); };
 $('hg-start-x').onclick = () => $('hg-start').classList.add('hidden');
-$('hg-resume').onclick = () => { $('hg-start').classList.add('hidden'); const p = hgSavedPos(); startHangang(p ? { s: p.s, lat: p.lat } : null); };
+$('hg-resume').onclick = () => { $('hg-start').classList.add('hidden'); const p = hgSavedPos(); if (p?.region) hgUse(p.region); startHangang(p ? { s: p.s, lat: p.lat } : null); };
 $('hg-from-start').onclick = () => { $('hg-start').classList.add('hidden'); startHangang({ s: 30, lat: -4.3 }); };
-$('hg-pick').onclick = async () => { $('hg-start').classList.add('hidden'); try { await hg.load('yeouido'); } catch (e) { toast(e.message); return; } hgOpenMap(true); };
+$('hg-pick').onclick = async () => { $('hg-start').classList.add('hidden'); try { await hg.load(hgRegion); } catch (e) { toast(e.message); return; } hgOpenMap(true); };
 let hgPick = null, hgMapStart = false;
 function hgOpenMap(start = false) { hgMapStart = start; hgPick = null; $('hg-go').disabled = true; $('hg-go').textContent = start ? '🏃 여기서 시작' : '📍 새 위치로 이동'; $('hg-map').classList.remove('hidden'); if (document.pointerLockElement) document.exitPointerLock?.(); hgDrawMap(); }
 function hgDrawMap() { const c = $('hg-map-c'); hg.drawBigMap(c.getContext('2d'), c.width, hgPick); }
@@ -1005,13 +1010,14 @@ $('hg-map-x').onclick = () => $('hg-map').classList.add('hidden');
 $('hg-mini').onclick = () => { if (game.mode === 'hangang') hgOpenMap(false); };
 async function startHangang(pos = null) {
   const b = $('hg-btn'); b.disabled = true;
-  try { if (!hg.ready) toast('🌉 한강 지도를 펼치는 중…', 4000); await hg.load('yeouido'); }
+  try { if (!hg.ready) toast(`${HG_REGIONS[hgRegion].label} 지도를 펼치는 중…`, 4000); await hg.load(hgRegion); }
   catch (e) { toast(`한강 지도를 불러오지 못했어요 · ${e.message}`, 2600); b.disabled = false; return; }
   b.disabled = false;
   hideScreens(); game.mode = 'hangang'; document.body.classList.add('hg');
   runner.shadow.visible = false; hg.enter(runner.bear, pos ? { s: pos.s } : {}); if (pos) hg.teleport(pos.s, pos.lat);
   renderer.shadowMap.enabled = !isPhone; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
-  if (!isPhone && !hgPost) { try { const { makePost } = await import('./hangang-post.js'); hgPost = makePost(renderer, hg.scene, camera); } catch (e) { console.warn('화면 보정 없이', e); } }
+  if (hgPost && hgPost.scene !== hg.scene) { hgPost.dispose(); hgPost = null; } // 지역이 바뀌면 그 지역 장면으로 다시
+  if (!isPhone && !hgPost) { try { const { makePost } = await import('./hangang-post.js'); hgPost = makePost(renderer, hg.scene, camera); hgPost.scene = hg.scene; } catch (e) { console.warn('화면 보정 없이', e); } }
   $('hg-hud').classList.remove('hidden'); if (document.body.classList.contains('touch')) $('touch').classList.remove('hidden');
   $('t-shove').textContent = '💨';
   setMusic(['pent', 62, 66, 'sine']); hgRun.tk = null; hgRun.sent = 0; hgRun.sendT = 20;
@@ -1123,4 +1129,4 @@ function hgLabels() {
   }
 }
 
-function hgSavePos() { if (!hg.ready || hg.px == null) return; store.set(HG_POS_KEY, JSON.stringify({ s: Math.round(hg.s), lat: Math.round(hg.lat * 10) / 10, where: `${hg.regionName || hg.map.name} 근처 · ${(hg.s / 1000).toFixed(1)}km 지점` })); }
+function hgSavePos() { if (!hg.ready || hg.px == null) return; store.set(HG_POS_KEY, JSON.stringify({ region: hgRegion, s: Math.round(hg.s), lat: Math.round(hg.lat * 10) / 10, where: `${hg.regionName || hg.map.name} 근처 · ${(hg.s / 1000).toFixed(1)}km 지점` })); }
