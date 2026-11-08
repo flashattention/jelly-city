@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { makeBear, poseBear, FLIP_T } from './runner.js';
 import { isPhone } from '../../shared/js/perf.js';
-import { buildStation } from './hangang-station.js';
+import { buildStation, buildCar } from './hangang-station.js';
 
 export const SEASONS = { spring: '🌸 봄', summer: '🌿 여름', autumn: '🍁 가을', winter: '❄️ 겨울' };
 export const WEATHERS = { clear: '☀️ 맑음', cloudy: '☁️ 구름', rain: '🌧️ 비', snow: '🌨️ 눈' };
@@ -264,8 +264,26 @@ export class Hangang {
     this.placeAt(e.x - Math.sin(th) * 3.6, e.z - Math.cos(th) * 3.6, th + Math.PI); this.stationCool = 2; this.onInside?.(null);
   }
   placeAt(x, z, face) { this.px = x; this.pz = z; this.y = 0; this.vy = 0; this.climb = null; this.face = face; this.camYaw = face; this.camInit = false; this.mdx = null; this.onRoof = null; }
+  // 열차 타기: 열린 문 앞에 서면 탄다 → 열차 안에서 잠깐 달리고 → 다음 역 승강장에 내린다 (그 역이 지도 밖이면 같은 역 반대편으로)
+  startRide(p, T) {
+    const I = this.inside, line = p.l, destName = T.sd < 0 ? p.prev : p.next, dest = this.stations.find((q) => q.name === destName && this.entrances.some((e) => e.st === q));
+    this.rideCars ||= {}; const key = String(line), C = this.rideCars[key] ||= buildCar(this, line, Object.keys(this.rideCars).length);
+    I.S.g.visible = false; C.g.visible = true; C.setText(dest ? dest.name : '', `${line}${String(line).length === 1 ? '호선' : '선'} ${T.to}행`);
+    this.ride = { C, t: 13, line, dest: dest || I.st }; this.placeAt(C.spawn.x, C.spawn.z, C.spawn.face);
+  }
+  tickRide(dt) {
+    const R2 = this.ride, k = R2.t > 10 ? (13 - R2.t) / 3 : R2.t < 3 ? R2.t / 3 : 1; R2.C.tick(dt, 0.15 + k * 1.6); R2.t -= dt;
+    // 흔들림: 달리는 동안 카메라가 아주 살짝
+    if (R2.t > 0) return;
+    R2.C.g.visible = false; this.ride = null;
+    const st = R2.dest, e = this.entrances.find((q) => q.st === st), si = this.stations.indexOf(st);
+    const S = this.stationInt[si] ||= buildStation(this, st, si, this.entrances.filter((q) => q.st === st).map((q) => String(q.ref || '1')));
+    this.inside = { S, st, from: e }; S.g.visible = true; const li = Math.max(0, st.lines.indexOf(R2.line)), sp = S.spawnPlatform(li); this.placeAt(sp.x, sp.z, sp.face); this.zoneCool = 1.5; this.onInside?.({ name: st.name, lines: st.lines });
+  }
   tickInside(dt) {
+    if (this.ride) return this.tickRide(dt);
     const I = this.inside, S = I.S; S.tick(dt, this.arrivals);
+    { const dtn = S.doorTrain(this.px, this.pz); if (dtn && !(this.zoneCool > 0)) return this.startRide(dtn.p, dtn.T); }
     const z = S.zoneAt(this.px, this.pz); if (!z || (this.zoneCool || 0) > 0) { this.zoneCool = Math.max(0, (this.zoneCool || 0) - dt); return; }
     this.zoneCool = 1.2;
     if (z.kind === 'exit') this.leaveStation(z.ref);
@@ -1192,7 +1210,7 @@ export class Hangang {
   tickCamera(dt, camera, bx, bz, fx, fz) {
     const k = 1 - Math.exp(-dt * ((this.dragT || 0) > 0 && (this.opt.cam || 0) === 0 ? 14 : 3)), mode = this.opt.cam || 0, y = this.y;
     let cx, cy, cz, lx, ly, lz;
-    if (mode === 0) { const pt = this.camPitch ?? 0.3, d = 4.8 * (pt < 0 ? 1 + pt * 0.6 : 1), hd = Math.cos(pt) * d; cx = bx - fx * hd; cy = Math.max(0.35, 0.55 + Math.sin(pt) * d) + y; cz = bz - fz * hd; lx = bx + fx * 1.0; ly = 0.55 + y + (pt < 0 ? -pt * 7 : 0); lz = bz + fz * 1.0;
+    if (mode === 0) { const pt = this.camPitch ?? 0.3, d = (this.ride ? 3.2 : 4.8) * (pt < 0 ? 1 + pt * 0.6 : 1), hd = Math.cos(pt) * d; cx = bx - fx * hd; cy = Math.max(0.35, 0.55 + Math.sin(pt) * d) + y; cz = bz - fz * hd; lx = bx + fx * 1.0; ly = 0.55 + y + (pt < 0 ? -pt * 7 : 0); lz = bz + fz * 1.0;
       // 벽 타기: 벽에서 6m 떨어져 살짝 아래에서 곰과 벽을 올려다본다
       if (this.climb) { const C = this.climb; cx = bx + C.nx * 6; cz = bz + C.nz * 6; cy = y + 0.6; lx = bx; ly = y + 1.4; lz = bz; } }
     else if (mode === 1) { const p = this.at(this.s); cx = bx - p.rx * 5 + p.dx * 1.5; cy = 1.0; cz = bz - p.rz * 5 + p.dz * 1.5; lx = bx; ly = 0.6; lz = bz; }
@@ -1200,7 +1218,7 @@ export class Hangang {
     if (!this.camInit) { camera.position.set(cx, cy, cz); this.camInit = true; }
     const ky = this.climb || Math.abs(cy - camera.position.y) > 3 ? 1 - Math.exp(-dt * 12) : k; camera.position.x += (cx - camera.position.x) * k; camera.position.y += (cy - camera.position.y) * ky; // 높이: 벽 타기나 크게 벌어졌을 땐 빨리 따라간다 (작은 점프는 부드럽게)
     camera.position.z += (cz - camera.position.z) * k; camera.position.y = Math.max(0.3, camera.position.y); { const dg = this.deckAt(camera.position.x, camera.position.z, this.y + 0.5); if (dg > 0.5 && this.y >= dg - 0.3) camera.position.y = Math.max(camera.position.y, dg + 0.6); } // 다리 위에 있을 땐 카메라가 다리 밑으로 안 내려간다
-    if (this.inside) camera.position.y = Math.min(camera.position.y, 4.1);
+    if (this.inside) camera.position.y = Math.min(camera.position.y, this.ride ? 2.2 : 4.1);
     this.look ||= new THREE.Vector3(lx, ly, lz); this.look.x += (lx - this.look.x) * k; this.look.y += (ly - this.look.y) * ky; this.look.z += (lz - this.look.z) * k;
     camera.lookAt(this.look);
     const fov = 56 + clamp(this.v - 6, 0, 18) * 0.8; if (Math.abs(camera.fov - fov) > 0.05 || camera.far < 20000) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 3); camera.far = 24000; camera.updateProjectionMatrix(); }
@@ -1313,6 +1331,7 @@ export class Hangang {
   }
   // 지금 위치 설명: 다음 이정표까지
   where() {
+    if (this.ride) return `${this.ride.line}${String(this.ride.line).length === 1 ? '호선' : '선'} 열차 안 · 다음 ${this.ride.dest.name}`;
     if (this.inside) return `${this.inside.st.name}역 안`;
     const marks = this.map.marks || [], s = this.s, d = this.dir;
     const next = d > 0 ? marks.find(([, ms]) => ms > s + 5) : [...marks].reverse().find(([, ms]) => ms < s - 5);
