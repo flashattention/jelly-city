@@ -5,17 +5,42 @@ import { SeoulMap } from '/dream-runner/js/seoul-map.js';
 const $ = (id) => document.getElementById(id), esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const PLAY = '/seoul-walk/play/';
 
-// ---------- 첫 화면 장면 (게임 속에서 찍은 랜드마크) ----------
-const SCENES = [['63', '63빌딩', '여의도 · 해 질 녘'], ['tower', 'N서울타워', '남산 · 밤'], ['namsanview', '남산에서 본 서울', '진짜 지형 · 해 질 녘'], ['lotte', '롯데월드타워', '잠실 · 노을'], ['hongdae', '홍대 거리', '마포 · 여름밤'], ['gangnam', '강남역 거리', '강남 · 겨울밤'], ['hangang', '한강의 밤', '여의도 · 여름']];
-{
-  const box = $('scenes'), dots = $('dots'), els = SCENES.map(([f]) => { const d = document.createElement('div'); d.className = 's'; d.dataset.src = `/dream-runner/sw/${f}.webp`; box.appendChild(d); return d; });
-  dots.innerHTML = SCENES.map(() => '<i></i>').join(''); const ds = [...dots.children];
-  let k = -1, timer = null; const load = (i) => { if (!els[i].style.backgroundImage) els[i].style.backgroundImage = `url(${els[i].dataset.src})`; };
-  const show = (i) => { if (k >= 0) { els[k].classList.remove('on'); ds[k].classList.remove('on'); } k = (i + SCENES.length) % SCENES.length; load(k); load((k + 1) % SCENES.length); void els[k].offsetWidth; els[k].classList.add('on'); ds[k].classList.add('on'); $('cap-n').textContent = SCENES[k][1]; $('cap-s').textContent = SCENES[k][2]; };
-  const loop = () => { clearInterval(timer); timer = setInterval(() => { if (!document.hidden) show(k + 1); }, 7000); };
-  ds.forEach((d, i) => { d.onclick = () => { show(i); loop(); }; });
-  show(0); loop();
+// ---------- 장면 이야기: 화면에 붙은 무대에서 스크롤에 맞춰 장면이 천천히 다가오고 다음 장면으로 녹아 바뀐다 ----------
+const CH = [
+  ['c1', '여의도', '37.5198° N · 126.9405° E', '오후 6:06 · 여름', 'Golden Hour', '해가 63빌딩 유리벽에 마지막 빛을 걸어 둘 때, 한강공원 잔디밭이 금빛으로 물들어요.'],
+  ['c2', '석촌호수 · 잠실', '37.5096° N · 127.1035° E', '오후 5:24 · 봄', 'Blossom Lake', '봄이면 호수 둘레가 벚꽃으로 덮이고, 555m 롯데월드타워가 분홍빛 노을에 잠겨요.'],
+  ['c3', '남산', '37.5512° N · 126.9882° E', '오후 8:36 · 가을', 'The Tower', '진짜 산 위, 해발 262m. 해가 지면 N서울타워에 불이 켜지고 서울이 발아래에서 반짝여요.'],
+  ['c4', '남산 정상', '37.5509° N · 126.9880° E', '오후 6:30 · 가을', 'City Below', '한양도성 길에 서면 지붕이 끝없이 이어져요. 저 아래 어디든, 걸어서 갈 수 있어요.'],
+  ['c5', '홍대', '37.5563° N · 126.9236° E', '오후 9:30 · 비', 'Neon Rain', '비 오는 밤의 골목. 간판 불빛이 젖은 길에 번지고, 어디선가 버스킹 소리가 들려요.'],
+  ['c6', '한강', '37.5265° N · 126.9340° E', '오후 8:48 · 여름', 'River Lights', '강물 위로 도시의 불빛이 흔들려요. 실제 열차가 다리를 건너는 그 순간, 여기서도.'],
+  ['c7', '강남', '37.4979° N · 127.0276° E', '오후 8:12 · 첫눈', 'First Snow', '첫눈 오는 강남대로. 유리 빌딩 사이로 눈송이가 천천히, 아주 천천히 내려요.'],
+];
+const film = $('film'), frames = CH.map(([f]) => { const d = document.createElement('div'); d.className = 'f'; d.dataset.src = `/seoul-walk/img/${f}.webp`; $('frames').appendChild(d); return d; });
+film.style.setProperty('--n', CH.length);
+const chaps = CH.map(([, place, co, when, title, txt], i) => { const d = document.createElement('div'); d.className = 'chap'; d.innerHTML = `<div class="lab"><b>CH.${String(i + 1).padStart(2, '0')}</b><span>${place}</span><span>${when}</span></div><h3>${title}</h3><div class="rule"></div><p>${txt}</p><div class="co">${co}</div>`; $('chaps').appendChild(d); return d; });
+$('prog').innerHTML = CH.map(() => '<i></i>').join(''); const pr = [...$('prog').children];
+const load = (k) => { const d = frames[k]; if (d && !d.style.backgroundImage) d.style.backgroundImage = `url(${d.dataset.src})`; };
+const cl = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v)), ease = (x) => x * x * (3 - 2 * x);
+let ticking = false, lastP = -1;
+function filmTick() {
+  ticking = false; const r = film.getBoundingClientRect(), span = film.offsetHeight - innerHeight, p = cl(-r.top / span), N = CH.length, P = p * (N + 0.6); if (Math.abs(P - lastP) < 1e-4) return; lastP = P;
+  for (let i = 0; i < N; i++) {
+    const t = P - i; // 이 장면 안에서의 진행 (0 ~ 1)
+    if (t > -0.6 && t < 1.6) { load(i); load(i + 1); }
+    const fin = i === 0 ? 1 : ease(cl((t + 0.3) / 0.3)), fout = i === N - 1 ? 1 - ease(cl((t - 1) / 0.6)) : 1 - ease(cl((t - 0.85) / 0.3));
+    const o = Math.min(fin, fout), F = frames[i]; F.style.opacity = o.toFixed(3); if (o > 0) { const k = cl((t + 0.3) / 1.6); F.style.transform = `scale(${(1.04 + k * 0.16).toFixed(4)}) translate3d(${(-k * 1.6).toFixed(3)}%, ${(-k * 1.1).toFixed(3)}%, 0)`; }
+    const ti = ease(cl((t - 0.08) / 0.22)), to = 1 - ease(cl((t - 0.62) / 0.2)), C = chaps[i], co = Math.min(ti, to); C.style.opacity = co.toFixed(3); C.style.transform = `translate3d(0, ${((1 - ti) * 34 - (1 - to) * 24).toFixed(1)}px, 0)`;
+    pr[i].classList.toggle('on', t >= 0 && t < 1);
+  }
+  const e = ease(cl((P - N + 0.1) / 0.4)); $('end').style.opacity = e.toFixed(3); $('end').classList.toggle('on', e > 0.5);
 }
+addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(filmTick); } }, { passive: true });
+addEventListener('resize', () => { lastP = -1; filmTick(); });
+load(0); filmTick();
+// 첫 화면 그림이 오면 불러오기 덮개를 걷는다 (늦어도 3초)
+{ const im = new Image(), done = () => $('loader').classList.add('done'); im.onload = done; im.onerror = done; im.src = '/seoul-walk/img/c1.webp'; setTimeout(done, 3000); }
+// 서울 지금 시각
+{ const f = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', hour: 'numeric', minute: '2-digit' }), tick = () => { $('clock').textContent = `${f.format(new Date())} KST`; }; tick(); setInterval(tick, 15000); }
 
 // ---------- 저장된 자리 (게임과 같은 저장소) ----------
 const POS_KEY = 'dreamrunner.hangang.pos', VISIT_KEY = 'dreamrunner.hangang.visit';
@@ -43,7 +68,7 @@ function renderHoods() {
   $('hoods').innerHTML = HOODS.map(([id, em, name, desc, c]) => { const p = A.regions[id], resume = !!p; return `<a class="hood reveal" style="--c:${c}" href="${PLAY}?r=${id}&go=${resume ? 'resume' : 'start'}">${resume ? '<span class="badge">이어 걷기</span>' : ''}<span class="em">${em}</span><b>${name}</b><p>${desc}</p><span class="go">${resume ? `▶ ${esc(String(p.where || '멈춘 자리').slice(0, 30))}` : '여기서 걷기 →'}</span></a>`; }).join('');
   const last = A.last && A.regions[A.last] ? A.regions[A.last] : null;
   $('resume-all').classList.toggle('hidden', !last); if (last) { $('resume-all').href = `${PLAY}?go=last`; $('resume-all-sub').textContent = last.where || ''; }
-  $('go-now').href = last ? `${PLAY}?go=last` : `${PLAY}?r=yeouido&go=start`; $('go-now-sub').textContent = last ? `이어서 · ${String(last.where || '').slice(0, 26)}` : '여의도 한강에서';
+  $('go-now').href = $('go-end').href = last ? `${PLAY}?go=last` : `${PLAY}?r=yeouido&go=start`; $('go-now-sub').textContent = last ? `이어서 · ${String(last.where || '').slice(0, 26)}` : '여의도 한강에서';
   observe();
 }
 

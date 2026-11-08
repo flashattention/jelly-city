@@ -583,7 +583,7 @@ export class Hangang {
     this.sky.renderOrder = -100; sc.add(this.sky);
     this.grassTex = groundTex('grass');
     // 땅 바탕 (도시)
-    const landTex = groundTex('city'); landTex.repeat.set(26000 / 9, 26000 / 9); const land = new THREE.Mesh(new THREE.PlaneGeometry(26000, 26000), flatMat('#a3a39f', -60, { map: landTex })); land.receiveShadow = true; land.rotation.x = -Math.PI / 2; land.renderOrder = -60; land.material.depthTest = true; land.material.depthWrite = true; sc.add(land); this.landM = land.material;
+    const landTex = groundTex('city'); landTex.repeat.set(26000 / 9, 26000 / 9); const land = new THREE.Mesh(new THREE.PlaneGeometry(26000, 26000), flatMat('#a3a39f', -60, { map: landTex })); land.receiveShadow = true; land.rotation.x = -Math.PI / 2; land.renderOrder = -60; land.material.depthTest = true; land.material.depthWrite = true; sc.add(land); this.landM = land.material; if (M.kind === 'world') land.visible = false; // 서울 전체: 땅은 칸마다 지형 + 먼 지형 덩어리
     // 물: 반짝이는 물결 · 하늘 색 반사 · 밤에는 도시 불빛이 비친다
     this.waterU = { time: { value: 0 }, sunDir: this.skyU.sunDir, sunCol: this.skyU.sunCol, hor: this.skyU.hor, top: this.skyU.top, night: this.skyU.night, rain: { value: 0 }, fogCol: { value: C('#bcdcf4') }, fogD: { value: 0.00022 }, deep: { value: C('#2a6f80') } };
     const waterM = new THREE.ShaderMaterial({ uniforms: this.waterU, depthWrite: false, depthTest: false, side: THREE.DoubleSide,
@@ -1136,6 +1136,16 @@ export class Hangang {
     const ring = [], N = 160; for (let i = 0; i <= N; i++) { const a = (i / N) * Math.PI * 2, R = 11000 + Math.sin(a * 3.1) * 900, north = Math.max(0, -Math.sin(a)), hh = 240 + north * 520 + Math.max(0, Math.sin(a)) * 380 + (Math.sin(a * 23) * 0.5 + Math.sin(a * 57) * 0.3) * 120; ring.push([Math.cos(a) * R, Math.sin(a) * R, hh]); }
     const P = [], I = []; ring.forEach(([x, z, hh], i) => { P.push(x, -20, z, x, hh, z); if (i) { const k = i * 2; I.push(k - 2, k, k - 1, k - 1, k, k + 1); } });
     this.mtM = new THREE.MeshBasicMaterial({ color: '#7f95a8', fog: false, side: THREE.DoubleSide }); const mt = new THREE.Mesh(geoOf(P, I), this.mtM); mt.renderOrder = -90; this.scene.add(mt);
+    // 서울 전체: 가짜 산 고리(지도 가운데 둘레 11km) 대신 진짜 지형 전체를 성기게(200m) 한 덩어리로 — 멀리 북한산 · 관악산이 실제로 보인다. 가까운 칸 땅이 그 위에 그려진다
+    if (M.kind === 'world' && this.terr) { mt.visible = false; this.buildFarTerrain(); }
+  }
+  buildFarTerrain() {
+    const T = this.terr, st = 4, nx = Math.floor((T.nx - 1) / st) + 1, nz = Math.floor((T.nz - 1) / st) + 1, P = new Float32Array(nx * nz * 3), C = new Float32Array(nx * nz * 3), I = [], c = new THREE.Color(), lo = new THREE.Color('#6f8f5a'), hi = new THREE.Color('#8d8f86'), wat = new THREE.Color('#4b6b82'), city = new THREE.Color('#9a9890');
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i, h = T.h[j * st * T.nx + i * st]; P[k * 3] = T.x0 + i * st * T.step; P[k * 3 + 1] = h - 1.5; P[k * 3 + 2] = T.z0 + j * st * T.step;
+      if (h <= 0.2) c.copy(wat); else if (h < 40) c.copy(city).lerp(lo, h / 40); else c.copy(lo).lerp(hi, Math.min(1, (h - 40) / 400)); C[k * 3] = c.r; C[k * 3 + 1] = c.g; C[k * 3 + 2] = c.b; }
+    for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) { const a = j * nx + i, b = a + nx; I.push(a, b, a + 1, a + 1, b, b + 1); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3)); g.setIndex(I); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: 6, polygonOffsetUnits: 6 })); m.renderOrder = -62; m.receiveShadow = false; this.scene.add(m); this.farTerrain = m;
   }
   // 나무 · 풀 · 꽃: 길 양옆에 줄지어, 공원 안에 흩어서
   buildPlants(inWater, r) {
@@ -1811,6 +1821,7 @@ export class Hangang {
     const grassC = C({ spring: '#9cbf7c', summer: '#86ab68', autumn: '#97a65e', winter: '#b3b89a' }[this.state.season]).lerp(C('#eef2f6'), this.snowK * 0.85);
     for (const o of [this, ...(this.chunks?.values() || [])]) if (o.greenM?.grass) { o.greenM.grass.color.copy(grassC); for (const m of o.wideM || []) m.color.copy(grassC); o.stripM?.color.copy(grassC); }
     this.landM.color.copy(C('#a3a39f')).lerp(C('#e6eaee'), this.snowK * 0.6);
+    this.terrLandM?.color.copy(C('#a3a39f')).lerp(C('#e6eaee'), this.snowK * 0.6);
     // 벌레: 낮엔 나비(봄 · 여름) · 잠자리(가을), 여름밤엔 반딧불
     const day = sunUp > 0.4 && !rainOn && !snowOn, season = this.state.season;
     const bugCol = season === 'autumn' ? '#c8502a' : ['#ffffff', '#ffd23f', '#9fd0ff', '#ff9ec0'];

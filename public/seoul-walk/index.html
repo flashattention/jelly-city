@@ -7,7 +7,7 @@
   <meta name="description" content="진짜 서울을 그대로 옮긴 도시를 내 곰돌이와 걷고 · 달리고 · 날아요. 실제 지도 · 건물 · 지형 · 실시간 지하철 · 버스 · 날씨." />
   <meta property="og:title" content="젤리 서울 산책" />
   <meta property="og:description" content="진짜 서울을 그대로 옮긴 도시를 내 곰돌이와 걷고 · 달리고 · 날아요." />
-  <meta property="og:image" content="/dream-runner/sw/63.webp" />
+  <meta property="og:image" content="/seoul-walk/img/c2.webp" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="theme-color" content="#0c1222" />
   <link rel="icon" href="/seoul-walk/icon.svg" type="image/svg+xml" />
@@ -15,31 +15,44 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/seoul-walk/landing.css" />
-  <link rel="preload" as="image" href="/dream-runner/sw/63.webp" />
+  <link rel="preload" as="image" href="/seoul-walk/img/c1.webp" />
   <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" } }</script>
 </head>
 <body>
+  <!-- 불러오기 -->
+  <div class="loader" id="loader"><div><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="8" r="4.2" /><circle cx="23" cy="8" r="4.2" /><circle cx="16" cy="18" r="11" /></svg><span>서울을 불러오는 중…</span></div></div>
+
   <!-- 첫 화면 -->
   <header class="hero" id="top">
-    <div class="scenes" id="scenes" aria-hidden="true"></div>
+    <div class="scenes" aria-hidden="true"><div class="s on" id="hero-bg"></div></div>
     <div class="veil" aria-hidden="true"></div>
     <nav class="nav">
       <a class="brand" href="#top"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="8" r="4.2" /><circle cx="23" cy="8" r="4.2" /><circle cx="16" cy="18" r="11" /></svg><span>젤리 서울 산책</span></a>
-      <div class="links"><a href="#where">어디서부터</a><a href="#map">서울 지도</a><a href="#story">만든 이야기</a></div>
+      <div class="links"><a href="#film">이야기</a><a href="#where">어디서부터</a><a href="#map">서울 지도</a><a href="#story">만든 이야기</a></div>
     </nav>
+    <div class="hero-meta"><span>SEOUL, KOREA</span><span id="clock">—</span><span>37.5665° N · 126.9780° E</span></div>
     <div class="hero-in">
       <p class="eyebrow">A walk through real Seoul</p>
       <h1>젤리 서울 산책</h1>
       <p class="lead">진짜 서울을 그대로 옮긴 도시에서,<br />내 곰돌이와 걷고 · 달리고 · 날아요.</p>
       <div class="cta">
         <a class="btn primary" id="go-now" href="/seoul-walk/play/?r=yeouido&amp;go=start"><span>지금 걷기</span><small id="go-now-sub">여의도 한강에서</small></a>
-        <a class="btn glass" href="#map">서울 지도에서 고르기</a>
+        <a class="btn glass" href="#film">서울 둘러보기</a>
       </div>
     </div>
-    <div class="scene-cap"><b id="cap-n"></b><small id="cap-s"></small></div>
-    <div class="scene-dots" id="dots"></div>
-    <a class="scroll" href="#where" aria-label="아래로">↓</a>
+    <a class="scroll" href="#film" aria-label="아래로"><span>SCROLL</span>↓</a>
   </header>
+
+  <!-- 장면 이야기: 스크롤하면 풍경이 다가오며 바뀐다 -->
+  <section class="film" id="film">
+    <div class="stage">
+      <div class="frames" id="frames" aria-hidden="true"></div>
+      <div class="fveil" aria-hidden="true"></div>
+      <div class="chaps" id="chaps"></div>
+      <div class="end" id="end"><p class="kicker">THE END</p><h2>A Jelly Love Letter<br />to Seoul</h2><p>이제 직접 걸어 볼 차례예요.</p><a class="btn primary" id="go-end" href="/seoul-walk/play/?r=yeouido&amp;go=start"><span>지금 걷기</span></a></div>
+      <div class="prog" id="prog"></div>
+    </div>
+  </section>
 
   <main>
     <!-- 어디서부터 -->
