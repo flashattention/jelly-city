@@ -484,6 +484,7 @@ export class Hangang {
     this.buildBuildings(P2);
     this.buildFar(P2);
     if (M.kind === 'summit') this.summit = buildSummit(this);
+    if (this.id === 'hongdae') this.buildForestPath(r);
     this.buildPlants(inWater, r);
     // 큰 몰 정문: 더현대 서울 (가장 긴 벽 가운데, 바깥을 본다)
     this.malls = []; for (const [want, mallName] of [['더현대 서울', '더현대 서울'], ['IFC mall (South Gate)', 'IFC몰'], ['IFC mall (North Gate)', 'IFC몰']]) { const fs2 = (this.foot || []).filter((f) => f.name === want); const f = fs2.sort((a, b) => Math.abs(ringArea(b.ring)) - Math.abs(ringArea(a.ring)))[0]; if (f) { const ring = f.ring, sg = ringArea(ring) > 0 ? 1 : -1; let best = null; for (let k = 0; k < ring.length; k++) { const a = ring[k], c = ring[(k + 1) % ring.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]); if (!best || L > best.L) best = { L, x: (a[0] + c[0]) / 2, z: (a[1] + c[1]) / 2, nx: (sg > 0 ? c[1] - a[1] : a[1] - c[1]) / L, nz: (sg > 0 ? a[0] - c[0] : c[0] - a[0]) / L }; } const D2 = { name: mallName, x: best.x + best.nx * 0.1, z: best.z + best.nz * 0.1, nx: best.nx, nz: best.nz }; this.malls.push(D2);
@@ -591,6 +592,27 @@ export class Hangang {
       for (let q = 0; q < F.PER; q++) { const i = k * F.PER + q; if (!on) { F.P[i * 3 + 1] = -100; continue; } const life = 1.6, tt = (F.t + q * (life / F.PER) + k * 0.05) % life, v = Math.sqrt(2 * 9.8 * hgt), y = v * tt - 4.9 * tt * tt, out = lean * tt * 3;
         F.P[i * 3] = Math.cos(j.a) * (j.r + out); F.P[i * 3 + 1] = Math.max(0.1, y); F.P[i * 3 + 2] = Math.sin(j.a) * (j.r + out); if (lit > 0.3) col.setHSL((j.ring * 0.22 + F.t * 0.05 + (j.a / 6.28) * 0.3) % 1, 0.85, 0.62); else col.setRGB(0.88, 0.94, 1); F.C[i * 3] = col.r; F.C[i * 3 + 1] = col.g; F.C[i * 3 + 2] = col.b; } });
     pa.needsUpdate = true; ca.needsUpdate = true;
+  }
+  // 홍대 경의선숲길(연트럴파크): 구역 안 잔디 · 가운데 옛 철길(레일 두 줄 · 침목) · 양옆 줄지은 나무 · 벤치 · 가로등 불빛, 풀밭에 앉은 곰들
+  buildForestPath(r) {
+    const A = (this.map.areas || []).filter(([n]) => /경의선/.test(n)).map(([n, ...f]) => unpack(f, this.map.scale)); if (!A.length) return;
+    for (const ring of A) {
+      // 구역의 긴 축을 따라 가운데 선
+      let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length; let xx = 0, zz = 0, xz = 0; for (const [x, z] of ring) { const dx = x - cx, dz = z - cz; xx += dx * dx; zz += dz * dz; xz += dx * dz; } const ang = 0.5 * Math.atan2(2 * xz, xx - zz), ux = Math.cos(ang), uz = Math.sin(ang);
+      const pr = ring.map(([x, z]) => (x - cx) * ux + (z - cz) * uz), a0 = Math.min(...pr), a1 = Math.max(...pr), NB = Math.max(4, Math.round((a1 - a0) / 15)), mid = [];
+      for (let i = 0; i <= NB; i++) { const a = a0 + (i / NB) * (a1 - a0); const bs = ring.map(([x, z]) => ({ a: (x - cx) * ux + (z - cz) * uz, b: -(x - cx) * uz + (z - cz) * ux })).filter((p) => Math.abs(p.a - a) < (a1 - a0) / NB); if (bs.length < 2) continue; const b = (Math.min(...bs.map((p) => p.b)) + Math.max(...bs.map((p) => p.b))) / 2; mid.push([cx + ux * a - uz * b, cz + uz * a + ux * b]); }
+      if (mid.length < 2) continue;
+      const P = [], I = []; ribbonInto(P, I, mid, 2.4, 0); const bed = new THREE.Mesh(geoOf(P, I), flatMat('#a39684', -48.2)); bed.renderOrder = -48.2; this.scene.add(bed);
+      const sl = []; for (const sd of [-0.55, 0.55]) { const q = mid.map((p, i) => { const a = mid[Math.max(0, i - 1)], c = mid[Math.min(mid.length - 1, i + 1)], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1; return new THREE.Vector3(p[0] - dz / L * sd, 0.06, p[1] + dx / L * sd); }); sl.push(...q.slice(0, -1).flatMap((v, i) => [v, q[i + 1]])); } this.scene.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(sl), new THREE.LineBasicMaterial({ color: '#8a8f96' })));
+      // 침목 · 나무 · 벤치 (인스턴스)
+      const ties = [], trees = [], benches = [];
+      for (let i = 1; i < mid.length; i++) { const [ax, az] = mid[i - 1], [bx, bz] = mid[i], L = Math.hypot(bx - ax, bz - az), dx = (bx - ax) / L, dz = (bz - az) / L; for (let t = 0; t < L; t += 0.8) ties.push([ax + dx * t, az + dz * t, Math.atan2(dx, dz)]); for (let t = r() * 6; t < L; t += 7 + r() * 3) for (const sd of [-1, 1]) { const off = sd * (4 + r() * 2.5); trees.push([ax + dx * t - dz * off, az + dz * t + dx * off]); if (r() < 0.25) benches.push([ax + dx * t - dz * sd * 2.3, az + dz * t + dx * sd * 2.3, Math.atan2(dx, dz)]); } }
+      const o = new THREE.Object3D(), tieG = new THREE.BoxGeometry(1.8, 0.08, 0.22); tieG.translate(0, 0.04, 0); const tim = new THREE.InstancedMesh(tieG, new THREE.MeshLambertMaterial({ color: '#6b5a48' }), ties.length); ties.forEach(([x, z, ry], i) => { o.position.set(x, 0, z); o.rotation.set(0, ry, 0); o.updateMatrix(); tim.setMatrixAt(i, o.matrix); }); this.scene.add(tim);
+      (this.extraTrees ||= []).push(...trees);
+      const bG = new THREE.BoxGeometry(1.7, 0.08, 0.5); bG.translate(0, 0.45, 0); const bim = new THREE.InstancedMesh(bG, new THREE.MeshLambertMaterial({ color: '#b98a5a' }), benches.length); benches.forEach(([x, z, ry], i) => { o.position.set(x, 0, z); o.rotation.set(0, ry, 0); o.updateMatrix(); bim.setMatrixAt(i, o.matrix); this.addCircle(x, z, 0.5, 0.5); }); this.scene.add(bim);
+      // 풀밭에 앉아 쉬는 곰들 (연트럴파크 피크닉)
+      for (let k = 0; k < Math.min(14, mid.length); k++) { const p = mid[Math.floor(r() * mid.length)], sd = r() < 0.5 ? -1 : 1, b = this.mkBear(r() < 0.5 ? 'street' : 'stroll', r, 0.95); b.root.position.set(p[0] + sd * (2.5 + r() * 2), 0, p[1] + (r() - 0.5) * 3); b.root.rotation.y = r() * 6.28; b.root.userData.sit = true; (this.picnic ||= []).push(b); }
+    }
   }
   tickBanpo(dt, lit) {
     const h = this.state.hour, F = this.fountain; this.sebit?.forEach((m, i) => { m.color.setHSL(((this.time * 0.03 + i * 0.07) % 1), 0.85, 0.6); m.opacity = 0.15 + lit * 0.85; });
@@ -858,6 +880,7 @@ export class Hangang {
     for (let s = 4; s < this.L; s += 9 / near) for (const lat of [-12.5, 7.5]) { if (lat < 0 && r() < 0.72) continue; const j = lat + (r() - 0.5) * 2.4, [x, z] = this.world(s + (r() - 0.5) * 3, j); if (okAt(x, z)) spots.push([x, z, 0.7 + r() * 0.3]); }
     // 공원 안 (코스 주변 450m)
     for (let n = 0; n < 2600 * near; n++) { const s = r() * this.L, lat = (r() < 0.25 ? -1 : 1) * (12 + r() * 260), [x, z] = this.world(s, lat); if (okAt(x, z) && this.greenPolys.some((g) => inPoly(x, z, g))) spots.push([x, z, 0.7 + r() * 0.6]); }
+    for (const [x, z] of this.extraTrees || []) spots.push([x, z, 0.85 + r() * 0.35]);
     this.trees = spots; for (const [x, z, k] of spots) this.addCircle(x, z, 0.34 * k, 7);
     const N = spots.length, o = new THREE.Object3D();
     // 나무 모양 셋: 둥근 활엽수(벚나무 · 느티나무), 키 큰 나무(은행 · 포플러), 소나무. 잎 덩어리 여러 개 + 아래가 어두운 그늘
@@ -1440,7 +1463,7 @@ export class Hangang {
     const work = hr >= 17 && hr < 20 ? 1 : hr >= 20 && hr < 22 ? 0.55 : hr >= 22 || hr < 6 ? 0.08 : hr < 8 ? 0.35 : 0.3;
     for (const [t, m] of Object.entries(this.bldByType || {})) m.emissiveIntensity = lit * (t.startsWith('street') ? (hr >= 2 && hr < 7 ? 0.3 : 1) : t === 'apt' || t === 'brick' ? home : work) * 0.5;
     if (this.signM) this.signM.emissiveIntensity = lit * (hr >= 1 && hr < 6 ? 0.15 : 0.45);
-    if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; if (this.summit) tickSummit(this, dt, lit); for (const m of this.neonMs || []) m.emissiveIntensity = 0.2 + lit * 1.2; if (this.jbugM) this.jbugM.emissiveIntensity = 0.15 + lit * 0.7; if (this.id === 'banpo') this.tickBanpo(dt, lit); if (this.mfount) this.tickMusicFountain(dt, lit); for (const m of this.shopSignMs || []) m.emissiveIntensity = 0.25 + lit * 0.85; for (const m of this.shopWinM || []) m.emissiveIntensity = 0.1 + lit * 0.42; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.35 * Math.max(0.2, (h >= 18 && h < 24 ? 1 : 0.4));
+    if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; if (this.summit) tickSummit(this, dt, lit); for (const m of this.neonMs || []) m.emissiveIntensity = 0.2 + lit * 1.2; if (this.jbugM) this.jbugM.emissiveIntensity = 0.15 + lit * 0.7; if (this.id === 'banpo') this.tickBanpo(dt, lit); if (this.mfount) this.tickMusicFountain(dt, lit); for (const b of this.picnic || []) b.update(dt, 0, { noCrawl: true }); for (const m of this.shopSignMs || []) m.emissiveIntensity = 0.25 + lit * 0.85; for (const m of this.shopWinM || []) m.emissiveIntensity = 0.1 + lit * 0.42; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.35 * Math.max(0.2, (h >= 18 && h < 24 ? 1 : 0.4));
     this.lampGlow.material.opacity = lit; if (this.lampHeadM) this.lampHeadM.emissiveIntensity = 0.2 + lit * 2.2; this.bridgeLights.material.opacity = lit; this.carPts.material.opacity = 0.25 + lit * 0.75;
     this.lampPool.material.opacity = lit * 0.32;
     let pi = 0; for (const [x, z] of this.poleXZ) { if (pi >= this.pools.length) break; if (Math.abs(x - px) < 90 && Math.abs(z - pz) < 90) { this.pools[pi].position.set(x, 0.03, z); this.pools[pi].visible = true; pi++; } } for (; pi < this.pools.length; pi++) this.pools[pi].visible = false;
