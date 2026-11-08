@@ -189,6 +189,8 @@ for (const e of bJ.elements) {
 }
 // 부분(building:part)이 들어 있는 건물 외곽선은 그리지 않는다 (OSM 3D 규칙)
 const parts = items.filter((b) => b.part);
+// 부분으로 그려진 건물: 외곽선의 이름 · 종류를 안쪽 부분들에 물려준다 (국회의사당 · 63빌딩처럼 이름표와 모습이 맞게)
+for (const b of items) { if (b.part || !b.t.name) continue; for (const p of parts) if (!p.t.name && Math.abs(p.c[0] - b.c[0]) < 250 && Math.abs(p.c[1] - b.c[1]) < 250 && inPoly(p.c, b.o)) { p.inherit = b.t.name; p.inheritKind = b.t.building; } }
 out.buildings = [];
 let dropped = 0;
 for (const b of items) {
@@ -201,8 +203,10 @@ for (const b of items) {
   if (a < 25 || (d > 1800 && h < 45) || (d > 900 && h < 12 && a < 400)) { dropped++; continue; }
   const s = simplify(o, a > 2000 ? 1.2 : 0.6);
   if (s.length < 3) continue;
-  const kind = KIND[t.building] ?? KIND[t['building:part']] ?? 0, mat = t['building:material'] === 'glass' ? 1 : 0;
-  out.buildings.push([Math.round(h * 10) / 10, Math.round(mh * 10) / 10, kind * 2 + mat, cIdx(t['building:colour'] || ''), nIdx(t.name || ''), cIdx(t['roof:colour'] || ''), t['roof:shape'] === 'dome' ? 1 : 0, ...flat(s)]);
+  const kind = KIND[t.building] ?? KIND[b.inheritKind] ?? KIND[t['building:part']] ?? 0, mat = t['building:material'] === 'glass' ? 1 : 0;
+  // 돔 지붕: 지붕 높이(m)를 담는다 (없으면 외곽 크기로 짐작)
+  const dome = t['roof:shape'] === 'dome' ? Math.max(1, Math.round(num(t['roof:height']) || 0)) : 0;
+  out.buildings.push([Math.round(h * 10) / 10, Math.round(mh * 10) / 10, kind * 2 + mat, cIdx(t['building:colour'] || ''), nIdx(t.name || b.inherit || ''), cIdx(t['roof:colour'] || ''), dome, ...flat(s)]);
 }
 out.colors = colors; out.names = names;
 
