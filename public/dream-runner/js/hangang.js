@@ -466,7 +466,10 @@ export class Hangang {
   }
   leaveStation(ref) {
     const I = this.inside; if (!I) return; I.S.g.visible = false; for (const o of this.hidden || []) o.visible = true; this.hidden = null; this.inside = null;
-    const e = this.entrances.find((q) => q.st === I.st && String(q.ref) === String(ref)) || I.from, th = e.g.rotation.y;
+    // 열차를 타고 온 역(I.from 없음)에서 나갈 때도: 그 역의 아무 출구 → 같은 이름 역의 출구 → 역 자리
+    const e = this.entrances.find((q) => q.st === I.st && String(q.ref) === String(ref)) || I.from || this.entrances.find((q) => q.st === I.st) || this.entrances.find((q) => q.st?.name === I.st?.name);
+    if (!e) { if (I.st) this.placeAt(I.st.x, I.st.z, 0); this.stationCool = 2; this.onInside?.(null); return; }
+    const th = e.g.rotation.y;
     this.placeAt(e.x - Math.sin(th) * 3.6, e.z - Math.cos(th) * 3.6, th + Math.PI); this.stationCool = 2; this.onInside?.(null);
   }
   // 한강을 나갈 때: 가게 · 역 · 열차 안이면 바깥으로 되돌려 놓는다 (다음에 들어왔을 때 바깥이 숨겨져 있지 않게)
