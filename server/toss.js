@@ -1,6 +1,8 @@
 // 토스 미니앱(앱인토스) 계정: 웹 계정 · 기록과 섞이지 않게 따로 둔다 (아이디는 언제나 'toss:' 로 시작)
 //   로그인: 미니앱이 토스 SDK(appLogin)로 받은 인가 코드를 보내면, 서버가 토스 파트너 API(mTLS)로 사용자 키를 받아 온다
 //   세션: 서버가 서명한 토큰 (토스 계정 파일만 있으면 되고, 젤리시티 세계와는 상관없다)
+//   기기 계정: 토스 로그인 없이도 기기마다 임시 아이디(toss:d_…)로 기록 · 별 · 치장이 남는다 (사업자 등록 전에도 낼 수 있게)
+//     나중에 토스 로그인을 하면 그 토스 계정을 이 기기 계정에 잇는다: 아이디가 그대로라 기록을 옮길 필요가 없다
 import fs from 'node:fs';
 import path from 'node:path';
 import https from 'node:https';
@@ -37,18 +39,34 @@ async function exchange(code, referrer) {
 const clean = (s) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim();
 export class TossAccounts {
   constructor(dataDir) {
-    this.file = path.join(dataDir, 'toss-users.json'); this.users = {}; this.secret = crypto.randomBytes(24).toString('hex');
-    try { const d = JSON.parse(fs.readFileSync(this.file, 'utf8')); this.users = d.users || {}; this.secret = d.secret || this.secret; } catch { /* 처음 */ }
+    this.file = path.join(dataDir, 'toss-users.json'); this.users = {}; this.links = {}; this.secret = crypto.randomBytes(24).toString('hex'); this.made = new Map();
+    try { const d = JSON.parse(fs.readFileSync(this.file, 'utf8')); this.users = d.users || {}; this.links = d.links || {}; this.secret = d.secret || this.secret; } catch { /* 처음 */ }
     this.dirty = !fs.existsSync(this.file); setInterval(() => this.save(), 20000).unref();
   }
-  save() { if (!this.dirty) return; this.dirty = false; try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ users: this.users, secret: this.secret })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('토스 계정 저장 실패', e.message); } }
+  save() { if (!this.dirty) return; this.dirty = false; try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ users: this.users, links: this.links, secret: this.secret })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('토스 계정 저장 실패', e.message); } }
   sign(sub) { const p = `${Buffer.from(sub).toString('base64url')}.${Date.now()}`; return `${p}.${crypto.createHmac('sha256', this.secret).update(p).digest('base64url').slice(0, 32)}`; }
   read(tok) { const s = String(tok || ''), i = s.lastIndexOf('.'); if (i < 0) return null; const p = s.slice(0, i); if (crypto.createHmac('sha256', this.secret).update(p).digest('base64url').slice(0, 32) !== s.slice(i + 1)) return null; const sub = Buffer.from(p.split('.')[0], 'base64url').toString(); return this.users[sub] ? sub : null; }
   // 다른 API 가 쓰는 모양 { sub, user } (드림 러너 · 치장 API 를 그대로 쓴다)
   userOf(tok) { const sub = this.read(tok); if (!sub) return null; const u = this.users[sub]; return { sub, user: { nick: u.nick || '', name: u.nick || '토스 곰돌이', toss: true } }; }
   nickOf(sub) { return this.users[sub]?.nick || null; }
-  pub(sub) { const u = this.users[sub]; return { name: u.nick || '토스 곰돌이', nick: u.nick || '', needNick: !u.nick, toss: true }; }
-  login(key) { const sub = `toss:${key}`; const u = (this.users[sub] ||= { nick: '', created: Date.now() }); u.last = Date.now(); this.dirty = true; return sub; }
+  pub(sub) { const u = this.users[sub]; return { name: u.nick || '토스 곰돌이', nick: u.nick || '', needNick: !u.nick, toss: true, device: !!u.device && !u.key }; }
+  // 토스 로그인: 이미 이은 계정 → 예전 토스 계정 → 지금 쓰던 기기 계정(아직 안 이었으면 잇는다) → 새 계정
+  login(key, fromSub = null) {
+    let sub = this.links[key] || (this.users[`toss:${key}`] ? `toss:${key}` : null);
+    const from = fromSub && this.users[fromSub];
+    if (!sub && from?.device && !from.key) { sub = fromSub; from.key = key; this.links[key] = sub; }
+    sub ||= `toss:${key}`;
+    const u = (this.users[sub] ||= { nick: '', created: Date.now() }); u.last = Date.now(); this.dirty = true; return sub;
+  }
+  // 기기 계정 만들기 (한 곳에서 하루에 너무 많이는 못 만든다)
+  device(ip) {
+    const day = `${ip}:${Math.floor(Date.now() / 864e5)}`, n = this.made.get(day) || 0;
+    if (n >= 30) throw new Error('잠시 뒤 다시 시도해 주세요');
+    this.made.set(day, n + 1); if (this.made.size > 50000) this.made.clear();
+    const sub = `toss:d_${crypto.randomBytes(9).toString('hex')}`;
+    this.users[sub] = { nick: '', created: Date.now(), last: Date.now(), device: true }; this.dirty = true; return sub;
+  }
+  touch(sub) { const u = this.users[sub]; if (u && Date.now() - (u.last || 0) > 36e5) { u.last = Date.now(); this.dirty = true; } }
   setNick(sub, nick) {
     const n = clean(nick);
     if ([...n].length < 2 || [...n].length > 12) throw new Error('닉네임은 2~12글자로 정해 주세요');
@@ -64,6 +82,9 @@ export async function tossAccountApi(req, res, url, toss, json, { cos, devLogin 
   const tok = (req.headers.authorization || '').replace(/^Bearer /, '');
   if (url.pathname === '/api/toss/login' && req.method === 'POST') {
     const b = await readJson(req);
+    if (b.device === true) { // 토스 로그인 없이: 이 기기 계정
+      try { const sub = toss.device(String(req.headers['fly-client-ip'] || req.socket.remoteAddress || '')); return json(res, 200, { session: toss.sign(sub), user: toss.pub(sub), cos: cos.pub(sub) }), true; } catch (e) { return json(res, 429, { error: e.message }), true; }
+    }
     let key;
     try {
       if (devLogin && typeof b.dev === 'string' && clean(b.dev)) key = `dev-${clean(b.dev).slice(0, 16)}`; // 개발 서버: 토스 없이 시험
@@ -71,11 +92,11 @@ export async function tossAccountApi(req, res, url, toss, json, { cos, devLogin 
       else if (typeof b.authorizationCode === 'string') key = await exchange(b.authorizationCode, String(b.referrer || 'DEFAULT'));
       else return json(res, 400, { error: '토스 로그인이 필요해요' }), true;
     } catch (e) { return json(res, 502, { error: e.message }), true; }
-    const sub = toss.login(key);
+    const sub = toss.login(key, toss.read(tok)); // 기기 계정으로 달리던 중이면 그 계정에 토스를 잇는다
     return json(res, 200, { session: toss.sign(sub), user: toss.pub(sub), cos: cos.pub(sub) }), true;
   }
   if (url.pathname === '/api/toss/status') return json(res, 200, { devLogin: !!devLogin, toss: tossReady }), true;
-  if (url.pathname === '/api/toss/me') { const sub = toss.read(tok); if (!sub) return json(res, 401, { error: 'login' }), true; return json(res, 200, { user: toss.pub(sub), cos: cos.pub(sub) }), true; }
+  if (url.pathname === '/api/toss/me') { const sub = toss.read(tok); if (!sub) return json(res, 401, { error: 'login' }), true; toss.touch(sub); return json(res, 200, { user: toss.pub(sub), cos: cos.pub(sub) }), true; }
   if (url.pathname === '/api/toss/nick' && req.method === 'POST') {
     const sub = toss.read(tok); if (!sub) return json(res, 401, { error: 'login' }), true;
     const b = await readJson(req);

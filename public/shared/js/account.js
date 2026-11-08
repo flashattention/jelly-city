@@ -50,6 +50,8 @@ export const account = {
     return r;
   },
   // 토스 미니앱: 토스 앱 안에서 바로 로그인 (SDK 가 없으면 개발 서버의 시험 계정)
+  // 토스 미니앱: 토스 로그인 없이 이 기기 계정으로 (기록 · 별 · 치장이 남는다)
+  tossDevice() { return this.login({ device: true }); },
   async tossLogin() {
     if (bridge?.appLogin) { const { authorizationCode, referrer } = await bridge.appLogin(); return this.login({ authorizationCode, referrer }); }
     return this.login({ dev: '토스 시험' });

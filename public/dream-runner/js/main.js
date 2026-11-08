@@ -145,7 +145,9 @@ async function boot() {
   const ok = await account.restore();
   // 점검용: ?autostart&name=이름 (개발 서버에서만)
   const q = new URLSearchParams(location.search);
-  if (!ok && q.has('autostart') && status.devLogin) { try { await account.login({ dev: q.get('name') || '러너' }); } catch (e) { err(e.message); } }
+  // 토스 미니앱: 처음이면 이 기기 계정을 만든다 (토스 로그인 없이도 기록이 남게)
+  if (!ok && TOSS) { try { await account.tossDevice(); } catch (e) { err(e.message); } }
+  else if (!ok && q.has('autostart') && status.devLogin) { try { await account.login({ dev: q.get('name') || '러너' }); } catch (e) { err(e.message); } }
   renderAccount();
   const inv = codeOf(q.get('room'));
   if (inv.length === 6) {
@@ -156,9 +158,12 @@ async function boot() {
   }
 }
 // 토스 미니앱: '토스로 시작하기' 를 눌러야 토스 로그인 (토스 정책: 사용자가 누를 때 부른다). 로그인 전에도 달릴 수 있다
-$('toss-login').onclick = async () => { const b = $('toss-login'); b.disabled = true; try { await account.tossLogin(); renderAccount(); toast('😊 토스로 들어왔어요'); } catch (e) { toast(`토스 로그인을 못 했어요 · ${e.message}`, 2600); } finally { b.disabled = false; } };
+$('toss-login').onclick = async () => { const b = $('toss-login'), linking = !!account.user?.device; b.disabled = true; try { await account.tossLogin(); renderAccount(); toast(linking && !account.user?.device ? '😊 토스 계정에 이었어요 · 기록이 그대로 남아요' : '😊 토스로 들어왔어요'); } catch (e) { toast(`토스 로그인을 못 했어요 · ${e.message}`, 2600); } finally { b.disabled = false; } };
 function renderAccount() {
-  $('toss-login').classList.toggle('hidden', !TOSS || !!account.user);
+  // 토스 로그인 버튼: 토스 로그인이 준비된 서버에서만 (기기 계정이면 '토스 계정에 잇기')
+  const tossOn = TOSS && (game.status?.toss || game.status?.devLogin) && (!account.user || account.user.device);
+  $('toss-login').classList.toggle('hidden', !tossOn);
+  if (tossOn) $('toss-login').innerHTML = account.user?.device ? '토스 계정에 잇기 <small>지금 기록 · 별 · 치장을 토스 계정에 그대로 남겨요</small>' : '토스로 시작하기 <small>기록 · 별 · 치장이 토스 계정에 남아요</small>';
   const on = logged();
   $('login-box').classList.toggle('hidden', on);
   $('who-row').classList.toggle('hidden', !on);
