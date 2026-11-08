@@ -59,7 +59,7 @@ export class Board {
   }
   detail(id, sub, admin) {
     const p = this.find(id), hide = this.hiddenFor(p, sub, admin);
-    return { ...this.card(p, sub, admin), body: hide ? '' : p.body, admin: !!admin, comments: p.comments.map((c) => { const { up, down } = tally(c.votes), h = this.hiddenFor(c, sub, admin); return { id: c.id, name: nickOf(c.sub, c.name), at: c.at, text: h ? '🚫 신고가 많아 가려진 댓글이에요' : c.text, up, down, my: c.votes[sub] || 0, hidden: !!c.hidden, mine: !!sub && c.sub === sub, reported: !!c.reports[sub] }; }) };
+    return { ...this.card(p, sub, admin), body: hide ? '' : p.body, edited: p.edited || 0, admin: !!admin, comments: p.comments.map((c) => { const { up, down } = tally(c.votes), h = this.hiddenFor(c, sub, admin); return { id: c.id, name: nickOf(c.sub, c.name), at: c.at, text: h ? '🚫 신고가 많아 가려진 댓글이에요' : c.text, up, down, my: c.votes[sub] || 0, hidden: !!c.hidden, mine: !!sub && c.sub === sub, reported: !!c.reports[sub] }; }) };
   }
   // AI 를 부르기 전에 걸러서 쓸데없는 호출을 막는다
   checkWrite(sub, b, now = Date.now()) {
@@ -68,6 +68,14 @@ export class Board {
     if (!title) throw new Error('제목을 써 주세요'); if (!body) throw new Error('내용을 써 주세요');
     return { title, body };
   }
+  // 고치기: 내가 쓴 글만 (관리자도 남의 글은 못 고친다 · 지우기만)
+  checkEdit(sub, id, b) {
+    const p = this.find(id); if (p.sub !== sub) throw new Error('내가 쓴 글만 고칠 수 있어요');
+    const title = oneLine(b.title, TITLE_MAX), body = multiLine(b.body, BODY_MAX);
+    if (!title) throw new Error('제목을 써 주세요'); if (!body) throw new Error('내용을 써 주세요');
+    return { title, body };
+  }
+  edit(sub, id, b, now = Date.now()) { const { title, body } = this.checkEdit(sub, id, b), p = this.find(id); p.title = title; p.body = body; p.edited = now; this.dirty = true; return p; }
   checkComment(sub, id, b, now = Date.now()) {
     if (now - (this.lastComment.get(sub) || 0) < COMMENT_GAP) throw new Error('댓글은 5초에 한 번만 쓸 수 있어요');
     const p = this.find(id), text = multiLine(b.text, COMMENT_MAX);
@@ -144,6 +152,10 @@ export async function boardApi(req, res, url, who, board, json, isAdmin, check =
         if (!name) return json(res, 400, { error: '닉네임을 먼저 정해 주세요' });
         const stop = await board.screen(sub, ip, board.checkWrite(sub, b), check); if (stop) return json(res, stop.status, stop.body);
         return json(res, 200, { id: board.write(sub, name, b).id });
+      }
+      case '/api/board/edit': {
+        const stop = await board.screen(sub, ip, board.checkEdit(sub, pid, b), check); if (stop) return json(res, stop.status, stop.body);
+        board.edit(sub, pid, b); return json(res, 200, board.detail(pid, sub, admin));
       }
       case '/api/board/comment': {
         if (!name) return json(res, 400, { error: '닉네임을 먼저 정해 주세요' });
