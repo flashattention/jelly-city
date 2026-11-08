@@ -8,7 +8,7 @@ import { isPhone } from '../../shared/js/perf.js';
 import { buildStation, buildCar } from './hangang-station.js';
 import { buildShopFronts, buildShopInterior, foodMesh, SHOP_MENU, SHOP_KIND } from './hangang-shop.js';
 import { buildMall } from './hangang-mall.js';
-import { buildSummit, tickSummit } from './hangang-summit.js';
+import { buildSummit, tickSummit, deckBears } from './hangang-summit.js';
 
 export const SEASONS = { spring: '🌸 봄', summer: '🌿 여름', autumn: '🍁 가을', winter: '❄️ 겨울' };
 export const WEATHERS = { clear: '☀️ 맑음', cloudy: '☁️ 구름', rain: '🌧️ 비', snow: '🌨️ 눈' };
@@ -344,7 +344,7 @@ export class Hangang {
       const cell = this.footGrid?.get(`${Math.floor(x / 40)},${Math.floor(z / 40)}`) || [];
       const cells = new Set(cell); for (const [dx, dz] of [[r, 0], [-r, 0], [0, r], [0, -r]]) for (const fi of this.footGrid?.get(`${Math.floor((x + dx) / 40)},${Math.floor((z + dz) / 40)}`) || []) cells.add(fi);
       for (const fi of cells) {
-        const f = this.foot[fi]; if (y >= f.h - 0.35 || x < f.x0 - r || x > f.x1 + r || z < f.z0 - r || z > f.z1 + r) continue;
+        const f = this.foot[fi]; if (f.deck || (f.deckWall && y < f.h - 5)) continue; if (y >= f.h - 0.35 || x < f.x0 - r || x > f.x1 + r || z < f.z0 - r || z > f.z1 + r) continue;
         // 가장 가까운 벽과 그 거리
         let best = Infinity, bx = 0, bz = 0, bnx = 0, bnz = 0; const ring = f.ring, sgn = ringArea(ring) > 0 ? 1 : -1;
         for (let k = 0; k < ring.length; k++) { const a = ring[k], c = ring[(k + 1) % ring.length], ex = c[0] - a[0], ez = c[1] - a[1], L2 = ex * ex + ez * ez || 1, t = clamp(((x - a[0]) * ex + (z - a[1]) * ez) / L2, 0, 1), px = a[0] + ex * t, pz = a[1] + ez * t, d = Math.hypot(x - px, z - pz); if (d < best) { best = d; bx = px; bz = pz; const L = Math.sqrt(L2); bnx = (sgn > 0 ? ez : -ez) / L; bnz = (sgn > 0 ? -ex : ex) / L; } }
@@ -1140,6 +1140,10 @@ export class Hangang {
     for (const o of this.buses.values()) { o.x += (o.tx - o.x) * Math.min(1, dt * 0.25); o.z += (o.tz - o.z) * Math.min(1, dt * 0.25); o.mesh.position.set(o.x, 0, o.z); if (o.yaw != null) o.mesh.rotation.y = o.yaw; }
     // 가까운 지하철 출입구
     let near = null; for (const e of this.entrances) { const d = Math.hypot(e.x - px, e.z - pz); if (d < 7 && (!near || d < near.d)) near = { ...e, d }; }
+    // 남산: 타워 아래로 다가가면 엘리베이터로 전망대(140m), 전망대 가운데 엘리베이터 앞에서 다시 아래로
+    if (this.deckInfo && !this.shopCool) { const D = this.deckInfo, d = Math.hypot(px - D.cx, pz - D.cz);
+      if (this.y < 5 && d < 7.6 && (this.mdx ?? 0) * (D.cx - px) + (this.mdz ?? 0) * (D.cz - pz) > 0.3 * d) { deckBears(this, makeBear); this.placeAt(D.cx, D.cz + 6.5, 0); this.y = D.DY; this.inDeck = true; this.shopCool = 1.5; this.onShopEnter?.({ name: 'N서울타워 전망대 (140m)' }); return; }
+      if (this.inDeck && d < 5.3) { this.placeAt(D.cx, D.cz + 9.5, 0); this.y = 0; this.inDeck = false; this.shopCool = 2; return; } }
     // 가게 문 앞에서 벽 쪽으로 다가가면 가게 안으로
     this.shopCool = Math.max(0, (this.shopCool || 0) - dt); if (this.carry) { this.carryT -= dt; if (this.carryT <= 0) { this.bear.root.remove(this.carry); this.carry = null; } }
     if (!this.inShop && !this.inside && !this.inMall && !this.shopCool && this.y < 0.5) for (const D2 of this.malls || []) if (Math.hypot(px - D2.x, pz - D2.z) < 3.2 && (this.mdx ?? 0) * D2.nx + (this.mdz ?? 0) * D2.nz < -0.3) { this.enterMall(D2); return; }
@@ -1384,7 +1388,7 @@ export class Hangang {
   tickCamera(dt, camera, bx, bz, fx, fz) {
     const k = 1 - Math.exp(-dt * ((this.dragT || 0) > 0 && (this.opt.cam || 0) === 0 ? 14 : 3)), mode = this.opt.cam || 0, y = this.y;
     let cx, cy, cz, lx, ly, lz;
-    if (mode === 0) { const pt = this.camPitch ?? 0.3, d = (this.ride || this.inShop ? 3.2 : 4.8) * (pt < 0 ? 1 + pt * 0.6 : 1), hd = Math.cos(pt) * d; cx = bx - fx * hd; cy = Math.max(0.35, 0.55 + Math.sin(pt) * d) + y; cz = bz - fz * hd; lx = bx + fx * 1.0; ly = 0.55 + y + (pt < 0 ? -pt * 7 : 0); lz = bz + fz * 1.0;
+    if (mode === 0) { const pt = this.camPitch ?? 0.3, d = (this.ride || this.inShop || this.inDeck ? 3.2 : 4.8) * (pt < 0 ? 1 + pt * 0.6 : 1), hd = Math.cos(pt) * d; cx = bx - fx * hd; cy = Math.max(0.35, 0.55 + Math.sin(pt) * d) + y; cz = bz - fz * hd; lx = bx + fx * 1.0; ly = 0.55 + y + (pt < 0 ? -pt * 7 : 0); lz = bz + fz * 1.0;
       // 벽 타기: 벽에서 6m 떨어져 살짝 아래에서 곰과 벽을 올려다본다
       if (this.climb) { const C = this.climb; cx = bx + C.nx * 6; cz = bz + C.nz * 6; cy = y + 0.6; lx = bx; ly = y + 1.4; lz = bz; } }
     else if (mode === 1) { const p = this.at(this.s); cx = bx - p.rx * 5 + p.dx * 1.5; cy = 1.0; cz = bz - p.rz * 5 + p.dz * 1.5; lx = bx; ly = 0.6; lz = bz; }
@@ -1394,6 +1398,7 @@ export class Hangang {
     camera.position.z += (cz - camera.position.z) * k; camera.position.y = Math.max(0.3, camera.position.y); { const dg = this.deckAt(camera.position.x, camera.position.z, this.y + 0.5); if (dg > 0.5 && this.y >= dg - 0.3) camera.position.y = Math.max(camera.position.y, dg + 0.6); } // 다리 위에 있을 땐 카메라가 다리 밑으로 안 내려간다
     if (this.inside) camera.position.y = Math.min(camera.position.y, this.ride ? 2.2 : 4.1);
     if (this.inShop) camera.position.y = Math.min(camera.position.y, 3.1);
+    if (this.inDeck) { const D = this.deckInfo; camera.position.y = Math.min(Math.max(camera.position.y, D.DY + 0.6), D.DY + 3.1); const dx = camera.position.x - D.cx, dz = camera.position.z - D.cz, dd = Math.hypot(dx, dz); if (dd > D.DR - 0.6) { camera.position.x = D.cx + dx / dd * (D.DR - 0.6); camera.position.z = D.cz + dz / dd * (D.DR - 0.6); } if (dd < 4.9) { camera.position.x = D.cx + dx / (dd || 1) * 4.9; camera.position.z = D.cz + dz / (dd || 1) * 4.9; } }
     this.look ||= new THREE.Vector3(lx, ly, lz); this.look.x += (lx - this.look.x) * k; this.look.y += (ly - this.look.y) * ky; this.look.z += (lz - this.look.z) * k;
     camera.lookAt(this.look);
     const fov = 56 + clamp(this.v - 6, 0, 18) * 0.8; if (Math.abs(camera.fov - fov) > 0.05 || camera.far < 20000) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 3); camera.far = 24000; camera.updateProjectionMatrix(); }
@@ -1510,6 +1515,7 @@ export class Hangang {
     if (this.inside) return `${this.inside.st.name}역 안`;
     if (this.inShop) return `${SHOP_KIND[this.inShop.F.kind].emoji} ${this.inShop.F.name}`;
     if (this.inMall) return `🛍️ ${this.inMall.D.name}`;
+    if (this.inDeck) return '🗼 N서울타워 전망대 · 140m';
     const marks = this.map.marks || [], s = this.s, d = this.dir;
     const next = d > 0 ? marks.find(([, ms]) => ms > s + 5) : [...marks].reverse().find(([, ms]) => ms < s - 5);
     return next ? `${next[0]}까지 ${Math.round(Math.abs(next[1] - s))}m` : d > 0 ? `반환점까지 ${Math.round(this.L - s)}m` : `반환점까지 ${Math.round(s)}m`;
