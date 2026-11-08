@@ -297,7 +297,7 @@ export class Hangang {
     if (this.inside) { const S = this.inside.S, O = S.O, list = [box(O.x, O.z, S.CW / 2, S.CD / 2), ...S.plats.map((p) => box(O.x, p.pz, p.PL / 2, 5 + 5.2))]; return list.find(inBox) || list[0]; }
     return null;
   }
-  placeAt(x, z, face) { this.px = x; this.pz = z; this.y = 0; this.vy = 0; this.climb = null; this.face = face; this.camYaw = face; this.camInit = false; this.mdx = null; this.onRoof = null; }
+  placeAt(x, z, face) { this.px = x; this.pz = z; this.y = 0; this.vy = 0; this.climb = null; this.flying = false; this.face = face; this.camYaw = face; this.camInit = false; this.mdx = null; this.onRoof = null; }
   // 열차 타기: 열린 문 앞에 서면 탄다 → 열차 안에서 잠깐 달리고 → 다음 역 승강장에 내린다 (그 역이 지도 밖이면 같은 역 반대편으로)
   startRide(p, T) {
     const I = this.inside, line = p.l, destName = T.sd < 0 ? p.prev : p.next, dest = this.stations.find((q) => q.name === destName && this.entrances.some((e) => e.st === q));
@@ -1396,7 +1396,7 @@ export class Hangang {
     if (ml > 1) { mx /= ml; mz /= ml; }
     // Shift(휴대폰은 💨 버튼)를 누르는 동안 가속: 지금 단계보다 확 빨라진다
     if (inp.sprint && ml > 0.05) this.boostOn = true; if (ml <= 0.05) this.boostOn = false;
-    const boost = !!this.boostOn, want = Math.min(V_MAX, this.target * Math.min(1, ml) * (boost ? 1.8 : 1) + (boost ? 3 : 0));
+    const boost = !!this.boostOn, want = Math.min(V_MAX * (this.flying ? 1.5 : 1), (this.target * Math.min(1, ml) * (boost ? 1.8 : 1) + (boost ? 3 : 0)) * (this.flying ? 1.5 : 1));
     this.v += (want - this.v) * Math.min(1, dt * (want > this.v ? (boost ? 4.5 : 1.8) : 4)); this.boosting = boost;
     let ds = 0;
     if (ml > 0.05) { this.mdx = mx / ml; this.mdz = mz / ml; }
@@ -1404,8 +1404,8 @@ export class Hangang {
     if (this.climb) {
       // 벽 타기: 앞(W)으로 오르고 뒤(S)로 내려가고, 옆(A · D)으로 게걸음 · 점프하면 벽에서 떨어진다
       const C = this.climb, up = (inp.mz || 0), side = (inp.mx || 0);
-      this.y = clamp(this.y + up * 3.4 * dt, 0, C.top);
-      const tx = -C.nz, tz = C.nx; let nx = this.px + tx * side * 2.2 * dt, nz = this.pz + tz * side * 2.2 * dt;
+      this.y = clamp(this.y + up * 6.8 * dt, 0, C.top);
+      const tx = -C.nz, tz = C.nx; let nx = this.px + tx * side * 4.4 * dt, nz = this.pz + tz * side * 4.4 * dt;
       const ok = this.pushOut(nx, nz, this.y, R0, C.f); if (ok.f !== C.f && !ok.hit) { nx = this.px; nz = this.pz; } else { nx = ok.x; nz = ok.z; }
       this.px = nx; this.pz = nz; this.face = Math.atan2(-C.nx, -C.nz); this.v = Math.abs(up) + Math.abs(side) > 0.1 ? 2.5 : 0; this.vy = 0;
       if (inp.jump) { this.climb = null; this.vy = 5; this.jumps = 1; this.px += C.nx * 1.0; this.pz += C.nz * 1.0; inp.jump = false; }
@@ -1417,7 +1417,7 @@ export class Hangang {
       nx = clamp(nx, -2500, 2500); nz = clamp(nz, -2500, 2500);
       const qn = this.project(nx, nz);
       // 물 위로는 점프 중에도 못 나간다 (2 · 3단 점프로 한강을 건너지 못하게)
-      if (!this.walkable(nx, nz, qn.lat) && this.deckAt(nx, nz, this.y) < 0) { if (this.walkable(nx, this.pz, qn.lat)) nz = this.pz; else if (this.walkable(this.px, nz, qn.lat)) nx = this.px; else { nx = this.px; nz = this.pz; } }
+      if (!(this.flying && this.y > 1.5) && !this.walkable(nx, nz, qn.lat) && this.deckAt(nx, nz, this.y) < 0) { if (this.walkable(nx, this.pz, qn.lat)) nz = this.pz; else if (this.walkable(this.px, nz, qn.lat)) nx = this.px; else { nx = this.px; nz = this.pz; } }
       // 건물 · 나무 · 가로등 · 교각 · 사람과 부딪힘 (벽을 따라 미끄러진다)
       const res = this.pushOut(nx, nz, this.y, R0, this.onRoof);
       nx = res.x; nz = res.z;
@@ -1434,8 +1434,10 @@ export class Hangang {
     // 점프 · 2단 · 3단 점프(공중제비) · 숙이기 · 옥상 위에 서기
     const ground = this.groundAt(this.px, this.pz, this.y);
     if (!this.climb) {
-      if (inp.jump) { if (this.y <= ground + 0.001) { this.vy = 5.2; this.jumps = 1; } else if (this.jumps < 3) { this.vy = this.jumps === 1 ? 4.9 : 4.6; this.jumps++; this.flipT = FLIP_T; } }
-      this.vy -= 16 * dt; this.y = Math.max(ground, this.y + this.vy * dt); if (this.y <= ground) { this.vy = Math.max(0, this.vy); this.jumps = 0; }
+      // 날기 (젤리시티처럼): 3단 점프 뒤 공중에서 한 번 더 Space → 날기. Space 꾹 = 위로, C = 아래로, 땅 · 옥상에 닿으면 내려앉는다
+      if (inp.jump) { if (this.flying) { /* 날고 있을 땐 꾹 누르기로 오른다 */ } else if (this.y <= ground + 0.001) { this.vy = 5.2; this.jumps = 1; } else if (this.jumps < 3) { this.vy = this.jumps === 1 ? 4.9 : 4.6; this.jumps++; this.flipT = FLIP_T; } else if (!this.inside && !this.inShop && !this.inMall) { this.flying = true; this.vy = 2; this.onFly?.(true); } }
+      if (this.flying) { const upIn = (inp.jumpHeld ? 1 : 0) - (inp.slide ? 1 : 0); this.vy += (upIn * 9 - this.vy) * Math.min(1, dt * 4); this.y = Math.min(400, Math.max(ground, this.y + this.vy * dt)); if (this.y <= ground + 0.001 && this.vy <= 0) { this.flying = false; this.jumps = 0; this.vy = 0; this.onFly?.(false); } }
+      else { this.vy -= 16 * dt; this.y = Math.max(ground, this.y + this.vy * dt); if (this.y <= ground) { this.vy = Math.max(0, this.vy); this.jumps = 0; } }
     }
     this.flipT = Math.max(0, this.flipT - dt); this.slide = !!inp.slide && this.y <= ground + 0.001 && !this.climb;
     if (this.slide) this.v = Math.min(this.v, this.target * 0.75);
@@ -1700,6 +1702,7 @@ export class Hangang {
   }
   // 순간 이동: 그 자리에서 다시 시작 (주변 사람들은 새로)
   teleport(s, lat) {
+    this.flying = false; this.y = 0; this.vy = 0;
     this.s = clamp(s, 4, this.L - 4); this.lat = clamp(lat, LAT_MIN, LAT_MAX); [this.px, this.pz] = this.world(this.s, this.lat); this.ri = Math.round(this.s / this.step);
     const p = this.at(this.s); this.face = Math.atan2(p.dx, p.dz); this.camYaw = this.face; this.camInit = false; this.v = 0; this.mdx = null;
     for (const q of this.people) this.removePerson(q); this.people = []; for (const gd of this.groups) this.removeGroup(gd); this.groups = []; this.regionName = null;

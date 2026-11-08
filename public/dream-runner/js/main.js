@@ -978,6 +978,7 @@ async function hgGoRegion(G) {
   await startHangang(null); const back = (hg.gates || []).find((q) => q.id === from); if (back) hg.teleport(back.end === 0 ? 14 : hg.L - 14, 0);
 }
 hg.onRegionGate = (G) => hgGoRegion(G);
+hg.onFly = (on) => toast(on ? '🕊️ 날기! Space 꾹 = 위로 · C = 아래로' : '🐾 내려앉았어요', on ? 2200 : 1200);
 hg.onTurn = (txt) => toast(`🚧 ${txt}이에요 · 돌아서 달려요`, 2200);
 // 역 안: 실제 도착 정보를 계속 받아 안내판에 (hg.arrivals)
 hg.onInside = (st) => hg.onStation(st ? { name: st.name } : null);
@@ -1083,7 +1084,7 @@ function hgFrame(dt) {
   const L = keys.has('KeyA') || keys.has('ArrowLeft'), R = keys.has('KeyD') || keys.has('ArrowRight');
   const U = keys.has('KeyW') || keys.has('ArrowUp'), D = keys.has('KeyS') || keys.has('ArrowDown');
   const look = hgLook; hgLook = { yaw: 0, pitch: 0 };
-  const inp = { mx: (R ? 1 : 0) - (L ? 1 : 0) + joyX, mz: (U ? 1 : 0) - (D ? 1 : 0) + joyY, yaw: look.yaw, pitch: look.pitch, jump: input.jump, sprint: keys.has('ShiftLeft') || keys.has('ShiftRight') || touchHeld.has('shove'), slide: keys.has('KeyC') || keys.has('ControlLeft') || touchHeld.has('slide') };
+  const inp = { mx: (R ? 1 : 0) - (L ? 1 : 0) + joyX, mz: (U ? 1 : 0) - (D ? 1 : 0) + joyY, yaw: look.yaw, pitch: look.pitch, jump: input.jump, sprint: keys.has('ShiftLeft') || keys.has('ShiftRight') || touchHeld.has('shove'), slide: keys.has('KeyC') || keys.has('ControlLeft') || touchHeld.has('slide'), jumpHeld: keys.has('Space') || touchHeld.has('jump') };
   if (!$('hg-set').classList.contains('hidden')) { inp.mx = inp.mz = 0; inp.jump = false; }
   hg.update(dt, inp, camera);
   input.jump = input.slide = input.shove = input.item = false;
