@@ -256,9 +256,9 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .card.dream { box-shadow: 0 20px 50px rgba(0,0,0,.35), 0 0 24px rgba(255,120,220,.25); }
 
 /* 드림 러너: 맨 윗줄을 통째로 쓰는 큰 카드 · 맵 4가지를 나란히 */
-.card.dream.wide { grid-column: 1 / -1; min-height: 380px; }
+.card.dream.wide { grid-column: span 2; min-height: 380px; }
 .card.dream.wide .art { bottom: 132px; }
-.card.dream.wide .art { display: grid; grid-template-columns: repeat(4, 1fr); background: #120a35; }
+.card.dream.wide .art { display: grid; grid-template-columns: repeat(3, 1fr); background: #120a35; }
 .dp { position: relative; overflow: hidden; border-right: 2px solid rgba(255,255,255,.12); background-size: cover; background-position: center; transition: transform .6s; }
 .card.dream.wide:hover .dp { transform: scale(1.04); }
 .dp:last-child { border-right: 0; }
@@ -296,8 +296,8 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
   .card.dream.wide .art { bottom: 220px; }
   .card.dream.wide .info { grid-template-columns: 1fr; }
   .card.dream.wide .info .play { grid-column: 1; grid-row: auto; justify-self: start; margin-top: 10px; }
-  .card.dream.wide .art { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr); }
-  .dp:nth-child(2) { border-right: 0; } .dp:nth-child(-n+2) { border-bottom: 2px solid rgba(255,255,255,.12); }
+  .card.dream.wide { grid-column: 1 / -1; }
+  .card.dream.wide .art { grid-template-columns: repeat(3, 1fr); }
   .card.dream.wide .info p { font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) { .dp-hell .fist, .dp-hg .jog, .dp-hg .river, .dp-void .vroad, .dp-hell .lava { animation: none; } }
@@ -316,7 +316,10 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .ody .ovirus { position: absolute; right: 9%; top: 18px; font-size: 30px; filter: hue-rotate(60deg) drop-shadow(0 0 10px #3dff74); animation: wob 2s ease-in-out infinite; }
 .ody .ofire { position: absolute; right: 24%; bottom: 14px; font-size: 26px; filter: drop-shadow(0 0 8px #ff8a3a); }
 .ody .new { position: absolute; right: 14px; bottom: 12px; padding: 4px 12px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-size: 13px; }
-/* 젤리 서울 산책 카드: 드림 러너 서울 사진 */
-.card.seoul .art { background: url(/hub/img/dr-hangang.webp) center / cover; }
-.card.seoul .art .stag { position: absolute; left: 10px; bottom: 10px; padding: 3px 10px; border-radius: 999px; background: rgba(15, 23, 38, 0.72); color: #fff; font-size: 13px; }
-.card.seoul .new { position: absolute; right: 14px; top: 12px; padding: 4px 12px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-family: 'Jua', sans-serif; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+/* 젤리 서울 산책 카드: 드림 러너와 나란히 둘 다 2칸 (사진 두 장) */
+.card.seoul.wide { grid-column: span 2; min-height: 380px; }
+.card.seoul.wide .art { bottom: 132px; display: grid; grid-template-columns: repeat(2, 1fr); background: #0f1726; }
+.card.seoul.wide:hover .dp { transform: scale(1.04); }
+.card.seoul .new { position: absolute; left: 14px; top: 12px; z-index: 1; padding: 4px 12px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-family: 'Jua', sans-serif; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+@media (max-width: 720px) { .card.seoul.wide { grid-column: 1 / -1; } }
+.card.seoul .dp > span { top: 48px; }
