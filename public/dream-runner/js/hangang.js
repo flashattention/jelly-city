@@ -491,6 +491,7 @@ export class Hangang {
     if (M.kind === 'street') this.buildNeon(r);
     if (M.kind !== 'summit') this.buildAlleys(P2, r);
     if (this.id === 'banpo') this.buildBanpo(P2);
+    if (this.id === 'ttukseom') { const m = (M.marks || []).find(([n]) => /자벌레/.test(n)); if (m) { let p = this.world(m[1] + 60, 40); for (const lat of [40, -40, 70, -70, 25, -25]) { p = this.world(m[1] + 60, lat); if (!this.inWater(p[0], p[1])) break; } this.buildMusicFountain(p); } }
     this.shopFronts = buildShopFronts(this, M.shops || [], M.scale); this.shopGrid = new Map(); this.shopFronts.forEach((F, i) => { const k = `${Math.floor(F.x / 40)},${Math.floor(F.z / 40)}`; if (!this.shopGrid.has(k)) this.shopGrid.set(k, []); this.shopGrid.get(k).push(i); });
     if (M.kind !== 'summit') this.buildStreetSigns(P2, r);
     this.buildLights(r);
@@ -569,6 +570,27 @@ export class Hangang {
     const isl = (M.areas || []).filter(([n]) => /빛섬/.test(n)).map(([n, ...f]) => unpack(f, M.scale)); const lines = [];
     for (const f of this.foot || []) { let cx = 0, cz = 0; for (const [x, z] of f.ring) { cx += x; cz += z; } cx /= f.ring.length; cz /= f.ring.length; if (!isl.some((r2) => inRing(cx, cz, r2))) continue; for (const y of [f.h + 0.1, f.h * 0.5]) lines.push(f.ring.map(([x, z]) => new THREE.Vector3(x, y, z))); }
     if (lines.length) { this.sebit = lines.map((pts2) => { const m = new THREE.LineBasicMaterial({ color: '#ff6fb5', transparent: true, opacity: 0.2 }); this.scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([...pts2, pts2[0]]), m)); return m; }); }
+  }
+  // 위도 · 경도 → 지도 좌표
+  ll(lat, lon) { const KX = 111320 * Math.cos((37.53 * Math.PI) / 180); return [(lon - 126.98) * KX - this.map.center[0], -(lat - 37.53) * 110574 - this.map.center[1]]; }
+  // 뚝섬 음악분수: 둥근 광장 · 가운데 높은 물기둥 + 두 겹 고리 물줄기가 박자에 맞춰 춤춘다 (공연 시간 · 밤엔 색조명)
+  buildMusicFountain([x, z]) {
+    const g = new THREE.Group(); g.position.set(x, 0, z); this.scene.add(g);
+    const plaza = new THREE.Mesh(new THREE.CircleGeometry(22, 48), new THREE.MeshLambertMaterial({ color: '#cfc8bb' })); plaza.rotation.x = -Math.PI / 2; plaza.position.y = 0.03; g.add(plaza);
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(14, 48), new THREE.MeshPhongMaterial({ color: '#7fb8d0', shininess: 100 })); pool.rotation.x = -Math.PI / 2; pool.position.y = 0.06; g.add(pool);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(14, 0.3, 6, 64), new THREE.MeshLambertMaterial({ color: '#e8e4dc' })); rim.rotation.x = Math.PI / 2; rim.position.y = 0.2; g.add(rim);
+    const jets = [{ r: 0, a: 0, ring: 0 }]; for (let i = 0; i < 16; i++) jets.push({ r: 5, a: (i / 16) * Math.PI * 2, ring: 1 }); for (let i = 0; i < 28; i++) jets.push({ r: 10, a: (i / 28) * Math.PI * 2, ring: 2 });
+    const PER = 16, N = jets.length * PER, P = new Float32Array(N * 3), C = new Float32Array(N * 3); for (let i = 0; i < N; i++) P[i * 3 + 1] = -100;
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(P, 3)); geo.setAttribute('color', new THREE.BufferAttribute(C, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.7, vertexColors: true, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending })); pts.frustumCulled = false; g.add(pts);
+    this.mfount = { g, jets, PER, P, C, pts, t: 0 }; this.addCircle(x, z, 14.3, 0.4);
+  }
+  tickMusicFountain(dt, lit) {
+    const F = this.mfount; if (!F) return; const h = this.state.hour, on = (h >= 12 && h < 12.5) || (h >= 19.5 && h < 21.5); F.t += dt; const col = new THREE.Color(), beat = F.t * 2.1, pa = F.pts.geometry.attributes.position, ca = F.pts.geometry.attributes.color;
+    F.jets.forEach((j, k) => { const hgt = j.ring === 0 ? 9 + Math.sin(beat * 0.5) * 5 : j.ring === 1 ? 3.5 + Math.max(0, Math.sin(beat + j.a * 2)) * 4 : 2 + Math.max(0, Math.sin(beat * 1.3 - j.a * 3)) * 3, lean = j.ring === 2 ? Math.sin(beat * 0.7) * 0.6 : 0;
+      for (let q = 0; q < F.PER; q++) { const i = k * F.PER + q; if (!on) { F.P[i * 3 + 1] = -100; continue; } const life = 1.6, tt = (F.t + q * (life / F.PER) + k * 0.05) % life, v = Math.sqrt(2 * 9.8 * hgt), y = v * tt - 4.9 * tt * tt, out = lean * tt * 3;
+        F.P[i * 3] = Math.cos(j.a) * (j.r + out); F.P[i * 3 + 1] = Math.max(0.1, y); F.P[i * 3 + 2] = Math.sin(j.a) * (j.r + out); if (lit > 0.3) col.setHSL((j.ring * 0.22 + F.t * 0.05 + (j.a / 6.28) * 0.3) % 1, 0.85, 0.62); else col.setRGB(0.88, 0.94, 1); F.C[i * 3] = col.r; F.C[i * 3 + 1] = col.g; F.C[i * 3 + 2] = col.b; } });
+    pa.needsUpdate = true; ca.needsUpdate = true;
   }
   tickBanpo(dt, lit) {
     const h = this.state.hour, F = this.fountain; this.sebit?.forEach((m, i) => { m.color.setHSL(((this.time * 0.03 + i * 0.07) % 1), 0.85, 0.6); m.opacity = 0.15 + lit * 0.85; });
@@ -1418,7 +1440,7 @@ export class Hangang {
     const work = hr >= 17 && hr < 20 ? 1 : hr >= 20 && hr < 22 ? 0.55 : hr >= 22 || hr < 6 ? 0.08 : hr < 8 ? 0.35 : 0.3;
     for (const [t, m] of Object.entries(this.bldByType || {})) m.emissiveIntensity = lit * (t.startsWith('street') ? (hr >= 2 && hr < 7 ? 0.3 : 1) : t === 'apt' || t === 'brick' ? home : work) * 0.5;
     if (this.signM) this.signM.emissiveIntensity = lit * (hr >= 1 && hr < 6 ? 0.15 : 0.45);
-    if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; if (this.summit) tickSummit(this, dt, lit); for (const m of this.neonMs || []) m.emissiveIntensity = 0.2 + lit * 1.2; if (this.jbugM) this.jbugM.emissiveIntensity = 0.15 + lit * 0.7; if (this.id === 'banpo') this.tickBanpo(dt, lit); for (const m of this.shopSignMs || []) m.emissiveIntensity = 0.25 + lit * 0.85; for (const m of this.shopWinM || []) m.emissiveIntensity = 0.1 + lit * 0.42; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.35 * Math.max(0.2, (h >= 18 && h < 24 ? 1 : 0.4));
+    if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; if (this.summit) tickSummit(this, dt, lit); for (const m of this.neonMs || []) m.emissiveIntensity = 0.2 + lit * 1.2; if (this.jbugM) this.jbugM.emissiveIntensity = 0.15 + lit * 0.7; if (this.id === 'banpo') this.tickBanpo(dt, lit); if (this.mfount) this.tickMusicFountain(dt, lit); for (const m of this.shopSignMs || []) m.emissiveIntensity = 0.25 + lit * 0.85; for (const m of this.shopWinM || []) m.emissiveIntensity = 0.1 + lit * 0.42; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.35 * Math.max(0.2, (h >= 18 && h < 24 ? 1 : 0.4));
     this.lampGlow.material.opacity = lit; if (this.lampHeadM) this.lampHeadM.emissiveIntensity = 0.2 + lit * 2.2; this.bridgeLights.material.opacity = lit; this.carPts.material.opacity = 0.25 + lit * 0.75;
     this.lampPool.material.opacity = lit * 0.32;
     let pi = 0; for (const [x, z] of this.poleXZ) { if (pi >= this.pools.length) break; if (Math.abs(x - px) < 90 && Math.abs(z - pz) < 90) { this.pools[pi].position.set(x, 0.03, z); this.pools[pi].visible = true; pi++; } } for (; pi < this.pools.length; pi++) this.pools[pi].visible = false;
