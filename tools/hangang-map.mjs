@@ -250,6 +250,26 @@ const VW = await (async () => {
   }
   fs.mkdirSync(CACHE, { recursive: true }); fs.writeFileSync(f, JSON.stringify(out2)); console.log(`\n브이월드 건물 ${out2.length}`); return out2;
 })();
+// 브이월드 건축물 정보 (용도 · 구조 · 사용승인 연도 · 실제 높이): 건물 모습을 실제 정보로 정한다
+const VI = await (async () => {
+  const f = path.join(CACHE, 'vworld_info.json'); if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf8'));
+  const key = process.env.VWORLD_KEY; if (!key) return [];
+  const [la0, lo0, la1, lo1] = C.bbox, out2 = [], STEP = 0.008;
+  for (let la = la0; la < la1; la += STEP) for (let lo = lo0; lo < lo1; lo += STEP) {
+    for (let page = 1; page < 40; page++) {
+      const u = `https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_BLDGINFO&key=${key}&domain=jelly-city.fly.dev&geomFilter=BOX(${lo},${la},${Math.min(lo + STEP, lo1)},${Math.min(la + STEP, la1)})&size=1000&page=${page}&format=json&crs=EPSG:4326&geometry=true&attribute=true`;
+      let j; for (let tr = 0; tr < 3; tr++) { try { j = await (await fetch(u, { signal: AbortSignal.timeout(30000) })).json(); break; } catch { await new Promise((r) => setTimeout(r, 2000)); } }
+      for (const ft of j?.response?.result?.featureCollection?.features || []) { const pr = ft.properties || {}, g = ft.geometry; if (!g) continue; const polys = g.type === 'MultiPolygon' ? g.coordinates : [g.coordinates]; for (const pl of polys) { const ring = (pl[0] || []).map(([lon, lat]) => P(lat, lon)); if (ring.length > 2) out2.push({ use: Math.round((+pr.usability || 0) / 1000), st: +pr.strct_cd || 0, yr: +String(pr.useapr_day || '').slice(0, 4) || 0, h: +pr.height || 0, fl: +pr.grnd_flr || 0, ring }); } }
+      if (+(j?.response?.page?.total || 1) <= page) break;
+    }
+    process.stdout.write(':');
+  }
+  fs.writeFileSync(f, JSON.stringify(out2)); console.log(`\n건축물 정보 ${out2.length}`); return out2;
+})();
+{ const grid = new Map(), G = 50; VI.forEach((v, i) => { let x = 0, z = 0; for (const p of v.ring) { x += p[0]; z += p[1]; } v.c = [x / v.ring.length, z / v.ring.length]; const k = `${Math.floor(v.c[0] / G)},${Math.floor(v.c[1] / G)}`; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(i); });
+  let hit = 0; for (const b of items) { const [cx, cz] = b.c; let v = null; for (let a = -1; a <= 1 && !v; a++) for (let c2 = -1; c2 <= 1 && !v; c2++) for (const i of grid.get(`${Math.floor(cx / G) + a},${Math.floor(cz / G) + c2}`) || []) if (inPoly(b.c, VI[i].ring)) { v = VI[i]; break; }
+    if (!v) continue; hit++; b.info = [v.use, v.st, v.yr]; if (!b.t.height && v.h > 2 && !b.part) b.t = { ...b.t, height: String(v.h) }; }
+  console.log(`건축물 정보 맞춘 건물 ${hit}`); }
 { const grid = new Map(), G = 50; VW.forEach((v, i) => { let x = 0, z = 0; for (const p of v.ring) { x += p[0]; z += p[1]; } v.c = [x / v.ring.length, z / v.ring.length]; const k = `${Math.floor(v.c[0] / G)},${Math.floor(v.c[1] / G)}`; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(i); });
   let hit = 0, named = 0; const BAD = /^(주택|단독주택|다가구주택|근린생활시설|창고|.*\d+-\d+)$/;
   for (const b of items) { if (b.part) continue; const [cx, cz] = b.c; let v = null; for (let a = -1; a <= 1 && !v; a++) for (let c2 = -1; c2 <= 1 && !v; c2++) for (const i of grid.get(`${Math.floor(cx / G) + a},${Math.floor(cz / G) + c2}`) || []) if (inPoly(b.c, VW[i].ring)) { v = VW[i]; break; }
@@ -261,7 +281,7 @@ const VW = await (async () => {
 const parts = items.filter((b) => b.part);
 // 부분으로 그려진 건물: 외곽선의 이름 · 종류를 안쪽 부분들에 물려준다 (국회의사당 · 63빌딩처럼 이름표와 모습이 맞게)
 for (const b of items) { if (b.part || !b.t.name) continue; for (const p of parts) if (!p.t.name && Math.abs(p.c[0] - b.c[0]) < 250 && Math.abs(p.c[1] - b.c[1]) < 250 && inPoly(p.c, b.o)) { p.inherit = b.t.name; p.inheritKind = b.t.building; } }
-out.buildings = [];
+out.buildings = []; out.binfo = [];
 let dropped = 0;
 for (const b of items) {
   const { t, o, c } = b;
@@ -277,7 +297,7 @@ for (const b of items) {
   const kind = KIND[t.building] ?? KIND[b.inheritKind] ?? KIND[t['building:part']] ?? 0, mat = t['building:material'] === 'glass' ? 1 : 0;
   // 돔 지붕: 지붕 높이(m)를 담는다 (없으면 외곽 크기로 짐작)
   const dome = t['roof:shape'] === 'dome' ? Math.max(1, Math.round(num(t['roof:height']) || 0)) : 0;
-  out.buildings.push([Math.round(h * 10) / 10, Math.round(mh * 10) / 10, kind * 2 + mat, cIdx(t['building:colour'] || ''), nIdx(t.name || b.inherit || ''), cIdx(t['roof:colour'] || ''), dome, ...flat(s)]);
+  out.buildings.push([Math.round(h * 10) / 10, Math.round(mh * 10) / 10, kind * 2 + mat, cIdx(t['building:colour'] || ''), nIdx(t.name || b.inherit || ''), cIdx(t['roof:colour'] || ''), dome, ...flat(s)]); out.binfo.push(b.info || 0);
 }
 out.colors = colors; out.names = names;
 

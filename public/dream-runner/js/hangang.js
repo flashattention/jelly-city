@@ -699,7 +699,8 @@ export class Hangang {
     const box = (x, y, z, w, h, d, c, rotY = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.rotateY(rotY); g.translate(x, y, z); const k = extras.P.length / 3, p = g.attributes.position, n = g.attributes.normal; for (let i = 0; i < p.count; i++) { extras.P.push(p.getX(i), p.getY(i), p.getZ(i)); extras.N.push(n.getX(i), n.getY(i), n.getZ(i)); extras.Cl.push(c.r, c.g, c.b); } for (const ix of g.index.array) extras.I.push(k + ix); };
     const campus = []; for (const [nm, L] of Object.entries(LANDMARKS)) { if (!L.campus) continue; const ni2 = M.names.indexOf(nm); const b2 = M.buildings.find((q) => q[4] === ni2); if (!b2) continue; let x = 0, z = 0, n = 0; for (let k = 7; k < b2.length; k += 2) { x += b2[k] * M.scale; z += b2[k + 1] * M.scale; n++; } campus.push({ x: x / n, z: z / n, r: L.campus, L, nm, kind: b2[2] >> 1, ring: P2(b2.slice(7)), self: b2 }); }
     this.lmParts = {}; const touches = (cp, b, ring) => cp.self !== b && (ring.some(([x, z]) => inRing(x, z, cp.ring)) || cp.ring.some(([x, z]) => inRing(x, z, ring)));
-    for (const b of M.buildings) {
+    for (const [bi, b] of M.buildings.entries()) {
+      const info = M.binfo?.[bi] || null;
       const [h0, mh, km, ci, ni, rci, dome] = b, kind = km >> 1, glassTag = km & 1, ring = P2(b.slice(7)); if (ring.length < 3) continue;
       // 돔 지붕 부분: 벽은 돔 아래까지, 그 위에 돔 (높이 · 색은 지도 데이터대로)
       const domeR = dome ? Math.sqrt(Math.abs(ringArea(ring)) / Math.PI) : 0, domeH = dome ? (dome > 1 ? dome : domeR * 0.6) : 0, h = Math.min(Math.max(mh + 0.5, h0 - domeH), M.kind === 'summit' && M.names[ni] !== '남산서울타워' ? 12 : 1e9);
@@ -720,6 +721,8 @@ export class Hangang {
       else if (campus.some((cp) => { const [x, z] = ring[0]; return cp.kind === kind && Math.hypot(x - cp.x, z - cp.z) < cp.r; })) { const cp = campus.find((q) => q.kind === kind && Math.hypot(ring[0][0] - q.x, ring[0][1] - q.z) < q.r); type = cp.L.campusFacade || cp.L.facade; c = cp.L.campusColor || cp.L.color; }
       else if (kind === 6 || /교회|성당|채플/.test(name)) { type = 'church'; c = '#efe9de'; crosses.push(ring); }
       else if (/^#?[0-9a-f]{6}$/i.test(cTag) || /^[a-z]+$/i.test(cTag)) { try { col.set(cTag); c = `#${col.getHexString()}`; } catch { c = null; } }
+      // 실제 건축물 정보(용도 · 구조 · 사용승인 연도)로 외벽을 정한다 (틀 찍어내기 대신 그 건물의 실제 정보대로)
+      if (info && !c && !LANDMARKS[name] && type !== 'church' && type !== 'gold' && type !== 'assembly') { const st = styleOf(info, h, r); if (st) { type = st[0]; c = st[1]; } }
       // 거리 지역(홍대 · 이태원 등) 낮은 상가: 외벽 색 · 창 무늬 · 층 높이를 건물마다 다르게
       if ((M.kind === 'street' || ((!M.kind || M.kind === 'river') && (kind === 2 || kind === 0) && h < 26 && M.shops?.length)) && h < 32 && type !== 'apt' && type !== 'church' && type !== 'glass' && !LANDMARKS[name] && !c) { type = r() < 0.62 ? 'street' : 'street2'; c = ['#f4f1ea', '#efe3cf', '#b5654a', '#a29e98', '#f2c6cf', '#bfe3d6', '#c8dcef', '#2f2f33', '#e8d9b5', '#8a5a44', '#d9cfc2', '#fff7e8'][Math.floor(r() * 12)]; }
       if (!c) c = type === 'apt' ? APT[Math.floor(r() * APT.length)] : type === 'glass' ? GLASS[Math.floor(r() * GLASS.length)] : type === 'brick' ? BRICK[Math.floor(r() * BRICK.length)] : STONE[Math.floor(r() * STONE.length)];
@@ -1822,6 +1825,21 @@ function skyGlass(m, skyU, gold) {
       #include <opaque_fragment>`);
   };
   m.customProgramCacheKey = () => (gold ? 'skyglass-gold' : 'skyglass');
+}
+// 건축물 정보 → 외벽 [종류, 색]. use: 1 단독 · 2 공동주택 · 3 · 4 근린생활 · 6 종교 · 7 판매 · 9 의료 · 10 교육 · 14 업무 · 15 숙박, st: 11 · 12 · 13 · 19 조적(벽돌 · 블록 · 돌) · 21 · 22 철근콘크리트 · 3x 철골, yr: 사용승인 연도
+function styleOf([use, st, yr], h, r) {
+  const pick2 = (a) => a[Math.floor(r() * a.length)], masonry = st >= 11 && st <= 19, steel = st >= 31 && st <= 39, era = yr ? (yr < 1990 ? 0 : yr < 2005 ? 1 : 2) : 1;
+  if (use === 6) return ['church', '#efe9de'];
+  if (use === 2 && h > 24) return null; // 아파트 단지는 아파트 모습 그대로
+  if (masonry) return ['brick', era === 0 ? pick2(['#8a4a36', '#7a3f30', '#9a5a44']) : era === 1 ? pick2(['#a5523e', '#b0604a', '#9c4f3a']) : pick2(['#b8735a', '#c9a27a', '#a8866a'])];
+  if (steel && h > 15) return ['glass', pick2(['#9fb6c8', '#a9bccb', '#8fa6b8'])];
+  if (use === 14) return h > 30 || yr >= 2000 ? ['glass', pick2(['#9fb2c0', '#b0c2cc', '#8d9aa6'])] : ['stone', pick2(['#d6d0c4', '#cfc8bb', '#e0dacd'])];
+  if (use === 10) return ['stone', pick2(['#efe6cf', '#e8dcc0'])];
+  if (use === 9) return ['stone', '#f2f2ee'];
+  if (use === 15) return ['street2', pick2(['#e8e4dc', '#6b4a3a', '#2f2f33', '#c8b49a'])];
+  if (use === 1 || use === 2) return era === 0 ? (r() < 0.6 ? ['brick', pick2(['#9a4f3c', '#a5523e', '#8a4a36'])] : ['stone', pick2(['#e8dfcc', '#ddd3c0'])]) : era === 1 ? ['street', pick2(['#e9dfd0', '#f0e6dc', '#dcd3c6', '#e8d8cf', '#d8cdbd'])] : ['street2', pick2(['#d9d9d6', '#f2f2f0', '#5a5d63', '#bfb7ab', '#e6e1d8'])];
+  if (use === 3 || use === 4 || use === 7 || use === 5) return era === 0 ? ['street', pick2(['#efe6d6', '#e3d6c2', '#cfc6b8', '#b5654a'])] : era === 1 ? ['street', pick2(['#d8d2c8', '#c9c2b6', '#e8e4dc', '#a29e98', '#d9cfc2'])] : ['street2', pick2(['#2f2f33', '#f4f1ea', '#8a8f96', '#c8dcef', '#e8d9b5', '#fff7e8'])];
+  return null;
 }
 // 뚝섬 자벌레: 외곽선의 긴 축을 따라 칸마다 가운데 · 폭을 재서 그 선을 따라 납작한 튜브
 function buildJBug(hg, ring) {
