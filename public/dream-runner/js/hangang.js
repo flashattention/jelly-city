@@ -1785,6 +1785,20 @@ export const LANDMARKS = {
   국회의원회관: { facade: 'assembly', color: '#ece8de', roof: '#5a9482' },
   //   더현대 서울: 낮고 넓은 유리 · 회색 몸체, 지붕은 초록 정원과 유리 천창 격자, 긴 두 변에 붉은 아치 트러스
   '더현대 서울': { facade: 'glass', color: '#b9c3c8', roof: '#6f8a6a', skylight: true, arches: { n: 6, color: '#c8382a' } },
+  // 홍대: 메세나폴리스 · 세아타워 · CGV 아트레온 · 홍익대 문헌관 · 홍문관
+  '메세나폴리스 101동': { facade: 'glass', color: '#c9d8e2', crown: { rise: 8, dir: [1, 0] } },
+  세아타워: { facade: 'glass', color: '#6f8494', roof: '#4a5560' },
+  'CGV 아트레온(CGV Artreon)': { facade: 'glass', color: '#b9c3c8', topSign: { text: 'CGV', color: '#e8102c', bg: '#ffffff' } },
+  문헌관: { facade: 'brick', color: '#9a4a36' }, 홍문관: { facade: 'brick', color: '#a5523e' },
+  // 이태원: 제일기획 · 용산구청
+  제일기획: { facade: 'glass', color: '#5f6b74' }, 용산구청: { facade: 'stone', color: '#e8e2d6' },
+  // 반포: 신세계백화점 강남 · JW 메리어트 · 서울성모병원 · 서울법원종합청사
+  신세계백화점: { facade: 'stone', color: '#e8dcc8', topSign: { text: 'SSG', color: '#e8102c', bg: '#ffffff' } }, 'JW 메리어트 호텔 서울': { facade: 'glass', color: '#b5c2c8' },
+  '가톨릭대학교 서울성모병원': { facade: 'glass', color: '#d2e2e6', roof: '#6db894' }, 서울법원종합청사: { facade: 'stone', color: '#d9d2c4' },
+  // 뚝섬 · 건대 · 청담: 테크노마트 · 롯데백화점 · 갤러리아 명품관(유리 원판 외벽 · 밤 테두리 빛) · 서울숲 세 동
+  테크노마트: { facade: 'glass', color: '#7f93a3', crown: { rise: 12, dir: [0, 1] } }, 롯데백화점: { facade: 'stone', color: '#ece4d4', topSign: { text: 'LOTTE', color: '#e8102c', bg: '#ffffff' } },
+  '갤러리아백화점 이스트': { facade: 'panels', color: '#dfe6ea', rimLight: true }, '갤러리아백화점 웨스트': { facade: 'panels', color: '#dfe6ea', rimLight: true },
+  이스트윙: { facade: 'glass', color: '#c8d6de' }, 웨스트윙: { facade: 'glass', color: '#c8d6de' }, 사우스윙: { facade: 'glass', color: '#c8d6de' },
   여의도순복음교회: { facade: 'panels', color: '#5d4f48', campus: 160, campusFacade: 'stone', campusColor: '#a08a7a', front: { w: 16, d: 9, up: 13, face: 'west', screen: true, cross: true, sign: '여의도순복음교회' }, rimLight: true },
 };
 const CAR_COLORS = ['#f4f4f2', '#f4f4f2', '#1d1d1f', '#9aa0a6', '#c9ccd0', '#2a3a5a', '#7a1d22', '#3d4a3a', '#d8d2c4'];
