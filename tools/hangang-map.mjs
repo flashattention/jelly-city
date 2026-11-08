@@ -239,7 +239,7 @@ for (const e of [...lJ.elements, ...wJ.elements]) {
 
 // ---------- 길 · 철길 · 다리 ----------
 const W = { motorway: 22, trunk: 18, primary: 14, secondary: 10, tertiary: 8, trunk_link: 6, primary_link: 6, secondary_link: 6, motorway_link: 6, cycleway: 3, footway: 2.4, path: 2, pedestrian: 4 };
-out.roads = []; out.roadNames = []; out.alleys = []; out.bridges = []; out.rails = []; out.paths = [];
+out.roads = []; out.roadNames = []; out.alleys = []; out.bridges = []; out.rails = []; out.paths = []; const walkLines = [];
 for (const e of lJ.elements) {
   const t = e.tags || {}; if (e.type !== 'way' || !e.geometry || t.tunnel === 'yes' || t.tunnel === 'building_passage' || +t.layer < 0) continue;
   const g = geo(e.geometry), mid = g[Math.floor(g.length / 2)];
@@ -250,6 +250,7 @@ for (const e of lJ.elements) {
   const lanes = +t.lanes || 0, w = t.highway in { cycleway: 1, footway: 1, path: 1, pedestrian: 1 } ? w0 : Math.max(w0, lanes * 3.3 + 1);
   const pts = simplify(g, 0.8);
   if (bridge && w0 >= 6) { out.bridges.push({ n: t['bridge:name'] || t.name || '', w, p: flat(pts) }); continue; }
+  if (t.highway in { footway: 1, pedestrian: 1, living_street: 1, service: 1, residential: 1, unclassified: 1, alley: 1 }) walkLines.push(pts);
   if (t.highway in { cycleway: 1, footway: 1, path: 1, pedestrian: 1 }) { if (t.name === C.path || near(mid, 450) < 450) out.paths.push([t.name === C.path ? 1 : 0, w, ...flat(pts)]); continue; }
   if (w0 >= 8) { out.roads.push([w, bridge ? 1 : 0, ...flat(pts)]); out.roadNames.push(String(t.name || '').slice(0, 12)); }
   // 거리 지역: 좁은 골목(서비스 도로 · 생활도로 · 좁은 주택가 길)도 담는다 (전봇대 · 전깃줄 · 스쿠터를 세운다)
@@ -330,6 +331,10 @@ const parts = items.filter((b) => b.part);
 for (const b of items) { if (b.part || !b.t.name) continue; for (const p of parts) if (!p.t.name && Math.abs(p.c[0] - b.c[0]) < 250 && Math.abs(p.c[1] - b.c[1]) < 250 && inPoly(p.c, b.o)) { p.inherit = b.t.name; p.inheritKind = b.t.building; } }
 out.buildings = []; out.binfo = []; const bR = [];
 // 지하철 출구 자리: 그 위의 작은 건물(출구 덮개로 그려진 것)은 세우지 않는다 (10m 상자가 계단을 덮고 들어갈 수 없게 막았다)
+// 전통시장: 골목이 지붕 아래로 지나가면(20m 넘게) 걸어 들어갈 수 있는 아케이드로 — 벽은 4.2m 위부터 (상자로 골목을 막지 않게)
+const walkGrid = new Map(); for (const pts of walkLines) for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k], L = Math.hypot(b[0] - a[0], b[1] - a[1]); for (let t = 0; t < L; t += 2) { const x = a[0] + (b[0] - a[0]) * t / L, z = a[1] + (b[1] - a[1]) * t / L, kk = `${Math.floor(x / 40)},${Math.floor(z / 40)}`; if (!walkGrid.has(kk)) walkGrid.set(kk, []); walkGrid.get(kk).push([x, z]); } }
+const walkThrough = (o) => { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of o) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } let n = 0; for (let gx = Math.floor(x0 / 40); gx <= Math.floor(x1 / 40); gx++) for (let gz = Math.floor(z0 / 40); gz <= Math.floor(z1 / 40); gz++) for (const p of walkGrid.get(`${gx},${gz}`) || []) if (p[0] >= x0 && p[0] <= x1 && p[1] >= z0 && p[1] <= z1 && inPoly(p, o)) n++; return n * 2; };
+let arcades = 0;
 const exitPts = sJ.elements.filter((e) => e.type === 'node' && e.tags?.railway === 'subway_entrance').map((e) => P(e.lat, e.lon));
 let dropped = 0;
 for (const b of items) {
@@ -337,18 +342,19 @@ for (const b of items) {
   if (c[0] < rect[0] || c[0] > rect[2] || c[1] < rect[1] || c[1] > rect[3]) continue;
   if (!b.part && parts.some((p) => Math.abs(p.c[0] - c[0]) < 200 && Math.abs(p.c[1] - c[1]) < 200 && inPoly(p.c, o))) continue;
   const lv = num(t['building:levels']), h = num(t.height) || (lv ? lv * 3.3 + 1 : 0) || (t.building === 'house' ? 7 : 10);
-  const mh = num(t.min_height) || (num(t['building:min_level']) ? num(t['building:min_level']) * 3.3 : 0);
+  let mh = num(t.min_height) || (num(t['building:min_level']) ? num(t['building:min_level']) * 3.3 : 0);
   const a = Math.abs(area(o)), d = near(c, 1800);
   if (/출구|출입구|지하쇼핑|지하상가|지하도|지하보도/.test(t.name || '') && !num(t['building:levels'])) { dropped++; continue; }
   if (a < 400 && exitPts.some((p) => Math.abs(p[0] - c[0]) < 40 && Math.abs(p[1] - c[1]) < 40 && (inPoly(p, o) || Math.hypot(p[0] - c[0], p[1] - c[1]) < 3))) { dropped++; continue; }
   // 거리 지역(골목이 빽빽): 코스에서 600m 넘게 먼 낮은 건물은 뺀다 (무거워서 이동이 느려 보이지 않게)
   if (a < 25 || (d > 1800 && h < 45) || (d > 900 && h < 12 && a < 400) || (C.kind === 'street' && h < 30 && near(c, 0) > 600)) { dropped++; continue; }
+  let hA = h; if (/시장|아케이드/.test(t.name || '') && !b.part && h < 25 && walkThrough(o) >= 20) { mh = 4.2; hA = 6; arcades++; }
   const s = simplify(o, a > 2000 ? 1.2 : 0.6);
   if (s.length < 3) continue;
   const kind = KIND[t.building] ?? KIND[b.inheritKind] ?? KIND[t['building:part']] ?? 0, mat = t['building:material'] === 'glass' ? 1 : 0;
   // 돔 지붕: 지붕 높이(m)를 담는다 (없으면 외곽 크기로 짐작)
   const dome = t['roof:shape'] === 'dome' ? Math.max(1, Math.round(num(t['roof:height']) || 0)) : 0;
-  out.buildings.push([Math.round(h * 10) / 10, Math.round(mh * 10) / 10, kind * 2 + mat, cIdx(t['building:colour'] || ''), nIdx(t.name || b.inherit || ''), cIdx(t['roof:colour'] || ''), dome, ...flat(s)]); out.binfo.push(b.info || 0); bR.push(s);
+  out.buildings.push([Math.round(hA * 10) / 10, Math.round(mh * 10) / 10, kind * 2 + mat, cIdx(t['building:colour'] || ''), nIdx(t.name || b.inherit || ''), cIdx(t['roof:colour'] || ''), dome, ...flat(s)]); out.binfo.push(b.info || 0); bR.push(s);
 }
 // 진짜 가게(소상공인 상가정보, tools/seoul-shops.mjs 로 받은 .cache/shops/<칸>.json): 가게마다 들어 있는 건물 · 층을 찾아 담는다
 //   게임은 그 건물의 길 쪽 벽에 층마다 간판을 단다 (아무 가게 이름을 아무 건물에 붙이지 않게). [이름, 종류, 건물 번호, 층(0 = 지하)]
@@ -367,6 +373,7 @@ for (const b of items) {
       if (bi < 0) { miss++; continue; }
       out.shops2.push([String(nm).replace(/\s*\(.*?\)\s*/g, '').trim().slice(0, 16), kind, bi, floor]);
     }
+    console.log(`시장 아케이드 ${arcades}`);
     console.log(`진짜 가게 ${out.shops2.length} (건물 못 찾음 ${miss})`);
   } }
 out.colors = colors; out.names = names;
