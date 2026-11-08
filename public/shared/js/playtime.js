@@ -6,9 +6,9 @@
   let last = Date.now(), id = '';
   try { id = sessionStorage.getItem('jelly.pt') || Math.random().toString(36).slice(2); sessionStorage.setItem('jelly.pt', id); } catch { /* 없음 */ }
   for (const ev of ['keydown', 'pointerdown', 'pointermove', 'touchstart', 'wheel']) addEventListener(ev, () => { last = Date.now(); }, { passive: true, capture: true });
-  const base = window.__TOSS__?.apiBase || '';
+  const base = window.__TOSS__?.apiBase || ''; let first = true; // 이 탭에서 처음 1분 = 한 판
   setInterval(() => {
     if (document.visibilityState !== 'visible' || Date.now() - last > 120000) return;
-    fetch(`${base}/api/playtime`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ game, id }), keepalive: true }).catch(() => {});
+    fetch(`${base}/api/playtime`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ game, id: `${id}:${game}`, first }), keepalive: true }).catch(() => {}); first = false;
   }, 60000);
 })();

@@ -40,8 +40,8 @@ fetch('/api/playtime/all').then((r) => r.json()).then((d) => {
   const cards = [...box.querySelectorAll('a.card')], order = new Map(cards.map((c, i) => [c, i]));
   for (const c of cards) {
     const id = (c.getAttribute('href') || '').split('/').filter(Boolean)[0], g = games[id] || { min: 0, players: 0 };
-    c.dataset.score = g.min + g.players * 15;
-    const b = document.createElement('span'); b.className = 'pt'; b.textContent = g.min >= 1 ? `⏱️ 누적 플레이 ${fmt(g.min)}${g.players ? ` · ${g.players}명` : ''}` : g.players ? `👥 누적 ${g.players}명 플레이` : '⏱️ 플레이 시간 모으는 중'; c.appendChild(b);
+    c.dataset.score = g.min + (g.plays || 0) * 2 + g.players * 15;
+    const b = document.createElement('span'); b.className = 'pt'; b.textContent = g.min >= 1 ? `⏱️ 누적 ${fmt(g.min)}${g.plays ? ` · ${g.plays.toLocaleString()}판` : ''}` : g.players ? `🏆 순위표 ${g.players}명 · 플레이 집계 중` : '⏱️ 플레이 집계 중'; c.appendChild(b);
   }
   const rest = cards.filter((c) => !c.classList.contains('wide')).sort((a, b) => (+b.dataset.score - +a.dataset.score) || (order.get(a) - order.get(b)));
   for (const c of rest) box.appendChild(c);
