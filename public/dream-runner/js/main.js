@@ -1062,10 +1062,12 @@ async function startHangang(pos = null) {
   try { if (!hg.ready) toast(hgWorld ? '🗺️ 서울을 펼치는 중…' : `${HG_REGIONS[hgRegion].label} 지도를 펼치는 중…`, 4000); await hg.load(hgWorld ? 'seoul' : hgRegion); }
   catch (e) { toast(`한강 지도를 불러오지 못했어요 · ${e.message}`, 2600); b.disabled = false; return; }
   b.disabled = false;
+  // 서울 전체: 시작 자리를 들어가기 전에 정한다 (예전엔 들어간 뒤 기다리는 사이 기본 자리(남산 근처) 칸부터 만들어 시작이 칸 하나만큼 늦었다)
+  const startP = hgWorld ? (pos?.x != null ? pos : await hgRegionStart(hgRegion)) : null;
   hideScreens(); game.mode = 'hangang'; document.body.classList.add('hg');
   if (!hgWorld && pos && pos.s == null) pos = null; // 서울 전체에서 저장한 자리(x, z)는 지역 지도에선 못 쓴다
   runner.shadow.visible = false; hg.enter(runner.bear, { ...(pos?.s != null && !hgWorld ? { s: pos.s } : {}), keep: hgKeep });
-  if (hgWorld) { const p = pos?.x != null ? pos : await hgRegionStart(hgRegion); hg.placeAt(p.x, p.z, p.face ?? 0); } else if (pos) hg.teleport(pos.s, pos.lat);
+  if (hgWorld) hg.placeAt(startP.x, startP.z, startP.face ?? 0); else if (pos) hg.teleport(pos.s, pos.lat);
   renderer.shadowMap.enabled = !isPhone; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
   if (hgPost && hgPost.scene !== hg.scene) { hgPost.dispose(); hgPost = null; } // 지역이 바뀌면 그 지역 장면으로 다시
   if (!isPhone && !hgPost) { try { const { makePost } = await import('./hangang-post.js'); hgPost = makePost(renderer, hg.scene, camera); hgPost.scene = hg.scene; } catch (e) { console.warn('화면 보정 없이', e); } }
