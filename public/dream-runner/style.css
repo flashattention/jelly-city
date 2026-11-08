@@ -132,6 +132,7 @@ h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 #touch > div { display: flex; gap: 12px; align-items: flex-end; pointer-events: auto; touch-action: none; }
 #touch button { width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); background: rgba(20,8,50,.4); color: #fff; font-size: 26px; touch-action: none; }
 #touch button.big { width: 80px; height: 80px; }
+#touch .t-r button[data-k="jump"] { margin-bottom: 60px; margin-left: -4px; } /* 점프는 숙이기의 오른쪽 위 대각선 (엄지를 위로 밀어 누르게) */
 /* 조이스틱: 큰 원 안에서 작은 원이 사방으로 움직이지만, 게임에는 좌우만 들어간다 */
 #joy { position: relative; width: 132px; height: 132px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); background: radial-gradient(circle, rgba(255,255,255,.08) 0 30%, rgba(20,8,50,.45) 31%); touch-action: none; display: flex; align-items: center; justify-content: center; }
 #joy::before, #joy::after { content: '◀'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,.5); font-size: 15px; pointer-events: none; }
