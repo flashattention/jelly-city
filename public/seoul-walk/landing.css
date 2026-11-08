@@ -177,10 +177,10 @@ body.light .bar nav { color: rgba(28, 33, 51, .62); } body.light .bar nav a:hove
 main, .foot { --fg: #f3eee6; --mute: rgba(243, 238, 230, .66); --dim: rgba(243, 238, 230, .42); --line: rgba(243, 238, 230, .14); --gold: #f2cf8a; color: var(--fg); }
 main { background:
   radial-gradient(1.2px 1.2px at 12% 18%, rgba(255, 255, 255, .8), transparent 60%), radial-gradient(1px 1px at 38% 42%, rgba(255, 255, 255, .6), transparent 60%), radial-gradient(1.4px 1.4px at 72% 12%, rgba(255, 236, 190, .85), transparent 60%), radial-gradient(1px 1px at 88% 58%, rgba(255, 255, 255, .55), transparent 60%), radial-gradient(1.2px 1.2px at 22% 76%, rgba(255, 255, 255, .6), transparent 60%), radial-gradient(1px 1px at 60% 88%, rgba(255, 236, 190, .6), transparent 60%),
-  linear-gradient(180deg, #05070c 0%, #0a1024 22%, #10173a 55%, #0c1230 80%, #080b1c 100%);
+  linear-gradient(180deg, #0a1024 0%, #0e1533 30%, #10173a 55%, #0c1230 80%, #080b1c 100%);
   background-size: 520px 520px, 610px 610px, 470px 470px, 690px 690px, 560px 560px, 640px 640px, 100% 100%; }
 .foot { background: #070a18; }
-.end { color: var(--fg); background: radial-gradient(1.2px 1.2px at 20% 30%, rgba(255, 255, 255, .8), transparent 60%), radial-gradient(1px 1px at 70% 20%, rgba(255, 236, 190, .8), transparent 60%), radial-gradient(1.2px 1.2px at 40% 70%, rgba(255, 255, 255, .6), transparent 60%), radial-gradient(ellipse at 50% 120%, rgba(90, 70, 150, .45), transparent 60%), linear-gradient(180deg, rgba(5, 7, 12, .55), rgba(10, 16, 40, .95)); background-size: 380px 380px, 450px 450px, 520px 520px, 100% 100%, 100% 100%; }
+.end { color: var(--fg); background: radial-gradient(1.2px 1.2px at 12% 18%, rgba(255, 255, 255, .8), transparent 60%), radial-gradient(1px 1px at 38% 42%, rgba(255, 255, 255, .6), transparent 60%), radial-gradient(1.4px 1.4px at 72% 12%, rgba(255, 236, 190, .85), transparent 60%), radial-gradient(1px 1px at 88% 58%, rgba(255, 255, 255, .55), transparent 60%), linear-gradient(180deg, rgba(10, 16, 36, .62) 0%, rgba(10, 16, 36, .92) 40%, #0a1024 72%, #0a1024 100%); background-size: 520px 520px, 610px 610px, 470px 470px, 690px 690px, 100% 100%; } /* 아래 섹션이 시작하는 남색으로 끝난다 (밤하늘이 그대로 이어지게) */
 .end h2 { color: #f3eee6; }
 body.light .bar { color: #f3eee6; background: linear-gradient(180deg, rgba(7, 10, 24, .9), rgba(7, 10, 24, 0)); } body.light .bar nav { color: rgba(243, 238, 230, .64); } body.light .bar nav a:hover, body.light .bar nav .go { color: #f3eee6; }
 .loader { color: #f3eee6; background: radial-gradient(1.2px 1.2px at 15% 25%, rgba(255, 255, 255, .8), transparent 60%), radial-gradient(1px 1px at 65% 15%, rgba(255, 255, 255, .6), transparent 60%), radial-gradient(1.3px 1.3px at 40% 70%, rgba(255, 236, 190, .7), transparent 60%), radial-gradient(1px 1px at 85% 55%, rgba(255, 255, 255, .55), transparent 60%), radial-gradient(ellipse at 50% 110%, rgba(80, 60, 140, .4), transparent 60%), linear-gradient(180deg, #05070c, #0d1434 70%, #111a40);
@@ -193,3 +193,10 @@ body.light .bar { color: #f3eee6; background: linear-gradient(180deg, rgba(7, 10
 .skyline .st:nth-child(3n) { animation-delay: .4s; } .skyline .st:nth-child(3n + 1) { animation-delay: .9s; } .skyline .st:nth-child(4n) { animation-delay: 1.3s; }
 @keyframes twinkle { 0%, 100% { opacity: .35; transform: scale(.7); } 50% { opacity: 1; transform: scale(1.15); } }
 .skyline .st { transform-box: fill-box; transform-origin: center; }
+
+/* 밤하늘 위 단추(마지막 · 마지막 장): 빛나는 별빛 노랑, 빛무리가 천천히 숨 쉰다 */
+.last .btn, .end .btn { background: radial-gradient(120% 160% at 30% 20%, #fff4c9 0%, #ffe08a 45%, #ffc95a 100%); color: #1d1630; box-shadow: 0 0 22px rgba(255, 214, 120, .55), 0 0 60px rgba(255, 214, 120, .22), inset 0 1px 0 rgba(255, 255, 255, .7); animation: starglow 2.8s ease-in-out infinite; }
+.last .btn:hover, .end .btn:hover { filter: brightness(1.05); box-shadow: 0 0 30px rgba(255, 220, 130, .8), 0 0 80px rgba(255, 214, 120, .35), inset 0 1px 0 rgba(255, 255, 255, .7); }
+@keyframes starglow { 50% { box-shadow: 0 0 30px rgba(255, 214, 120, .75), 0 0 80px rgba(255, 214, 120, .32), inset 0 1px 0 rgba(255, 255, 255, .7); } }
+.last .link { color: rgba(255, 236, 190, .85); border-bottom-color: rgba(255, 236, 190, .35); }
+@media (prefers-reduced-motion: reduce) { .last .btn, .end .btn { animation: none; } }
