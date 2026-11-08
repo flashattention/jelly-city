@@ -29,11 +29,14 @@ const Grade = {
       gl_FragColor = vec4(max(col, 0.0), 1.0); }`,
 };
 
-export function makePost(renderer, scene, camera) {
+// opt.bloomScale: 빛 번짐을 낮은 해상도로 (랜딩처럼 가벼워야 할 때 0.35 ~ 0.5, 보기엔 거의 같다)
+export function makePost(renderer, scene, camera, opt = {}) {
+  const bs = opt.bloomScale || 1;
   const size = renderer.getSize(new THREE.Vector2()), pr = renderer.getPixelRatio();
   const composer = new EffectComposer(renderer); composer.setPixelRatio(Math.min(pr, 1.5)); composer.setSize(size.x, size.y);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.32, 0.65, 0.86); composer.addPass(bloom);
+  // 빛 번짐 그림판을 작게 할 수 있다 (bloomScale, 그리기 비용 ↓)
+  const bloom = new UnrealBloomPass(new THREE.Vector2(size.x * bs, size.y * bs), 0.32, 0.65, 0.86); if (bs !== 1) { const ss = bloom.setSize.bind(bloom); bloom.setSize = (w, h) => ss(Math.max(64, Math.round(w * bs)), Math.max(64, Math.round(h * bs))); } composer.addPass(bloom);
   const grade = new ShaderPass(Grade); grade.uniforms.res.value.set(size.x, size.y); composer.addPass(grade);
   composer.addPass(new OutputPass());
   return {
@@ -47,7 +50,7 @@ export function makePost(renderer, scene, camera) {
       bloom.strength = 0.22 + n * 0.22 + golden * 0.12; bloom.threshold = 0.88 - n * 0.12; // 은은하게 (밤에도 건물이 하얗게 날아가지 않게)
     },
     render() { composer.render(); },
-    setSize(w, h) { composer.setSize(w, h); bloom.resolution.set(w, h); grade.uniforms.res.value.set(w, h); },
+    setSize(w, h) { composer.setSize(w, h); bloom.resolution.set(w * bs, h * bs); grade.uniforms.res.value.set(w, h); },
     dispose() { composer.dispose(); },
   };
 }
