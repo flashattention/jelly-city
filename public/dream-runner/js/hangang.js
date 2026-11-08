@@ -2312,7 +2312,7 @@ export const LANDMARKS = {
   숭례문: GATE_SN, '숭례문(남대문)': GATE_SN, 흥인지문: { facade: 'hanok', gate: { base: 6, tiers: 2, ong: true } }, 광화문: { facade: 'hanok', gate: { base: 8, tiers: 2, arches: 3 } },
   // 서울시청 새 청사 (유리 파도) · DDP (은빛 알루미늄 패널) · 국립중앙박물관 (긴 화강석 건물)
   // 경기장: 바깥 벽 + 비스듬한 관중석 + 흰 지붕 고리 + 가운데 잔디 (상자로 막지 않게)
-  월드컵주경기장: { facade: 'panels', stadium: { h: 32, roof: '#f4f4f0', mast: true } }, 목동주경기장: { facade: 'stone', stadium: { h: 18, roof: '#e8e4dc' } },
+  월드컵주경기장: { facade: 'panels', stadium: { h: 32, roof: '#f4f4f0', mast: true } }, 목동주경기장: { facade: 'stone', stadium: { h: 18, roof: '#e8e4dc' } }, '올림픽 주경기장': { facade: 'stone', stadium: { h: 30, roof: '#ece8e0' } }, 잠실야구장: { facade: 'stone', stadium: { h: 22, roof: '#d8d4cc' } }, 목동야구장: { facade: 'stone', stadium: { h: 16, roof: '#d8d4cc' } },
   고척스카이돔: { facade: 'panels', color: '#d8dadc', height: 34, domeTop: { r: 92, h: 30, c: '#eceef0' } },
   대한문: { facade: 'hanok', gate: { base: 1.2, tiers: 1, arches: 3, wood: true } },
   // 옛 서울역 (문화역서울284): 붉은 벽돌 + 화강석 띠 + 가운데 초록 돔 · 덕수궁 석조전 (흰 돌 신고전) · 지금 서울역 (유리)
