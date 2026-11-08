@@ -1164,6 +1164,8 @@ function swSlides() {
 // 젤리 서울 러너(/seoul-walk/): 러너 타이틀 없이 바로 서울 산책 시작 화면. 닫기 = 메인으로, 산책을 마치면 다시 시작 화면
 // 따로 된 랜딩 페이지 등에서 바로 온 사람: 젤리게임즈와 상관없이 (닫기 · 메인으로 단추 없음). 젤리게임즈 메인 카드로 온 사람(?from=hub): 메인으로 돌아가는 단추
 // 서울 산책 게임(/seoul-walk/play/): 랜딩에서 고른 곳에서 바로 시작 (r = 동네, go = start · resume · last, x · z = 지도에서 고른 자리), 나가면 랜딩으로
+// 젤리 서울 러너 이용 지표 (익명, 서울 러너 화면에서만 불러온다)
+if (window.SW_PLAY || window.SEOUL_WALK) import('/seoul-walk/metrics.js').then((m) => m.trackGame(() => hg, game, window.SW_PLAY ? 'landing' : 'platform')).catch(() => {});
 if (window.SW_PLAY) { document.body.classList.add('sw', 'solo', 'swplay'); const q = new URLSearchParams(location.search);
   // 첫 칸이 다 만들어질 때까지 덮개 (빈 땅이 보이지 않게, 늦어도 25초 뒤엔 걷힌다)
   hg.onChunk = () => document.body.classList.add('swready'); setTimeout(() => document.body.classList.add('swready'), 25000);

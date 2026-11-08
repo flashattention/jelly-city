@@ -1,6 +1,7 @@
 // 젤리 서울 러너 랜딩: 첫 화면부터 실시간 3D 장면(스크롤로 카메라가 서울 곳곳을 지나간다) · 오른쪽 위 출발(모든 동네 · 지금 걷기 · 이어 걷기 · 지도) · 만든 이야기
 import { account, store } from '/shared/js/account.js';
 import { SeoulMap } from '/dream-runner/js/seoul-map.js';
+import { ev, trackLanding } from '/seoul-walk/metrics.js';
 
 const $ = (id) => document.getElementById(id), esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const PLAY = '/seoul-walk/play/', cl = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v)), ease = (x) => x * x * (3 - 2 * x);
@@ -46,7 +47,7 @@ const want3d = (matchMedia('(min-width: 900px) and (pointer: fine)').matches && 
 if (want3d) {
   use3d = true; loader.set(0.08, '서울을 불러오는 중');
   const giveUp = setTimeout(() => { if (!$('loader').classList.contains('done')) fallbackImages(); }, 25000);
-  const onReady = () => { clearTimeout(giveUp); loader.set(1); setTimeout(loader.done, 250); }, onFail = () => { clearTimeout(giveUp); fallbackImages(); };
+  const onReady = () => { ev('l_3d', { ok: 1, ms: Math.round(performance.now()), mode: W3D ? 'worker' : 'inline' }); clearTimeout(giveUp); loader.set(1); setTimeout(loader.done, 250); }, onFail = () => { ev('l_3d', { ok: 0, ms: Math.round(performance.now()), mode: 'fail' }); clearTimeout(giveUp); fallbackImages(); };
   const cv = $('gl'), qt = new URLSearchParams(location.search).get('tier');
   if (cv.transferControlToOffscreen && typeof Worker === 'function' && !new URLSearchParams(location.search).has('inline')) {
     // 3D 는 웹 워커에서 (메인 스레드는 스크롤 · 글자만 → 약한 컴퓨터에서도 스크롤이 부드럽다)
@@ -71,12 +72,14 @@ const visits = () => { try { return new Set(JSON.parse(store.get(VISIT_KEY) || '
 // 새로 채운 구: 대표 역 앞 길 위에서 시작 [이름, 구, 그림, x, z, 방향]
 const GU_SPOTS = [['마곡나루', '강서구', '🌿', -13433, -4018, 3.04], ['목동', '양천구', '🏙️', -10216, 414, 0.36], ['구로디지털', '구로구', '💻', -6816, 5012, -0.59], ['가산디지털', '금천구', '🏭', -8571, 5328, -2.8], ['노량진', '동작구', '🐟', -3354, 1815, 1.64], ['서울대입구', '관악구', '⛰️', -2407, 5390, -0.29], ['연신내', '은평구', '🛍️', -5201, -9815, 1.86], ['수유', '강북구', '🏔️', 4053, -11957, 2.45], ['창동', '도봉구', '🚉', 5843, -13541, -2.82], ['노원', '노원구', '🌳', 7105, -13767, 0.23], ['성신여대', '성북구', '🎒', 3229, -6938, -1.08], ['청량리', '동대문구', '🧺', 5726, -5535, 2.1], ['상봉', '중랑구', '🌸', 9303, -7338, -1.39], ['건대입구', '광진구', '🍢', 7990, -1081, -0.37], ['천호', '강동구', '🌉', 12659, -923, 2.83]];
 const HOODS = [['yeouido', '여의도 한강', '🌉'], ['banpo', '반포 한강', '🌈'], ['ttukseom', '뚝섬 한강', '🎶'], ['namsan', '남산타워', '🗼'], ['hongdae', '홍대', '🎸'], ['sinchon', '신촌', '🎓'], ['itaewon', '이태원', '🌍'], ['myeongdong', '명동', '🛍️'], ['insadong', '인사동 · 종로', '🏮'], ['bukchon', '북촌 한옥마을', '🏯'], ['seongsu', '성수', '☕'], ['gangnam', '강남역', '🏙️'], ['jamsil', '석촌호수', '🌸']];
+// "지금 걷기": 한 동네로 고정하지 않고 28곳 중 무작위 (via=random 으로 직접 고른 시작과 구분해 기록)
+function randomStart() { const k = Math.floor(Math.random() * (HOODS.length + GU_SPOTS.length)); if (k < HOODS.length) return `${PLAY}?r=${HOODS[k][0]}&go=start&via=random`; const [n, , , x, z, f] = GU_SPOTS[k - HOODS.length]; return `${PLAY}?x=${x}&z=${z}&f=${f}&via=random&n=${encodeURIComponent(n)}`; }
 function renderStart() {
   const A = posAll();
-  $('hoods').innerHTML = HOODS.map(([id, name, ic]) => `<li><a href="${PLAY}?r=${id}&go=${A.regions[id] ? 'resume' : 'start'}"><i>${ic}</i><span>${name}</span>${A.regions[id] ? '<em>이어서</em>' : ''}</a></li>`).join('') + GU_SPOTS.map(([n, gu, ic, x, z, f]) => `<li><a href="${PLAY}?x=${x}&z=${z}&f=${f}" title="${gu}"><i>${ic}</i><span>${n}</span></a></li>`).join('');
+  $('hoods').innerHTML = HOODS.map(([id, name, ic]) => `<li><a href="${PLAY}?r=${id}&go=${A.regions[id] ? 'resume' : 'start'}&via=pick"><i>${ic}</i><span>${name}</span>${A.regions[id] ? '<em>이어서</em>' : ''}</a></li>`).join('') + GU_SPOTS.map(([n, gu, ic, x, z, f]) => `<li><a href="${PLAY}?x=${x}&z=${z}&f=${f}&via=pick&n=${encodeURIComponent(n)}" title="${gu}"><i>${ic}</i><span>${n}</span></a></li>`).join('');
   const last = A.last && A.regions[A.last] ? A.regions[A.last] : null; $('resume').classList.toggle('hidden', !last);
   if (last) { $('resume').href = `${PLAY}?go=last`; $('resume-sub').textContent = last.where || ''; }
-  for (const id of ['go-now', 'go-end', 'go-last', 'bar-go']) $(id).href = last ? `${PLAY}?go=last` : `${PLAY}?r=yeouido&go=start`;
+  for (const id of ['go-now', 'go-end', 'go-last', 'bar-go']) $(id).href = last ? `${PLAY}?go=last` : randomStart();
   const n = visits().size; $('tile-n').textContent = n ? `· 가 본 서울 ${n}/201칸` : '';
 }
 
@@ -95,7 +98,7 @@ addEventListener('keydown', (e) => { if (e.key === 'Escape') $('mapbox').classLi
 $('seoul').addEventListener('pointerdown', (e) => {
   if (!map) return; const cv = $('seoul'), r = cv.getBoundingClientRect(), p = map.pickAt((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height); pick = p;
   const ok = !!p.gu || !!p.region; $('pick-n').textContent = p.region ? p.name : p.gu || '서울 바깥'; $('pick-s').textContent = p.region ? `${p.gu} · 이 동네 길 위에서 시작해요` : p.gu ? `${p.gu} · 이 자리에서 시작해요` : '서울 안을 눌러 주세요';
-  $('go-pick').classList.toggle('disabled', !ok); $('go-pick').href = ok ? `${PLAY}?${p.region ? `r=${p.region}&` : ''}x=${Math.round(p.x)}&z=${Math.round(p.z)}` : '#';
+  $('go-pick').classList.toggle('disabled', !ok); $('go-pick').href = ok ? `${PLAY}?${p.region ? `r=${p.region}&` : ''}x=${Math.round(p.x)}&z=${Math.round(p.z)}&via=map&n=${encodeURIComponent(p.region ? p.name : p.gu)}` : '#';
 });
 
 // ---------- 계정 (선택) ----------
@@ -111,4 +114,4 @@ async function setupAcct() {
   if (account.user) { $('acct-t').textContent = `${account.user.nick || account.user.name || ''} 님 · 걸은 자리가 계정에 저장돼요`; return; }
   if (st.googleClientId) account.googleButton($('g-btn'), st.googleClientId, async () => { try { cloudMerge(await account.api('/api/dream/hangang/me')); await account.api('/api/dream/hangang/save', { method: 'POST', body: { pos: posAll(), visit: [...visits()] } }); } catch { /* 다음에 */ } $('acct-t').textContent = '로그인했어요 · 걸은 자리가 계정에 저장돼요'; $('g-btn').innerHTML = ''; renderStart(); }, () => {}).catch(() => {});
 }
-renderStart(); setupAcct();
+renderStart(); setupAcct(); trackLanding();
