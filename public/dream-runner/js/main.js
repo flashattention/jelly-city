@@ -254,7 +254,7 @@ $('code-btn').onclick = () => joinByCode($('code-in').value);
 $('code-btn2').onclick = () => joinByCode($('code-in2').value);
 $('code-in').onkeydown = (e) => { if (e.key === 'Enter') $('code-btn').click(); };
 $('code-in2').onkeydown = (e) => { if (e.key === 'Enter') $('code-btn2').click(); };
-$('solo-btn').onclick = () => { unlock(); startSoloFresh(); };
+$('solo-btn').onclick = () => { unlock(); for (const id of ['hg-start', 'hg-map']) $(id).classList.add('hidden'); startSoloFresh(); };
 $('multi-btn').onclick = () => { unlock(); openLobby(); };
 // ---------- 스피드전 · 아이템전 ----------
 const modeName = (m) => (m === 'item' ? '🎁 아이템전' : '⚡ 스피드전');

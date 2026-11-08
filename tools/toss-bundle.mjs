@@ -24,6 +24,7 @@ html = html
   .replace('https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js', './vendor/three/three.module.js')
   .replace('https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/', './vendor/three/addons/')
   .replace('href="style.css"', 'href="dream-runner/style.css"')
+  .replace('src="/shared/js/playtime.js"', 'src="./shared/js/playtime.js"')
   .replace('<script type="module" src="js/main.js"></script>', '<script src="./dream-ver.js"></script>\n  <script type="module" src="./toss-bridge.js"></script>\n  <script type="module" src="./dream-runner/js/main.js"></script>');
 if (!html.includes('./dream-ver.js') || !html.includes('./toss-bridge.js') || !html.includes('./vendor/three/three.module.js')) throw new Error('index.html 모양이 바뀌었어요: tools/toss-bundle.mjs 를 고쳐 주세요');
 fs.writeFileSync(path.join(OUT, 'index.html'), html);

@@ -271,7 +271,8 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .card.dream.wide { grid-column: 1 / -1; min-height: 380px; }
 .card.dream.wide .art { bottom: 132px; }
 .card.dream.wide .art { display: grid; grid-template-columns: repeat(4, 1fr); background: #120a35; }
-.dp { position: relative; overflow: hidden; border-right: 2px solid rgba(255,255,255,.12); }
+.dp { position: relative; overflow: hidden; border-right: 2px solid rgba(255,255,255,.12); background-size: cover; background-position: center; transition: transform .6s; }
+.card.dream.wide:hover .dp { transform: scale(1.04); }
 .dp:last-child { border-right: 0; }
 .dp > span { position: absolute; left: 12px; top: 12px; padding: 4px 11px; border-radius: 999px; background: rgba(10,6,30,.5); font-family: 'Jua', sans-serif; font-size: 14px; backdrop-filter: blur(4px); }
 .dp-dream { background: linear-gradient(180deg, #120a35 0%, #3b1f7a 45%, #ff8fb8 100%); }
@@ -312,3 +313,8 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
   .card.dream.wide .info p { font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) { .dp-hell .fist, .dp-hg .jog, .dp-hg .river, .dp-void .vroad, .dp-hell .lava { animation: none; } }
+
+/* 카드 오른쪽 위: 최근 플레이 시간 (NEW 표시는 왼쪽 위로) */
+.card .pt { position: absolute; right: 12px; top: 12px; z-index: 4; padding: 4px 11px; border-radius: 999px; background: rgba(10, 6, 30, .55); color: #fff; font-size: 12px; backdrop-filter: blur(4px); pointer-events: none; }
+.card .new { right: auto !important; left: 14px; }
+.card.dream.wide .pt { top: 14px; right: 16px; font-size: 13px; }

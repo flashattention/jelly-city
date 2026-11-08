@@ -218,9 +218,9 @@ export class Hangang {
           c += vec3(1.0, 0.72, 0.4) * lights * 0.35;
           float d = length(cameraPosition - vW); float f = 1.0 - exp(-pow(fogD * d, 2.0)); c = mix(c, fogCol, f);
           gl_FragColor = vec4(c, 1.0); }` });
-    const wMesh = new THREE.Mesh(fillGeo(this.water), waterM); wMesh.renderOrder = -55; sc.add(wMesh);
+    const wMesh = new THREE.Mesh(fillGeo(this.water), waterM); wMesh.renderOrder = -47; sc.add(wMesh); // 물은 공원 위에 (OSM 한강공원 영역이 물까지 덮고 있다)
     // 섬 · 녹지 (계절마다 색이 바뀐다)
-    this.islandM = flatMat('#7fa860', -54, { map: this.grassTex ||= groundTex('grass') }); const isl = new THREE.Mesh(fillGeo(this.islands, 0, 7), this.islandM); isl.renderOrder = -54; sc.add(isl);
+    this.islandM = flatMat('#7fa860', -46.9, { map: this.grassTex ||= groundTex('grass') }); const isl = new THREE.Mesh(fillGeo(this.islands, 0, 7), this.islandM); isl.renderOrder = -46.9; sc.add(isl);
     const greens = { grass: [], wood: [], wild: [], pitch: [], sand: [] };
     for (const g of M.green) (greens[g[0]] || greens.grass).push(g.slice(1).map(P2));
     this.greenPolys = [...greens.grass, ...greens.wood, ...greens.wild];
@@ -243,7 +243,7 @@ export class Hangang {
     {
       const P = [], I = [], U = [];
       for (const w of this.water) for (const ring of w) { let run = []; const flush = () => { if (run.length > 2) ribbonInto(P, I, run, 5, 0, U); run = []; }; for (const [x, z] of ring) { const near = Math.abs(x) < 3200 && Math.abs(z) < 3200 && Math.abs(Math.abs(x) - 7000) > 5 && Math.abs(Math.abs(z) - 7000) > 5; if (near) run.push([x, z]); else flush(); } flush(); }
-      const m = new THREE.Mesh(geoOf(P, I, { uv: [U, 2] }), flatMat('#ffffff', -54.5, { map: groundTex('stone') })); m.renderOrder = -54.5; sc.add(m);
+      const m = new THREE.Mesh(geoOf(P, I, { uv: [U, 2] }), flatMat('#ffffff', -46.8, { map: groundTex('stone') })); m.renderOrder = -46.8; sc.add(m);
     }
     this.buildBridges(P2, inWater, r);
     this.buildBuildings(P2);

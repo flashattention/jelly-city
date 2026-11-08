@@ -33,6 +33,21 @@ fetch('/api/dream/board').then((r) => r.json()).then((d) => {
   if (t.length) $('top3').textContent = '🏆 ' + t.map((e, i) => `${['🥇', '🥈', '🥉'][i]} ${e.name} ${e.score.toLocaleString()}점`).join('  ');
 }).catch(() => {});
 
+// 게임 카드: 오른쪽 위에 "n일간 플레이 n시간", 플레이 시간이 많은 게임부터 (드림 러너 큰 카드는 맨 위 그대로)
+fetch('/api/playtime?days=7').then((r) => r.json()).then((d) => {
+  const games = d.games || {}, since = d.since ? Math.max(1, Math.ceil((Date.now() - Date.parse(`${d.since}T00:00:00+09:00`)) / 864e5)) : 1, days = Math.min(d.days || 7, since);
+  const fmt = (m) => (m >= 60 ? `${Math.round(m / 6) / 10}시간` : `${m}분`).replace('.0시간', '시간');
+  const box = document.querySelector('.games'); if (!box) return;
+  const cards = [...box.querySelectorAll('a.card')], order = new Map(cards.map((c, i) => [c, i]));
+  for (const c of cards) {
+    const id = (c.getAttribute('href') || '').split('/').filter(Boolean)[0], m = games[id] || 0;
+    c.dataset.pt = m;
+    const b = document.createElement('span'); b.className = 'pt'; b.textContent = `⏱️ ${days}일간 플레이 ${fmt(m)}`; c.appendChild(b);
+  }
+  const rest = cards.filter((c) => !c.classList.contains('wide')).sort((a, b) => (+b.dataset.pt - +a.dataset.pt) || (order.get(a) - order.get(b)));
+  for (const c of rest) box.appendChild(c);
+}).catch(() => {});
+
 // ---------- 계정 ----------
 async function boot() {
   try { status = await account.status(); } catch { err('서버에 연결할 수 없어요'); }

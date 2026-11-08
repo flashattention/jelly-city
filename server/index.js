@@ -17,6 +17,7 @@ import { llmEnabled, MODEL } from './jelly-city/llm.js';
 import { GOOGLE_CLIENT_ID, DEV_LOGIN, verifyGoogle, readJson } from './auth.js';
 import { DreamBoard, dreamApi } from './dream-runner/leaderboard.js';
 import { TossAccounts, tossAccountApi, cors as tossCors } from './toss.js';
+import { PlayTime, playtimeApi } from './playtime.js';
 import { Board, boardApi } from './board.js';
 import { DreamRooms } from './dream-runner/rooms.js';
 import { DriftRooms } from './jelly-drift/rooms.js';
@@ -65,6 +66,7 @@ try {
 } catch (e) { console.error('복원 실패', e); }
 const world = new World({ dataDir: DATA_DIR });
 const dreamBoard = new DreamBoard(DATA_DIR); // 드림 러너 리더보드
+const playtime = new PlayTime(DATA_DIR); // 게임마다 플레이 시간 (메인 화면 카드 · 인기순)
 const cosmetics = new Cosmetics(DATA_DIR); cosmetics.dream = dreamBoard; // 치장 · 업적 (모든 게임 공용)
 // 토스 미니앱: 계정 · 드림 러너 기록을 웹과 따로 (같은 서버 · 같은 게임 코드, 파일만 다르다)
 const toss = new TossAccounts(DATA_DIR);
@@ -182,6 +184,7 @@ async function api(req, res, url) {
   if (url.pathname.startsWith('/api/board/')) return boardApi(req, res, url, world.userOf(sid), board, json, isAdmin);
   if (url.pathname.startsWith('/api/dream/')) return dreamApi(req, res, url, world.userOf(sid), dreamBoard, json, isAdmin);
   if (url.pathname.startsWith('/api/merge/')) return mergeRecords.api(req, res, url, world.userOf(sid), json, '/api/merge');
+  if (url.pathname === '/api/playtime' && await playtimeApi(req, res, url, playtime, json)) return;
   if (url.pathname.startsWith('/api/slide/')) return slideRecords.api(req, res, url, world.userOf(sid), json, '/api/slide');
   if (url.pathname.startsWith('/api/drift/')) return driftRecords.api(req, res, url, world.userOf(sid), json, '/api/drift');
   if (url.pathname.startsWith('/api/rider/')) return driftRecords.api(req, res, url, world.userOf(sid), json, '/api/rider'); // 옛 주소
@@ -391,7 +394,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
     world.broadcast({ t: 'sys', text: '🔧 서버가 업데이트돼요! 잠시 후 자동으로 다시 접속해요' });
     try { const n = dreamRooms.maint(); if (n) console.log(`🌙 드림 러너: 달리던 방 ${n}개를 멈춰 적어 뒀어요`); } catch (e) { console.error('드림 러너 멈추기 실패', e); }
     try { world.save(); console.log('💾 세계를 저장했어요'); } catch (e) { console.error('저장 실패', e); }
-    dreamBoard.save(); dreamToss.save(); toss.save(); cosmetics.save(); board.save(); driftRecords.save(); tenRecords.save(); survRecords.save(); wordDict.save(); typeRecords.save(); mergeRecords.save(); slideRecords.save();
+    dreamBoard.save(); dreamToss.save(); toss.save(); playtime.save(); cosmetics.save(); board.save(); driftRecords.save(); tenRecords.save(); survRecords.save(); wordDict.save(); typeRecords.save(); mergeRecords.save(); slideRecords.save();
     setTimeout(() => process.exit(0), 500);
   });
 }
