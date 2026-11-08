@@ -76,6 +76,11 @@ function windowTex(glass, lit, seed) {
 function facadeTex(type, lit, seed) {
   const cv = document.createElement('canvas'); cv.width = cv.height = 256; const g = cv.getContext('2d'), r = rnd(seed + type.length * 7), C = 32;
   const wall = { apt: '#f4f2ee', glass: '#d6dde4', stone: '#e6e1d8', brick: '#d7d0c8', gold: '#f0e2c0', assembly: '#f6f3ec' }[type];
+  if (type === 'fins') { // 연회색 세로 핀 + 그 사이 좁은 유리 띠 (파크원)
+    g.fillStyle = lit ? '#000' : '#e4e4e0'; g.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { const x = i * 32, y = j * 32; if (lit) { if (r() < 0.45) { g.fillStyle = `hsl(${200 + r() * 20},20%,${78 + r() * 12}%)`; g.fillRect(x + 9, y + 2, 14, 27); } continue; } const k = 0.8 + r() * 0.2; g.fillStyle = `rgb(${120 * k},${136 * k},${150 * k})`; g.fillRect(x + 9, y + 2, 14, 27); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(x + 9, y + 2, 3, 27); g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(x + 23, y, 3, 32); }
+    if (!lit) for (let j = 0; j < 8; j++) { g.fillStyle = 'rgba(0,0,0,.08)'; g.fillRect(0, j * 32 + 30, 256, 2); }
+    const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
   if (type === 'panels') { g.fillStyle = lit ? '#000' : '#cfc8c2'; g.fillRect(0, 0, 256, 256); for (let i = 0; i < 8; i++) { const x = i * 32; if (lit) { g.fillStyle = 'rgba(255,226,180,.75)'; g.fillRect(x + 14, 0, 4, 256); g.fillStyle = 'rgba(255,214,160,.18)'; g.fillRect(x + 10, 0, 12, 256); } else { g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(x + 10, 0, 12, 256); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(x + 2, 0, 2, 256); } } const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
   if (type === 'church') { g.fillStyle = lit ? '#000' : '#f2ede4'; g.fillRect(0, 0, 256, 256); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { const x = i * 64 + 22, y = j * 64 + 8; g.fillStyle = lit ? (r() < 0.35 ? '#ffd9a0' : '#000') : '#5a6a86'; g.beginPath(); g.moveTo(x, y + 48); g.lineTo(x, y + 12); g.arc(x + 10, y + 12, 10, Math.PI, 0); g.lineTo(x + 20, y + 48); g.closePath(); g.fill(); if (!lit) { g.strokeStyle = 'rgba(255,255,255,.5)'; g.beginPath(); g.moveTo(x + 10, y + 4); g.lineTo(x + 10, y + 48); g.stroke(); } } const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
   if (type === 'assembly') { g.fillStyle = lit ? '#000' : wall; g.fillRect(0, 0, 256, 256); if (!lit) { for (let i = 0; i < 8; i++) { const x = i * 32; g.fillStyle = 'rgba(0,0,0,.07)'; g.fillRect(x + 22, 0, 10, 256); g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(x + 4, 0, 3, 256); } for (let j = 0; j < 8; j++) { g.fillStyle = 'rgba(0,0,0,.04)'; g.fillRect(0, j * 32, 256, 1); } } const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
@@ -240,6 +245,10 @@ export class Hangang {
   deckAt(x, z, y) {
     let g = -1; for (const si of this.deckGrid?.get(`${Math.floor(x / 40)},${Math.floor(z / 40)}`) || []) { const d = this.decks[si], ex = d.cx - d.ax, ez = d.cz - d.az, L2 = ex * ex + ez * ez || 1, t = clamp(((x - d.ax) * ex + (z - d.az) * ez) / L2, 0, 1); if (Math.hypot(x - d.ax - ex * t, z - d.az - ez * t) > d.hw) continue; const dy = d.ya + (d.yc - d.ya) * t; if (y >= dy - 1.0 && dy > g) g = dy; }
     return g;
+  }
+  nearDeck(x, z, m) {
+    for (const si of this.deckGrid?.get(`${Math.floor(x / 40)},${Math.floor(z / 40)}`) || []) { const d = this.decks[si], ex = d.cx - d.ax, ez = d.cz - d.az, L2 = ex * ex + ez * ez || 1, t = clamp(((x - d.ax) * ex + (z - d.az) * ez) / L2, 0, 1); if (Math.hypot(x - d.ax - ex * t, z - d.az - ez * t) < d.hw + m) return true; }
+    return false;
   }
   groundAt(x, z, y) {
     const cell = this.footGrid?.get(`${Math.floor(x / 40)},${Math.floor(z / 40)}`); let g = Math.max(0, this.deckAt(x, z, y));
@@ -419,7 +428,7 @@ export class Hangang {
       for (let i = 0; i < fine.length; i += 2) { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], ang = Math.atan2(c[1] - a[1], c[0] - a[0]) + Math.PI / 2; if (ys[i] < 3) continue; if (wet[i]) { if (i % 4 === 0) piers.push([fine[i][0], fine[i][1], ys[i], b.w, ang]); } else piers.push([fine[i][0], fine[i][1], ys[i], b.w * 0.6, ang]); }
       if (anyWet) for (let i = 0; i < fine.length; i += 3) { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1; for (const sgn of [-1, 1]) lamps.push(fine[i][0] - dz / L * b.w / 2 * sgn, ys[i] + 1.2, fine[i][1] + dx / L * b.w / 2 * sgn); }
     }
-    const dm = new THREE.MeshLambertMaterial({ color: '#77746f' }), sm = new THREE.MeshLambertMaterial({ color: '#d9d2c6', side: THREE.DoubleSide });
+    const dm = new THREE.MeshLambertMaterial({ color: '#77746f', side: THREE.DoubleSide }), sm = new THREE.MeshLambertMaterial({ color: '#d9d2c6', side: THREE.DoubleSide });
     this.scene.add(new THREE.Mesh(geoOf(deck.P, deck.I), dm), new THREE.Mesh(geoOf(side.P, side.I), sm));
     // 난간: 얇은 벽 (아래 · 위 두 줄)
     { const P = [], I = []; for (const { off, ys } of rails2) for (let i = 1; i < off.length; i++) { const a = off[i - 1], c = off[i], k = P.length / 3; P.push(a[0], ys[i - 1], a[1], c[0], ys[i], c[1], c[0], ys[i] + 1.15, c[1], a[0], ys[i - 1] + 1.15, a[1]); I.push(k, k + 1, k + 2, k, k + 2, k + 3); } this.scene.add(new THREE.Mesh(geoOf(P, I), new THREE.MeshLambertMaterial({ color: '#7d8a99', side: THREE.DoubleSide, transparent: true, opacity: 0.55 })));
@@ -461,12 +470,12 @@ export class Hangang {
   //   아파트(흰 벽 · 발코니 띠) · 유리 오피스(색 유리 · 멀리온) · 석재 오피스(창이 뚫린 돌벽) · 벽돌(학교 · 주택) · 금빛 유리(63빌딩)
   //   랜드마크: 63빌딩 금빛 유리 · 파크원 빨간 철골 기둥 · LG트윈타워 청동빛 유리 · IFC 푸른 유리 · 전경련회관 짙은 유리 · 국회의사당 흰 기둥 + 초록 돔
   buildBuildings(P2) {
-    const M = this.map, r = rnd(99), types = ['apt', 'glass', 'stone', 'brick', 'gold', 'assembly', 'church', 'panels'];
+    const M = this.map, r = rnd(99), types = ['apt', 'glass', 'stone', 'brick', 'gold', 'assembly', 'church', 'panels', 'fins'];
     const sets = Object.fromEntries(types.map((t) => [t, { P: [], N: [], U: [], Cl: [], I: [] }]));
     const extras = { P: [], N: [], Cl: [], I: [] }, domes = [], signs = { P: [], N: [], Cl: [], I: [] }, crosses = [];
     const col = new THREE.Color(), roofC = new THREE.Color();
     const GLASS = ['#6f8fb2', '#5f9aa2', '#8a96a4', '#6d9a86', '#9a8a70', '#55626f', '#7aa0c8', '#8fa8b8'], STONE = ['#d8cfbf', '#c9c4bc', '#b8b2a8', '#d9c8ae', '#a99c88', '#e2ddd2'], BRICK = ['#a8573e', '#9a4a36', '#b8694a', '#8a4a3a', '#c07a55'], APT = ['#f1ede4', '#ece4d4', '#e8e8e4', '#f2e9da', '#e4dccd', '#dfe3e6'];
-    const FLOOR = { apt: 2.9, glass: 3.9, stone: 3.6, brick: 3.2, gold: 3.9, assembly: 6, church: 7, panels: 8 }, BAY = { apt: 3.4, glass: 1.6, stone: 2.6, brick: 2.4, gold: 1.6, assembly: 3.5, church: 4.5, panels: 5 };
+    const FLOOR = { apt: 2.9, glass: 3.9, stone: 3.6, brick: 3.2, gold: 3.9, assembly: 6, church: 7, panels: 8, fins: 3.9 }, BAY = { apt: 3.4, glass: 1.6, stone: 2.6, brick: 2.4, gold: 1.6, assembly: 3.5, church: 4.5, panels: 5, fins: 1.6 };
     const box = (x, y, z, w, h, d, c, rotY = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.rotateY(rotY); g.translate(x, y, z); const k = extras.P.length / 3, p = g.attributes.position, n = g.attributes.normal; for (let i = 0; i < p.count; i++) { extras.P.push(p.getX(i), p.getY(i), p.getZ(i)); extras.N.push(n.getX(i), n.getY(i), n.getZ(i)); extras.Cl.push(c.r, c.g, c.b); } for (const ix of g.index.array) extras.I.push(k + ix); };
     const campus = []; for (const [nm, L] of Object.entries(LANDMARKS)) { if (!L.campus) continue; const ni2 = M.names.indexOf(nm); const b2 = M.buildings.find((q) => q[4] === ni2); if (!b2) continue; let x = 0, z = 0, n = 0; for (let k = 7; k < b2.length; k += 2) { x += b2[k] * M.scale; z += b2[k + 1] * M.scale; n++; } campus.push({ x: x / n, z: z / n, r: L.campus, L, nm, kind: b2[2] >> 1, ring: P2(b2.slice(7)), self: b2 }); }
     this.lmParts = {}; const touches = (cp, b, ring) => cp.self !== b && (ring.some(([x, z]) => inRing(x, z, cp.ring)) || cp.ring.some(([x, z]) => inRing(x, z, ring)));
@@ -480,7 +489,7 @@ export class Hangang {
       let c = null;
       if (LANDMARKS[name]) { const L = LANDMARKS[name]; type = L.facade; c = L.color; (this.lmQueue ||= []).push({ name, ring, h, L }); }
       else if (/63/.test(name) || /gold/i.test(cTag)) { type = 'gold'; c = '#ffd76a'; }
-      else if (/파크원|NH금융타워/.test(name)) { type = 'glass'; c = '#9fb6c8'; }
+      else if (/파크원|NH금융타워/.test(name)) { type = 'fins'; c = '#e8e8e4'; }
       else if (/LG트윈|트윈타워/.test(name)) { type = 'glass'; c = '#7a6248'; }
       else if (/IFC/.test(name)) { type = 'glass'; c = '#6f95c8'; }
       else if (/전경련|FKI/.test(name)) { type = 'glass'; c = '#4f6266'; }
@@ -493,6 +502,7 @@ export class Hangang {
       col.set(c); if (type !== 'gold') col.offsetHSL((r() - 0.5) * 0.02, 0, (r() - 0.5) * 0.05);
       try { roofC.set(rci >= 0 ? M.colors[rci] : type === 'apt' ? '#8f8a84' : '#7d7b78'); } catch { roofC.set('#7d7b78'); }
       if (type === 'glass' || type === 'gold') roofC.copy(col).multiplyScalar(0.6);
+      if (LANDMARKS[name]?.roof) roofC.set(LANDMARKS[name].roof);
       const set = sets[type], s = ringArea(ring) > 0 ? 1 : -1, base = () => set.P.length / 3, FH = FLOOR[type] * 8, BW = BAY[type] * 8;
       let acc = 0;
       for (let i = 0; i < ring.length; i++) {
@@ -515,7 +525,7 @@ export class Hangang {
       // 옥상 설비 (높은 건물)
       if (h > 40 && !/63|IFC|파크원|전경련/.test(name)) { const area = Math.abs(ringArea(ring)), w = Math.sqrt(area) * 0.32; box(cx, h + 1.6, cz, w, 3.2, w * 0.8, new THREE.Color('#8e8c88')); }
       // 파크원: 모서리를 따라 오르는 빨간 철골 기둥과 가로대
-      if (/파크원|NH금융타워/.test(name)) { const red = new THREE.Color('#d8382a'); for (let i = 0; i < ring.length; i++) { const [x, z] = ring[i], ox = x + (x - cx) * 0.04, oz = z + (z - cz) * 0.04; box(ox, (mh + h) / 2, oz, 2.2, h - mh, 2.2, red); } for (let y = mh + 40; y < h - 10; y += 48) for (let i = 0; i < ring.length; i++) { const a = ring[i], c2 = ring[(i + 1) % ring.length], L = Math.hypot(c2[0] - a[0], c2[1] - a[1]); box((a[0] + c2[0]) / 2 + ((a[0] + c2[0]) / 2 - cx) * 0.04, y, (a[1] + c2[1]) / 2 + ((a[1] + c2[1]) / 2 - cz) * 0.04, L, 1.6, 1.2, red, -Math.atan2(c2[1] - a[1], c2[0] - a[0])); } }
+      if (/파크원|NH금융타워/.test(name)) { const red = new THREE.Color('#d8382a'); for (let i = 0; i < ring.length; i++) { const [x, z] = ring[i], ox = x + (x - cx) * 0.04, oz = z + (z - cz) * 0.04; box(ox, (mh + h) / 2, oz, 2.2, h - mh, 2.2, red); } for (let y = mh + 60; y < h - 20; y += 96) for (let i = 0; i < ring.length; i++) { const a = ring[i], c2 = ring[(i + 1) % ring.length], L = Math.hypot(c2[0] - a[0], c2[1] - a[1]); box((a[0] + c2[0]) / 2 + ((a[0] + c2[0]) / 2 - cx) * 0.04, y, (a[1] + c2[1]) / 2 + ((a[1] + c2[1]) / 2 - cz) * 0.04, L, 1.6, 1.2, red, -Math.atan2(c2[1] - a[1], c2[0] - a[0])); } }
       if (dome) { let rc = '#4f9e8c'; try { rc = rci >= 0 ? `#${new THREE.Color(M.colors[rci]).getHexString()}` : rc; } catch { /* 기본 */ } domes.push([cx, h, cz, domeR, domeH, rc]); }
     }
     this.winTex = {}; this.litTex = {}; this.bldM = [];
@@ -569,7 +579,8 @@ export class Hangang {
   // 나무 · 풀 · 꽃: 길 양옆에 줄지어, 공원 안에 흩어서
   buildPlants(inWater, r) {
     const spots = [], near = isPhone ? 0.55 : 1;
-    const okAt = (x, z) => !inWater(x, z);
+    // 물 · 다리(경사로 포함, 둘레 4m) · 건물 안에는 심지 않는다 (다리를 가로막지 않게)
+    const okAt = (x, z) => !inWater(x, z) && !this.nearDeck(x, z, 4) && this.groundAt(x, z, 9999) === 0;
     // 강 쪽은 탁 트이게 드문드문, 공원 쪽은 줄지어
     for (let s = 4; s < this.L; s += 9 / near) for (const lat of [-12.5, 7.5]) { if (lat < 0 && r() < 0.72) continue; const j = lat + (r() - 0.5) * 2.4, [x, z] = this.world(s + (r() - 0.5) * 3, j); if (okAt(x, z)) spots.push([x, z, 0.7 + r() * 0.3]); }
     // 공원 안 (코스 주변 450m)
@@ -1136,7 +1147,7 @@ export class Hangang {
     else if (mode === 1) { const p = this.at(this.s); cx = bx - p.rx * 5 + p.dx * 1.5; cy = 1.0; cz = bz - p.rz * 5 + p.dz * 1.5; lx = bx; ly = 0.6; lz = bz; }
     else { cx = bx - fx * 26; cy = 22; cz = bz - fz * 26; lx = bx + fx * 30; ly = 0; lz = bz + fz * 30; }
     if (!this.camInit) { camera.position.set(cx, cy, cz); this.camInit = true; }
-    camera.position.x += (cx - camera.position.x) * k; camera.position.y += (cy - camera.position.y) * k; camera.position.z += (cz - camera.position.z) * k; camera.position.y = Math.max(0.3, camera.position.y);
+    camera.position.x += (cx - camera.position.x) * k; camera.position.y += (cy - camera.position.y) * k; camera.position.z += (cz - camera.position.z) * k; camera.position.y = Math.max(0.3, camera.position.y); { const dg = this.deckAt(camera.position.x, camera.position.z, this.y + 0.5); if (dg > 0.5 && this.y >= dg - 0.3) camera.position.y = Math.max(camera.position.y, dg + 0.6); } // 다리 위에 있을 땐 카메라가 다리 밑으로 안 내려간다
     this.look ||= new THREE.Vector3(lx, ly, lz); this.look.x += (lx - this.look.x) * k; this.look.y += (ly - this.look.y) * k; this.look.z += (lz - this.look.z) * k;
     camera.lookAt(this.look);
     const fov = 56 + clamp(this.v - 6, 0, 18) * 0.8; if (Math.abs(camera.fov - fov) > 0.05 || camera.far < 20000) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 3); camera.far = 24000; camera.updateProjectionMatrix(); }
@@ -1330,6 +1341,11 @@ export const LANDMARKS = {
   전경련회관: { facade: 'glass', color: '#9bb0aa', crown: { rise: 18, dir: [0, -1] }, rimLight: true },
   LG트윈타워: { facade: 'gold', color: '#d9b27c', topSign: { text: 'LG', color: '#c4003a', bg: '#ffffff' } },
   'KBS 본관': { facade: 'stone', color: '#bfae92' },
+  //   국회도서관: 흰 석조 · 청록 동판 지붕 / 국회의원회관: 흰 석조 · 청록 지붕
+  국회도서관: { facade: 'assembly', color: '#f1ede4', roof: '#4f8f7c' },
+  국회의원회관: { facade: 'assembly', color: '#ece8de', roof: '#5a9482' },
+  //   더현대 서울: 낮고 넓은 유리 · 회색 몸체, 지붕은 초록 정원과 유리 천창 격자, 긴 두 변에 붉은 아치 트러스
+  '더현대 서울': { facade: 'glass', color: '#b9c3c8', roof: '#6f8a6a', skylight: true, arches: { n: 6, color: '#c8382a' } },
   여의도순복음교회: { facade: 'panels', color: '#5d4f48', campus: 160, campusFacade: 'stone', campusColor: '#a08a7a', front: { w: 16, d: 9, up: 13, face: 'west', screen: true, cross: true, sign: '여의도순복음교회' }, rimLight: true },
 };
 const CAR_COLORS = ['#f4f4f2', '#f4f4f2', '#1d1d1f', '#9aa0a6', '#c9ccd0', '#2a3a5a', '#7a1d22', '#3d4a3a', '#d8d2c4'];
@@ -1376,6 +1392,20 @@ function buildLandmarkExtras(hg, { name, ring, h, L }) {
   const parts = [{ ring, h }, ...(hg.lmParts?.[name] || [])];
   if (L.rimLight) { const m = new THREE.LineBasicMaterial({ color: '#fff4e0', transparent: true, opacity: 0.3 }); for (const q of parts) { const pts = [...q.ring, q.ring[0]].map(([x, z]) => new THREE.Vector3(x, q.h + 0.2, z)); hg.scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), m)); } (hg.lmLights ||= []).push(m); }
   if (L.crown) buildCrown(hg, ring, h, L);
+  if (L.skylight) { // 지붕: 초록 정원 칸과 유리 천창 띠 (위성사진 모습)
+    const cv = document.createElement('canvas'); cv.width = cv.height = 256; const c2 = cv.getContext('2d'); c2.fillStyle = '#7d8e86'; c2.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { const x = i * 64, y = j * 64; c2.fillStyle = (i + j) % 2 ? '#6f8f62' : '#8a9aa0'; c2.fillRect(x + 6, y + 6, 52, 52); c2.strokeStyle = 'rgba(255,255,255,.35)'; c2.lineWidth = 2; c2.beginPath(); c2.moveTo(x + 6, y + 6); c2.lineTo(x + 58, y + 58); c2.moveTo(x + 58, y + 6); c2.lineTo(x + 6, y + 58); c2.stroke(); c2.fillStyle = 'rgba(210,235,245,.75)'; c2.fillRect(x + 26, y + 26, 12, 12); }
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    const xs = ring.map((p) => p[0]), zs = ring.map((p) => p[1]), x0 = Math.min(...xs), z0 = Math.min(...zs), shape = new THREE.Shape(ring.map(([x, z]) => new THREE.Vector2(x, -z))), g = new THREE.ShapeGeometry(shape); g.rotateX(-Math.PI / 2);
+    const uv = g.attributes.uv, pos = g.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, (pos.getX(i) - x0) / 40, (pos.getZ(i) - z0) / 40);
+    const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: t, emissive: '#fff2d8', emissiveMap: t, emissiveIntensity: 0 })); m.position.y = h + 0.15; hg.scene.add(m); (hg.lmCrowns ||= []).push(m.material);
+  }
+  if (L.arches) { // 긴 두 변을 따라 붉은 아치 트러스 (벽 바깥으로 살짝)
+    const am = new THREE.MeshLambertMaterial({ color: L.arches.color }), sides = ring.map((a, i) => { const b = ring[(i + 1) % ring.length]; return { a, b, L: Math.hypot(b[0] - a[0], b[1] - a[1]) }; }).sort((p, q) => q.L - p.L).slice(0, 2);
+    for (const { a, b, L: len } of sides) { const ux = (b[0] - a[0]) / len, uz = (b[1] - a[1]) / len; let nx = -uz, nz = ux; const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2; if ((mx + nx - cx) ** 2 + (mz + nz - cz) ** 2 < (mx - cx) ** 2 + (mz - cz) ** 2) { nx = -nx; nz = -nz; }
+      const n = L.arches.n, span = len / n; for (let k = 0; k < n; k++) { const s0 = span * k + span * 0.12, s1 = span * (k + 1) - span * 0.12, pts = []; for (let q = 0; q <= 12; q++) { const t = q / 12, sx = s0 + (s1 - s0) * t, y = h * 0.35 + Math.sin(t * Math.PI) * h * 0.75; pts.push(new THREE.Vector3(a[0] + ux * sx + nx * 1.2, y, a[1] + uz * sx + nz * 1.2)); } const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.55, 6), am); hg.scene.add(tube); const tube2 = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((p) => p.clone().add(new THREE.Vector3(0, -1.6, 0)))), 24, 0.35, 6), am); hg.scene.add(tube2); }
+    }
+  }
   if (L.topSign) { // 꼭대기 로고: 가장 높은 조각의 가장 긴 두 벽에
     const cen = (r2) => { let x = 0, z = 0; for (const p of r2) { x += p[0]; z += p[1]; } return [x / r2.length, z / r2.length]; };
     // 동마다 (60m 넘게 떨어진 무리마다) 가장 높은 조각 하나씩
