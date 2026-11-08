@@ -16,7 +16,8 @@ const TOKEN_PATH = process.env.TOSS_TOKEN_PATH || '/api-partner/v1/apps-in-toss/
 const ME_PATH = process.env.TOSS_ME_PATH || '/api-partner/v1/apps-in-toss/user/oauth2/login-me';
 const pem = (v) => (!v ? null : v.includes('BEGIN') ? v : Buffer.from(v, 'base64').toString('utf8'));
 const CERT = pem(process.env.TOSS_MTLS_CERT), KEY = pem(process.env.TOSS_MTLS_KEY);
-export const tossReady = !!(CERT && KEY);
+// 토스 로그인은 콘솔에서 열려야 쓸 수 있다 (사업자 등록 뒤). 인증서가 있어도 TOSS_LOGIN=1 을 넣어야 '토스 계정에 잇기' 버튼이 뜬다
+export const tossReady = !!(CERT && KEY) && process.env.TOSS_LOGIN === '1';
 
 function call(method, p, body, token) {
   return new Promise((ok, bad) => {
