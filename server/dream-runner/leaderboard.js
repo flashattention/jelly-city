@@ -7,11 +7,11 @@ import { DIFFS, diffOf } from '../../public/dream-runner/js/diff.js';
 import { getCos, boardMedal, nameOf, tagChar } from '../cosmetics.js';
 import crypto from 'node:crypto';
 import { Tickets, ReplayPool, decodeReplay } from './verify.js';
+import { codeVer, archiveCode, hasVer, VER_RE } from './codever.js';
 import { itemById } from '../../public/shared/js/cos-items.js';
 
 // 게임 코드 판: 서버가 다시 돌려 보는 코드와 브라우저 코드가 같아야 기록이 맞는다. 배포로 바뀌면 브라우저가 달리기 전에 새로 고친다
-const JS_DIR = new URL('../../public/dream-runner/js/', import.meta.url);
-export const DREAM_VER = (() => { try { const h = crypto.createHash('sha1'); for (const f of fs.readdirSync(JS_DIR).filter((x) => x.endsWith('.js')).sort()) h.update(fs.readFileSync(new URL(f, JS_DIR))); return h.digest('hex').slice(0, 12); } catch { return 'x'; } })();
+export const DREAM_VER = codeVer();
 const MAX_SPEED = 50;
 const MAX_SPEED_ITEM = 75; // 아이템전: 로켓 · 순간이동이 있어서 더 넉넉하게      // 게임 속 최고 속도(30m/s × 가속 1.5)보다 넉넉하게: 이보다 빠른 기록은 조작으로 본다
 const TOP = 50;
@@ -40,7 +40,7 @@ export class DreamBoard {
       // 예전 '확인 대기' 기록: 순위표에 올리고 비상 리포트로 옮긴다 (더는 기다리게 하지 않는다)
       for (const p of d.pending || []) { this.mig = true; const T = this.table(p.mode, p.diff, p.map); if (!T[p.sub] || p.e.score > T[p.sub].score) T[p.sub] = p.e; this.report('red', p.sub, p.mode, p.diff, p.map, p.why, p.e, p.r); }
     } catch { /* 처음 */ }
-    this.dirty = !!this.mig; this.tickets = new Tickets(this.secret); this.pool = opt.pool || new ReplayPool(); this.done = new Map(); this.busy = new Set();
+    this.dirty = !!this.mig; this.tickets = new Tickets(this.secret); this.pool = opt.pool || new ReplayPool(DREAM_VER, archiveCode(dataDir, DREAM_VER)); this.done = new Map(); this.busy = new Set();
     try { this.tickets.load(JSON.parse(fs.readFileSync(this.file, 'utf8')).used); } catch { /* 처음 */ }
     setInterval(() => this.save(), 20000).unref();
   }
@@ -154,8 +154,11 @@ export class DreamBoard {
     if (claim <= oldScore) { this.vstat.skip++; return { ok: false, skip: true, why: 'notbest' }; } // 내 최고보다 낮으면 돌려 볼 필요가 없다
     const sum = rp.dts.reduce((a, v) => a + v, 0) / 10000;
     if (tk && (tk.diff !== diff || tk.map !== map || sum > (now - tk.at) / 1000 + 5)) return { ok: false, why: 'time' }; // 기록된 시간이 실제로 지난 시간보다 길면 안 된다
+    // 그 판을 달린 게임 코드로 다시 돌린다 (토스 미니앱은 검수 때문에 예전 판으로 돌 수 있다). 서버가 보관한 적 없는 판이면 확인할 수 없다
+    const ver = VER_RE.test(String(b.ver || '')) ? String(b.ver) : DREAM_VER;
+    if (ver !== DREAM_VER && !hasVer(ver)) { this.vstat.old = (this.vstat.old || 0) + 1; return { ok: false, why: 'oldver' }; }
     const seed = tk ? tk.seed : Number(b.seed) | 0;
-    const r = await this.pool.run({ seed, diff, map, dts: rp.dts, evs: rp.evs });
+    const r = await this.pool.run({ seed, diff, map, dts: rp.dts, evs: rp.evs, ver });
     if (!r) return { ok: false, why: 'busy', soft: true };
     // 브라우저마다 소수점 끝자리가 조금 달라도 괜찮게 약간의 오차는 넘어간다
     const dOk = r.dead && Math.abs(r.dist - Number(b.dist)) <= Math.max(3, r.dist * 0.01), sOk = Math.abs(r.stars - Number(b.stars)) <= Math.max(1, r.stars * 0.02);
@@ -205,7 +208,7 @@ export class DreamBoard {
     let chk; try { chk = await this.check(b, diff, map, mode, now, T[who.sub]?.score || 0); } finally { this.busy.delete(tk.id); }
     // 혼자 달린 스피드전: 플레이 기록을 다시 돌려 봐서 맞아야만 올린다 (기록이 없거나 결과가 다르면 거절, 확인을 못 했으면 잠시 뒤 다시)
     if (chk.why === 'busy') throw err('기록을 확인하는 중이에요 · 잠시 뒤 다시 올려요', 503);
-    if (['noreplay', 'mismatch', 'time'].includes(chk.why)) { console.warn(`드림 러너 기록 거절(${chk.why}): ${score}점 ${map} ${diff}`); throw err(chk.why === 'noreplay' ? '플레이 기록이 없는 판은 순위표에 올리지 않아요' : '플레이 기록과 점수가 맞지 않아요'); }
+    if (['noreplay', 'mismatch', 'time', 'oldver'].includes(chk.why)) { console.warn(`드림 러너 기록 거절(${chk.why}): ${score}점 ${map} ${diff}`); throw err(chk.why === 'noreplay' ? '플레이 기록이 없는 판은 순위표에 올리지 않아요' : chk.why === 'oldver' ? '예전 버전으로 달린 판이라 확인할 수 없어요 · 앱을 업데이트해 주세요' : '플레이 기록과 점수가 맞지 않아요'); }
     if (!this.tickets.once(tk.id, 'score')) throw err('이미 기록한 판이에요');
     this.runs++; this.dirty = true;
     const name = clean(b.name, 14) || clean(who.user.nick || (who.user.guest ? who.user.name : ''), 14) || '꿈꾸는 곰돌이'; // 구글 실명은 쓰지 않는다
@@ -244,7 +247,7 @@ export async function dreamApi(req, res, url, who, board, json, isAdmin) {
     try { return json(res, 200, { ok: true, ...board.played(who?.sub || 'anon:' + b.anon, b) }); } catch (e) { return json(res, 400, { error: e.message }); }
   }
   // 출발표: 기다리지 않고 시작하고, 뒤에서 받아 둔다
-  if (url.pathname === '/api/dream/ver') return json(res, 200, { v: DREAM_VER });
+  if (url.pathname === '/api/dream/ver') { const has = url.searchParams.get('has'); return json(res, 200, has ? { v: DREAM_VER, has: has === DREAM_VER || hasVer(has) } : { v: DREAM_VER }); }
   if (url.pathname === '/api/dream/run' && req.method === 'POST') { const b = await readJson(req); return json(res, 200, { tk: board.ticket(b), v: DREAM_VER }); }
   if (url.pathname.startsWith('/api/dream/admin/')) {
     if (!who || !isAdmin?.(who.user)) return json(res, 403, { error: '관리자만 할 수 있어요' });

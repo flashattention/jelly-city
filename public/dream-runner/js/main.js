@@ -365,7 +365,9 @@ async function encodeReplay(R) {
 }
 // 새 버전이 배포됐으면 달리기 전에 페이지를 새로 고치고 바로 출발한다 (예전 코드로 달리면 서버 확인과 길이 달라 기록이 '확인 중'에 걸린다)
 game.ver = null; const verOf = () => fetch(apiUrl('/api/dream/ver'), { cache: 'no-store' }).then((r) => r.json()).then((j) => j.v).catch(() => null);
-verOf().then((v) => { game.ver = v; });
+// 토스 미니앱은 번들을 만들 때 그 코드의 판을 적어 둔다 (서버가 그 판의 코드로 기록을 다시 돌린다)
+if (TOSS && /^[0-9a-f]{12}$/.test(window.__DREAM_VER__ || '')) game.ver = window.__DREAM_VER__;
+else verOf().then((v) => { game.ver = v; });
 try { if (sessionStorage.getItem('dreamrunner.autostart')) { sessionStorage.removeItem('dreamrunner.autostart'); const go = (n) => (game.mode === 'title' && runner ? (toast('🆕 새 버전으로 바꿨어요'), startSolo()) : n > 0 && setTimeout(() => go(n - 1), 100)); setTimeout(() => go(80), 300); } } catch { /* 없음 */ }
 async function startSoloFresh() {
   if (game.ver && !TOSS) { const v = await Promise.race([verOf(), new Promise((ok) => setTimeout(() => ok(null), 700))]); if (v && v !== game.ver) { try { sessionStorage.setItem('dreamrunner.autostart', '1'); } catch { /* 없음 */ } window.onbeforeunload = null; location.reload(); return; } }
@@ -412,7 +414,7 @@ async function died(why) {
   game.mode = 'dead'; game.deadT = 0; game.why = why;
   const rpNow = game.rp; game.rp = null;
   reportPlay();
-  const rec = { dist: Math.floor(runner.s), stars: runner.stars, themes: game.dreamsSeen, time: game.runT, name: game.profile.name, color: game.profile.color, mode: game.itemMode ? 'item' : 'speed', diff: game.diff, map: game.map, seed: game.seed, multi: game.multi || undefined };
+  const rec = { dist: Math.floor(runner.s), stars: runner.stars, themes: game.dreamsSeen, time: game.runT, name: game.profile.name, color: game.profile.color, mode: game.itemMode ? 'item' : 'speed', diff: game.diff, map: game.map, seed: game.seed, multi: game.multi || undefined, ver: game.ver || undefined };
   if (game.multi) net.send({ t: 'dead', dist: rec.dist, stars: rec.stars, why });
   game.rec = rec;
   // 출발표 · 플레이 기록이 있어야 기록이 올라간다 (출발표는 늦게 와도 조금 더 기다린다)

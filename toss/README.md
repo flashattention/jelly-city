@@ -19,7 +19,7 @@
 ```bash
 cd toss/app
 npm install        # 처음 한 번 (앱인토스 SDK · esbuild)
-npm run build      # 번들(dist/) → SDK 다리 묶기(dist/toss-bridge.js) → toss/app/dreamrunner.ait
+npm run build      # 판 확인 → 번들(dist/) → SDK 다리 묶기(dist/toss-bridge.js) → toss/app/dreamrunner.ait
 ```
 
 - `dist/`는 웹 드림 러너 코드를 그대로 복사한 것이에요 (`tools/toss-bundle.mjs`). 게임은 `public/`만 고치면 돼요.
@@ -39,7 +39,15 @@ npm run build      # 번들(dist/) → SDK 다리 묶기(dist/toss-bridge.js) �
 
 개발 서버(`DEV_LOGIN`)에서 `/dream-runner/?toss=1`로 열면 토스 모드로 떠요. 토스 로그인 대신 시험 계정으로 들어가고, 광고는 확인 창으로 대신해요.
 
+## 기록 확인 판 (게임 코드 버전)
+
+미니앱은 검수 때문에 며칠씩 예전 판으로 돌 수 있어요. 그래서 기록을 그 판의 게임 코드로 다시 돌려 봐요.
+
+- 판 = `public/dream-runner/js` · `public/shared/js` 코드의 해시 (`server/dream-runner/codever.js`).
+- 서버는 켜질 때마다 지금 코드를 데이터 볼륨 `/data/dream-code/<판>/`에 보관해요. 180일 동안 안 쓰인 판은 지워요.
+- 번들을 만들 때 그 판을 `dist/dream-ver.js`에 적어 두고, 미니앱은 기록을 올릴 때 그 판을 같이 보내요.
+- **번들은 배포된 코드로만 만들어요.** `npm run build`는 서버에 그 판이 있는지 먼저 물어보고, 없으면(커밋 · 푸시 · 배포 전) 멈춰요. 서버가 모르는 판으로 달린 기록은 확인할 수 없어서 거절되기 때문이에요.
+
 ## 아직 남은 것
 
-- **기록 확인 판 맞추기**: 서버는 지금 판의 게임 코드로 기록을 다시 돌려 봐요. 미니앱은 검수 때문에 며칠씩 예전 판으로 돌 수 있어서, 그동안 미니앱 기록이 "서버 결과와 다름"으로 잡힐 수 있어요. 미니앱을 낼 때마다 그 판의 게임 코드를 서버에 보관해 두고 그 판으로 돌려 보게 바꿔야 해요.
 - 운영자 비상 리포트 창은 아직 웹 기록만 보여 줘요.

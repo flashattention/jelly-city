@@ -30,14 +30,15 @@ export class Tickets {
 }
 // 한 스레드에서 차례대로. 밀리거나 고장 나면 null (그 기록은 나중에 사람이 본다, 플레이어를 기다리게 하지 않는다)
 export class ReplayPool {
-  constructor() { this.q = new Map(); this.n = 0; this.fails = 0; this.start(); }
+  // cur: 지금 게임 코드 판 · store: 예전 판 코드를 보관한 폴더 (그 판으로 달린 기록은 그 코드로 돌린다)
+  constructor(cur = null, store = null) { this.q = new Map(); this.n = 0; this.fails = 0; this.cur = cur; this.store = store; this.start(); }
   start() {
     if (this.fails > 5) return;
     try {
-      this.w = new Worker(new URL('./replay-worker.js', import.meta.url), { execArgv: [], resourceLimits: { maxOldGenerationSizeMb: 256 } }); this.w.unref();
+      this.w = new Worker(new URL('./replay-worker.js', import.meta.url), { execArgv: [], workerData: { cur: this.cur, store: this.store }, resourceLimits: { maxOldGenerationSizeMb: 256 } }); this.w.unref();
       this.w.on('message', (m) => { if (m.ready) { this.ok = true; return; } const cb = this.q.get(m.id); if (cb) { this.q.delete(m.id); cb(m.error ? null : m); if (m.error) console.warn('기록 재생 오류', m.error); } });
       const down = (e) => { console.warn('기록 재생 스레드 재시작', e?.message || ''); this.ok = false; this.fails++; for (const cb of this.q.values()) cb(null); this.q.clear(); setTimeout(() => this.start(), 1000).unref?.(); };
-      this.w.on('error', down); this.w.on('exit', (c) => { if (c) down(); });
+      this.w.on('error', down); this.w.on('exit', (c) => { if (c) down(); else { for (const cb of this.q.values()) cb(null); this.q.clear(); this.start(); } });
     } catch (e) { console.warn('기록 재생 스레드 실패', e.message); this.fails++; }
   }
   run(job, timeout = 5000) {
