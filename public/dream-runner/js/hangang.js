@@ -233,9 +233,51 @@ export class Hangang {
   }
   async load(id = 'yeouido') {
     if (this.ready && this.id === id) return;
+    if (id === 'seoul') { // 서울 전체: 2km 칸들을 곰 둘레로 불러오고 내린다
+      const res = await fetch(new URL('../seoul/index.json', import.meta.url)); if (!res.ok) throw new Error('서울 지도를 불러오지 못했어요');
+      this.world0 = await res.json(); this.tileHave = new Set(this.world0.have.map(([i, j]) => `${i}_${j}`));
+      const E = []; this.map = { id: 'seoul', kind: 'world', name: '서울', sub: '', center: [0, 0], scale: 0.1, len: 400, route: [0, 0, 4000, 0], water: [], island: [], green: [], areas: [], roads: [], roadNames: [], alleys: [], bridges: [], rails: [], paths: [], buildings: [], binfo: [], colors: [], names: [], tall: [], stations: E, entrances: E, marks: [], labels: [], arches: [], far: [['남산서울타워', 0, 0, 236, 'tower']].slice(0, 0), shops: [] };
+      this.id = id; this.build(); this.ready = true; return;
+    }
     const res = await fetch(new URL(`../hangang/${id}.json`, import.meta.url)); if (!res.ok) throw new Error('지도를 불러오지 못했어요');
     this.map = await res.json(); this.id = id; this.build(); this.ready = true;
   }
+  // ---------- 서울 전체: 칸 불러오기 · 내리기 ----------
+  //   칸 = 같은 Hangang 을 '칸 모드'로 지은 것. 부딪힘 · 바닥 · 가게 · 출구 목록은 주인(host)의 것을 함께 써서, 주인의 모든 검사가 그대로 서울 전체에 통한다
+  async loadChunk(key) {
+    const res = await fetch(new URL(`../seoul/t_${key}.json`, import.meta.url)); if (!res.ok) throw new Error('칸 없음'); const M = await res.json();
+    const c = new Hangang(); c.host = this; c.isChunk = true; c.chunkKey = key; c.map = M; c.id = 'seoul'; c.scene = new THREE.Group(); c.state = this.state; c.opt = this.opt;
+    for (const k of ['skyU', 'windU', 'waterU', 'grassTex', 'dot', 'waterSets']) c[k] = this[k];
+    c.foot = this.foot ||= []; c.footGrid = this.footGrid ||= new Map(); c.decks = this.decks ||= []; c.deckGrid = this.deckGrid ||= new Map(); c.circGrid = this.circGrid ||= new Map(); c.shopFronts = this.shopFronts ||= []; c.shopGrid = this.shopGrid ||= new Map();
+    c.inWater = this.inWater; c.routeSetup();
+    const f0 = this.foot.length, d0 = this.decks.length, [i, j] = key.split('_').map(Number);
+    c.buildContent(rnd(((i * 73856093) ^ (j * 19349663)) >>> 0));
+    for (let k = f0; k < this.foot.length; k++) this.foot[k].key ??= key; for (let k = d0; k < this.decks.length; k++) this.decks[k].key = key;
+    c.applySeason(); this.scene.add(c.scene); return c;
+  }
+  unloadChunk(key) {
+    const c = this.chunks.get(key); if (!c) return; this.chunks.delete(key); this.scene.remove(c.scene);
+    c.scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of ms) { m.map?.dispose?.(); m.dispose?.(); } });
+    const keep = (a) => a.filter((x) => x.key !== key);
+    this.foot = keep(this.foot); this.footGrid.clear(); this.foot.forEach((f, fi) => { for (let gx = Math.floor(f.x0 / 40); gx <= Math.floor(f.x1 / 40); gx++) for (let gz = Math.floor(f.z0 / 40); gz <= Math.floor(f.z1 / 40); gz++) { const k = `${gx},${gz}`; if (!this.footGrid.has(k)) this.footGrid.set(k, []); this.footGrid.get(k).push(fi); } });
+    this.decks = keep(this.decks); this.deckGrid.clear(); this.decks.forEach((sg, si) => { for (let gx = Math.floor((Math.min(sg.ax, sg.cx) - sg.hw) / 40); gx <= Math.floor((Math.max(sg.ax, sg.cx) + sg.hw) / 40); gx++) for (let gz = Math.floor((Math.min(sg.az, sg.cz) - sg.hw) / 40); gz <= Math.floor((Math.max(sg.az, sg.cz) + sg.hw) / 40); gz++) { const k = `${gx},${gz}`; if (!this.deckGrid.has(k)) this.deckGrid.set(k, []); this.deckGrid.get(k).push(si); } });
+    for (const [k, list] of this.circGrid) { const l2 = list.filter((q) => q.key !== key); if (l2.length) this.circGrid.set(k, l2); else this.circGrid.delete(k); }
+    this.shopFronts = keep(this.shopFronts); this.shopGrid.clear(); this.shopFronts.forEach((F, i) => { const k = `${Math.floor(F.x / 40)},${Math.floor(F.z / 40)}`; if (!this.shopGrid.has(k)) this.shopGrid.set(k, []); this.shopGrid.get(k).push(i); });
+    this.entrances = keep(this.entrances || []); const ws = keep(this.waterSets); this.waterSets.length = 0; this.waterSets.push(...ws);
+    for (const c2 of this.chunks.values()) { c2.foot = this.foot; c2.decks = this.decks; c2.shopFronts = this.shopFronts; }
+    this.cityDirty = true;
+  }
+  // 곰이 있는 칸 둘레 3 × 3 을 불러오고(가까운 것부터 하나씩), 5 × 5 밖은 내린다
+  tickWorld(px, pz) {
+    if (this.map.kind !== 'world') return;
+    const T = this.world0.tile, ti = Math.floor(px / T), tj = Math.floor(pz / T); this.tileNow = [ti, tj];
+    for (const key of [...this.chunks.keys()]) { const [i, j] = key.split('_').map(Number); if (Math.max(Math.abs(i - ti), Math.abs(j - tj)) > 2) this.unloadChunk(key); }
+    if (this.chunkLoading) return;
+    const want = []; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const key = `${ti + a}_${tj + b}`; if (this.tileHave.has(key) && !this.chunks.has(key) && !this.chunkFail?.has(key)) want.push([Math.hypot((ti + a + 0.5) * T - px, (tj + b + 0.5) * T - pz), key]); }
+    if (!want.length) return; want.sort((a, b) => a[0] - b[0]); const key = want[0][1];
+    this.chunkLoading = key; this.loadChunk(key).then((c) => { if (this.map.kind === 'world') { this.chunks.set(key, c); this.cityDirty = true; this.onChunk?.(key, this.chunks.size); } }).catch(() => { (this.chunkFail ||= new Set()).add(key); }).finally(() => { this.chunkLoading = null; });
+  }
+  addShopFronts(list) { const H = this.host || this; H.shopFronts ||= []; H.shopGrid ||= new Map(); for (const F of list) { F.key = this.chunkKey; const i = H.shopFronts.push(F) - 1, k = `${Math.floor(F.x / 40)},${Math.floor(F.z / 40)}`; if (!H.shopGrid.has(k)) H.shopGrid.set(k, []); H.shopGrid.get(k).push(i); } }
   // ---------- 코스 (실제 자전거길) ----------
   routeSetup() {
     const S = this.map.scale, pts = unpack(this.map.route, S), cum = [0];
@@ -256,6 +298,7 @@ export class Hangang {
   world(s, lat) { const p = this.at(s); return [p.x + p.rx * lat, p.z + p.rz * lat]; }
   // 걸어갈 수 있는 곳: 물이 아니고, 코스 둘레 45m 안이거나 공원 · 녹지 · 섬 안 (5m 칸마다 기억)
   walkable(x, z, lat) {
+    if (this.map.kind === 'world') return !this.inWater(x, z);
     if (this.walkLimit && Math.hypot(x - this.walkLimit.x, z - this.walkLimit.z) > this.walkLimit.r) return false; // 남산 정상: 광장 밖(비탈)으로는 못 간다
     if (Math.abs(lat + 2) < 7.5) return true; // 코스(자전거길 · 트랙)는 물 위도 다리로 건넌다
     return !this.inWater(x, z); // 이제 서울을 걸어 다니는 게임: 물이 아니면 어디든 (도시 골목까지)
@@ -385,7 +428,7 @@ export class Hangang {
     void roofF; return { x, z, wall, hit };
   }
   // 둥근 물체: 고정된 것(격자) + 움직이는 사람 · 차
-  addCircle(x, z, r, h = 99) { this.circGrid ||= new Map(); const k = `${Math.floor(x / 20)},${Math.floor(z / 20)}`; if (!this.circGrid.has(k)) this.circGrid.set(k, []); this.circGrid.get(k).push({ x, z, r, h }); }
+  addCircle(x, z, r, h = 99) { this.circGrid ||= new Map(); const k = `${Math.floor(x / 20)},${Math.floor(z / 20)}`; if (!this.circGrid.has(k)) this.circGrid.set(k, []); this.circGrid.get(k).push({ x, z, r, h, key: this.chunkKey }); }
   circlesNear(x, z) {
     const out = []; const gx = Math.floor(x / 20), gz = Math.floor(z / 20);
     for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const c = this.circGrid?.get(`${gx + a},${gz + b}`); if (c) out.push(...c); }
@@ -407,10 +450,8 @@ export class Hangang {
     const M = this.map, S = M.scale, sc = this.scene, r = rnd(12345);
     this.routeSetup();
     this.windU = { value: 0 };
-    const P2 = (a) => unpack(a, S), polys = (list) => list.map((p) => p.map(P2));
-    this.water = polys(M.water); this.islands = polys(M.island);
-    const inWater = (x, z) => this.water.some((w) => inPoly(x, z, w)) && !this.islands.some((w) => inPoly(x, z, w));
-    this.inWater = inWater;
+    // 물: 서울 전체(칸) 모드에선 불러온 칸들의 물을 모두 (칸마다 넣고 뺀다), 아니면 이 지도의 물
+    this.waterSets = []; this.inWater = (x, z) => { for (const W of this.waterSets) { if (x < W.b[0] || x > W.b[1] || z < W.b[2] || z > W.b[3]) continue; if (W.water.some((w) => inPoly(x, z, w)) && !W.islands.some((w) => inPoly(x, z, w))) return true; } return false; };
     // 빛
     this.hemi = new THREE.HemisphereLight('#cfe3ff', '#7a7a60', 1.1); sc.add(this.hemi);
     this.sun = new THREE.DirectionalLight('#ffffff', 1.6); sc.add(this.sun); sc.add(this.sun.target);
@@ -432,6 +473,7 @@ export class Hangang {
           #include <colorspace_fragment>
         }` }));
     this.sky.renderOrder = -100; sc.add(this.sky);
+    this.grassTex = groundTex('grass');
     // 땅 바탕 (도시)
     const landTex = groundTex('city'); landTex.repeat.set(26000 / 9, 26000 / 9); const land = new THREE.Mesh(new THREE.PlaneGeometry(26000, 26000), flatMat('#a3a39f', -60, { map: landTex })); land.receiveShadow = true; land.rotation.x = -Math.PI / 2; land.renderOrder = -60; land.material.depthTest = true; land.material.depthWrite = true; sc.add(land); this.landM = land.material;
     // 물: 반짝이는 물결 · 하늘 색 반사 · 밤에는 도시 불빛이 비친다
@@ -456,7 +498,29 @@ export class Hangang {
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
         }` });
-    const wMesh = new THREE.Mesh(fillGeo(this.water), waterM); wMesh.renderOrder = -47; sc.add(wMesh); // 물은 공원 위에 (OSM 한강공원 영역이 물까지 덮고 있다)
+    this.waterM = waterM;
+    if (M.kind !== 'world') this.buildContent(r);
+    if (M.kind === 'world') { this.chunks = new Map(); this.buildFar(); }
+    this.buildLights(r);
+    this.buildSkyStuff(r);
+    this.buildPeople();
+    this.buildTransit();
+    // 내 곰돌이 그림자
+    this.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.5, 18), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.25, depthWrite: false }));
+    this.shadow.rotation.x = -Math.PI / 2; this.shadow.renderOrder = -40; sc.add(this.shadow);
+  }
+  // 지도 안의 것들 (물 · 녹지 · 길 · 다리 · 건물 · 나무 · 가게 · 간판 · 골목 · 출구): 지역 지도 하나, 또는 서울 칸 하나(isChunk)
+  buildContent(r) {
+    const M = this.map, S = M.scale, sc = this.scene, P2 = (a) => unpack(a, S), polys = (list) => list.map((p) => p.map(P2));
+    this.water = polys(M.water); this.islands = polys(M.island);
+    const bb = (list) => { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const poly of list) for (const ring of poly) for (const [x, z] of ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return [x0, x1, z0, z1]; };
+    const WS = { water: this.water, islands: this.islands, b: bb(this.water), key: this.chunkKey }; (this.host || this).waterSets.push(WS);
+    const inWater = (x, z) => this.water.some((w) => inPoly(x, z, w)) && !this.islands.some((w) => inPoly(x, z, w));
+    if (!this.host) this.inWater = (this.host || this).inWater;
+    // 지도 사각형 (물가 계단 · 거품: 잘린 가장자리는 빼려고)
+    const RX = M.kind === 'tile' ? [M.terrain.x0, M.terrain.x0 + (M.terrain.nx - 1) * M.terrain.step, M.terrain.z0, M.terrain.z0 + (M.terrain.nz - 1) * M.terrain.step] : [-3200, 3200, -3200, 3200];
+    const inside = (x, z) => x > RX[0] + 5 && x < RX[1] - 5 && z > RX[2] + 5 && z < RX[3] - 5 && (M.kind === 'tile' || (Math.abs(Math.abs(x) - 7000) > 5 && Math.abs(Math.abs(z) - 7000) > 5));
+    const wMesh = new THREE.Mesh(fillGeo(this.water), (this.host || this).waterM); wMesh.renderOrder = -47; sc.add(wMesh); // 물은 공원 위에 (OSM 한강공원 영역이 물까지 덮고 있다)
     // 섬 · 녹지 (계절마다 색이 바뀐다)
     this.islandM = flatMat('#7fa860', -46.9, { map: this.grassTex ||= groundTex('grass') }); patchy(this.islandM); const isl = new THREE.Mesh(fillGeo(this.islands, 0, 7), this.islandM); isl.renderOrder = -46.9; sc.add(isl);
     const greens = { grass: [], wood: [], wild: [], pitch: [], sand: [] };
@@ -480,21 +544,21 @@ export class Hangang {
       ln(0, 4.9, '#d9d4c8', -46.4); ln(-4.3, 3.8, '#d9d4c8', -46.3);
       this.bikeM = ln(0, 4.2, '#ffffff', -46.2, groundTex('asphalt')); this.runM = ln(-4.3, 3.2, '#ffffff', -46.1, groundTex('track'));
       // 코스가 물(샛강 등)을 건너는 곳: 작은 다리 난간 + 다리 바닥 테두리
-      { const posts = [], rails = []; let run = null; const flush = () => { if (run && run.length > 1) rails.push(run); run = null; };
+      if (M.kind !== 'tile') { const posts = [], rails = []; let run = null; const flush = () => { if (run && run.length > 1) rails.push(run); run = null; };
         for (let s0 = 0; s0 < this.L; s0 += 2) { const [mx, mz] = this.world(s0, -2.2); if (this.inWater(mx, mz)) { (run ||= []).push(s0); } else flush(); } flush();
         const P = [], I = [];
         for (const seg of rails) for (const lat of [-6.4, 2.7]) { const pts = seg.map((s0) => this.world(s0, lat)); ribbonInto(P, I, pts, 0.16, 1.05); for (let k = 0; k < pts.length; k += 1) posts.push([pts[k][0], pts[k][1]]); }
         if (P.length) { sc.add(new THREE.Mesh(geoOf(P, I), new THREE.MeshLambertMaterial({ color: '#f2eee6', side: THREE.DoubleSide }))); const pg = new THREE.BoxGeometry(0.12, 1.05, 0.12); pg.translate(0, 0.52, 0); const im = new THREE.InstancedMesh(pg, new THREE.MeshLambertMaterial({ color: '#e8e2d6' }), posts.length), o4 = new THREE.Object3D(); posts.forEach(([x, z], i) => { o4.position.set(x, 0, z); o4.updateMatrix(); im.setMatrixAt(i, o4.matrix); }); sc.add(im); }
         this.crossings = rails; }
-      const P = [], I = []; for (let s = 0; s < this.L - 3; s += 6) { const seg = [this.world(s, 0), this.world(s + 3, 0)]; ribbonInto(P, I, seg, 0.15, 0); } const m = new THREE.Mesh(geoOf(P, I), flatMat('#f2c53d', -46)); m.renderOrder = -46; sc.add(m);
+      if (M.kind !== 'tile') { const P = [], I = []; for (let s = 0; s < this.L - 3; s += 6) { const seg = [this.world(s, 0), this.world(s + 3, 0)]; ribbonInto(P, I, seg, 0.15, 0); } const m = new THREE.Mesh(geoOf(P, I), flatMat('#f2c53d', -46)); m.renderOrder = -46; sc.add(m); }
     }
     {
       const P = [], I = [], U = [];
-      for (const w of this.water) for (const ring of w) { let run = []; const flush = () => { if (run.length > 2) ribbonInto(P, I, run, 4, 0, U); run = []; }; for (const [x, z] of ring) { const near = Math.abs(x) < 3200 && Math.abs(z) < 3200 && Math.abs(Math.abs(x) - 7000) > 5 && Math.abs(Math.abs(z) - 7000) > 5; if (near) run.push([x, z]); else flush(); } flush(); }
+      for (const w of this.water) for (const ring of w) { let run = []; const flush = () => { if (run.length > 2) ribbonInto(P, I, run, 4, 0, U); run = []; }; for (const [x, z] of ring) { if (inside(x, z)) run.push([x, z]); else flush(); } flush(); }
       const m = new THREE.Mesh(geoOf(P, I, { uv: [U, 2] }), flatMat('#ffffff', -46.8, { map: this.stepTex = groundTex('steps') })); m.renderOrder = -46.8; sc.add(m);
       // 물가 잔물결: 호안 바로 바깥 물 위에 하얀 거품 띠 (천천히 밀려왔다 빠진다)
-      const Pf = [], If = [], Uf = []; for (const w of this.water) for (const ring of w) { let run = []; const flush = () => { if (run.length > 2) ribbonInto(Pf, If, run, 6, 0, Uf); run = []; }; for (const [x, z] of ring) { if (Math.abs(x) < 3200 && Math.abs(z) < 3200 && Math.abs(Math.abs(x) - 7000) > 5 && Math.abs(Math.abs(z) - 7000) > 5) run.push([x, z]); else flush(); } flush(); }
-      this.foamU = { time: this.waterU.time };
+      const Pf = [], If = [], Uf = []; for (const w of this.water) for (const ring of w) { let run = []; const flush = () => { if (run.length > 2) ribbonInto(Pf, If, run, 6, 0, Uf); run = []; }; for (const [x, z] of ring) { if (inside(x, z)) run.push([x, z]); else flush(); } flush(); }
+      this.foamU = { time: (this.host || this).waterU.time };
       const fm = new THREE.ShaderMaterial({ uniforms: this.foamU, transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide,
         vertexShader: 'varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
         fragmentShader: 'uniform float time; varying vec2 vU; void main(){ float side = abs(vU.x - 0.5) * 2.0; float wave = 0.5 + 0.5 * sin(vU.y * 2.4 + time * 1.3); float band = smoothstep(1.0, 0.55, side) * smoothstep(0.0, 0.45, side); float foam = band * (0.25 + 0.35 * wave) * (0.6 + 0.4 * sin(vU.y * 13.0 - time * 2.0)); gl_FragColor = vec4(vec3(0.97, 0.99, 1.0), foam * 0.32); }' });
@@ -502,7 +566,7 @@ export class Hangang {
     }
     this.buildBridges(P2, inWater, r);
     this.buildBuildings(P2);
-    this.buildFar(P2);
+    if (M.kind !== 'tile') this.buildFar(P2);
     if (M.kind === 'summit') this.summit = buildSummit(this);
     if (this.id === 'hongdae') this.buildForestPath(r);
     this.buildPlants(inWater, r);
@@ -515,15 +579,9 @@ export class Hangang {
     if (this.id === 'hongdae') this.buildMurals(r);
     if (this.id === 'banpo') this.buildBanpo(P2);
     if (this.id === 'ttukseom') { const m = (M.marks || []).find(([n]) => /자벌레/.test(n)); if (m) { let p = this.world(m[1] + 60, 40); for (const lat of [40, -40, 70, -70, 25, -25]) { p = this.world(m[1] + 60, lat); if (!this.inWater(p[0], p[1])) break; } this.buildMusicFountain(p); } }
-    this.shopFronts = buildShopFronts(this, M.shops || [], M.scale); this.shopGrid = new Map(); this.shopFronts.forEach((F, i) => { const k = `${Math.floor(F.x / 40)},${Math.floor(F.z / 40)}`; if (!this.shopGrid.has(k)) this.shopGrid.set(k, []); this.shopGrid.get(k).push(i); });
+    this.addShopFronts(buildShopFronts(this, M.shops || [], M.scale));
     if (M.kind !== 'summit') this.buildStreetSigns(P2, r);
-    this.buildLights(r);
-    this.buildSkyStuff(r);
-    this.buildPeople();
-    this.buildTransit();
-    // 내 곰돌이 그림자
-    this.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.5, 18), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.25, depthWrite: false }));
-    this.shadow.rotation.x = -Math.PI / 2; this.shadow.renderOrder = -40; sc.add(this.shadow);
+    this.buildEntrances();
   }
 
   // 도시 바닥: 보도(보도블록) · 연석 · 차선(가운데 노란 겹줄 · 흰 점선) · 교차로 횡단보도(흰 줄무늬) · 신호등 (차량 신호 · 보행 신호, 방향마다 번갈아 바뀐다)
@@ -714,7 +772,7 @@ export class Hangang {
         if (list.length > 1500) break; } if (list.length > 1500) break; }
     // 들어갈 수 있는 문: 짙은 문틀 + 밝은 유리문 (인스턴스 두 개), 가게 목록 · 칸 지도에 더한다
     if (doors.length) { const o = new THREE.Object3D(), fg = new THREE.BoxGeometry(1.9, 2.5, 0.1); fg.translate(0, 1.25, 0.02); const dg = new THREE.PlaneGeometry(1.6, 2.3); dg.translate(0, 1.15, 0.08); const fm = new THREE.InstancedMesh(fg, new THREE.MeshLambertMaterial({ color: '#2b2d31' }), doors.length), dm = new THREE.InstancedMesh(dg, new THREE.MeshPhongMaterial({ color: '#d8c8a8', emissive: '#ffe2b0', emissiveIntensity: 0.2, shininess: 80 }), doors.length);
-      doors.forEach((D, i) => { o.position.set(D.x, 0, D.z); o.rotation.y = Math.atan2(D.nx, D.nz); o.updateMatrix(); fm.setMatrixAt(i, o.matrix); dm.setMatrixAt(i, o.matrix); const fi = this.shopFronts.push(D) - 1, k = `${Math.floor(D.x / 40)},${Math.floor(D.z / 40)}`; if (!this.shopGrid.has(k)) this.shopGrid.set(k, []); this.shopGrid.get(k).push(fi); }); this.scene.add(fm, dm); (this.shopWinM ||= []).push(dm.material); }
+      doors.forEach((D, i) => { o.position.set(D.x, 0, D.z); o.rotation.y = Math.atan2(D.nx, D.nz); o.updateMatrix(); fm.setMatrixAt(i, o.matrix); dm.setMatrixAt(i, o.matrix); D.key = this.chunkKey; const fi = this.shopFronts.push(D) - 1, k = `${Math.floor(D.x / 40)},${Math.floor(D.z / 40)}`; if (!this.shopGrid.has(k)) this.shopGrid.set(k, []); this.shopGrid.get(k).push(fi); }); this.scene.add(fm, dm); (this.shopWinM ||= []).push(dm.material); }
     // 글씨 그림: 256 × 32 칸, 2048 × 1024 한 장에 256 개
     const PER = 256; for (let s0 = 0; s0 < list.length; s0 += PER) { const part = list.slice(s0, s0 + PER), cv = document.createElement('canvas'); cv.width = 2048; cv.height = 1024; const c = cv.getContext('2d');
       const BG = [['#c0392b', '#ffffff'], ['#ffffff', '#1f4fa8'], ['#1b1820', '#ffd23f'], ['#2f7a5a', '#ffffff'], ['#fff3d6', '#7a3b2e']];
@@ -1142,13 +1200,14 @@ export class Hangang {
 
   // ---------- 도시: 인도를 걷는 사람들 · 차도를 달리는 차 ----------
   citySetup() {
-    const S = this.map.scale, lines = [], drives = [];
+    const lines = [], drives = [], maps = this.map.kind === 'world' ? [...this.chunks.values()].map((c) => c.map) : [this.map];
     const mk = (pts, w, kind) => { const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); return { pts, cum, len: cum[cum.length - 1], w, kind }; };
-    for (const rd of this.map.roads) { if (rd[1]) continue; const pts = unpack(rd.slice(2), S); if (pts.length < 2) continue; const L = mk(pts, rd[0], 'road'); if (L.len > 40) { lines.push(L); if (rd[0] >= 10) drives.push(L); } }
-    for (const pa of this.map.paths) { if (pa[0]) continue; const pts = unpack(pa.slice(2), S); if (pts.length < 2) continue; const L = mk(pts, pa[1], 'path'); if (L.len > 25) lines.push(L); }
+    for (const Mx of maps) { const S = Mx.scale;
+      for (const rd of Mx.roads) { if (rd[1]) continue; const pts = unpack(rd.slice(2), S); if (pts.length < 2) continue; const L = mk(pts, rd[0], 'road'); if (L.len > 40) { lines.push(L); if (rd[0] >= 10) drives.push(L); } }
+      for (const pa of Mx.paths) { if (pa[0]) continue; const pts = unpack(pa.slice(2), S); if (pts.length < 2) continue; const L = mk(pts, pa[1], 'path'); if (L.len > 25) lines.push(L); } }
     const grid = (arr) => { const g = new Map(); arr.forEach((L, li) => { for (let i = 0; i < L.pts.length; i++) { const k = `${Math.floor(L.pts[i][0] / 50)},${Math.floor(L.pts[i][1] / 50)}`; if (!g.has(k)) g.set(k, []); g.get(k).push([li, i]); } }); return g; };
     this.walkLines = lines; this.walkGrid = grid(lines); this.driveLines = drives; this.driveGrid = grid(drives);
-    this.walkers = []; this.cars3 = []; this.cityT = 0; this.carT = 0;
+    this.walkers ||= []; this.cars3 ||= []; this.cityT ||= 0; this.carT ||= 0; this.cityDirty = false;
   }
   lineAt(L, d, off) { d = clamp(d, 0, L.len); let i = 1; while (i < L.cum.length - 1 && L.cum[i] < d) i++; const a = L.pts[i - 1], b = L.pts[i], seg = L.cum[i] - L.cum[i - 1] || 1, t = (d - L.cum[i - 1]) / seg, dx = (b[0] - a[0]) / seg, dz = (b[1] - a[1]) / seg; return { x: lerp(a[0], b[0], t) - dz * off, z: lerp(a[1], b[1], t) + dx * off, dx, dz }; }
   pickNear(grid, lines, px, pz, minD, maxD, r) {
@@ -1165,7 +1224,7 @@ export class Hangang {
     return office > home && office > shop ? 'office' : home > shop ? 'home' : 'shop';
   }
   tickCity(dt, px, pz) {
-    if (!this.walkLines) this.citySetup();
+    if (!this.walkLines || this.cityDirty) this.citySetup();
     const r = this.r, cw = this.crowd(), h = this.state.hour, rain = this.state.weather === 'rain';
     // 인도 사람들: 회사 동네는 양복 · 셔츠, 아파트 동네는 가족 · 어르신 · 아이, 상가는 친구 · 연인
     this.cityT -= dt;
@@ -1246,9 +1305,11 @@ export class Hangang {
   //   출입구: 실제 위치에 유리 지붕 계단 + 호선 색 표지판 · 가까이 가면 그 역 실시간 도착 (onStation)
   //   한강철교: 1호선 열차가 실시간 위치대로 노량진 ↔ 용산을 건넌다 (정보가 없으면 시간표처럼 몇 분마다)
   //   버스: 실제 GPS 위치대로
-  buildTransit() {
-    const M = this.map, S = M.scale; this.stations = (M.stations || []).map(([n, x, z]) => ({ name: n, x: x * S, z: z * S, lines: STATION_LINES[n] || [] }));
-    this.entrances = [];
+  // 지하철 출구 (지도마다): 칸 모드에선 열 · 역을 주인(host)의 목록에 더한다
+  buildEntrances() {
+    const M = this.map, S = M.scale, H = this.host || this; H.entrances ||= []; H.stations ||= [];
+    const st0 = (M.stations || []).map(([n, x, z]) => { const x2 = x * S, z2 = z * S, old = H.stations.find((q) => q.name === n && Math.hypot(q.x - x2, q.z - z2) < 400); if (old) return old; const st = { name: n, x: x2, z: z2, lines: STATION_LINES[n] || [] }; H.stations.push(st); return st; });
+    this.stations = st0; const mine = [];
     const glass = new THREE.MeshPhongMaterial({ color: '#cfe6f0', transparent: true, opacity: 0.38, shininess: 90, side: THREE.DoubleSide }), frame = new THREE.MeshLambertMaterial({ color: '#5a636e' }), pit = new THREE.MeshBasicMaterial({ color: '#2a2a30' }), stepM = new THREE.MeshLambertMaterial({ color: '#9a9690' }), noseM = new THREE.MeshLambertMaterial({ color: '#e0b830' }), granite = new THREE.MeshLambertMaterial({ color: '#8f8a84' }), steel = new THREE.MeshPhongMaterial({ color: '#d8dce0', shininess: 80 }), exitLightM = new THREE.MeshLambertMaterial({ color: '#fff6e0', emissive: '#fff2d0', emissiveIntensity: 0.3 }), exitGlowM = new THREE.MeshBasicMaterial({ color: '#ffe2a8', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }); this.exitLightM = exitLightM; this.exitGlowM = exitGlowM;
     for (const [x0, z0, si, ref] of M.entrances || []) {
       const st = this.stations[si]; if (!st) continue; const x = x0 * S, z = z0 * S; if (this.inWater(x, z)) continue;
@@ -1273,11 +1334,14 @@ export class Hangang {
       // 안내 기둥 (입구 옆, 길 쪽을 본다)
       const tm = new THREE.MeshLambertMaterial({ map: exitTotemTex(st.name, st.lines, ref), emissive: '#ffffff', emissiveMap: exitTotemTex(st.name, st.lines, ref), emissiveIntensity: 0.25 }); (this.exitSignMs ||= []).push(tm);
       const totem = new THREE.Mesh(new THREE.BoxGeometry(0.62, 2.7, 0.2), [frame, frame, frame, frame, tm, tm]); totem.position.set(1.95, 1.35, -2.2); g.add(totem);
-      this.scene.add(g); this.entrances.push({ x, z, st, ref, g });
+      this.scene.add(g); const E = { x, z, st, ref, g, key: this.chunkKey }; H.entrances.push(E); mine.push(E);
       // 부딪힘: 양옆 화강석 벽 · 뒤 벽 · 안내 기둥 (가운데 계단으로는 걸어 내려갈 수 있다)
       { const th = g.rotation.y, W = (lx, lz) => [x + lx * Math.cos(th) + lz * Math.sin(th), z - lx * Math.sin(th) + lz * Math.cos(th)], rect = (a0, b0, a1, b1) => { const ring = [W(a0, b0), W(a1, b0), W(a1, b1), W(a0, b1)], xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); this.addFoot({ ring, h: 2.6, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), name: `${st.name}역 ${ref || ''}번 출구`, type: 'stone', noClimb: false }); }; rect(-1.45, -2.3, -1.15, 2.4); rect(1.15, -2.3, 1.45, 2.4); rect(-1.45, 2.3, 1.45, 2.6); this.addCircle(W(1.95, -2.2)[0], W(1.95, -2.2)[1], 0.4, 2.7); }
     }
-    batchStatic(this.scene, this.entrances.map((e) => e.g), (this.lodObjs ||= [])); // 출구 수백 개를 재질별로 묶고, 멀면 숨긴다
+    batchStatic(this.scene, mine.map((e) => e.g), (this.lodObjs ||= [])); // 출구 수백 개를 재질별로 묶고, 멀면 숨긴다
+  }
+  buildTransit() {
+    this.entrances ||= []; this.stations ||= [];
     // 한강철교 선로 두 줄: 가장 긴 철교 둘
     // 한강철교(노량진 ↔ 용산, 북위 37.5172 · 동경 126.958) 근처 철교 중 긴 두 줄
     const M2 = this.map, hx = (126.958 - 126.98) * 111320 * Math.cos(37.53 * Math.PI / 180) - M2.center[0], hz = -(37.5172 - 37.53) * 110574 - M2.center[1];
@@ -1346,11 +1410,13 @@ export class Hangang {
     this.s = opt.s ?? 30; this.dir = 1; this.lat = -4.3; this.v = 0; this.target = 6.4; this.y = 0; this.vy = 0; this.dist = 0; this.time = 0; this.moments = {}; this.turnT = 0;
     const p0 = this.at(this.s); [this.px, this.pz] = this.world(this.s, this.lat); this.face = Math.atan2(p0.dx, p0.dz); this.camYaw = this.face; this.ri = Math.round(this.s / this.step); this.dragT = 0; this.camInit = false; this.mdx = null;
     bear.root.scale.setScalar(BEAR); bear.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-    const r = rnd((Date.now() / 1000) | 0);
-    if (this.opt.season === 'auto') this.state.season = Object.keys(SEASONS)[Math.floor(r() * 4)];
-    if (this.opt.weather === 'auto') this.state.weather = this.randWeather(r);
-    if (this.opt.time === 'auto') this.state.hour = [5.9, 6.4, 9.5, 15.8, 16.6, 17.2, 17.7, 18.1, 18.4, 19.2, 21, 13][Math.floor(r() * 12)]; // 감성적인 시간(늦은 오후 · 노을 · 해 뜰 녘)이 더 자주
-    this.applySeason(); this.weatherT = 240 + r() * 360; this.r = r;
+    const r = rnd((Date.now() / 1000) | 0), K = opt.keep;
+    // 다른 지역에서 옮겨 왔으면 시각 · 계절 · 날씨를 그대로 (무작위는 처음 시작할 때만)
+    if (K) { this.opt = { ...this.opt, ...K.opt }; this.state = { ...this.state, ...K.state }; }
+    else if (this.opt.season === 'auto') this.state.season = Object.keys(SEASONS)[Math.floor(r() * 4)];
+    if (!K && this.opt.weather === 'auto') this.state.weather = this.randWeather(r);
+    if (!K && this.opt.time === 'auto') this.state.hour = [5.9, 6.4, 9.5, 15.8, 16.6, 17.2, 17.7, 18.1, 18.4, 19.2, 21, 13][Math.floor(r() * 12)]; // 감성적인 시간(늦은 오후 · 노을 · 해 뜰 녘)이 더 자주
+    this.applySeason(); this.weatherT = K?.weatherT ?? 240 + r() * 360; this.r = r;
     for (const p of this.people) this.removePerson(p); this.people = []; for (const gd of this.groups) this.removeGroup(gd); this.groups = []; for (const w of this.walkers || []) this.removePerson(w); this.walkers = []; for (const w of this.shoppers || []) this.removePerson(w); this.shoppers = []; for (const c of this.cars3 || []) this.scene.remove(c.mesh); this.cars3 = []; this.seenLabel = new Set(); this.activeLabels = []; this.regionName = null; this.regionSeen = new Map(); this.jumps = 0; this.flipT = 0;
   }
   leave() { if (this.bear) { this.bear.root.traverse((o) => { if (o.isMesh) o.castShadow = false; }); this.bear.root.scale.setScalar(1); this.bear.inner.rotation.set(0, 0, 0); this.bear.inner.position.set(0, 0, 0); } if (this.bear && this.prevParent) this.prevParent.add(this.bear.root); for (const p of this.people) this.removePerson(p); this.people = []; for (const gd of this.groups) this.removeGroup(gd); this.groups = []; this.bear = null; }
@@ -1362,6 +1428,8 @@ export class Hangang {
     if (k === 'time' && v !== 'auto') this.state.hour = TIMES[v][1];
   }
   applySeason() {
+    for (const ch of this.chunks?.values() || []) ch.applySeason(); // 서울 전체: 칸마다
+    if (!this.trees) return; // 서울 전체의 주인은 나무가 없다 (칸에 있다)
     const s = this.state.season, r = rnd(4242), c = new THREE.Color(), N = this.trees.length;
     const pal = { spring: ['#ffc9de', '#ffd6e6', '#ffb9d3', '#ffe3ee', '#ffc0d8'], summer: ['#3f8a3a', '#4f9a40', '#2f7a34', '#5aa548', '#3a7f40'], autumn: ['#e8742a', '#f2b233', '#c8402a', '#d9902a', '#9aa83a', '#f0c84a'], winter: ['#ffffff'] }[s];
     void N;
@@ -1461,6 +1529,7 @@ export class Hangang {
     if (!this.climb) poseBear(this.bear, { ground: this.y <= this.groundAt(bx, bz, this.y) + 0.001, slide: this.slide, flip: this.flipT > 0 ? 1 - this.flipT / FLIP_T : null, vy: this.vy, alive: true }, dt);
     this.shadow.position.set(bx, this.groundAt(bx, bz, this.y) + 0.02, bz); this.shadow.scale.setScalar(BEAR * (1 - Math.min(0.5, this.y * 0.2)));
     this.tickSignals(this.time);
+    this.worldT = (this.worldT || 0) - dt; if (this.worldT <= 0) { this.worldT = 0.5; this.tickWorld(bx, bz); }
     // 멀리 있는 작은 것(출구 · 동 번호 등)은 숨긴다 (0.5초마다)
     this.lodT = (this.lodT || 0) - dt; if (this.lodT <= 0) { this.lodT = 0.5; const v = new THREE.Vector3(); for (const o of this.lodObjs || []) { const bs = o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere); v.copy(bs.center).applyMatrix4(o.matrixWorld); o.visible = Math.hypot(v.x - bx, v.z - bz) - bs.radius < 400; }
       // 곰(사람)은 70m 밖이면 숨긴다 (곰 하나가 부품 수십 개라 무겁다)
@@ -1516,6 +1585,13 @@ export class Hangang {
     }
     for (const p of [...this.people]) { const [x, z] = this.world(p.s, p.lat); if (Math.hypot(x - px, z - pz) > 260 || p.s < 2 || p.s > this.L - 2) { this.removePerson(p); this.people.splice(this.people.indexOf(p), 1); } }
   }
+  // 밤 불빛: 이 지도(또는 칸)의 재질들
+  tickLit(lit, hr, home, work, dt) {
+    for (const [t, m] of Object.entries(this.bldByType || {})) m.emissiveIntensity = lit * (t.startsWith('street') || t === 'factory' ? (hr >= 2 && hr < 7 ? 0.3 : 1) : t === 'apt' || t === 'brick' ? home : work) * 0.5;
+    if (this.signM) this.signM.emissiveIntensity = lit * (hr >= 1 && hr < 6 ? 0.15 : 0.45);
+    if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; if (this.summit) tickSummit(this, dt, lit); for (const m of this.neonMs || []) m.emissiveIntensity = 0.2 + lit * 1.2; if (this.jbugM) this.jbugM.emissiveIntensity = 0.15 + lit * 0.7; if (this.id === 'banpo') this.tickBanpo(dt, lit); if (this.mfount) this.tickMusicFountain(dt, lit); for (const b of this.picnic || []) b.update(dt, 0, { noCrawl: true }); for (const m of this.shopSignMs || []) m.emissiveIntensity = 0.25 + lit * 0.85; for (const m of this.shopWinM || []) m.emissiveIntensity = 0.1 + lit * 0.42; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.35 * Math.max(0.2, (hr >= 18 && hr < 24 ? 1 : 0.4));
+    if (this.bridgeLights) this.bridgeLights.material.opacity = lit;
+  }
   tickEnv(dt, camera, px, pz) {
     const st = this.state, h = st.hour, sk = skyAt(h), wt = st.weather;
     const cloud = wt === 'clear' ? 0.08 : wt === 'cloudy' ? 0.6 : 0.85;
@@ -1545,10 +1621,8 @@ export class Hangang {
     // 시간대별 켜진 정도: 집은 저녁 7 ~ 11시가 가장 밝고 새벽엔 거의 꺼짐, 회사는 퇴근 무렵 밝다가 밤이 깊으면 거의 꺼짐
     const hr = h, home = hr >= 17 && hr < 19 ? 0.6 : hr >= 19 && hr < 23 ? 1 : hr >= 23 || hr < 1 ? 0.55 : hr < 5 ? 0.12 : hr < 7 ? 0.3 : 0.2;
     const work = hr >= 17 && hr < 20 ? 1 : hr >= 20 && hr < 22 ? 0.55 : hr >= 22 || hr < 6 ? 0.08 : hr < 8 ? 0.35 : 0.3;
-    for (const [t, m] of Object.entries(this.bldByType || {})) m.emissiveIntensity = lit * (t.startsWith('street') || t === 'factory' ? (hr >= 2 && hr < 7 ? 0.3 : 1) : t === 'apt' || t === 'brick' ? home : work) * 0.5;
-    if (this.signM) this.signM.emissiveIntensity = lit * (hr >= 1 && hr < 6 ? 0.15 : 0.45);
-    if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; if (this.summit) tickSummit(this, dt, lit); for (const m of this.neonMs || []) m.emissiveIntensity = 0.2 + lit * 1.2; if (this.jbugM) this.jbugM.emissiveIntensity = 0.15 + lit * 0.7; if (this.id === 'banpo') this.tickBanpo(dt, lit); if (this.mfount) this.tickMusicFountain(dt, lit); for (const b of this.picnic || []) b.update(dt, 0, { noCrawl: true }); for (const m of this.shopSignMs || []) m.emissiveIntensity = 0.25 + lit * 0.85; for (const m of this.shopWinM || []) m.emissiveIntensity = 0.1 + lit * 0.42; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.35 * Math.max(0.2, (h >= 18 && h < 24 ? 1 : 0.4));
-    this.lampGlow.material.opacity = lit; if (this.lampHeadM) this.lampHeadM.emissiveIntensity = 0.2 + lit * 2.2; this.bridgeLights.material.opacity = lit; this.carPts.material.opacity = 0.25 + lit * 0.75;
+    this.tickLit(lit, hr, home, work, dt); for (const c of this.chunks?.values() || []) { c.time = this.time; c.tickLit(lit, hr, home, work, dt); }
+    this.lampGlow.material.opacity = lit; if (this.lampHeadM) this.lampHeadM.emissiveIntensity = 0.2 + lit * 2.2; this.carPts.material.opacity = 0.25 + lit * 0.75;
     this.lampPool.material.opacity = lit * 0.32;
     let pi = 0; for (const [x, z] of this.poleXZ) { if (pi >= this.pools.length) break; if (Math.abs(x - px) < 90 && Math.abs(z - pz) < 90) { this.pools[pi].position.set(x, 0.03, z); this.pools[pi].visible = true; pi++; } } for (; pi < this.pools.length; pi++) this.pools[pi].visible = false;
     // 자동차 불빛
