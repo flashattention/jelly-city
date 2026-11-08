@@ -7,12 +7,12 @@ const PLAY = '/seoul-walk/play/', cl = (v, a = 0, b = 1) => Math.min(b, Math.max
 
 // ---------- 장 (landing3d.js 의 장면과 같은 순서) ----------
 const CH = [
-  ['c1', '여의도 한강', '37.5198° N · 126.9405° E', '오후 6:09 · 여름', 'Golden Run', '63빌딩을 등지고 달리는 저녁. 한강 러닝 코스 위로 곰들이 하나둘 지나가요.'],
-  ['c2', '석촌호수 · 잠실', '37.5126° N · 127.1025° E', '오후 1:36 · 봄', 'Spring Tower', '벚꽃이 호수를 두르는 봄날 낮, 555m 롯데월드타워가 맑은 하늘을 찔러요.'],
-  ['c5', '홍대', '37.5563° N · 126.9236° E', '오후 6:33 · 노을', 'Sunset Alley', '해가 기우는 골목. 간판에 하나둘 불이 들어오고, 거리에 사람들이 모여들어요.'],
-  ['c7', '종로 · 인사동', '37.5740° N · 126.9850° E', '오후 5:18 · 눈', 'Snow in Jongno', '오래된 골목에 눈이 내려요. 처마 끝 등불 아래로 발자국이 이어져요.'],
-  ['c3', '남산', '37.5512° N · 126.9882° E', '오후 8:36 · 가을', 'The Tower', '진짜 산 위, 해발 262m. 밤이면 N서울타워에 불이 켜지고 서울이 발아래에서 반짝여요.'],
-  ['c6', '한강', '37.5265° N · 126.9340° E', '오후 8:48 · 여름', 'River Lights', '강물 위로 도시의 불빛이 흔들려요. 실제 열차가 다리를 건너는 그 순간, 여기서도.'],
+  ['c1', '여의도 한강', '북위 37.5198° · 동경 126.9405°', '오후 6:09 · 여름', '해 질 녘 러닝', '63빌딩을 등지고 달리는 저녁. 한강 러닝 코스 위로 곰들이 하나둘 지나가요.'],
+  ['c2', '석촌호수 · 잠실', '북위 37.5126° · 동경 127.1025°', '오후 1:36 · 봄', '봄날의 타워', '벚꽃이 호수를 두르는 봄날 낮, 555m 롯데월드타워가 맑은 하늘을 찔러요.'],
+  ['c5', '홍대', '북위 37.5563° · 동경 126.9236°', '오후 6:33 · 노을', '노을 골목', '해가 기우는 골목. 간판에 하나둘 불이 들어오고, 거리에 사람들이 모여들어요.'],
+  ['c7', '종로 · 인사동', '북위 37.5740° · 동경 126.9850°', '오후 5:18 · 눈', '눈 오는 종로', '오래된 골목에 눈이 내려요. 처마 끝 등불 아래로 발자국이 이어져요.'],
+  ['c3', '남산', '북위 37.5512° · 동경 126.9882°', '오후 8:36 · 가을', '밤의 타워', '진짜 산 위, 해발 262m. 밤이면 N서울타워에 불이 켜지고 서울이 발아래에서 반짝여요.'],
+  ['c6', '한강', '북위 37.5265° · 동경 126.9340°', '오후 8:48 · 여름', '강 위의 불빛', '강물 위로 도시의 불빛이 흔들려요. 실제 열차가 다리를 건너는 그 순간, 여기서도.'],
 ];
 const film = $('film'), N = CH.length; film.style.setProperty('--n', N);
 const frames = CH.map(([f]) => { const d = document.createElement('div'); d.className = 'f'; d.dataset.src = `/seoul-walk/img/${f}.webp`; $('frames').appendChild(d); return d; });
@@ -21,7 +21,7 @@ let use3d = false; // 3D 가 돌면 그림은 쓰지 않는다 (불러오기 전
 const loadImg = (k) => { const d = frames[k]; if (d && !d.style.backgroundImage) d.style.backgroundImage = `url(${d.dataset.src})`; };
 let ticking = false, lastP = -1;
 function filmTick() {
-  ticking = false; const r = film.getBoundingClientRect(), span = film.offsetHeight - innerHeight, p = cl(-r.top / span), P = p * (N + 0.6); window.SW_FILM = { P: Math.min(P, N - 0.001), N };
+  ticking = false; const r = film.getBoundingClientRect(), span = film.offsetHeight - innerHeight, p = cl(-r.top / span), P = p * (N + 0.6); window.SW_FILM = { P: Math.min(P, N - 0.001), N }; document.body.classList.toggle('light', r.bottom < 80);
   if (Math.abs(P - lastP) < 1e-4) return; lastP = P;
   // 첫 화면 겹침(제목 · 출발)은 스크롤을 시작하면 걷힌다
   const io = 1 - ease(cl((P - 0.12) / 0.26)); $('intro').style.opacity = io.toFixed(3); $('intro').style.transform = `translate3d(0, ${(-(1 - io) * 40).toFixed(1)}px, 0)`; $('intro').style.pointerEvents = io > 0.5 ? 'auto' : 'none'; $('cue').style.opacity = (io * 0.9).toFixed(2);
@@ -35,7 +35,7 @@ function filmTick() {
 }
 addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(filmTick); } }, { passive: true });
 addEventListener('resize', () => { lastP = -1; filmTick(); });
-{ const f = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', hour: 'numeric', minute: '2-digit' }), tick = () => { $('clock').textContent = `${f.format(new Date())} KST`; }; tick(); setInterval(tick, 15000); }
+{ const f = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', hour: 'numeric', minute: '2-digit' }), tick = () => { $('clock').textContent = `지금 ${f.format(new Date())}`; }; tick(); setInterval(tick, 15000); }
 
 // ---------- 불러오기: 컴퓨터는 첫 3D 장면이 그려지면, 아니면 첫 그림이 오면 걷는다 ----------
 const loader = { set: (k, s) => { $('ld-bar').style.width = `${Math.round(k * 100)}%`; if (s) $('ld-s').textContent = s; }, done: () => $('loader').classList.add('done') };

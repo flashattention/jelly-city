@@ -34,10 +34,10 @@
 
       <div class="intro" id="intro">
         <div class="title">
-          <p class="lab">A WALK THROUGH REAL SEOUL</p>
+          <p class="lab">진짜 서울을 걷는 산책</p>
           <h1>젤리 서울<br />산책</h1>
           <p class="lead">진짜 서울을 그대로 옮긴 도시에서,<br />내 곰돌이와 걷고 · 달리고 · 날아요.</p>
-          <p class="meta"><span>SEOUL, KOREA</span><span id="clock">—</span><span>37.5665° N · 126.9780° E</span></p>
+          <p class="meta"><span>서울</span><span id="clock">—</span><span>북위 37.5665° · 동경 126.9780°</span></p>
         </div>
         <aside class="start" id="start" aria-label="어디서 걸을까요">
           <p class="lab">어디서 걸을까요 <span id="tile-n"></span></p>
@@ -49,15 +49,15 @@
       </div>
 
       <div class="chaps" id="chaps"></div>
-      <div class="end" id="end"><p class="lab">THE END</p><h2>A Jelly Love Letter<br />to Seoul</h2><a class="btn" id="go-end" href="/seoul-walk/play/?r=yeouido&amp;go=start">지금 걷기</a></div>
+      <div class="end" id="end"><h2>이제 직접<br />걸어 봐요</h2><a class="btn" id="go-end" href="/seoul-walk/play/?r=yeouido&amp;go=start">지금 걷기</a></div>
       <div class="prog" id="prog"><i id="prog-fill"></i><span id="prog-t">01 / 06</span></div>
-      <p class="cue" id="cue">SCROLL</p>
+      <p class="cue" id="cue">내려 보기</p>
     </div>
   </section>
 
   <main>
     <section class="story" id="story">
-      <div class="side"><p class="lab">THE MAKING</p><h2>진짜 서울을<br />이렇게 옮겼어요</h2></div>
+      <div class="side"><p class="lab">만든 이야기</p><h2>진짜 서울을<br />이렇게 옮겼어요</h2></div>
       <div class="body">
         <div class="why">
           <p><b>정해진 길도, 탈락도 없는 곳.</b> 장애물을 피하거나 점수를 다투지 않고, 내 속도로 걷고 달리고 날아서 가고 싶은 곳으로. 쉬고 싶을 때 들르는 서울.</p>
@@ -74,15 +74,15 @@
           <tr><th>국토교통부 브이월드</th><td><b>건물 공간정보</b><code>LT_C_SPBD</code></td><td>서울 모든 건물의 바닥 모양 · 층수 · 이름 → 건물 덩어리와 높이</td></tr>
           <tr><th>국토교통부 브이월드</th><td><b>건축물대장 정보</b><code>LT_C_BLDGINFO</code></td><td>주용도 · 구조 · 사용승인 연도 → 외벽 · 창 · 지붕</td></tr>
           <tr><th>소상공인시장진흥공단</th><td><b>상가(상권)정보</b><code>storeListInRectangle</code></td><td>서울 가게 76만 곳의 이름 · 업종 · 층 · 건물 이름 → 간판 · 건물 이름표 <em>반영 중</em></td></tr>
-          <tr><th>OpenStreetMap</th><td><b>대한민국 원본 지도</b><code>Geofabrik</code></td><td>길 · 골목 · 인도 · 공원 · 숲 · 물 · 다리 · 철길 · 지하철 출구 · 카페 · 식당</td></tr>
-          <tr><th>Mapzen · AWS Open Data</th><td><b>지형 고도 타일</b><code>Terrarium</code></td><td>서울 전체 50m 간격 높이 → 남산 · 인왕산 · 북악산 · 관악산이 실제 높이로</td></tr>
+          <tr><th>오픈스트리트맵</th><td><b>대한민국 원본 지도</b><code>Geofabrik 추출본</code></td><td>길 · 골목 · 인도 · 공원 · 숲 · 물 · 다리 · 철길 · 지하철 출구 · 카페 · 식당</td></tr>
+          <tr><th>맵젠 · AWS 공개 데이터</th><td><b>지형 고도 타일</b><code>Terrarium</code></td><td>서울 전체 50m 간격 높이 → 남산 · 인왕산 · 북악산 · 관악산이 실제 높이로</td></tr>
         </table>
 
         <h3>건물 외형은 이렇게</h3>
         <ol class="steps">
-          <li><b>모양 · 높이</b>건물 바닥 모양을 그대로 세워요. 높이는 실제 높이 기록이 있으면 그대로, 없으면 브이월드 지상 층수 × 3.3m, 그것도 없으면 건물 종류로. 이름도 브이월드 건물명 · OpenStreetMap 에서.</li>
+          <li><b>모양 · 높이</b>건물 바닥 모양을 그대로 세워요. 높이는 실제 높이 기록이 있으면 그대로, 없으면 브이월드 지상 층수 × 3.3m, 그것도 없으면 건물 종류로. 이름도 브이월드 건물명 · 오픈스트리트맵에서.</li>
           <li><b>외벽</b>건축물대장의 주용도 · 구조 · 지은 해로 골라요. 2000년대 업무 빌딩은 유리 커튼월, 오래된 상가는 1층 진열창 위로 벽돌 · 타일, 아파트는 줄지은 창과 동 번호, 목구조 기와집은 한옥 지붕.</li>
-          <li><b>색</b>OpenStreetMap 에 건물 색이 적혀 있으면 그 색, 없으면 연식 · 용도에 맞는 색에서 건물마다 조금씩 다르게. 틀로 찍어 내지 않아요.</li>
+          <li><b>색</b>오픈스트리트맵에 건물 색이 적혀 있으면 그 색, 없으면 연식 · 용도에 맞는 색에서 건물마다 조금씩 다르게. 틀로 찍어 내지 않아요.</li>
           <li><b>밤의 창</b>용도에 따라 불 켜지는 시간이 달라요. 집은 저녁에, 사무실은 낮과 야근 시간에, 거리의 상가는 새벽 몇 시간만 빼고.</li>
           <li><b>랜드마크</b>63빌딩 · 롯데월드타워 · N서울타워 · 명동대성당 · 경복궁 · 조계사는 위성사진 · 거리 사진을 보며 실제 비율로 하나씩 손으로.</li>
           <li><b>사진은 보기만</b>위성사진 · 거리 사진은 모양 · 색 · 비율을 맞추는 데 눈으로만 보고, 화면의 무늬 · 창 · 간판은 모두 코드로 그려요.</li>
