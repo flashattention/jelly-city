@@ -9,129 +9,107 @@
   <meta property="og:description" content="진짜 서울을 그대로 옮긴 도시를 내 곰돌이와 걷고 · 달리고 · 날아요." />
   <meta property="og:image" content="/seoul-walk/img/c2.webp" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="theme-color" content="#0c1222" />
+  <meta name="theme-color" content="#07090f" />
   <link rel="icon" href="/seoul-walk/icon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,400;1,500&family=IBM+Plex+Mono:wght@400;500&family=Nanum+Myeongjo:wght@700;800&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/seoul-walk/landing.css" />
-  <link rel="preload" as="image" href="/seoul-walk/img/c1.webp" />
   <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }</script>
 </head>
 <body>
-  <!-- 불러오기 -->
-  <div class="loader" id="loader"><div><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="8" r="4.2" /><circle cx="23" cy="8" r="4.2" /><circle cx="16" cy="18" r="11" /></svg><span>서울을 불러오는 중…</span></div></div>
+  <div class="loader" id="loader"><span class="ld-t">젤리 서울 산책</span><span class="ld-bar"><i id="ld-bar"></i></span><span class="ld-s" id="ld-s">서울을 불러오는 중</span></div>
 
-  <!-- 첫 화면 -->
-  <header class="hero" id="top">
-    <div class="scenes" aria-hidden="true"><div class="s on" id="hero-bg"></div></div>
-    <div class="veil" aria-hidden="true"></div>
-    <nav class="nav">
-      <a class="brand" href="#top"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="8" r="4.2" /><circle cx="23" cy="8" r="4.2" /><circle cx="16" cy="18" r="11" /></svg><span>젤리 서울 산책</span></a>
-      <div class="links"><a href="#film">이야기</a><a href="#where">어디서부터</a><a href="#map">서울 지도</a><a href="#story">만든 이야기</a></div>
-    </nav>
-    <div class="hero-meta"><span>SEOUL, KOREA</span><span id="clock">—</span><span>37.5665° N · 126.9780° E</span></div>
-    <div class="hero-in">
-      <p class="eyebrow">A walk through real Seoul</p>
-      <h1>젤리 서울 산책</h1>
-      <p class="lead">진짜 서울을 그대로 옮긴 도시에서,<br />내 곰돌이와 걷고 · 달리고 · 날아요.</p>
-      <div class="cta">
-        <a class="btn primary" id="go-now" href="/seoul-walk/play/?r=yeouido&amp;go=start"><span>지금 걷기</span><small id="go-now-sub">여의도 한강에서</small></a>
-        <a class="btn glass" href="#film">서울 둘러보기</a>
-      </div>
-    </div>
-    <a class="scroll" href="#film" aria-label="아래로"><span>SCROLL</span>↓</a>
+  <header class="bar">
+    <a class="mark" href="#film">젤리 서울 산책</a>
+    <nav><a href="#story">만든 이야기</a><a href="#" data-open-map>서울 지도</a><a class="go" id="bar-go" href="/seoul-walk/play/?r=yeouido&amp;go=start">지금 걷기 →</a></nav>
   </header>
 
-  <!-- 장면 이야기: 스크롤하면 풍경이 다가오며 바뀐다 -->
+  <!-- 장면: 첫 화면부터 실시간 3D. 스크롤하면 카메라가 서울 곳곳을 지나간다 -->
   <section class="film" id="film">
     <div class="stage">
       <div class="frames" id="frames" aria-hidden="true"></div>
       <canvas id="gl" aria-hidden="true"></canvas>
-      <div class="fveil" aria-hidden="true"></div>
+      <div class="shade" aria-hidden="true"></div>
+
+      <div class="intro" id="intro">
+        <div class="title">
+          <p class="lab">A WALK THROUGH REAL SEOUL</p>
+          <h1>젤리 서울<br />산책</h1>
+          <p class="lead">진짜 서울을 그대로 옮긴 도시에서,<br />내 곰돌이와 걷고 · 달리고 · 날아요.</p>
+          <p class="meta"><span>SEOUL, KOREA</span><span id="clock">—</span><span>37.5665° N · 126.9780° E</span></p>
+        </div>
+        <aside class="start" id="start" aria-label="어디서 걸을까요">
+          <p class="lab">어디서 걸을까요 <span id="tile-n"></span></p>
+          <a class="resume hidden" id="resume" href="#"><span>이어 걷기</span><small id="resume-sub"></small></a>
+          <ol class="hoods" id="hoods"></ol>
+          <div class="acts"><a class="btn" id="go-now" href="/seoul-walk/play/?r=yeouido&amp;go=start">지금 걷기</a><a class="link" href="#" data-open-map>서울 지도에서 고르기 →</a></div>
+          <div class="acct" id="acct"><span id="acct-t">로그인 없이 바로 · 걸은 자리는 이 기기에</span><div id="g-btn"></div></div>
+        </aside>
+      </div>
+
       <div class="chaps" id="chaps"></div>
-      <div class="end" id="end"><p class="kicker">THE END</p><h2>A Jelly Love Letter<br />to Seoul</h2><p>이제 직접 걸어 볼 차례예요.</p><a class="btn primary" id="go-end" href="/seoul-walk/play/?r=yeouido&amp;go=start"><span>지금 걷기</span></a></div>
-      <div class="prog" id="prog"></div>
+      <div class="end" id="end"><p class="lab">THE END</p><h2>A Jelly Love Letter<br />to Seoul</h2><a class="btn" id="go-end" href="/seoul-walk/play/?r=yeouido&amp;go=start">지금 걷기</a></div>
+      <div class="prog" id="prog"><i id="prog-fill"></i><span id="prog-t">01 / 06</span></div>
+      <p class="cue" id="cue">SCROLL</p>
     </div>
   </section>
 
   <main>
-    <!-- 어디서부터 -->
-    <section class="sec" id="where">
-      <div class="head"><p class="kicker">01 · 어디서부터</p><h2>오늘은 어느 동네를 걸어 볼까요</h2><p>동네를 고르면 그곳에서 시작해요. 한 번 걸었던 동네는 멈춘 자리에서 이어 걸어요. 서울 25개 구는 모두 이어져 있어서, 걷다 보면 옆 동네로 그대로 넘어가요.</p></div>
-      <a class="resume-all hidden" id="resume-all" href="#"><span>▶ 서울 전체에서 마지막으로 있던 곳에서 이어 걷기</span><small id="resume-all-sub"></small></a>
-      <div class="hoods" id="hoods"></div>
-    </section>
-
-    <!-- 서울 지도 -->
-    <section class="sec dark" id="map">
-      <div class="head"><p class="kicker">02 · 서울 지도</p><h2>지도에서 누른 곳에서 바로</h2><p>서울 25개 구 어디든 눌러 보세요. 그 자리에 곰돌이가 내려앉아요.</p></div>
-      <div class="map-wrap">
-        <canvas id="seoul" width="1100" height="900"></canvas>
-        <div class="map-side">
-          <div class="pick" id="pick"><b>어디로 갈까요?</b><span>지도를 눌러 보세요</span></div>
-          <a class="btn primary wide disabled" id="go-pick" href="#">여기서 시작</a>
-          <p class="note">걷기 W A S D · 시점 마우스 · 날기 Space 세 번 · 휴대폰은 화면 조이스틱</p>
+    <section class="story" id="story">
+      <div class="side"><p class="lab">THE MAKING</p><h2>진짜 서울을<br />이렇게 옮겼어요</h2></div>
+      <div class="body">
+        <div class="why">
+          <p><b>정해진 길도, 탈락도 없는 곳.</b> 장애물을 피하거나 점수를 다투지 않고, 내 속도로 걷고 달리고 날아서 가고 싶은 곳으로. 쉬고 싶을 때 들르는 서울.</p>
+          <p><b>지어낸 도시가 아니라 진짜 서울.</b> 매일 지나는 길, 가 본 골목, 아직 못 가 본 동네를 그대로 걸어 보는 즐거움. 그래서 동네 하나에서 시작해 서울 25개 구를 하나로 이었어요.</p>
+          <p><b>지금의 서울과 같이 숨 쉬게.</b> 밖에 비가 오면 게임에도 비가, 붐비는 시간엔 거리에 곰이 가득, 한밤엔 드문드문.</p>
         </div>
-      </div>
-    </section>
 
-    <!-- 세 가지 -->
-    <section class="sec" id="feel">
-      <div class="trio">
-        <article><img src="/dream-runner/sw/namsanview.webp" alt="남산에서 내려다본 서울" loading="lazy" /><h3>진짜 서울</h3><p>오픈스트리트맵 길과 브이월드 건물 · 건축물대장, 지형 고도로 만든 도시. 남산은 산 위에, 63빌딩은 강가에, 골목은 골목대로.</p></article>
-        <article><img src="/dream-runner/sw/hangang.webp" alt="한강의 밤" loading="lazy" /><h3>지금의 서울</h3><p>밖에 비가 오면 게임에도 비가. 지하철 도착 · 열차 위치 · 버스 · 거리 혼잡도가 실시간으로 이어져요.</p></article>
-        <article><img src="/dream-runner/sw/hongdae.webp" alt="홍대 밤거리" loading="lazy" /><h3>내 마음대로</h3><p>장애물도 점수도 없어요. 걷다가 뛰다가, 벽을 타고 오르다가, 날아서 한강을 건너요. 가게에 들어가 한 그릇 먹고 가도 좋아요.</p></article>
-      </div>
-    </section>
+        <h3>사용한 데이터 · API</h3>
+        <table class="api">
+          <tr><th>서울 열린데이터광장</th><td><b>지하철 실시간 도착정보</b><code>realtimeStationArrival</code></td><td>역 출구 앞 · 역 안 안내판에 지금 실제로 들어오는 열차 (몇 분 뒤 · 어느 방면)</td></tr>
+          <tr><th>서울 열린데이터광장</th><td><b>지하철 실시간 열차 위치정보</b><code>realtimePosition</code></td><td>실제 열차가 한강 철교 양끝 역에 있을 때, 게임 속 다리 위로 그 호선 색 열차가 건너가요</td></tr>
+          <tr><th>서울 열린데이터광장</th><td><b>서울시 실시간 도시데이터</b><code>citydata</code></td><td>혼잡도 → 거리의 곰 수, 도로 소통 → 차 수, 하늘 · 강수 → 게임 날씨, 기온 → 안내</td></tr>
+          <tr><th>서울특별시 · 공공데이터포털</th><td><b>버스위치정보조회</b><code>getBusPosByRtid</code></td><td>실제 버스가 있는 자리에 그 노선 번호를 단 버스 (간선 파랑 · 지선 초록)</td></tr>
+          <tr><th>국토교통부 브이월드</th><td><b>건물 공간정보</b><code>LT_C_SPBD</code></td><td>서울 모든 건물의 바닥 모양 · 층수 · 이름 → 건물 덩어리와 높이</td></tr>
+          <tr><th>국토교통부 브이월드</th><td><b>건축물대장 정보</b><code>LT_C_BLDGINFO</code></td><td>주용도 · 구조 · 사용승인 연도 → 외벽 · 창 · 지붕</td></tr>
+          <tr><th>소상공인시장진흥공단</th><td><b>상가(상권)정보</b><code>storeListInRectangle</code></td><td>서울 가게 76만 곳의 이름 · 업종 · 층 · 건물 이름 → 간판 · 건물 이름표 <em>반영 중</em></td></tr>
+          <tr><th>OpenStreetMap</th><td><b>대한민국 원본 지도</b><code>Geofabrik</code></td><td>길 · 골목 · 인도 · 공원 · 숲 · 물 · 다리 · 철길 · 지하철 출구 · 카페 · 식당</td></tr>
+          <tr><th>Mapzen · AWS Open Data</th><td><b>지형 고도 타일</b><code>Terrarium</code></td><td>서울 전체 50m 간격 높이 → 남산 · 인왕산 · 북악산 · 관악산이 실제 높이로</td></tr>
+        </table>
 
-    <!-- 만든 이야기 -->
-    <section class="sec story" id="story">
-      <div class="head"><p class="kicker">03 · 만든 이야기</p><h2>진짜 서울을 이렇게 옮겼어요</h2></div>
-      <div class="why">
-        <div><h4>정해진 길도, 탈락도 없는 곳</h4><p>장애물을 피하거나 점수를 다투지 않고, 내 속도로 걷고 달리고 날아서 가고 싶은 곳으로. 쉬고 싶을 때 들르는 서울.</p></div>
-        <div><h4>지어낸 도시가 아니라 진짜 서울</h4><p>매일 지나는 길, 가 본 골목, 아직 못 가 본 동네를 그대로 걸어 보는 즐거움. 그래서 동네 하나에서 시작해 서울 전체를 하나로 이었어요.</p></div>
-        <div><h4>지금의 서울과 같이 숨 쉬게</h4><p>붐비는 시간엔 거리에 곰이 가득, 한밤엔 드문드문. 화면 속 서울이 지금 이 순간의 진짜 서울을 닮도록.</p></div>
-      </div>
-      <div class="tech">
-        <h3 class="tech-h">사용한 데이터 · API <small>무엇을 받아서 게임의 무엇이 되었나</small></h3>
-        <div class="api">
-          <div class="row"><span class="who">서울 열린데이터광장</span><b>지하철 실시간 도착정보 <code>realtimeStationArrival</code></b><p>역 출구 앞 · 역 안 안내판에 지금 실제로 들어오는 열차 (몇 분 뒤 · 어느 방면)</p></div>
-          <div class="row"><span class="who">서울 열린데이터광장</span><b>지하철 실시간 열차 위치정보 <code>realtimePosition</code></b><p>실제 열차가 한강 철교 양끝 역에 있을 때, 게임 속 다리 위로 그 호선 색 열차가 건너가요</p></div>
-          <div class="row"><span class="who">서울 열린데이터광장</span><b>서울시 실시간 도시데이터 <code>citydata</code></b><p>혼잡도 → 거리의 곰 수, 도로 소통(원활 · 서행 · 정체) → 차 수, 하늘 · 강수 → 게임 날씨, 기온 → 안내</p></div>
-          <div class="row"><span class="who">서울특별시 · 공공데이터포털</span><b>버스위치정보조회 <code>getBusPosByRtid</code></b><p>실제 버스가 있는 자리에 그 노선 번호를 단 버스 (간선 파랑 · 지선 초록)</p></div>
-          <div class="row"><span class="who">국토교통부 브이월드</span><b>건물 공간정보 <code>LT_C_SPBD</code></b><p>서울 모든 건물의 바닥 모양과 층수 → 건물 덩어리와 높이</p></div>
-          <div class="row"><span class="who">국토교통부 브이월드</span><b>건축물대장 정보 <code>LT_C_BLDGINFO</code></b><p>주용도 · 구조 · 사용승인 연도 → 외벽 · 창 · 지붕 모양 (아래 '건물 외형')</p></div>
-          <div class="row"><span class="who">소상공인시장진흥공단</span><b>상가(상권)정보 <code>storeListInRectangle</code></b><p>서울 가게 이름 · 업종 · 층 · 건물 이름 → 1층 간판 · 2 · 3층 창 간판 · 건물 이름표 <em>(반영 중)</em></p></div>
-          <div class="row"><span class="who">OpenStreetMap</span><b>대한민국 원본 지도 (Geofabrik 추출본)</b><p>길 · 골목 · 인도 · 공원 · 숲 · 물 · 다리 · 철길 · 지하철 출구 위치 · 카페 · 식당 이름</p></div>
-          <div class="row"><span class="who">Mapzen · AWS Open Data</span><b>지형 고도 타일 <code>Terrarium</code></b><p>서울 전체 50m 간격 높이 → 남산 · 인왕산 · 북악산 · 관악산이 실제 높이로 (평지의 빌딩 혹은 걷어냄)</p></div>
-        </div>
-        <h3 class="tech-h">건물 외형은 이렇게 <small>틀로 찍지 않고, 자료와 사진을 보며</small></h3>
+        <h3>건물 외형은 이렇게</h3>
         <ol class="steps">
-          <li><b>모양 · 높이</b> 건물 바닥 모양을 그대로 세워요. 높이는 실제 높이 기록이 있으면 그대로, 없으면 브이월드 지상 층수 × 3.3m, 그것도 없으면 건물 종류(단독주택 · 상가 …)로 정해요. 이름도 브이월드 건물명 · OpenStreetMap 에서.</li>
-          <li><b>외벽 고르기</b> 건축물대장의 주용도 · 구조 · 지은 해로 외벽을 골라요. 2000년대 업무 빌딩은 유리 커튼월, 오래된 상가는 1층 진열창 위로 벽돌 · 타일, 아파트는 줄지은 창과 동 번호, 공장은 슬레이트, 목구조 기와집은 한옥 지붕.</li>
-          <li><b>색</b> OpenStreetMap 에 건물 색이 적혀 있으면 그 색, 없으면 연식 · 용도에 맞는 색에서 건물마다 조금씩 다르게. "교회면 다 같은 모양" 같은 틀은 쓰지 않아요.</li>
-          <li><b>밤의 창</b> 용도에 따라 불 켜지는 시간이 달라요. 집은 저녁에, 사무실은 낮과 야근 시간에, 거리의 상가는 새벽 몇 시간만 빼고.</li>
-          <li><b>랜드마크</b> 63빌딩(금빛 유리) · 롯데월드타워(위로 갈수록 가늘어지는 555m) · N서울타워(전망대 · 안테나) · 명동대성당(첨탑) · 경복궁 · 조계사(기와) 같은 곳은 위성사진 · 거리 사진을 보며 실제 비율로 하나씩 손으로 만들었어요.</li>
-          <li><b>사진은 보기만</b> 위성사진 · 거리 사진은 모양 · 색 · 비율을 맞추는 데 눈으로만 보고, 화면의 무늬 · 창 · 간판은 모두 코드로 그려요.</li>
+          <li><b>모양 · 높이</b>건물 바닥 모양을 그대로 세워요. 높이는 실제 높이 기록이 있으면 그대로, 없으면 브이월드 지상 층수 × 3.3m, 그것도 없으면 건물 종류로. 이름도 브이월드 건물명 · OpenStreetMap 에서.</li>
+          <li><b>외벽</b>건축물대장의 주용도 · 구조 · 지은 해로 골라요. 2000년대 업무 빌딩은 유리 커튼월, 오래된 상가는 1층 진열창 위로 벽돌 · 타일, 아파트는 줄지은 창과 동 번호, 목구조 기와집은 한옥 지붕.</li>
+          <li><b>색</b>OpenStreetMap 에 건물 색이 적혀 있으면 그 색, 없으면 연식 · 용도에 맞는 색에서 건물마다 조금씩 다르게. 틀로 찍어 내지 않아요.</li>
+          <li><b>밤의 창</b>용도에 따라 불 켜지는 시간이 달라요. 집은 저녁에, 사무실은 낮과 야근 시간에, 거리의 상가는 새벽 몇 시간만 빼고.</li>
+          <li><b>랜드마크</b>63빌딩 · 롯데월드타워 · N서울타워 · 명동대성당 · 경복궁 · 조계사는 위성사진 · 거리 사진을 보며 실제 비율로 하나씩 손으로.</li>
+          <li><b>사진은 보기만</b>위성사진 · 거리 사진은 모양 · 색 · 비율을 맞추는 데 눈으로만 보고, 화면의 무늬 · 창 · 간판은 모두 코드로 그려요.</li>
         </ol>
       </div>
-      <div class="facts"><div><b>201</b><span>2km 칸으로 이은 서울 25개 구</span></div><div><b>4</b><span>실시간으로 이어진 서울 데이터</span></div><div><b>50m</b><span>간격의 실제 지형 고도</span></div><div><b>0</b><span>장애물 · 탈락 · 로그인 필요</span></div></div>
     </section>
 
-    <!-- 계정 -->
-    <section class="sec acct" id="acct">
-      <div class="acct-in">
-        <div><h3 id="acct-t">로그인 없이 바로 걸어요</h3><p id="acct-p">걸은 자리와 가 본 동네는 이 기기에 저장돼요. 구글로 로그인하면 다른 기기에서도 이어서 걷고, 방문 기록이 계정에 남아요.</p><p class="visits" id="visits"></p></div>
-        <div id="g-btn"></div>
-      </div>
+    <section class="facts">
+      <div><b>201</b><span>2km 칸으로 이은<br />서울 25개 구</span></div>
+      <div><b>760,664</b><span>받아 둔 실제 가게<br />(상가정보 · 반영 중)</span></div>
+      <div><b>50m</b><span>간격의<br />실제 지형 고도</span></div>
+      <div><b>0</b><span>장애물 · 탈락 ·<br />로그인 필요</span></div>
+    </section>
+
+    <section class="last">
+      <h2>오늘은 어디를<br />걸어 볼까요</h2>
+      <div class="acts"><a class="btn" id="go-last" href="/seoul-walk/play/?r=yeouido&amp;go=start">지금 걷기</a><a class="link" href="#" data-open-map>서울 지도에서 고르기 →</a></div>
     </section>
   </main>
 
-  <footer class="foot">
-    <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="9" cy="8" r="4.2" /><circle cx="23" cy="8" r="4.2" /><circle cx="16" cy="18" r="11" /></svg><span>젤리 서울 산책</span></div>
-    <p>지도 © OpenStreetMap contributors · 건물 © 국토교통부 브이월드 · 실시간 © 서울 열린데이터광장 · 지형 © Mapzen / AWS Terrain Tiles</p>
-  </footer>
+  <footer class="foot"><span>젤리 서울 산책</span><span>지도 © OpenStreetMap contributors · 건물 © 국토교통부 브이월드 · 실시간 © 서울 열린데이터광장 · 상가 © 소상공인시장진흥공단 · 지형 © Mapzen / AWS Terrain Tiles</span></footer>
+
+  <!-- 서울 지도 (어디서든 열린다) -->
+  <div class="mapbox hidden" id="mapbox" role="dialog" aria-label="서울 지도">
+    <canvas id="seoul" width="1200" height="980"></canvas>
+    <div class="map-ui"><p class="lab">서울 지도</p><h3 id="pick-n">어디로 갈까요?</h3><p id="pick-s">25개 구 어디든 눌러 보세요. 그 자리에 곰돌이가 내려앉아요.</p><a class="btn disabled" id="go-pick" href="#">여기서 시작</a><a class="link" href="#" id="map-x">닫기</a></div>
+  </div>
   <script type="module" src="/seoul-walk/landing.js"></script>
 </body>
 </html>

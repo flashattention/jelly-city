@@ -245,7 +245,7 @@ export class Hangang {
     this.opt = { season: 'auto', weather: 'auto', time: 'auto', flow: 1, cam: 0 };
     this.state = { season: 'spring', weather: 'clear', hour: 12 };
   }
-  async load(id = 'yeouido') {
+  async load(id = 'yeouido', opt = {}) {
     if (this.ready && this.id === id) return;
     if (id === 'seoul') { // 서울 전체: 2km 칸들을 곰 둘레로 불러오고 내린다
       const res = await fetch(new URL('../seoul/index.json', import.meta.url)); if (!res.ok) throw new Error('서울 지도를 불러오지 못했어요');
@@ -257,7 +257,9 @@ export class Hangang {
       this.id = id; this.build(); this.ready = true; return;
     }
     const res = await fetch(new URL(`../hangang/${id}.json`, import.meta.url)); if (!res.ok) throw new Error('지도를 불러오지 못했어요');
-    this.map = await res.json(); this.id = id; this.build(); this.ready = true;
+    this.map = await res.json(); this.id = id;
+    if (opt.steps) { const idle = () => new Promise((ok) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(() => ok(), { timeout: 80 }) : setTimeout(ok, 0))); for (const _ of this.buildGen()) await idle(); } else this.build();
+    this.ready = true;
   }
   // ---------- 서울 전체: 칸 불러오기 · 내리기 ----------
   //   칸 = 같은 Hangang 을 '칸 모드'로 지은 것. 부딪힘 · 바닥 · 가게 · 출구 목록은 주인(host)의 것을 함께 써서, 주인의 모든 검사가 그대로 서울 전체에 통한다
@@ -554,7 +556,9 @@ export class Hangang {
     return { s, lat: (x - p.x) * p.rx + (z - p.z) * p.rz };
   }
 
-  build() {
+  // 지도 만들기. buildGen 은 단계마다 쉬어 갈 수 있게(yield) — 랜딩처럼 화면을 멈추면 안 되는 곳에서 load(id, { steps: true })
+  build() { for (const _ of this.buildGen()); }
+  *buildGen() {
     const M = this.map, S = M.scale, sc = this.scene, r = rnd(12345);
     this.routeSetup();
     this.windU = { value: 0 };
@@ -607,13 +611,17 @@ export class Hangang {
           #include <colorspace_fragment>
         }` });
     this.waterM = waterM;
-    if (M.kind !== 'world') this.buildContent(r);
+    if (M.kind !== 'world') yield* this.buildSteps(r);
+    yield;
     if (M.kind === 'world') { this.chunks = new Map(); this.buildFar(); waterM.depthTest = true; waterM.polygonOffset = true; waterM.polygonOffsetFactor = -2; waterM.polygonOffsetUnits = -4; }
     this.buildLights(r);
+    yield;
     this.buildSkyStuff(r);
+    yield;
     // 여기까지는 땅 높이를 따르지 않는 것(하늘 · 빛 · 비 · 먼 풍경)
     if (M.kind === 'world') this.fixedObjs = new Set(sc.children);
     this.buildPeople();
+    yield;
     this.buildTransit();
     // 내 곰돌이 그림자
     this.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.5, 18), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.25, depthWrite: false }));
