@@ -1147,6 +1147,7 @@ export class Hangang {
       if (h > 40 && !heli && !/63|IFC|파크원|전경련/.test(name)) { const area = Math.abs(ringArea(ring)), w = Math.sqrt(area) * 0.32; box(cx, h + 1.6, cz, w, 3.2, w * 0.8, new THREE.Color('#8e8c88')); }
       // 파크원: 모서리를 따라 오르는 빨간 철골 기둥과 가로대
       if (/파크원|NH금융타워/.test(name)) { const red = new THREE.Color('#d8382a'); for (let i = 0; i < ring.length; i++) { const [x, z] = ring[i], ox = x + (x - cx) * 0.04, oz = z + (z - cz) * 0.04; box(ox, (mh + h) / 2, oz, 2.2, h - mh, 2.2, red); } for (let y = mh + 60; y < h - 20; y += 96) for (let i = 0; i < ring.length; i++) { const a = ring[i], c2 = ring[(i + 1) % ring.length], L = Math.hypot(c2[0] - a[0], c2[1] - a[1]); box((a[0] + c2[0]) / 2 + ((a[0] + c2[0]) / 2 - cx) * 0.04, y, (a[1] + c2[1]) / 2 + ((a[1] + c2[1]) / 2 - cz) * 0.04, L, 1.6, 1.2, red, -Math.atan2(c2[1] - a[1], c2[0] - a[0])); } }
+      if (LANDMARKS[name]?.domeTop) { const D = LANDMARKS[name].domeTop; domes.push([cx, h, cz, D.r, D.h, D.c, curY]); }
       if (dome) { let rc = '#4f9e8c'; try { rc = rci >= 0 ? `#${new THREE.Color(M.colors[rci]).getHexString()}` : rc; } catch { /* 기본 */ } domes.push([cx, h, cz, domeR, domeH, rc, curY]); }
     }
     fillY();
@@ -2112,6 +2113,9 @@ function buildGate(ring, LM) {
   const roof = (w, d, y, h, top, c) => { const g = new THREE.CylinderGeometry(top, 1, h, 4, 1); g.rotateY(Math.PI / 4); g.scale((w / 2) * Math.SQRT2, 1, (d / 2) * Math.SQRT2); g.translate(0, y + h / 2, 0); add(g, c); };
   const B = G.base || 7, W = a * 2, D = b * 2, STONE = '#bfb7a6', RED = '#8e2f26', DAN = '#3f7a6a', TILE = '#4a4e56';
   box(W, B, D, 0, STONE); box(W * 1.01, 0.5, D * 1.01, B - 0.5, '#a9a191');
+  // 나무 문 (대한문처럼 돌 축대 없이 낮은 기단 위 한 층): 붉은 기둥 사이 세 칸 문 + 우진각 지붕 하나
+  if (G.wood) { box(W * 0.86, 5.2, D * 0.7, B, RED); for (let k = 0; k < 3; k++) box(W * 0.2, 3.6, D * 0.72, B, '#3a2420', (k - 1) * W * 0.27); box(W * 0.88, 0.5, D * 0.72, B + 4.8, DAN); roof(W * 1.12, D * 1.35, B + 5.2, 3.6, 0.3, TILE); box(W * 0.6, 0.6, 0.8, B + 8.8, '#3a3d44');
+    const g0 = new THREE.BufferGeometry(); g0.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g0.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g0.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); return new THREE.Mesh(g0, new THREE.MeshLambertMaterial({ vertexColors: true })); }
   const n = G.arches || 1; for (let k = 0; k < n; k++) { const off = (k - (n - 1) / 2) * W * 0.22; box(n > 1 ? 4.2 : 5.2, B * 0.62, D + 0.2, 0, '#2a2420', off); box(n > 1 ? 4.6 : 5.6, 0.6, D + 0.25, B * 0.62, '#9a9282', off); }
   // 1층 문루 + 처마
   box(W * 0.74, 4, D * 0.66, B, RED); box(W * 0.76, 0.5, D * 0.68, B + 3.5, DAN);
@@ -2260,6 +2264,9 @@ export const LANDMARKS = {
   // 도성 문 (돌 축대 위 2층 문루 · 실제 높이 약 20m): 축대 색 돌 + 기와 우진각 지붕
   숭례문: GATE_SN, '숭례문(남대문)': GATE_SN, 흥인지문: { facade: 'hanok', gate: { base: 6, tiers: 2, ong: true } }, 광화문: { facade: 'hanok', gate: { base: 8, tiers: 2, arches: 3 } },
   // 서울시청 새 청사 (유리 파도) · DDP (은빛 알루미늄 패널) · 국립중앙박물관 (긴 화강석 건물)
+  대한문: { facade: 'hanok', gate: { base: 1.2, tiers: 1, arches: 3, wood: true } },
+  // 옛 서울역 (문화역서울284): 붉은 벽돌 + 화강석 띠 + 가운데 초록 돔 · 덕수궁 석조전 (흰 돌 신고전) · 지금 서울역 (유리)
+  문화역서울284: { facade: 'brick', color: '#a8573e', height: 15, domeTop: { r: 7, h: 9, c: '#4f8a76' } }, 석조전: { facade: 'stone', color: '#ece6d8', height: 17 }, '서울역(철도역)': { facade: 'glass', color: '#9fb6c8', height: 24 },
   서울특별시청: { facade: 'glass', color: '#a9c8dc', height: 52 }, 동대문디자인플라자: { facade: 'panels', color: '#c9ccd0', height: 29 }, 국립중앙박물관: { facade: 'stone', color: '#d9d2c4', height: 26 },
   경복궁: { facade: 'hanok', color: '#e8dccb', height: 9, roofH: 7 }, '경복궁 건춘문': { facade: 'hanok', color: '#e8dccb', height: 9, roofH: 5 }, 조계사: { facade: 'hanok', color: '#e8dccb', roofH: 7 },
   여의도순복음교회: { facade: 'panels', color: '#5d4f48', campus: 160, campusFacade: 'stone', campusColor: '#a08a7a', front: { w: 16, d: 9, up: 13, face: 'west', screen: true, cross: true, sign: '여의도순복음교회' }, rimLight: true },
