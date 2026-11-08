@@ -996,8 +996,10 @@ addEventListener('resize', () => hgPost?.setSize(innerWidth, innerHeight));
 // 입장: 이어 달리기 · 서강대교에서 · 지도에서 고르기
 const HG_POS_KEY = 'dreamrunner.hangang.pos';
 function hgSavedPos() { try { return JSON.parse(store.get(HG_POS_KEY) || 'null'); } catch { return null; } }
-function hgRegionUI() { $('hg-regions').innerHTML = Object.entries(HG_REGIONS).map(([id, r]) => `<button data-r="${id}" class="${id === hgRegion ? 'on' : ''}">${r.label}</button>`).join(''); $('hg-regions').querySelectorAll('button').forEach((b) => { b.onclick = () => { hgUse(b.dataset.r); hgRegionUI(); }; }); $('hg-from-start').textContent = HG_REGIONS[hgRegion].start; }
-$('hg-btn').onclick = () => { unlock(); hgRegionUI(); const p = hgSavedPos(); $('hg-resume').classList.toggle('hidden', !p); if (p) $('hg-resume-sub').textContent = p.where || ''; $('hg-start').classList.remove('hidden'); };
+// 지도 파일이 있는 지역만 보여 준다 (지도를 아직 안 만든 지역 단추가 먼저 배포돼도 깨지지 않게)
+const hgHave = {}; async function hgCheckRegions() { await Promise.all(Object.keys(HG_REGIONS).filter((id) => hgHave[id] === undefined).map(async (id) => { try { hgHave[id] = (await fetch(`hangang/${id}.json`, { method: 'HEAD' })).ok; } catch { hgHave[id] = false; } })); hgRegionUI(); }
+function hgRegionUI() { $('hg-regions').innerHTML = Object.entries(HG_REGIONS).filter(([id]) => hgHave[id] !== false).map(([id, r]) => `<button data-r="${id}" class="${id === hgRegion ? 'on' : ''}">${r.label}</button>`).join(''); $('hg-regions').querySelectorAll('button').forEach((b) => { b.onclick = () => { hgUse(b.dataset.r); hgRegionUI(); }; }); $('hg-from-start').textContent = HG_REGIONS[hgRegion].start; }
+$('hg-btn').onclick = () => { unlock(); hgRegionUI(); hgCheckRegions(); const p = hgSavedPos(); $('hg-resume').classList.toggle('hidden', !p); if (p) $('hg-resume-sub').textContent = p.where || ''; $('hg-start').classList.remove('hidden'); };
 $('hg-start-x').onclick = () => $('hg-start').classList.add('hidden');
 $('hg-resume').onclick = () => { $('hg-start').classList.add('hidden'); const p = hgSavedPos(); if (p?.region) hgUse(p.region); startHangang(p ? { s: p.s, lat: p.lat } : null); };
 $('hg-from-start').onclick = () => { $('hg-start').classList.add('hidden'); startHangang({ s: 30, lat: -4.3 }); };
