@@ -1249,8 +1249,15 @@ export class Hangang {
     const southFirst = tp.fine[0][1] > tp.fine[tp.fine.length - 1][1], forward = north ? southFirst : !southFirst;
     const g = makeTrain(); this.scene.add(g); this.trains.push({ tp, d: forward ? -200 : tp.len + 200, dir: forward ? 1 : -1, g, v: 16 });
   }
+  // 바깥 철교 열차 실시간: 그 철교 양 끝 역에 실제 열차가 들어오면(상태 1 도착 · 2 출발) 그쪽에서 철교로 출발
+  async pollLineTrains() {
+    if (!this.api || !this.lineTracks?.length) return; const BRIDGE_ST = { 2: [['당산', '합정'], ['성수', '뚝섬']], 3: [['압구정', '옥수']], 4: [['이촌', '동작']], 5: [['여의나루', '마포']], 7: [['청담', '뚝섬유원지']], 9: [['선유도', '당산']] };
+    for (const line of [...new Set(this.lineTracks.map((t) => t.line))]) { try { const j = await this.api(`/api/seoul/subway/position?line=${line}호선`); this.liveLines ||= new Set(); this.liveLines.add(line); this.lineSeen ||= new Set();
+      for (const t of j.trains || []) { const key = `${line}:${t.no}:${t.at}:${t.sttus}`; if (this.lineSeen.has(key) || (t.sttus !== 1 && t.sttus !== 2)) continue; for (const [a, b] of BRIDGE_ST[line] || []) { if (t.at !== a && t.at !== b) continue; this.lineSeen.add(key); const tp = this.lineTracks.filter((q) => q.line === line)[Math.floor(Math.random() * this.lineTracks.filter((q) => q.line === line).length)], fw = (t.at === a) === t.up, g = makeTrain(line); this.scene.add(g); this.trains.push({ tp, d: fw ? -200 : tp.len + 200, dir: fw ? 1 : -1, g, v: 15 }); } }
+      if (this.lineSeen.size > 600) this.lineSeen.clear(); } catch { /* 다음에 */ } }
+  }
   async pollTransit() {
-    if (!this.api) return;
+    if (!this.api) return; this.pollLineTrains();
     try {
       const j = await this.api('/api/seoul/subway/position?line=1호선'); this.liveTrains = true;
       for (const t of j.trains || []) { const key = `${t.no}:${t.at}:${t.up}`; if (t.sttus !== 2 || this.trainSeen.has(key)) continue; if (t.at === '노량진' && t.up) { this.trainSeen.add(key); this.spawnTrain(true); } else if (t.at === '용산' && !t.up) { this.trainSeen.add(key); this.spawnTrain(false); } }
@@ -1262,7 +1269,7 @@ export class Hangang {
   tickTransit(dt, px, pz) {
     if (!this.trains) return;
     this.trainT -= dt; if (this.trainT <= 0) { this.trainT = 20; this.pollTransit(); if (!this.liveTrains && Math.random() < 0.35) this.spawnTrain(Math.random() < 0.5); }
-    this.lineT -= dt; if (this.lineT <= 0 && this.lineTracks?.length) { this.lineT = 35 + Math.random() * 70; const tp = this.lineTracks[Math.floor(Math.random() * this.lineTracks.length)], fw = Math.random() < 0.5, g = makeTrain(tp.line); this.scene.add(g); this.trains.push({ tp, d: fw ? -200 : tp.len + 200, dir: fw ? 1 : -1, g, v: 15 }); }
+    this.lineT -= dt; if (this.lineT <= 0 && this.lineTracks?.length && !this.liveLines?.size) { this.lineT = 35 + Math.random() * 70; const tp = this.lineTracks[Math.floor(Math.random() * this.lineTracks.length)], fw = Math.random() < 0.5, g = makeTrain(tp.line); this.scene.add(g); this.trains.push({ tp, d: fw ? -200 : tp.len + 200, dir: fw ? 1 : -1, g, v: 15 }); }
     for (const t of this.trains) { t.d += t.dir * t.v * dt; t.g.children.forEach((car, i) => { const p = this.trainAt(t.tp, clamp(t.d - t.dir * i * 20, 0, t.tp.len)); car.position.set(p.x, p.y + 0.4, p.z); car.rotation.y = Math.atan2(p.dx, p.dz); car.visible = t.d - t.dir * i * 20 > 0 && t.d - t.dir * i * 20 < t.tp.len; }); }
     this.trains = this.trains.filter((t) => { const done = t.dir > 0 ? t.d > t.tp.len + 220 : t.d < -220; if (done) this.scene.remove(t.g); return !done; });
     // 실시간 버스: GPS → 지도 좌표, 받은 위치로 부드럽게
