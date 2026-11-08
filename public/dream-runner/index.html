@@ -58,6 +58,29 @@
   </div>
   <div id="toast" class="hidden"></div>
   <div id="spectate" class="hidden"></div>
+  <!-- 한강 러닝 -->
+  <div id="hg-hud" class="hidden">
+    <div class="hg-stat"><b id="hg-dist">0.00</b><span>km</span><div id="hg-sub">00:00 · --'--"/km · 0km/h</div></div>
+    <div class="hg-where" id="hg-where">📍</div>
+    <div class="hg-r"><span id="hg-clock">🕐 12:00</span><button id="hg-set-btn" class="btn ghost mini" aria-label="설정">⚙️</button><button id="hg-cam" class="btn ghost mini" aria-label="시점">🎥</button><button id="hg-exit" class="btn ghost mini" aria-label="나가기">✕</button></div>
+    <div class="hg-speed"><button id="hg-slow" class="btn ghost" aria-label="느리게">-</button><div><b id="hg-pace-name">🏃 조깅</b><div class="hg-bar"><i id="hg-bar"></i></div></div><button id="hg-fast" class="btn ghost" aria-label="빠르게">+</button></div>
+    <div class="hg-keys">W · S 속도 · A · D 옆으로 · Space 점프 · V 시점</div>
+  </div>
+  <div id="hg-set" class="hidden">
+    <div class="hg-card">
+      <h3>🌉 한강 설정</h3>
+      <div class="hg-row"><span>계절</span><div class="seg" id="hg-season"></div></div>
+      <div class="hg-row"><span>날씨</span><div class="seg" id="hg-weather"></div></div>
+      <div class="hg-row"><span>시간</span><div class="seg" id="hg-time"></div></div>
+      <div class="hg-row"><span>시간 흐름</span><div class="seg" id="hg-flow"></div></div>
+      <div class="hg-row"><span>시점</span><div class="seg" id="hg-camseg"></div></div>
+      <div class="hg-row"><span>소리</span><div class="seg" id="hg-sound"></div></div>
+      <p class="hg-tip">🎧 좋아하는 음악 앱(스포티파이 · 멜론 · 유튜브 뮤직)을 켜 두고 달려도 좋아요. 게임 소리를 끄면 음악만 들려요.</p>
+      <p class="hg-tip small">코스: 서강대교 → 마포대교 → 원효대교 → 63빌딩 (실제 한강남자전거길) · 끝에서 돌아서 계속 달려요<br />지도 © OpenStreetMap contributors</p>
+      <button id="hg-set-close" class="btn big">확인</button>
+    </div>
+  </div>
+
   <div id="touch" class="hidden">
     <div class="t-l"><div id="joy"><div id="joy-knob"></div></div></div>
     <div class="t-r"><button data-k="item" id="t-item" class="hidden">🎁</button><button data-k="shove" id="t-shove" class="hidden">🫸</button><button data-k="slide" class="big" aria-label="숙이기"><svg viewBox="0 0 24 24" width="50" height="50" aria-hidden="true"><path d="M5 5l7 6.5L19 5M5 11.5 12 18l7-6.5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button data-k="jump" class="big" aria-label="점프"><svg viewBox="0 0 24 24" width="50" height="50" aria-hidden="true"><path d="M5 12.5 12 6l7 6.5M5 19l7-6.5 7 6.5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
@@ -94,6 +117,7 @@
         <div class="btns" id="play-btns">
           <button id="solo-btn" class="btn big">🏃 혼자 달리기</button>
           <button id="multi-btn" class="btn big alt">👥 같이 달리기 <small>최대 12명</small></button>
+          <button id="hg-btn" class="btn big hg-go">🌉 한강 러닝 <small>실제 여의도 한강공원 · 내 속도로 쉬엄쉬엄</small></button>
         </div>
         <div class="row code-row"><input id="code-in" maxlength="6" placeholder="초대 코드 6자리" autocomplete="off" /><button id="code-btn" class="btn alt">🎟️ 코드로 참가</button></div>
       </div></div>

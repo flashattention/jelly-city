@@ -42,3 +42,4 @@ toss/app/*.ait
 *.msixbundle
 *.appx
 *.appxbundle
+.cache/

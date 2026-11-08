@@ -71,6 +71,9 @@ export class Cosmetics {
       case 'dream': { const m = dreamRow(r.map, r.diff); return !!m && !this.dreamOf(sub).table('speed', r.diff, r.map)[sub]?.u && placed(r, m.rank, Object.keys(this.dreamOf(sub).table('speed', r.diff, r.map)).length); }
       case 'dreamDist': { const e = this.dreamOf(sub)?.table('speed', r.diff, r.map)?.[sub]; return !!e && !e.u && e.dist >= r.value; }
       case 'starTotal': return u.total >= r.value;
+      case 'hgKm': return (this.dreamOf(sub)?.hg?.[sub]?.m || 0) >= r.value;
+      case 'hgRun': return (this.dreamOf(sub)?.hg?.[sub]?.best || 0) >= r.value;
+      case 'hgMo': return (this.dreamOf(sub)?.hg?.[sub]?.mo?.[r.mo] || 0) >= r.value;
       case 'record': { const m = recRow(r.game, r.board); return !!m && placed(r, m.rank, Object.keys(rec(r.game).data[r.board] || {}).length); }
       case 'recordVal': { const m = recRow(r.game, r.board); return !!m && m.value >= r.value; }
       case 'plays': return (r.game === 'dream-runner' ? this.dreamOf(sub)?.stats?.[sub]?.runs || 0 : u.plays[r.game] || 0) >= r.value;

@@ -21,7 +21,8 @@ const TOP_GUARD = 10, DAY_STARS = 300000; // 확인 안 된 기록이 이 순위
 
 // 운영 지표: 하루(한국 시간)마다 달린 사람 · 판수 · 광고 (기획 지표용, tools/metrics.mjs 가 읽는다)
 const dayKey = (t = Date.now()) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);
-const DAILY_KEEP = 120; // 이 날수보다 오래된 하루 기록은 지운다
+const DAILY_KEEP = 120;
+const HG_TTL = 10 * 3600e3, HG_MO = ['sunset', 'sunrise', 'night', 'rain', 'snow', 'spring', 'summer', 'autumn', 'winter']; // 한강 러닝: 한 번에 10시간까지 · 순간들 // 이 날수보다 오래된 하루 기록은 지운다
 const MAPS = ['dream', 'hell', 'void'], mapOf = (m) => (m === 'hell' || m === 'void' ? m : 'dream'); // 꿈나라 · 지옥 · 이공간
 const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n);
 
@@ -33,6 +34,7 @@ export class DreamBoard {
     this.bestItem = {}; // 아이템전
     this.boards = {};   // 노멀(easy) 말고 다른 난이도: 'speed:hard' → { sub → 기록 } (노멀은 위 둘을 그대로 쓴다)
     this.stats = {};    // sub → { runs, time, by: { easy: { runs, time } } } (순위와 상관없이 달린 판수 · 시간)
+    this.hg = {}; this.hgSess = {}; // 한강 러닝: sub → { m 모두 · best 한 번에 · runs · sec · mo 순간별 } · 달리는 중인 판
     this.daily = {}; this.first = {}; // 운영 지표: 날짜(한국 시간) → 하루 숫자 · sub → 처음 달린 날
     this.runs = 0; this.pending = []; this.reports = []; this.secret = crypto.randomBytes(24).toString('hex'); this.vstat = { ok: 0, bad: 0, none: 0, skip: 0 }; this.dayStars = new Map();
     this.lastPost = new Map();
@@ -40,7 +42,7 @@ export class DreamBoard {
     this.ipHits = new Map();
     try {
       const d = JSON.parse(fs.readFileSync(this.file, 'utf8'));
-      this.best = d.best || {}; this.bestItem = d.bestItem || {}; this.boards = d.boards || {}; this.stats = d.stats || {}; this.daily = d.daily || {}; this.first = d.first || {}; this.runs = d.runs || 0; this.reports = d.reports || []; this.secret = d.secret || this.secret;
+      this.best = d.best || {}; this.bestItem = d.bestItem || {}; this.boards = d.boards || {}; this.stats = d.stats || {}; this.daily = d.daily || {}; this.first = d.first || {}; this.hg = d.hg || {}; this.hgSess = d.hgSess || {}; this.runs = d.runs || 0; this.reports = d.reports || []; this.secret = d.secret || this.secret;
       // 예전 '확인 대기' 기록: 순위표에 올리고 비상 리포트로 옮긴다 (더는 기다리게 하지 않는다)
       for (const p of d.pending || []) { this.mig = true; const T = this.table(p.mode, p.diff, p.map); if (!T[p.sub] || p.e.score > T[p.sub].score) T[p.sub] = p.e; this.report('red', p.sub, p.mode, p.diff, p.map, p.why, p.e, p.r); }
     } catch { /* 처음 */ }
@@ -51,7 +53,7 @@ export class DreamBoard {
   save() {
     if (!this.dirty) return;
     this.dirty = false;
-    try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ best: this.best, bestItem: this.bestItem, boards: this.boards, stats: this.stats, daily: this.daily, first: this.first, runs: this.runs, reports: this.reports, secret: this.secret, used: this.tickets.dump(TICKET_TTL) })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('드림 러너 저장 실패', e); }
+    try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ best: this.best, bestItem: this.bestItem, boards: this.boards, stats: this.stats, daily: this.daily, first: this.first, hg: this.hg, hgSess: this.hgSess, runs: this.runs, reports: this.reports, secret: this.secret, used: this.tickets.dump(TICKET_TTL) })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('드림 러너 저장 실패', e); }
   }
   // map: 'hell' 은 난이도마다 따로 (꿈나라 노멀은 예전 표 그대로)
   table(mode, diff, map = 'dream') { if (map === 'hell' || map === 'void') return (this.boards[`${map}:${mode}:${diff}`] ||= {}); if (diff !== 'easy') return (this.boards[`${mode}:${diff}`] ||= {}); return mode === 'item' ? this.bestItem : this.best; }
@@ -139,6 +141,24 @@ export class DreamBoard {
     this.adDay.set(day, n + 1); if (this.adDay.size > 50000) this.adDay.clear(); this.adGot.delete(tk.id);
     const bonus = getCos()?.earnRaw?.(sub, got.earned) ?? 0, D = this.day(now); D.adWatch++; D.adStars += bonus; if (!D.adSubs.includes(sub)) D.adSubs.push(sub); this.dirty = true;
     return { bonus };
+  }
+  // 🌉 한강 러닝: 장애물이 없는 힐링 맵이라 순위표는 없다. 달린 거리는 실제로 흐른 시간으로만 믿는다 (초속 6.5m 까지)
+  hgStart() { return this.tickets.issue({ seed: 0, diff: 'hg', map: 'hangang', mode: 'hangang' }); }
+  hgRun(sub, b) {
+    const now = Date.now(), tk = this.tickets.read(b.tk);
+    if (!tk || tk.mode !== 'hangang' || now - tk.at > HG_TTL || tk.at - now > 5000) throw new Error('한강 출발표가 없거나 오래됐어요');
+    const S = (this.hgSess[tk.id] ||= { sub, m: 0, sec: 0, mo: {}, at: tk.at });
+    if (S.sub !== sub) throw new Error('다른 사람의 달리기예요');
+    const real = (now - tk.at) / 1000, m = Math.max(0, Math.min(Math.floor(Number(b.m)) || 0, real * 6.5 + 30)), sec = Math.max(0, Math.min(Math.floor(Number(b.sec)) || 0, real + 5));
+    const U = (this.hg[sub] ||= { m: 0, best: 0, runs: 0, sec: 0, mo: {} }), delta = Math.max(0, m - S.m);
+    if (!S.counted) { S.counted = 1; U.runs++; }
+    U.m += delta; U.sec += Math.max(0, sec - S.sec); S.m = Math.max(S.m, m); S.sec = Math.max(S.sec, sec); U.best = Math.max(U.best, S.m);
+    for (const k of HG_MO) { const v = Math.min(Math.floor(Number(b.mo?.[k])) || 0, S.m); if (v > (S.mo[k] || 0)) S.mo[k] = v; U.mo[k] = Math.max(U.mo[k] || 0, S.mo[k] || 0); }
+    const D = this.day(now); D.hgM = (D.hgM || 0) + delta; D.hgSubs ||= []; if (!D.hgSubs.includes(sub)) D.hgSubs.push(sub); this.first[sub] ||= dayKey(now);
+    this.dirty = true;
+    for (const [id, x] of Object.entries(this.hgSess)) if (now - x.at > HG_TTL) delete this.hgSess[id];
+    const fresh = getCos()?.refresh(sub) || [];
+    return { m: U.m, best: U.best, fresh };
   }
   // 오늘(한국 시간) 지표 칸: 달린 사람(subs) · 판수 · 시간 · 난이도 · 맵 · 광고 제안(adOffer) · 시청(adWatch) · 광고로 준 별 · 광고 본 사람
   day(now = Date.now()) {
@@ -257,6 +277,13 @@ export async function dreamApi(req, res, url, who, board, json, isAdmin) {
       hits.push(now); board.ipHits.set('p:' + ip, hits);
     }
     try { return json(res, 200, { ok: true, ...board.played(who?.sub || 'anon:' + b.anon, b) }); } catch (e) { return json(res, 400, { error: e.message }); }
+  }
+  // 한강 러닝: 시작 · 달린 거리 보내기 (로그인 없이도 이 기기 아이디로)
+  if (url.pathname === '/api/dream/hangang/start' && req.method === 'POST') return json(res, 200, { tk: board.hgStart() });
+  if (url.pathname === '/api/dream/hangang/run' && req.method === 'POST') {
+    const b = await readJson(req);
+    if (!who && !ANON.test(String(b.anon || ''))) return json(res, 401, { error: 'login' });
+    try { return json(res, 200, board.hgRun(who?.sub || 'anon:' + b.anon, b)); } catch (e) { return json(res, 400, { error: e.message }); }
   }
   // 출발표: 기다리지 않고 시작하고, 뒤에서 받아 둔다
   if (url.pathname === '/api/dream/ver') { const has = url.searchParams.get('has'); return json(res, 200, has ? { v: DREAM_VER, has: has === DREAM_VER || hasVer(has) } : { v: DREAM_VER }); }

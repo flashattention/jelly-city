@@ -22,6 +22,7 @@ import { VOIDS } from './voids.js';
 import { openPatchNotes, showWhatsNew } from '../../shared/js/patchnotes.js';
 import { openWardrobe, notifyNew, titleHtml, medalHtml, loadCos } from '../../shared/js/wardrobe.js';
 import { starsEarned } from '../../shared/js/cos-items.js';
+import { Hangang, SEASONS, WEATHERS, TIMES, SPEEDS, V_MIN, V_MAX } from './hangang.js';
 
 const $ = (id) => document.getElementById(id);
 const MODE_KEY = 'dreamrunner.mode', DIFF_KEY = 'dreamrunner.diff', CAM_KEY = 'dreamrunner.cam', MAP_KEY = 'dreamrunner.map';
@@ -96,7 +97,7 @@ for (const b of document.querySelectorAll('#touch button')) {
   for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) b.addEventListener(ev, () => touchHeld.delete(k));
 }
 // 휴대폰 조이스틱: 좌우로 밀면 그쪽으로 (입력 기록은 왼쪽 · 가운데 · 오른쪽 셋이라 가운데 조금은 쉬는 자리)
-let joyDir = 0, joyId = null;
+let joyDir = 0, joyId = null, joyY = 0;
 // 휴대폰: 터치하다가 화면 글자가 파랗게 선택되거나 길게 누르기 메뉴가 뜨지 않게 (글 쓰는 칸은 그대로)
 const typing = (t) => !!t?.closest?.('input, textarea, [contenteditable]');
 document.addEventListener('selectstart', (e) => { if (!typing(e.target)) e.preventDefault(); });
@@ -105,8 +106,8 @@ document.addEventListener('touchstart', (e) => { if (!typing(e.target)) { const 
 {
   const joy = $('joy'), knob = $('joy-knob'), R = 40, DEAD = 12;
   // 작은 원은 큰 원 안에서 사방으로 움직이고, 좌우로 기운 만큼만 방향이 된다
-  const move = (e) => { const r = joy.getBoundingClientRect(); let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2); const d = Math.hypot(dx, dy); if (d > R) { dx *= R / d; dy *= R / d; } knob.style.transform = `translate(${dx}px, ${dy}px)`; joyDir = dx > DEAD ? 1 : dx < -DEAD ? -1 : 0; joy.classList.toggle('on', joyDir !== 0); };
-  const end = (e) => { if (e.pointerId !== joyId) return; joyId = null; joyDir = 0; knob.style.transform = ''; joy.classList.remove('on'); };
+  const move = (e) => { const r = joy.getBoundingClientRect(); let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2); const d = Math.hypot(dx, dy); if (d > R) { dx *= R / d; dy *= R / d; } knob.style.transform = `translate(${dx}px, ${dy}px)`; joyDir = dx > DEAD ? 1 : dx < -DEAD ? -1 : 0; joyY = Math.abs(dy) > DEAD ? -dy / R : 0; joy.classList.toggle('on', joyDir !== 0); };
+  const end = (e) => { if (e.pointerId !== joyId) return; joyId = null; joyDir = 0; joyY = 0; knob.style.transform = ''; joy.classList.remove('on'); };
   joy.addEventListener('pointerdown', (e) => { e.preventDefault(); unlock(); joyId = e.pointerId; joy.setPointerCapture(e.pointerId); move(e); });
   joy.addEventListener('pointermove', (e) => { if (e.pointerId === joyId) move(e); });
   for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) joy.addEventListener(ev, end);
@@ -254,6 +255,7 @@ $('code-btn2').onclick = () => joinByCode($('code-in2').value);
 $('code-in').onkeydown = (e) => { if (e.key === 'Enter') $('code-btn').click(); };
 $('code-in2').onkeydown = (e) => { if (e.key === 'Enter') $('code-btn2').click(); };
 $('solo-btn').onclick = () => { unlock(); startSoloFresh(); };
+$('hg-btn').onclick = () => { unlock(); startHangang(); };
 $('multi-btn').onclick = () => { unlock(); openLobby(); };
 // ---------- 스피드전 · 아이템전 ----------
 const modeName = (m) => (m === 'item' ? '🎁 아이템전' : '⚡ 스피드전');
@@ -760,6 +762,7 @@ function frame() {
   const dtRaw = Math.min(0.05, clock.getDelta()) + (game.dtCarry || 0), dtT = Math.round(dtRaw * 10000), dt = dtT / 10000; game.dtCarry = dtRaw - dt;
   t += dt;
   readInput();
+  if (game.mode === 'hangang') { hgFrame(dt); return; }
   const z = track.origin - runner.s;
   if (game.mode === 'title') {
     // 처음 화면: 출발 발판에서 제자리 달리기 + 꿈이 6초마다 바뀌며 빙글 도는 카메라
@@ -947,3 +950,92 @@ function hud() {
 boot();
 frame();
 setTimeout(() => { if (game.mode === 'title' && !new URLSearchParams(location.search).has('room')) showWhatsNew('dream-runner'); }, 900);
+
+// ---------- 🌉 한강 러닝 ----------
+//   장애물 · 탈락 없이 내 속도로 달리는 힐링 맵. 거리 · 순간(노을 · 비 · 눈 …)은 서버에 모여 업적이 된다
+const hg = new Hangang();
+hg.onTurn = (txt) => toast(`🔄 ${txt}! 돌아서 계속 달려요`, 2200);
+const HG_OPT_KEY = 'dreamrunner.hangang';
+try { Object.assign(hg.opt, JSON.parse(store.get(HG_OPT_KEY) || '{}')); } catch { /* 기본 */ }
+const hgSave = () => store.set(HG_OPT_KEY, JSON.stringify(hg.opt));
+const hgRun = { tk: null, sent: 0, sendT: 0 };
+async function startHangang() {
+  const b = $('hg-btn'); b.disabled = true;
+  try { if (!hg.ready) toast('🌉 한강 지도를 펼치는 중…', 4000); await hg.load('yeouido'); }
+  catch (e) { toast(`한강 지도를 불러오지 못했어요 · ${e.message}`, 2600); b.disabled = false; return; }
+  b.disabled = false;
+  hideScreens(); game.mode = 'hangang'; document.body.classList.add('hg');
+  runner.shadow.visible = false; hg.enter(runner.bear); runner.bear.root.scale.setScalar(1);
+  $('hg-hud').classList.remove('hidden'); if (document.body.classList.contains('touch')) $('touch').classList.remove('hidden');
+  setMusic(['pent', 62, 66, 'sine']); hgRun.tk = null; hgRun.sent = 0; hgRun.sendT = 20;
+  account.api('/api/dream/hangang/start', { method: 'POST', body: logged() ? {} : { anon: anonId() } }).then((r) => { hgRun.tk = r.tk; }).catch(() => {});
+  toast(`🌉 ${hg.map.name} · ${SEASONS[hg.state.season]} · ${WEATHERS[hg.state.weather]}`, 2600);
+}
+function hgReport(final = false) {
+  if (!hgRun.tk || hg.dist - hgRun.sent < (final ? 30 : 100)) return;
+  hgRun.sent = hg.dist;
+  const body = { tk: hgRun.tk, m: Math.floor(hg.dist), sec: Math.floor(hg.time), mo: Object.fromEntries(Object.entries(hg.moments).map(([k, v]) => [k, Math.floor(v)])), ...(logged() ? {} : { anon: anonId() }) };
+  account.api('/api/dream/hangang/run', { method: 'POST', body }).then((r) => { if (r?.fresh?.length) setTimeout(notifyNew, 300); }).catch(() => {});
+}
+function leaveHangang() {
+  hgReport(true);
+  hg.leave(); document.body.classList.remove('hg');
+  $('hg-hud').classList.add('hidden'); $('hg-set').classList.add('hidden');
+  camera.far = 1600; camera.fov = 62; camera.updateProjectionMatrix();
+  runner.shadow.visible = true; scene.add(runner.bear.root);
+  if (hg.dist > 50) toast(`🌉 ${(hg.dist / 1000).toFixed(2)}km · ${hgTime(hg.time)} 달렸어요. 수고했어요!`, 3000);
+  toTitle();
+}
+$('hg-exit').onclick = leaveHangang;
+const hgTime = (sec) => { const m = Math.floor(sec / 60), h = Math.floor(m / 60); return h ? `${h}:${String(m % 60).padStart(2, '0')}:${String(Math.floor(sec % 60)).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(Math.floor(sec % 60)).padStart(2, '0')}`; };
+const hgSpeedIdx = () => { let best = 0; SPEEDS.forEach(([, v], i) => { if (Math.abs(v - hg.target) < Math.abs(SPEEDS[best][1] - hg.target)) best = i; }); return best; };
+const hgStep = (d) => { const i = Math.max(0, Math.min(SPEEDS.length - 1, hgSpeedIdx() + d)); hg.target = SPEEDS[i][1]; };
+$('hg-slow').onclick = () => hgStep(-1); $('hg-fast').onclick = () => hgStep(1);
+const CAMS = ['🎥 뒤에서', '🌊 강 쪽 옆에서', '🚁 높이서'];
+$('hg-cam').onclick = () => { hg.opt.cam = ((hg.opt.cam || 0) + 1) % 3; hgSave(); toast(CAMS[hg.opt.cam], 1200); };
+addEventListener('keydown', (e) => {
+  if (game.mode !== 'hangang') return;
+  if (e.code === 'KeyV') $('hg-cam').onclick();
+  if (e.code === 'Escape') { if (!$('hg-set').classList.contains('hidden')) $('hg-set').classList.add('hidden'); else leaveHangang(); }
+  if (e.code === 'KeyE' && !e.repeat) hgStep(1);
+  if (e.code === 'KeyQ' && !e.repeat) hgStep(-1);
+});
+// 설정: 계절 · 날씨 · 시간 · 시간 흐름 · 시점 · 소리
+function hgSeg(id, items, get, set) {
+  const el = $(id); el.innerHTML = '';
+  for (const [v, label] of items) { const b = document.createElement('button'); b.textContent = label; b.classList.toggle('on', get() === v); b.onclick = () => { set(v); hgSave(); hgSettings(); }; el.appendChild(b); }
+}
+function hgSettings() {
+  hgSeg('hg-season', [['auto', '🎲 무작위'], ...Object.entries(SEASONS)], () => hg.opt.season, (v) => { hg.setOpt('season', v); if (v === 'auto') { hg.state.season = Object.keys(SEASONS)[Math.floor(Math.random() * 4)]; hg.applySeason(); } });
+  hgSeg('hg-weather', [['auto', '🎲 바뀌어요'], ...Object.entries(WEATHERS)], () => hg.opt.weather, (v) => hg.setOpt('weather', v));
+  hgSeg('hg-time', [['auto', '🕐 흐르는 대로'], ...Object.entries(TIMES).map(([k, [n]]) => [k, n])], () => hg.opt.time, (v) => hg.setOpt('time', v));
+  hgSeg('hg-flow', [[0, '⏸️ 멈춤'], [1, '🐢 1분 = 1시간'], [4, '🐇 4배']], () => hg.opt.flow, (v) => { hg.opt.flow = v; });
+  hgSeg('hg-camseg', CAMS.map((n, i) => [i, n]), () => hg.opt.cam || 0, (v) => { hg.opt.cam = v; });
+  hgSeg('hg-sound', [[false, '🔊 게임 소리'], [true, '🔇 끄기 (내 음악 듣기)']], () => sound.muted, (v) => { if (sound.muted !== v) { toggleMute(); syncSound(); } });
+}
+$('hg-set-btn').onclick = () => { hgSettings(); $('hg-set').classList.remove('hidden'); };
+$('hg-set-close').onclick = () => $('hg-set').classList.add('hidden');
+function hgFrame(dt) {
+  const L = keys.has('KeyA') || keys.has('ArrowLeft'), R = keys.has('KeyD') || keys.has('ArrowRight');
+  const U = keys.has('KeyW') || keys.has('ArrowUp'), D = keys.has('KeyS') || keys.has('ArrowDown');
+  const inp = { lat: (R ? 1 : 0) - (L ? 1 : 0) + (Math.abs(joyDir) ? joyDir * Math.min(1, Math.abs(joyY) < 0.5 ? 1 : 0.6) : 0), up: (U ? 1 : 0) - (D ? 1 : 0) + joyY, jump: input.jump };
+  if (!$('hg-set').classList.contains('hidden')) { inp.lat = 0; inp.up = 0; inp.jump = false; }
+  hg.update(dt, inp, camera);
+  input.jump = input.slide = input.shove = input.item = false;
+  renderer.render(hg.scene, camera);
+  // 화면 글씨는 0.2초마다
+  game.hgT = (game.hgT || 0) + dt; if (game.hgT < 0.2) return; game.hgT = 0;
+  const km = hg.dist / 1000, pace = hg.v > 0.3 ? 1000 / hg.v : 0;
+  $('hg-dist').textContent = km.toFixed(2);
+  $('hg-sub').textContent = `${hgTime(hg.time)} · ${pace ? `${Math.floor(pace / 60)}'${String(Math.floor(pace % 60)).padStart(2, '0')}"` : `--'--"`}/km · ${(hg.v * 3.6).toFixed(1)}km/h`;
+  $('hg-where').textContent = `📍 ${hg.where()}`;
+  const h = hg.state.hour, icon = h >= 5.3 && h < 6.9 ? '🌅' : h >= 17.9 && h < 19.4 ? '🌇' : h >= 20 || h < 5.3 ? '🌙' : '☀️';
+  $('hg-clock').textContent = `${icon} ${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')} · ${SEASONS[hg.state.season].split(' ')[0]} ${WEATHERS[hg.state.weather].split(' ')[0]}`;
+  $('hg-pace-name').textContent = SPEEDS[hgSpeedIdx()][0];
+  $('hg-bar').style.width = `${Math.round(((hg.v - V_MIN) / (V_MAX - V_MIN)) * 100)}%`;
+  hgRun.sendT -= 0.2; if (hgRun.sendT <= 0) { hgRun.sendT = 20; hgReport(); }
+}
+addEventListener('pagehide', () => { if (game.mode === 'hangang') hgReport(true); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && game.mode === 'hangang') hgReport(true); });
+// 바로 가기: /dream-runner/#hangang 으로 들어오면 한강 러닝부터
+if (location.hash === '#hangang') setTimeout(() => { if (game.mode === 'title') startHangang(); }, 700);

@@ -198,6 +198,15 @@ function buildAch() {
     STEP[d].forEach((v, i) => A.push(ach(`${base}.d${v}`, 'dream-runner', `${label} ${v.toLocaleString()}m`, `${label} 스피드전에서 ${v.toLocaleString()}m 달리기`, TIER_STEP[i], { kind: 'dreamDist', map: m, diff: d, value: v })));
   }
   [[1000, 'bronze'], [10000, 'silver'], [50000, 'gold'], [250000, 'platinum'], [1000000, 'legend']].forEach(([v, t]) => A.push(ach(`dr.stars.${v}`, 'dream-runner', `별 ${v.toLocaleString()}개 모으기`, `드림 러너에서 별을 모두 ${v.toLocaleString()}개 벌기`, t, { kind: 'starTotal', value: v })));
+  // 🌉 한강 러닝: 모두 달린 거리 · 한 번에 달린 거리 · 순간(노을 · 비 · 눈 · 계절 …)에 500m
+  const hg = (id, name, desc, tier, rule, e = '🌉') => A.push({ ...ach(`dr.hg.${id}`, 'dream-runner', name, desc, tier, rule), e });
+  [[1000, 'bronze', '한강 첫 1km'], [5000, 'bronze', '한강 5km'], [10000, 'silver', '한강 10km'], [21097, 'gold', '한강 하프 마라톤'], [42195, 'platinum', '한강 풀코스 마라톤'], [100000, 'legend', '한강 100km']]
+    .forEach(([v, t, n]) => hg(`km${v}`, n, `한강 러닝으로 모두 ${(v / 1000).toLocaleString()}km 달리기`, t, { kind: 'hgKm', value: v }));
+  [[2800, 'silver', '여의도 코스 완주', '한 번에 2.8km (서강대교 → 63빌딩) 달리기'], [5000, 'silver', '한 번에 5km', '한강에서 쉬지 않고 5km 달리기'], [10000, 'gold', '한 번에 10km', '한강에서 쉬지 않고 10km 달리기'], [21097, 'platinum', '한 번에 하프', '한강에서 쉬지 않고 21.1km 달리기']]
+    .forEach(([v, t, n, d]) => hg(`run${v}`, n, d, t, { kind: 'hgRun', value: v }, '🏃'));
+  [['sunset', '노을 러너', '노을 지는 한강을 500m 달리기', '🌇'], ['sunrise', '해돋이 러너', '해 뜨는 한강을 500m 달리기', '🌅'], ['night', '달빛 러너', '밤의 한강을 500m 달리기', '🌙'], ['rain', '빗속 러너', '비 오는 한강을 500m 달리기', '🌧️'], ['snow', '눈길 러너', '눈 오는 한강을 500m 달리기', '🌨️'],
+    ['spring', '벚꽃 러너', '봄의 한강을 1km 달리기', '🌸'], ['summer', '초록 러너', '여름의 한강을 1km 달리기', '🌿'], ['autumn', '단풍 러너', '가을의 한강을 1km 달리기', '🍁'], ['winter', '겨울 러너', '겨울의 한강을 1km 달리기', '❄️']]
+    .forEach(([k, n, d, e]) => hg(`mo.${k}`, n, d, ['spring', 'summer', 'autumn', 'winter'].includes(k) ? 'bronze' : 'silver', { kind: 'hgMo', mo: k, value: d.includes('1km') ? 1000 : 500 }, e));
   // 기록판 게임
   for (const [g, c] of Object.entries(RECORD_GAMES)) for (const [b, bn] of Object.entries(c.boards)) {
     const base = `${g}.${b}`, label = `${GAMES[g].name} ${bn}`;
@@ -223,7 +232,7 @@ function rewardItems() {
   const out = [];
   for (const a of ACHIEVEMENTS) {
     const T = TIERS[a.tier], pr = a.rule.rank || a.rule.pct ? prestigeOf(a.rule) : 0, st = styleOf(a.rule), fx = { tier: T.n, color: gameColor(a), tierColor: T.color, glow: T.glow, rainbow: a.tier === 'legend', pr, ...(st ? { grad: st.grad, de: st.e } : {}) };
-    out.push({ id: `title.${a.id}`, slot: 'title', name: a.name, emoji: st?.e || GAMES[a.game]?.emoji || '🏆', ach: a.id, rarity: a.tier, fx });
+    out.push({ id: `title.${a.id}`, slot: 'title', name: a.name, emoji: st?.e || a.e || GAMES[a.game]?.emoji || '🏆', ach: a.id, rarity: a.tier, fx });
     if (T.n >= 3) out.push({ id: `sash.${a.id}`, slot: 'sash', name: `${a.name} 휘장`, emoji: '🎗️', ach: a.id, rarity: a.tier, fx });
     if (a.rule.crown) out.push({ id: `crown.${a.id}`, slot: 'crown', name: `${a.name} 왕관`, emoji: '👑', ach: a.id, rarity: 'legend', fx });
     // 메달: 열쇠 업적(1위 · 3위권 · 상위 %)을 가진 사람 중 지금 그 자리인 사람에게 붙는다
