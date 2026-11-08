@@ -387,3 +387,10 @@ body.sw #hg-regions button { transition: transform .15s, background .2s; } body.
 @media (max-width: 860px) { #sw-bg .cap, #sw-bg .dots { display: none; } }
 /* 서울 산책은 따로 된 게임(카드 · /seoul-walk/)으로 — 드림 러너 타이틀의 서울 산책 단추는 숨김 (#hangang 주소는 그대로 열린다) */
 #hg-btn { display: none !important; }
+/* 서울 산책 게임(/seoul-walk/play/): 불러오는 동안 덮개 (러너 타이틀 장면이 보이지 않게) */
+#sw-load { display: none; }
+body.swplay:not(.swready) #hg-hud { visibility: hidden; }
+body.swplay:not(.swready) #sw-load { display: flex; position: fixed; inset: 0; z-index: 60; align-items: center; justify-content: center; background: radial-gradient(ellipse at 50% 40%, #1b2440, #0c1222 70%); color: #fff; }
+#sw-load .in { display: flex; flex-direction: column; align-items: center; gap: 10px; font-family: 'Gowun Dodum', sans-serif; }
+#sw-load svg { width: 54px; height: 54px; fill: #f2c27b; animation: sw-breathe 1.6s ease-in-out infinite; } #sw-load b { font-family: 'Jua', sans-serif; font-weight: normal; font-size: 26px; letter-spacing: .02em; } #sw-load span { font-size: 13px; opacity: .7; }
+@keyframes sw-breathe { 50% { transform: scale(1.12); opacity: .8; } }

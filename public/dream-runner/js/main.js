@@ -1083,7 +1083,7 @@ function leaveHangang() {
   $('hg-hud').classList.add('hidden'); $('hg-set').classList.add('hidden');
   camera.far = 1600; camera.fov = 62; camera.updateProjectionMatrix();
   renderer.shadowMap.enabled = false; renderer.toneMapping = THREE.NoToneMapping; renderer.toneMappingExposure = 1;
-  hgSavePos(); if (window.SEOUL_WALK) setTimeout(() => $('hg-btn').onclick(), 300);
+  hgSavePos(); if (window.SW_PLAY) { setTimeout(() => { location.href = '/seoul-walk/'; }, 400); } else if (window.SEOUL_WALK) setTimeout(() => $('hg-btn').onclick(), 300);
   runner.shadow.visible = true; scene.add(runner.bear.root);
   if (hg.dist > 50) toast(`🌉 ${(hg.dist / 1000).toFixed(2)}km · ${hgTime(hg.time)} 달렸어요. 수고했어요!`, 3000);
   toTitle();
@@ -1156,7 +1156,15 @@ function swSlides() {
 }
 // 젤리 서울 산책(/seoul-walk/): 러너 타이틀 없이 바로 서울 산책 시작 화면. 닫기 = 메인으로, 산책을 마치면 다시 시작 화면
 // 따로 된 랜딩 페이지 등에서 바로 온 사람: 젤리게임즈와 상관없이 (닫기 · 메인으로 단추 없음). 젤리게임즈 메인 카드로 온 사람(?from=hub): 메인으로 돌아가는 단추
-if (window.SEOUL_WALK) { document.body.classList.add('sw'); $('hg-how').open = true; swSlides(); const fromHub = new URLSearchParams(location.search).get('from') === 'hub' || /^\/(\?|$)/.test((() => { try { const r = new URL(document.referrer); return r.origin === location.origin ? r.pathname + r.search : 'x'; } catch { return 'x'; } })()); if (fromHub) { $('hg-start-x').textContent = '🏠 젤리게임즈로'; $('hg-start-x').onclick = () => { location.href = '/'; }; } else { $('hg-start-x').classList.add('hidden'); document.body.classList.add('solo'); document.querySelectorAll('a[href]').forEach((a) => { if (!/^\/seoul-walk/.test(a.getAttribute('href'))) a.remove(); }); } if (location.hash !== '#hangang') setTimeout(() => { if (game.mode === 'title') $('hg-btn').onclick(); }, 300); }
+// 서울 산책 게임(/seoul-walk/play/): 랜딩에서 고른 곳에서 바로 시작 (r = 동네, go = start · resume · last, x · z = 지도에서 고른 자리), 나가면 랜딩으로
+if (window.SW_PLAY) { document.body.classList.add('sw', 'solo', 'swplay'); const q = new URLSearchParams(location.search);
+  // 첫 칸이 다 만들어질 때까지 덮개 (빈 땅이 보이지 않게, 늦어도 25초 뒤엔 걷힌다)
+  hg.onChunk = () => document.body.classList.add('swready'); setTimeout(() => document.body.classList.add('swready'), 25000);
+  setTimeout(async () => { if (game.mode !== 'title') return; const r = HG_REGIONS[q.get('r')] ? q.get('r') : 'yeouido'; let pos = null;
+    if (q.get('go') === 'last') { const p = hgLastPos(); hgUse(p ? p.region : r); pos = p; } else { hgUse(r); if (q.get('go') === 'resume') pos = hgSavedPos(r); }
+    if (q.has('x') && q.has('z')) pos = { x: +q.get('x'), z: +q.get('z'), face: +(q.get('f') || 0) };
+    await startHangang(pos); if (game.mode !== 'hangang') location.href = '/seoul-walk/'; }, 300); }
+else if (window.SEOUL_WALK) { document.body.classList.add('sw'); $('hg-how').open = true; swSlides(); const fromHub = new URLSearchParams(location.search).get('from') === 'hub' || /^\/(\?|$)/.test((() => { try { const r = new URL(document.referrer); return r.origin === location.origin ? r.pathname + r.search : 'x'; } catch { return 'x'; } })()); if (fromHub) { $('hg-start-x').textContent = '🏠 젤리게임즈로'; $('hg-start-x').onclick = () => { location.href = '/'; }; } else { $('hg-start-x').classList.add('hidden'); document.body.classList.add('solo'); document.querySelectorAll('a[href]').forEach((a) => { if (!/^\/seoul-walk/.test(a.getAttribute('href'))) a.remove(); }); } if (location.hash !== '#hangang') setTimeout(() => { if (game.mode === 'title') $('hg-btn').onclick(); }, 300); }
 if (location.hash === '#hangang') setTimeout(() => { if (game.mode === 'title') { const p = hgLastPos(); if (p) hgUse(p.region); startHangang(p); } }, 700);
 
 // 한강: 마우스로 시점 (화면을 누르면 마우스가 잠기고, Esc 로 풀린다) · 휴대폰은 화면을 끌어서

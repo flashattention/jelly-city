@@ -298,12 +298,14 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/admin.html') { res.writeHead(301, { Location: '/jelly-city/admin.html' }); res.end(); return; }
   for (const [o, n] of RENAMED) if (url.pathname === o || url.pathname.startsWith(o + '/')) { res.writeHead(301, { Location: n + url.pathname.slice(o.length) + url.search }); res.end(); return; }
   // 젤리 서울 산책: 드림 러너 페이지를 그대로 쓰되 따로 된 주소 · 제목으로, 열면 바로 서울 산책 (기존 /dream-runner/#hangang 도 그대로)
+  // /seoul-walk/ 는 따로 된 랜딩 페이지(public/seoul-walk/), 게임은 /seoul-walk/play/ (드림 러너 페이지를 서울 산책으로)
   if (url.pathname === '/seoul-walk' || url.pathname === '/seoul' || url.pathname === '/seoul/') { res.writeHead(301, { Location: '/seoul-walk/' + url.search }); res.end(); return; } // 짧은 주소 /seoul 도
-  if (url.pathname === '/seoul-walk/' || url.pathname === '/seoul-walk/index.html') {
+  if (url.pathname === '/seoul-walk/play') { res.writeHead(301, { Location: '/seoul-walk/play/' + url.search }); res.end(); return; }
+  if (url.pathname === '/seoul-walk/play/' || url.pathname === '/seoul-walk/play/index.html') {
     fs.readFile(path.join(PUBLIC, 'dream-runner/index.html'), 'utf8', (err, html) => {
       if (err) { res.writeHead(404); res.end('not found'); return; }
       const desc = '실제 서울을 걷고 · 달리고 · 나는 힐링 산책. 진짜 지도 · 건물 · 지형 · 실시간 날씨와 지하철';
-      html = html.replace(/\s*<link rel="manifest"[^>]*>/, '').replace('<head>', '<head>\n  <base href="/dream-runner/" />\n  <script>window.SEOUL_WALK = 1;</script>').replace('<title>드림 러너</title>', `<title>젤리 서울 산책</title>\n  <meta name="description" content="${desc}" />\n  <meta property="og:title" content="젤리 서울 산책" />\n  <meta property="og:description" content="${desc}" />\n  <meta property="og:image" content="/dream-runner/sw/63.webp" />\n  <meta name="twitter:card" content="summary_large_image" />`);
+      html = html.replace(/\s*<link rel="manifest"[^>]*>/, '').replace('<head>', '<head>\n  <base href="/dream-runner/" />\n  <script>window.SEOUL_WALK = 1; window.SW_PLAY = 1;</script>').replace('<title>드림 러너</title>', `<title>젤리 서울 산책</title>\n  <meta name="description" content="${desc}" />\n  <meta property="og:title" content="젤리 서울 산책" />\n  <meta property="og:description" content="${desc}" />\n  <meta property="og:image" content="/dream-runner/sw/63.webp" />\n  <meta name="twitter:card" content="summary_large_image" />`);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(html);
     });
     return;
