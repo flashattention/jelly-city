@@ -12,6 +12,8 @@ function ensure() {
   document.addEventListener('visibilitychange', () => { if (document.hidden) ctx.suspend(); else ctx.resume(); });
   return ctx;
 }
+// 같은 소리 출력 빌려 주기 (젤리 오디세이 배경음악): bus 를 거치니 음소거도 같이 따른다
+export function audioOut() { return ensure() ? { ctx, bus } : null; }
 export function unlock() { if (ensure() && ctx.state !== 'running') ctx.resume(); }
 export function toggleMute() { sound.muted = !sound.muted; try { localStorage.setItem(MUTE_KEY, sound.muted ? '1' : '0'); } catch { /* 무시 */ } if (bus) bus.gain.value = sound.muted ? 0 : 0.7; if (sound.muted) speechSynthesis?.cancel?.(); return sound.muted; }
 function out(vol) { const g = ctx.createGain(); g.gain.value = vol; g.connect(bus); return g; }

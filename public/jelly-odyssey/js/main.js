@@ -10,7 +10,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { isPhone, autoRes } from '../../shared/js/perf.js';
 import { store } from '../../shared/js/account.js';
 import { Shell } from '../../shared/js/shell.js';
-import { sfx, unlock, toggleMute, sound, say } from '../../jelly-guard/js/wsound.js';
+import { sfx, unlock, toggleMute, sound, say, audioOut } from '../../jelly-guard/js/wsound.js';
+import { createMusic } from './music.js';
 import { romanBear, setWeapon, poseGear } from './gear.js';
 import { virusMesh, animateVirus, KINDS, glow } from './virus.js';
 import { buildWorld, groundAt, PLAT } from './temple.js';
@@ -45,6 +46,29 @@ const game = window.ody = {
   cmd: 'follow', cut: null, oracleT: 0, checkpoint: null, stutter: 0, hold: null, boss: null, waves: null,
 };
 const D = () => DIFF[game.diff];
+// ---------- 배경음악 (music.js · 기획서 8장): 효과음과 같은 출력 · 같은 음소거 ----------
+let music = null;
+function mus() { if (!music) { const o = audioOut(); if (o) game.music = music = createMusic(o.ctx, o.bus, { muted: () => sound.muted }); } return music; }
+const theme = (name, o) => mus()?.setTheme(name, o), sting = (name) => mus()?.stinger(name), intensity = (v) => mus()?.setIntensity(v);
+const PHASE_MUSIC = { stealth: 'stealth', assault: 'assault', colonnade: 'colonnade', altars: 'altars', boss: 'boss' };
+// 브라우저는 사용자가 한 번 누른 뒤에만 소리를 내 준다 → 처음 누를 때 처음 화면 음악(애가)을 작게
+const firstGesture = () => { removeEventListener('pointerdown', firstGesture); removeEventListener('keydown', firstGesture); unlock(); if (game.mode === 'title') { intensity(0); theme('lament', { vol: 0.6 }); } };
+addEventListener('pointerdown', firstGesture); addEventListener('keydown', firstGesture);
+addEventListener('pagehide', () => music?.stop(0.1));
+// 전투 세기 0~1: 0.4초마다 (가까운 적 수 · 들킴 · 보스 상태)
+let musT = 0;
+function musicTick(dt) {
+  if ((musT -= dt) > 0 || !music) return; musT = 0.4;
+  const me = game.me, ph = game.phase; let near = 0, sus = 0;
+  for (const v of game.viruses) if (v.state === 'ok') { const d = Math.hypot(v.x - me.x, v.z - me.z); if (d < 22 && (!v.guard || v.alert || ph !== 'stealth')) near++; if (v.sus > sus) sus = v.sus; }
+  let x = 0;
+  if (ph === 'stealth') x = game.alarmed ? Math.min(1, 0.55 + near * 0.08) : sus * 0.35;
+  else if (ph === 'assault') x = (game.waves ? 0.25 : 0) + near / 8;
+  else if (ph === 'colonnade') x = near / 5;
+  else if (ph === 'altars') x = W.gods.filter((g) => g.freed).length * 0.12 + near / 5;
+  else if (ph === 'boss' && game.boss) { const k = game.boss; let cut = 0; for (const c of k.cables) if (!c.alive) cut++; x = k.hp < k.max / 3 ? 1 : k.staggered ? 0.8 : 0.25 + cut * 0.12; }
+  intensity(x);
+}
 // 게임 시간 기준으로 미루기 (탭이 느려지거나 시험 중 빨리 돌려도 같은 순서로)
 const timers = []; const later = (sec, fn) => timers.push({ at: game.t + sec, fn });
 function runTimers() { for (let i = timers.length - 1; i >= 0; i--) if (game.t >= timers[i].at) { const T = timers.splice(i, 1)[0]; T.fn(); } }
@@ -113,7 +137,8 @@ function startGame(phase = 'intro') {
   document.querySelectorAll('.screen').forEach((s) => s.classList.add('hidden')); $('title')?.classList.add('hidden');
   $('hud').classList.remove('hidden');
   renderWeap(); setCmd('follow', true);
-  if (phase === 'intro' && !params.has('t')) { me.bear.root.visible = false; intro(); } else enterPhase(phase);
+  // 시험(?t=intro)은 아래 시험 코드가 intro() 를 부른다
+  if (phase === 'intro') { me.bear.root.visible = false; if (!params.has('t')) intro(); } else enterPhase(phase);
 }
 function clearWorld() {
   timers.length = 0;
@@ -127,6 +152,7 @@ function toTitle() {
   game.mode = 'title'; clearWorld(); document.exitPointerLock?.();
   $('hud').classList.add('hidden'); $('over').classList.add('hidden'); $('lockmsg').classList.add('hidden'); $('oracle').classList.add('hidden');
   shell.show?.('title'); $('title')?.classList.remove('hidden');
+  intensity(0); theme('lament', { vol: 0.6 });
 }
 
 // ---------- 장(막) ----------
@@ -142,6 +168,7 @@ function enterPhase(ph) {
   if (ph === 'stealth') { const me = game.me; me.x = 0; me.z = 31; me.bear.root.visible = true; }
   // 시험용 바로 가기: 그 막에 맞게 앞 막을 끝낸 상태로
   if (params.has('t')) { const order = ['stealth', 'assault', 'colonnade', 'altars', 'boss']; const k = order.indexOf(ph); if (k >= 1) openGate(true); if (k >= 2) freeGod('posecool', true); if (k >= 3) { for (const fw of W.fireWalls) openFireWall(fw, true); } if (k >= 3) { unbox(W.eastFire.box); for (const f of W.eastFire.fs) W.fires.setStrength(f, 0); } if (k >= 4) { for (const id of ['mnemora', 'hephavolt', 'athenaris']) freeGod(id, true); unbox(W.cellaDoor.box); W.cellaDoor.mesh.visible = false; } const pos = { stealth: [0, 31], assault: [0, 52], colonnade: [-15.7, 6], altars: [-15.7, -40], boss: [0, -14] }[ph]; game.me.x = pos[0]; game.me.z = pos[1]; if (k >= 1 && !game.allies.length) armyArrives(true); }
+  intensity(0); theme(PHASE_MUSIC[ph]);
   $('obj').textContent = PH[ph].obj; PH[ph].spawn();
   saveCheckpoint();
 }
@@ -162,7 +189,7 @@ function setupStealth() {
 function openGate(instant) {
   W.winch.done = true; unbox(W.gateBox);
   if (instant) { W.gate.open = 1; return; }
-  sfx('horn'); toast('🚪 성문이 열린다! 곰돌 군단 본대 돌입!', 3);
+  sfx('horn'); sting('gate'); toast('🚪 성문이 열린다! 곰돌 군단 본대 돌입!', 3);
   later(1.6, () => { if (game.mode === 'play') { armyArrives(); enterPhase('assault'); } });
 }
 function armyArrives(instant) {
@@ -181,7 +208,7 @@ function freeGod(id, quiet) {
   const G = W.gods.find((g) => g.id === id); if (!G || G.freed) return; G.freed = true;
   game.respawnPts.push({ x: G.x, z: G.z + (G.big ? 4.5 : 3.2), y: G.y, name: G.name });
   if (quiet) return;
-  sfx('win'); toast(`✨ ${G.title} ${G.name} 해방! 젤리 리스폰 지점이 앞으로`, 3.5);
+  sfx('win'); sting(id === 'zeuron' ? 'victory' : 'altar'); toast(`✨ ${G.title} ${G.name} 해방! 젤리 리스폰 지점이 앞으로`, 3.5);
   if (id === 'posecool') { // 냉각의 신: 광장 불을 끄고, 감염된 조각상 · 화로를 되돌린다
     W.fires.douse(G.x - 20, G.z, 42);
     for (const v of [...game.viruses]) if (v.kind === 'statue' && v.from && Math.hypot(v.x - G.x, v.z - G.z) < 50) { v.from.state = 'ok'; v.from.g.visible = true; W.circles.push(v.from.col); removeVirus(v); }
@@ -219,7 +246,7 @@ function setupBoss() {
   });
   k.stagger = 0; k.regrow = 0; k.attack = null; k.atkCd = 3;
   $('boss').classList.remove('hidden'); $('boss').querySelector('.nm').textContent = '👑 바이러스 왕 — 연산의 왕을 빨아먹는 자';
-  sfx('enemyult');
+  sfx('enemyult'); sting('boss');
   // 보스 등장 컷신 (짧게)
   const Z2 = W.gods.find((g) => g.id === 'zeuron');
   cutBegin([
@@ -393,7 +420,7 @@ function breakDisguise() { const me = game.me; if (me?.disg > 0) { me.disg = 0; 
 // ---------- 감염 ----------
 function infectBrazier(B) { B.state = 'inf'; B.hits = 0; B.spawnT = 4; W.fires.setGreen(B.fire, 1); W.fires.setStrength(B.fire, 1); }
 function cureBrazier(B) { B.state = 'ok'; W.fires.setGreen(B.fire, 0); sparks(B.x, B.y + 1.6, B.z, '#ffb04a', 14); }
-function alarm(v) { if (game.phase !== 'stealth' || game.alarmed) return; game.alarmed = true; toast('🚨 들켰다! 경비들이 깨어난다', 2); sfx('enemyult'); later(0.9, () => { for (const u of game.viruses) if (u.guard && Math.hypot(u.x - v.x, u.z - v.z) < 26) { u.alert = true; u.sleep = false; } for (const a of game.allies) a.stealth = false; }); }
+function alarm(v) { if (game.phase !== 'stealth' || game.alarmed) return; game.alarmed = true; toast('🚨 들켰다! 경비들이 깨어난다', 2); sfx('enemyult'); sting('spotted'); later(0.9, () => { for (const u of game.viruses) if (u.guard && Math.hypot(u.x - v.x, u.z - v.z) < 26) { u.alert = true; u.sleep = false; } for (const a of game.allies) a.stealth = false; }); }
 
 // ---------- 효과 ----------
 const fx = [];
@@ -484,7 +511,7 @@ function tick(dt) {
       else if (B.state === 'inf') { B.spawnT -= dt; if (B.spawnT <= 0 && game.viruses.length < 26 && Math.hypot(B.x - me.x, B.z - me.z) < 40) { B.spawnT = 9; spawnVirus('worm', B.x + R(-1, 1), B.z + R(-1, 1)); } } }
   }
   // --- 막마다 진행 ---
-  phaseTick(dt);
+  phaseTick(dt); musicTick(dt);
   // --- 상호작용 ---
   interact(dt);
   // --- 신탁 · 표시 ---
@@ -555,7 +582,7 @@ function kingAI(k, dt) {
   const me = game.me; k.y = groundAt(k.x, k.z); k.atkCd -= dt;
   const alive = k.cables.filter((c) => c.alive);
   for (const c of k.cables) { c.mesh.visible = c.alive; c.tube.visible = c.alive; if (c.alive) { c.mesh.rotation.y += dt * 2; const a = c.chip, b = new THREE.Vector3(k.x, k.y + 2.4, k.z - 0.6), mid = new THREE.Vector3(c.x, PLAT.h + 0.8, c.z); c.tube.geometry.dispose(); c.tube.geometry = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([a, new THREE.Vector3((a.x + mid.x) / 2, a.y - 1, (a.z + mid.z) / 2), mid, new THREE.Vector3((mid.x + b.x) / 2, PLAT.h + 1.6, (mid.z + b.z) / 2), b]), 24, 0.16, 6); } }
-  if (alive.length === 0 && k.stagger <= 0 && !k.staggered) { k.stagger = 9; k.staggered = true; toast('💥 사슬이 모두 끊겼다! 빛나는 핵을 쳐요!', 2.5); sfx('bigboom'); shake(0.4); }
+  if (alive.length === 0 && k.stagger <= 0 && !k.staggered) { k.stagger = 9; k.staggered = true; toast('💥 사슬이 모두 끊겼다! 빛나는 핵을 쳐요!', 2.5); sfx('bigboom'); sting('stagger'); shake(0.4); }
   if (k.stagger > 0) { k.stagger -= dt; k.mesh.userData.heart.scale.setScalar(1.6 + Math.sin(game.t * 10) * 0.3); k.mesh.rotation.z = Math.sin(game.t * 6) * 0.05; if (k.stagger <= 0) { k.staggered = false; if (k.hp > k.max * 0.25) { const n = k.hp > k.max * 0.6 ? 4 : 2; k.cables.slice(0, n).forEach((c) => { c.alive = true; c.hp = c.max * 0.7; }); toast('⛓️ 바이러스 왕이 사슬을 다시 꽂았다!', 2); } } return; }
   k.mesh.userData.heart.scale.setScalar(alive.length ? 0.5 : 1.2);
   if (alive.length) k.hp = Math.min(k.max, k.hp + dt * 6);
@@ -690,18 +717,19 @@ function intro() {
   const party = []; const putParty = () => { for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2, v = spawnVirus(i % 3 ? 'worm' : 'soldier', Math.cos(a) * 7, 38 + Math.sin(a) * 7); v.party = true; party.push(v); } };
   W.skyU.night.value = 0.25; H.position.set(0, -1.2, 128); W.gate.open = 0;
   cutBegin([
-    { d: 6, from: [[0, 40, 190], [0, 6, 0]], to: [[20, 30, 120], [0, 8, -20]], cap: '바이러스 군단이 GPU 신전을 차지한 지 열흘째.<br>신들의 연산이 끊기며, 세상이 <b>버벅이기 시작했다</b>.', on: () => {}, each: () => {} },
+    { d: 6, from: [[0, 40, 190], [0, 6, 0]], to: [[20, 30, 120], [0, 8, -20]], cap: '바이러스 군단이 GPU 신전을 차지한 지 열흘째.<br>신들의 연산이 끊기며, 세상이 <b>버벅이기 시작했다</b>.', on: () => { intensity(0); theme('lament'); }, each: () => {} },
     { d: 6, from: [[6, PLAT.h + 4, -8], [0, PLAT.h + 4, -16]], to: [[-3, PLAT.h + 3, -10], [0, PLAT.h + 4, -16]], cap: '렌더의 여신 아테나리스도 초록 코드 사슬에 묶였다.<br>제단마다 <b>랜섬 자물쇠</b>.' },
     { d: 7, from: [[40, 6, 150], [0, 0, 220]], to: [[25, 10, 130], [0, 0, 260]], cap: '곰돌 군단은 배를 띄워 <b>물러나는 척</b>했다.', each: (k, dt) => { for (const s of W.ships) s.position.z += dt * 6; } },
     { d: 6, from: [[16, 4, 110], [0, 6, 128]], to: [[10, 9, 116], [0, 7, 128]], cap: '해변에 남은 건 형광 초록으로 번쩍이는 목마 하나.<br>꼬리표엔 이렇게 쓰여 있었다 — <b>「🎁 공짜 연산력! FREE_COMPUTE_PATCH.exe」</b>' },
-    { d: 8, from: [[24, 14, 90], [0, 4, 70]], to: [[18, 16, 52], [0, 4, 38]], cap: '바이러스들은 선물을 신전 안으로 끌고 들어가 밤새 잔치를 벌였다.<br><small>— 컴퓨터의 트로이 목마는 원래 악성코드의 수법. 이번엔 <b>백신이 그 수법을 거꾸로 쓴다.</b></small>', on: () => { putParty(); }, each: (k) => { H.position.z = 128 - 90 * Math.min(1, k * 1.2); H.position.y = H.position.z > 72 ? -1.2 + (128 - H.position.z) / 56 * 1.2 : 0; W.gate.open = H.position.z > 66 ? 1 : Math.max(0, 1 - (66 - H.position.z) / 10); W.skyU.night.value = 0.25 + k * 0.75; } },
-    { d: 6, from: [[5, 3, 30], [0, 5, 38]], to: [[3, 1.6, 33], [0, 4.6, 38]], cap: '깊은 밤. 잔치에 지친 경비들이 하나둘 잠든다.<br>그리고 — <b>목마의 배가 열린다.</b>', on: () => { for (const v of party) removeVirus(v); party.length = 0; }, each: (k) => { W.horse.hatch.rotation.x = -k * 1.6; } },
-    { d: 4.5, from: [[0, 10, 22], [0, 4, 40]], to: [[0, 8, 20], [0, 4, 40]], title: '<b>젤리 오디세이</b><small>1장 · 불타는 신전</small>', cap: '' },
+    { d: 8, from: [[24, 14, 90], [0, 4, 70]], to: [[18, 16, 52], [0, 4, 38]], cap: '바이러스들은 선물을 신전 안으로 끌고 들어가 밤새 잔치를 벌였다.<br><small>— 컴퓨터의 트로이 목마는 원래 악성코드의 수법. 이번엔 <b>백신이 그 수법을 거꾸로 쓴다.</b></small>', on: () => { putParty(); theme('party'); }, each: (k) => { H.position.z = 128 - 90 * Math.min(1, k * 1.2); H.position.y = H.position.z > 72 ? -1.2 + (128 - H.position.z) / 56 * 1.2 : 0; W.gate.open = H.position.z > 66 ? 1 : Math.max(0, 1 - (66 - H.position.z) / 10); W.skyU.night.value = 0.25 + k * 0.75; } },
+    { d: 6, from: [[5, 3, 30], [0, 5, 38]], to: [[3, 1.6, 33], [0, 4.6, 38]], cap: '깊은 밤. 잔치에 지친 경비들이 하나둘 잠든다.<br>그리고 — <b>목마의 배가 열린다.</b>', on: () => { for (const v of party) removeVirus(v); party.length = 0; theme('stealth'); }, each: (k) => { W.horse.hatch.rotation.x = -k * 1.6; } },
+    { d: 4.5, from: [[0, 10, 22], [0, 4, 40]], to: [[0, 8, 20], [0, 4, 40]], title: '<b>젤리 오디세이</b><small>1장 · 불타는 신전</small>', cap: '', on: () => sting('titlecard') },
   ], () => { H.position.set(0, 0, 38); W.horse.hatch.rotation.x = -1.6; W.gate.open = 0; W.skyU.night.value = 1; for (const s of W.ships) s.position.z = Math.max(s.position.z, 300); enterPhase('stealth'); lock(); }, { extraStutter: 0.1 });
 }
 function endingCut(mins) {
   const me = game.me; game.mode = 'ending';
   W.land.visible = true; for (const f of W.fires.list) W.fires.setStrength(f, 0.15);
+  intensity(0.5); theme('dawn', { fade: 4 });
   // 남은 바이러스 조각이 바다 너머로 달아난다
   const flee = []; for (let i = 0; i < 26; i++) { const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow(), color: '#4bff7a', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); m.scale.setScalar(R(1, 2.4)); m.position.set(R(-20, 20), R(6, 20), R(-30, 40)); scene.add(m); flee.push(m); }
   for (const v of [...game.viruses]) removeVirus(v);
@@ -716,6 +744,7 @@ function results(mins) {
   $('ov-title').textContent = '🏛️ 1장 「불타는 신전」 완료';
   $('ov-body').innerHTML = `난이도 ${D().label} · ${mins}분<br>쓰러뜨린 바이러스 <b>${game.kills}</b> · 감염된 동료 <b>${game.lost}</b><br>해방한 GPU 신 <b>5</b> / 5<br><br><small>2장 「약탈당한 데이터 항구」는 곧 열려요.</small>`;
   $('over').classList.remove('hidden'); sfx('win');
+  intensity(0); theme('dawn', { vol: 0.6 });
 }
 
 // ---------- 시험용 바로 가기 (?t=막&cx..) ----------
