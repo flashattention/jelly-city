@@ -958,6 +958,8 @@ const HG_OPT_KEY = 'dreamrunner.hangang';
 try { Object.assign(hg.opt, JSON.parse(store.get(HG_OPT_KEY) || '{}')); } catch { /* 기본 */ }
 const hgSave = () => store.set(HG_OPT_KEY, JSON.stringify(hg.opt));
 const hgRun = { tk: null, sent: 0, sendT: 0 };
+let hgPost = null; // 화면 보정 (블룸 · 색감) · 컴퓨터에서만
+addEventListener('resize', () => hgPost?.setSize(innerWidth, innerHeight));
 // 입장: 이어 달리기 · 서강대교에서 · 지도에서 고르기
 const HG_POS_KEY = 'dreamrunner.hangang.pos';
 function hgSavedPos() { try { return JSON.parse(store.get(HG_POS_KEY) || 'null'); } catch { return null; } }
@@ -981,6 +983,7 @@ async function startHangang(pos = null) {
   hideScreens(); game.mode = 'hangang'; document.body.classList.add('hg');
   runner.shadow.visible = false; hg.enter(runner.bear, pos ? { s: pos.s } : {}); if (pos) hg.teleport(pos.s, pos.lat);
   renderer.shadowMap.enabled = !isPhone; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
+  if (!isPhone && !hgPost) { try { const { makePost } = await import('./hangang-post.js'); hgPost = makePost(renderer, hg.scene, camera); } catch (e) { console.warn('화면 보정 없이', e); } }
   $('hg-hud').classList.remove('hidden'); if (document.body.classList.contains('touch')) $('touch').classList.remove('hidden');
   $('t-shove').textContent = '💨';
   setMusic(['pent', 62, 66, 'sine']); hgRun.tk = null; hgRun.sent = 0; hgRun.sendT = 20;
@@ -1041,7 +1044,7 @@ function hgFrame(dt) {
   if (!$('hg-set').classList.contains('hidden')) { inp.mx = inp.mz = 0; inp.jump = false; }
   hg.update(dt, inp, camera);
   input.jump = input.slide = input.shove = input.item = false;
-  renderer.render(hg.scene, camera);
+  if (hgPost) { hgPost.mood(hg.light); hgPost.render(); } else renderer.render(hg.scene, camera);
   if (hg.activeLabels?.length || $('hg-labels').childElementCount) hgLabels();
   // 화면 글씨는 0.2초마다
   game.hgT = (game.hgT || 0) + dt; if (game.hgT < 0.2) return; game.hgT = 0;

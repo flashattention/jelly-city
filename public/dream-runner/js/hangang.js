@@ -11,7 +11,7 @@ export const WEATHERS = { clear: '☀️ 맑음', cloudy: '☁️ 구름', rain:
 export const TIMES = { sunrise: ['🌅 일출', 5.9], day: ['🌤️ 낮', 11.5], sunset: ['🌇 노을', 18.4], night: ['🌙 밤', 21.5], dawn: ['🌌 새벽', 4.4] };
 export const SPEEDS = [['🚶 걷기', 3.2], ['🏃 조깅', 6.4], ['🏃 러닝', 9.2], ['💨 빠르게', 13.2], ['⚡ 전력 질주', 19]];
 export const V_MIN = 2.0, V_MAX = 26;
-const BEAR = 0.6; // 한강의 곰돌이들은 작게 (사람 크기쯤)
+const BEAR = 0.42; // 한강의 곰돌이들은 작게 (사람 크기쯤)
 const LAT_MIN = -11, LAT_MAX = 24; // 코스 밖으로는 못 나간다 (강 쪽 · 공원 쪽)
 
 const rnd = (seed) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
@@ -112,9 +112,40 @@ function groundTex(kind) {
   if (kind === 'grass') { noise('#e4e4e4', 0.22, 2600, 6); g.lineWidth = 1; for (let i = 0; i < 1400; i++) { const x = r() * N, y = r() * N, v = 150 + r() * 105; g.strokeStyle = `rgba(${v},${v},${v},.55)`; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (r() - 0.5) * 3, y - 2 - r() * 4); g.stroke(); } }
   else if (kind === 'city') { noise('#d8d8d8', 0.12, 500, 10); g.strokeStyle = 'rgba(0,0,0,.08)'; for (let i = 0; i <= N; i += 32) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, N); g.moveTo(0, i); g.lineTo(N, i); g.stroke(); } }
   else if (kind === 'asphalt') { noise('#4b4f56', 0.16, 5000, 2); g.fillStyle = '#e8e8e8'; g.fillRect(6, 0, 5, N); g.fillRect(N - 11, 0, 5, N); }
-  else if (kind === 'track') { noise('#b2604c', 0.16, 6000, 2); g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(5, 0, 4, N); g.fillRect(N - 9, 0, 4, N); }
+  else if (kind === 'track') { noise('#a35c4e', 0.14, 6000, 2); g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(5, 0, 4, N); g.fillRect(N - 9, 0, 4, N); }
   else { noise('#c9c2b4', 0.18, 300, 14); g.strokeStyle = 'rgba(0,0,0,.18)'; g.lineWidth = 2; for (let y = 0; y < N; y += 32) { g.beginPath(); g.moveTo(0, y); g.lineTo(N, y); g.stroke(); for (let x = (y / 32) % 2 ? 0 : 24; x < N; x += 48) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 32); g.stroke(); } } }
   const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+// 바람: 정점을 높이에 비례해 살랑 (인스턴스마다 위상이 다르게)
+function windify(mat, timeU, amp, crown = false) {
+  mat.customProgramCacheKey = () => `wind${amp}${crown}`;
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uTime = timeU;
+    sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      #ifdef USE_INSTANCING
+        vec2 ip = instanceMatrix[3].xz;
+      #else
+        vec2 ip = vec2(0.0);
+      #endif
+      float hk = ${crown ? 'clamp((position.y - 2.5) / 4.0, 0.0, 1.0)' : 'clamp(position.y / 0.42, 0.0, 1.0)'};
+      float w = sin(uTime * 1.7 + ip.x * 0.35 + ip.y * 0.21) + sin(uTime * 2.9 + ip.x * 0.9) * 0.4;
+      transformed.x += w * ${amp.toFixed(3)} * hk * ${crown ? '6.0' : '1.0'}; transformed.z += w * ${(amp * 0.6).toFixed(3)} * hk * ${crown ? '6.0' : '1.0'};`);
+  };
+}
+// 잔디밭 얼룩: 넓은 범위의 밝고 어두운 무늬 (월드 좌표 노이즈)
+function patchy(mat) {
+  mat.customProgramCacheKey = () => 'patchy';
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = 'varying vec3 vWP;\n' + sh.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\n vWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'varying vec3 vWP;\nfloat hh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\nfloat nz(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hh(i), hh(i + vec2(1, 0)), f.x), mix(hh(i + vec2(0, 1)), hh(i + vec2(1, 1)), f.x), f.y); }\n' +
+      sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n float pn = nz(vWP.xz * 0.045) * 0.6 + nz(vWP.xz * 0.16) * 0.4; diffuseColor.rgb *= 0.86 + pn * 0.3; diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.06, 1.04, 0.86), smoothstep(0.55, 0.8, nz(vWP.xz * 0.02)));');
+  };
+}
+// 풀잎 그림: 끝이 뾰족한 잎 여러 장 (투명 바탕)
+function bladeTex() {
+  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 96; const g = cv.getContext('2d'), r = rnd(5);
+  for (let i = 0; i < 22; i++) { const x = 10 + r() * 108, h = 40 + r() * 54, lean = (r() - 0.5) * 22, w = 3 + r() * 4; const v = 170 + r() * 85; g.fillStyle = `rgb(${v * 0.85},${v},${v * 0.7})`; g.beginPath(); g.moveTo(x - w, 96); g.quadraticCurveTo(x + lean * 0.4, 96 - h * 0.6, x + lean, 96 - h); g.quadraticCurveTo(x + lean * 0.4 + w * 0.3, 96 - h * 0.55, x + w, 96); g.closePath(); g.fill(); }
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 function cloudTex() {
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const g = cv.getContext('2d'), r = rnd(7);
@@ -176,6 +207,7 @@ export class Hangang {
   build() {
     const M = this.map, S = M.scale, sc = this.scene, r = rnd(12345);
     this.routeSetup();
+    this.windU = { value: 0 };
     const P2 = (a) => unpack(a, S), polys = (list) => list.map((p) => p.map(P2));
     this.water = polys(M.water); this.islands = polys(M.island);
     const inWater = (x, z) => this.water.some((w) => inPoly(x, z, w)) && !this.islands.some((w) => inPoly(x, z, w));
@@ -196,7 +228,10 @@ export class Hangang {
           float md = max(dot(vD, moonDir), 0.0); c += vec3(0.85,0.9,1.0) * (smoothstep(0.9993, 0.9996, md) * 0.9 + pow(md, 60.0) * 0.12) * night * (1.0 - cloud * 0.9);
           vec3 q = floor(vD * 420.0); float st = step(0.9965, h(q)) * smoothstep(0.02, 0.25, vD.y) * night * (1.0 - cloud); c += vec3(st) * (0.6 + 0.4 * h(q + 3.0));
           if (vD.y < 0.0) c = hor * 0.9;
-          gl_FragColor = vec4(c, 1.0); }` }));
+          gl_FragColor = vec4(c, 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }` }));
     this.sky.renderOrder = -100; sc.add(this.sky);
     // 땅 바탕 (도시)
     const landTex = groundTex('city'); landTex.repeat.set(26000 / 9, 26000 / 9); const land = new THREE.Mesh(new THREE.PlaneGeometry(26000, 26000), flatMat('#a3a39f', -60, { map: landTex })); land.receiveShadow = true; land.rotation.x = -Math.PI / 2; land.renderOrder = -60; land.material.depthTest = true; land.material.depthWrite = true; sc.add(land); this.landM = land.material;
@@ -217,16 +252,19 @@ export class Hangang {
           float lights = smoothstep(0.55, 1.0, sin(p.x * 0.09 + g.x * 2.0) * sin(p.x * 0.31) ) * night * smoothstep(40.0, 700.0, length(cameraPosition.xz - p));
           c += vec3(1.0, 0.72, 0.4) * lights * 0.35;
           float d = length(cameraPosition - vW); float f = 1.0 - exp(-pow(fogD * d, 2.0)); c = mix(c, fogCol, f);
-          gl_FragColor = vec4(c, 1.0); }` });
+          gl_FragColor = vec4(c, 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }` });
     const wMesh = new THREE.Mesh(fillGeo(this.water), waterM); wMesh.renderOrder = -47; sc.add(wMesh); // 물은 공원 위에 (OSM 한강공원 영역이 물까지 덮고 있다)
     // 섬 · 녹지 (계절마다 색이 바뀐다)
-    this.islandM = flatMat('#7fa860', -46.9, { map: this.grassTex ||= groundTex('grass') }); const isl = new THREE.Mesh(fillGeo(this.islands, 0, 7), this.islandM); isl.renderOrder = -46.9; sc.add(isl);
+    this.islandM = flatMat('#7fa860', -46.9, { map: this.grassTex ||= groundTex('grass') }); patchy(this.islandM); const isl = new THREE.Mesh(fillGeo(this.islands, 0, 7), this.islandM); isl.renderOrder = -46.9; sc.add(isl);
     const greens = { grass: [], wood: [], wild: [], pitch: [], sand: [] };
     for (const g of M.green) (greens[g[0]] || greens.grass).push(g.slice(1).map(P2));
     this.greenPolys = [...greens.grass, ...greens.wood, ...greens.wild];
     this.greenM = {};
     for (const [k, col, o] of [['grass', '#8db86a', -53], ['wild', '#94a96a', -52.5], ['wood', '#5f8a4a', -52], ['pitch', '#6aa860', -51.5], ['sand', '#d9c79a', -51]]) {
-      if (!greens[k].length) continue; const m = flatMat(col, o, k === 'sand' ? {} : { map: this.grassTex ||= groundTex('grass') }); this.greenM[k] = m; const me = new THREE.Mesh(fillGeo(greens[k], 0, 7), m); me.renderOrder = o; me.receiveShadow = true; sc.add(me);
+      if (!greens[k].length) continue; const m = flatMat(col, o, k === 'sand' ? {} : { map: this.grassTex ||= groundTex('grass') }); if (k !== 'sand') patchy(m); this.greenM[k] = m; const me = new THREE.Mesh(fillGeo(greens[k], 0, 7), m); me.renderOrder = o; me.receiveShadow = true; sc.add(me);
     }
     // 길 · 철길
     { const P = [], I = []; for (const rd of M.roads) { if (rd[1]) continue; ribbonInto(P, I, P2(rd.slice(2)), rd[0], 0); } const m = new THREE.Mesh(geoOf(P, I), flatMat('#6f7173', -50)); m.renderOrder = -50; sc.add(m); this.roadM = m.material; }
@@ -235,7 +273,8 @@ export class Hangang {
     // 달리는 길: 자전거길(짙은 아스팔트) + 강 쪽 산책 · 러닝 길(붉은 우레탄)
     {
       const ln = (lat, w, col, o, tex) => { const P = [], I = [], U = []; ribbonInto(P, I, this.rp.map((_, i) => this.world(i * this.step, lat)), w, 0, U); const m = new THREE.Mesh(geoOf(P, I, { uv: [U, 2] }), flatMat(col, o, tex ? { map: tex } : {})); m.renderOrder = o; m.receiveShadow = true; sc.add(m); return m.material; };
-      ln(-1.2, 15, '#8db86a', -48.5, this.grassTex ||= groundTex('grass'));
+      { const gm = ln(-1.2, 15, '#8db86a', -48.5, this.grassTex ||= groundTex('grass')); patchy(gm); this.stripM = gm;
+        for (const [lat, w] of [[16, 44], [-26, 34]]) { const wm = ln(lat, w, '#8db86a', -59.5, this.grassTex); patchy(wm); this.wideM = [...(this.wideM || []), wm]; } }
       ln(0, 4.9, '#d9d4c8', -48.2); ln(-4.3, 3.8, '#d9d4c8', -48.1);
       this.bikeM = ln(0, 4.2, '#ffffff', -48, groundTex('asphalt')); this.runM = ln(-4.3, 3.2, '#ffffff', -47.8, groundTex('track'));
       const P = [], I = []; for (let s = 0; s < this.L - 3; s += 6) { const seg = [this.world(s, 0), this.world(s + 3, 0)]; ribbonInto(P, I, seg, 0.15, 0); } const m = new THREE.Mesh(geoOf(P, I), flatMat('#f2c53d', -47.5)); m.renderOrder = -47.5; sc.add(m);
@@ -277,14 +316,17 @@ export class Hangang {
       for (let i = 0; i < fine.length; i += 4) { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], ang = Math.atan2(c[1] - a[1], c[0] - a[0]) + Math.PI / 2; if (anyWet && wet[i]) piers.push([fine[i][0], fine[i][1], ys[i], b.w, ang]); else if (!anyWet && i % 8 === 0) piers.push([fine[i][0], fine[i][1], ys[i], b.w * 0.6, ang]); }
       if (anyWet) for (let i = 0; i < fine.length; i += 3) { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1; for (const sgn of [-1, 1]) lamps.push(fine[i][0] - dz / L * b.w / 2 * sgn, ys[i] + 1.2, fine[i][1] + dx / L * b.w / 2 * sgn); }
     }
-    const dm = new THREE.MeshLambertMaterial({ color: '#8f9094' }), sm = new THREE.MeshLambertMaterial({ color: '#b9bcc0', side: THREE.DoubleSide });
+    const dm = new THREE.MeshLambertMaterial({ color: '#a9a49c' }), sm = new THREE.MeshLambertMaterial({ color: '#e4ddd2', side: THREE.DoubleSide });
     this.scene.add(new THREE.Mesh(geoOf(deck.P, deck.I), dm), new THREE.Mesh(geoOf(side.P, side.I), sm));
     // 난간: 얇은 벽 (아래 · 위 두 줄)
-    { const P = [], I = []; for (const { off, ys } of rails2) for (let i = 1; i < off.length; i++) { const a = off[i - 1], c = off[i], k = P.length / 3; P.push(a[0], ys[i - 1], a[1], c[0], ys[i], c[1], c[0], ys[i] + 1.15, c[1], a[0], ys[i - 1] + 1.15, a[1]); I.push(k, k + 1, k + 2, k, k + 2, k + 3); } this.scene.add(new THREE.Mesh(geoOf(P, I), new THREE.MeshLambertMaterial({ color: '#d8dade', side: THREE.DoubleSide, transparent: true, opacity: 0.85 }))); }
+    { const P = [], I = []; for (const { off, ys } of rails2) for (let i = 1; i < off.length; i++) { const a = off[i - 1], c = off[i], k = P.length / 3; P.push(a[0], ys[i - 1], a[1], c[0], ys[i], c[1], c[0], ys[i] + 1.15, c[1], a[0], ys[i - 1] + 1.15, a[1]); I.push(k, k + 1, k + 2, k, k + 2, k + 3); } this.scene.add(new THREE.Mesh(geoOf(P, I), new THREE.MeshLambertMaterial({ color: '#7d8a99', side: THREE.DoubleSide, transparent: true, opacity: 0.55 })));
+      const posts = []; for (const { off, ys } of rails2) for (let i = 0; i < off.length; i++) posts.push([off[i][0], ys[i], off[i][1]]);
+      const pg = new THREE.BoxGeometry(0.16, 1.25, 0.16); pg.translate(0, 0.62, 0); const pm2 = new THREE.InstancedMesh(pg, new THREE.MeshLambertMaterial({ color: '#f2eee6' }), posts.length), o3 = new THREE.Object3D(); posts.forEach(([x, y, z], i) => { o3.position.set(x, y, z); o3.updateMatrix(); pm2.setMatrixAt(i, o3.matrix); }); this.scene.add(pm2);
+      const topP = [], topI = []; for (const { off, ys } of rails2) ribbonInto(topP, topI, off, 0.22, (i) => ys[i] + 1.22); this.scene.add(new THREE.Mesh(geoOf(topP, topI), new THREE.MeshLambertMaterial({ color: '#f2eee6', side: THREE.DoubleSide }))); }
     // 교각: 둥근 기둥 둘 + 머리보 (물 위), 땅 위 고가는 기둥 하나
     const colG = new THREE.CylinderGeometry(0.5, 0.5, 1, 10); colG.translate(0, 0.5, 0);
     const capG = new THREE.BoxGeometry(1, 1.4, 2.4);
-    const pm = new THREE.MeshLambertMaterial({ color: '#a2a4a6' }), cols = new THREE.InstancedMesh(colG, pm, piers.length * 2), caps = new THREE.InstancedMesh(capG, pm, piers.length), o = new THREE.Object3D();
+    const pm = new THREE.MeshLambertMaterial({ color: '#c9c2b6' }), cols = new THREE.InstancedMesh(colG, pm, piers.length * 2), caps = new THREE.InstancedMesh(capG, pm, piers.length), o = new THREE.Object3D();
     piers.forEach(([x, z, y, w, ang], i) => { const half = Math.min(w * 0.3, 6); for (const sgn of [-1, 1]) { o.position.set(x + Math.cos(ang || 0) * half * sgn, -1, z + Math.sin(ang || 0) * half * sgn); o.rotation.set(0, 0, 0); o.scale.set(w > 12 ? 1.8 : 1.2, y - 1.4 + 1, w > 12 ? 1.8 : 1.2); o.updateMatrix(); cols.setMatrixAt(i * 2 + (sgn > 0 ? 1 : 0), o.matrix); } o.position.set(x, y - 2.4, z); o.rotation.set(0, -(ang || 0), 0); o.scale.set(Math.min(w * 0.75, 16), 1, 1); o.updateMatrix(); caps.setMatrixAt(i, o.matrix); });
     this.scene.add(cols, caps);
     // 철교: 트러스 (선)
@@ -345,7 +387,7 @@ export class Hangang {
         const a = ring[i], c2 = ring[(i + 1) % ring.length], dx = c2[0] - a[0], dz = c2[1] - a[1], L = Math.hypot(dx, dz); if (L < 0.05) continue;
         const nx = (s > 0 ? dz : -dz) / L, nz = (s > 0 ? -dx : dx) / L, k = base();
         set.P.push(a[0], mh, a[1], c2[0], mh, c2[1], c2[0], h, c2[1], a[0], h, a[1]);
-        for (let q = 0; q < 4; q++) { set.N.push(nx, 0, nz); set.Cl.push(col.r, col.g, col.b); }
+        const lo = mh < 1 ? 0.72 : 0.92, hi = 1.06; for (let q = 0; q < 4; q++) { const k2 = q < 2 ? lo : hi; set.N.push(nx, 0, nz); set.Cl.push(col.r * k2, col.g * k2, col.b * k2); }
         const u0 = acc / BW, u1 = (acc + L) / BW, v0 = mh / FH, v1 = h / FH; acc += L;
         set.U.push(u0, v0, u1, v0, u1, v1, u0, v1);
         if (s < 0) set.I.push(k, k + 1, k + 2, k, k + 2, k + 3); else set.I.push(k, k + 2, k + 1, k, k + 3, k + 2);
@@ -432,23 +474,27 @@ export class Hangang {
     SHAPES.forEach((sh, t) => {
       const idx = spots.map((_, i) => i).filter((i) => kindOf[i] === t), n = idx.length; if (!n) { this.crownSets.push(null); return; }
       const tg = new THREE.CylinderGeometry(sh.trunk[0], sh.trunk[1], sh.trunk[2], 7); tg.translate(0, sh.trunk[2] / 2, 0);
-      const crowns = new THREE.InstancedMesh(sh.crown, new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true }), n), trunks = new THREE.InstancedMesh(tg, barkM, n), tw = sh.pine ? null : new THREE.InstancedMesh(twigG, barkM, n);
+      const cm = new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true }); windify(cm, this.windU, 0.06, true);
+      const crowns = new THREE.InstancedMesh(sh.crown, cm, n), trunks = new THREE.InstancedMesh(tg, barkM, n), tw = sh.pine ? null : new THREE.InstancedMesh(twigG, barkM, n);
       idx.forEach((si, q) => { const [x, z, k] = spots[si]; o.position.set(x, 0, z); o.rotation.set(0, r() * 6.28, 0); o.scale.set(k * (0.85 + r() * 0.3), k * (0.85 + r() * 0.35), k * (0.85 + r() * 0.3)); o.updateMatrix(); crowns.setMatrixAt(q, o.matrix); trunks.setMatrixAt(q, o.matrix); tw?.setMatrixAt(q, o.matrix); });
       for (const m of [crowns, trunks, tw]) if (m) { m.castShadow = true; m.receiveShadow = false; this.scene.add(m); }
       this.crownSets.push({ crowns, idx, pine: !!sh.pine }); if (tw) this.twigSets.push(tw);
     });
     this.treeSeed = r;
     // 풀포기 · 꽃 (길 가까이)
-    const tuftG = new THREE.ConeGeometry(0.09, 0.28, 3); tuftG.translate(0, 0.14, 0);
-    const T = Math.floor(9000 * near), F = Math.floor(2600 * near);
-    this.tufts = new THREE.InstancedMesh(tuftG, new THREE.MeshLambertMaterial({ color: '#ffffff' }), T);
-    this.flowers = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.065, 0), new THREE.MeshBasicMaterial({ color: '#ffffff' }), F);
+    // 풀잎 다발: 엇갈린 판 세 장 + 풀잎 그림(투명) · 바람에 살랑
+    const tuftG = (() => { const gs = []; for (let k = 0; k < 3; k++) { const g = new THREE.PlaneGeometry(0.62, 0.42); g.translate(0, 0.21, 0); g.rotateY((k / 3) * Math.PI); gs.push(g); } const m = mergeGeos(gs.map((g) => { g.setAttribute('uv', g.attributes.uv); return g; })); const uv = []; for (const g of gs) { const u = g.attributes.uv; for (let q = 0; q < (g.index ? g.index.count : u.count); q++) { const ix = g.index ? g.index.array[q] : q; uv.push(u.getX(ix), u.getY(ix)); } } m.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); return m; })();
+    const T = Math.floor(14000 * near), F = Math.floor(2600 * near);
+    const grassM = new THREE.MeshLambertMaterial({ color: '#ffffff', map: bladeTex(), alphaTest: 0.45, side: THREE.DoubleSide });
+    windify(grassM, this.windU, 0.11);
+    this.tufts = new THREE.InstancedMesh(tuftG, grassM, T); this.tufts.receiveShadow = true;
+    this.flowers = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.05, 0), new THREE.MeshBasicMaterial({ color: '#ffffff' }), F);
     let ti = 0, fi = 0; const c = new THREE.Color();
     while (ti < T || fi < F) {
-      const s = r() * this.L, lat = (r() < 0.5 ? -1 : 1) * (2.4 + r() * 10) - (r() < 0.5 ? 4.3 : 0); if (Math.abs(lat + 4.3) < 1.9 || Math.abs(lat) < 2.3) continue;
+      const s = r() * this.L, lat = (r() < 0.5 ? -1 : 1) * (2.4 + r() * (r() < 0.6 ? 10 : 34)) - (r() < 0.5 ? 4.3 : 0); if (Math.abs(lat + 4.3) < 2.0 || Math.abs(lat) < 2.6) continue;
       const [x, z] = this.world(s, lat); if (inWater(x, z)) continue;
-      if (ti < T) { o.position.set(x, 0, z); o.rotation.set((r() - 0.5) * 0.3, r() * 6, (r() - 0.5) * 0.3); o.scale.set(1, 0.6 + r() * 0.9, 1); o.updateMatrix(); this.tufts.setMatrixAt(ti, o.matrix); c.setHSL(0.24 + r() * 0.06, 0.45, 0.32 + r() * 0.12); this.tufts.setColorAt(ti, c); ti++; }
-      else { o.position.set(x, 0.32, z); o.rotation.set(0, 0, 0); o.scale.setScalar(0.8 + r() * 0.6); o.updateMatrix(); this.flowers.setMatrixAt(fi, o.matrix); c.set(['#ffd23f', '#ffffff', '#ff8ab5', '#b58cff', '#ff6b5a'][Math.floor(r() * 5)]); this.flowers.setColorAt(fi, c); fi++; }
+      if (ti < T) { o.position.set(x, 0, z); o.rotation.set(0, r() * 6.28, 0); const k = 0.7 + r() * 0.8; o.scale.set(k, k * (0.7 + r() * 0.6), k); o.updateMatrix(); this.tufts.setMatrixAt(ti, o.matrix); c.setHSL(0.24 + r() * 0.06, 0.5, 0.42 + r() * 0.12); this.tufts.setColorAt(ti, c); ti++; }
+      else { o.position.set(x, 0.24 + r() * 0.1, z); o.rotation.set(0, 0, 0); o.scale.setScalar(0.8 + r() * 0.6); o.updateMatrix(); this.flowers.setMatrixAt(fi, o.matrix); c.set(['#ffd23f', '#ffffff', '#ff8ab5', '#b58cff', '#ff6b5a'][Math.floor(r() * 5)]); this.flowers.setColorAt(fi, c); fi++; }
     }
     this.scene.add(this.tufts, this.flowers);
   }
@@ -459,9 +505,9 @@ export class Hangang {
     const pm = new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial({ color: '#6a717b' }), poles.length), o = new THREE.Object3D();
     poles.forEach(([x, z], i) => { o.position.set(x, 0, z); o.updateMatrix(); pm.setMatrixAt(i, o.matrix); }); this.scene.add(pm);
     this.lampGlow = this.glowPoints(heads, '#ffd79a', 3.2);
-    this.lampPool = new THREE.Mesh(new THREE.CircleGeometry(1, 16), new THREE.MeshBasicMaterial({ color: '#ffcf8a', transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending }));
+    this.lampPool = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ color: '#ffcf8a', map: this.dot ||= dotTex(), transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending }));
     // 가로등 불빛 웅덩이: 가까운 몇 개만
-    this.pools = []; for (let i = 0; i < 6; i++) { const p = this.lampPool.clone(); p.material = this.lampPool.material; p.rotation.x = -Math.PI / 2; p.scale.setScalar(5); p.renderOrder = -45; this.scene.add(p); this.pools.push(p); }
+    this.pools = []; for (let i = 0; i < 6; i++) { const p = this.lampPool.clone(); p.material = this.lampPool.material; p.rotation.x = -Math.PI / 2; p.scale.setScalar(6); p.renderOrder = -45; this.scene.add(p); this.pools.push(p); }
     this.poleXZ = poles;
     // 길 위 차들 (밤에 불빛 띠)
     const cars = []; for (const rd of this.map.roads) if (rd[0] >= 14 && !rd[1]) { const pts = unpack(rd.slice(2), this.map.scale); if (pts.length > 1) cars.push(pts); }
@@ -603,9 +649,9 @@ export class Hangang {
       crowns.instanceColor.needsUpdate = true; crowns.visible = pine || s !== 'winter';
     }
     for (const tw of this.twigSets) tw.visible = s === 'winter';
-    const grass = { spring: '#94c470', summer: '#7fb05a', autumn: '#a7a85c', winter: '#a9a58e' }[s];
-    this.greenM.grass?.color.set(grass); this.greenM.wild?.color.set(grass).offsetHSL(0, -0.05, -0.03); this.greenM.wood?.color.set({ spring: '#6f9a52', summer: '#4f7f40', autumn: '#a8763a', winter: '#8a8270' }[s]); this.islandM.color.set(grass).offsetHSL(0, 0, -0.06);
-    const tc = new THREE.Color(); for (let i = 0; i < this.tufts.count; i++) { tc.setHSL(s === 'autumn' ? 0.13 + r() * 0.04 : s === 'winter' ? 0.12 : 0.24 + r() * 0.06, s === 'winter' ? 0.15 : 0.45, s === 'winter' ? 0.5 : 0.3 + r() * 0.12); this.tufts.setColorAt(i, tc); } this.tufts.instanceColor.needsUpdate = true;
+    const grass = { spring: '#94c470', summer: '#7fb05a', autumn: '#a7a85c', winter: '#b3b89a' }[s];
+    this.greenM.grass?.color.set(grass); for (const m of this.wideM || []) m.color.set(grass); this.stripM?.color.set(grass); this.greenM.wild?.color.set(grass).offsetHSL(0, -0.05, -0.03); this.greenM.wood?.color.set({ spring: '#6f9a52', summer: '#4f7f40', autumn: '#a8763a', winter: '#8a8270' }[s]); this.islandM.color.set(grass).offsetHSL(0, 0, -0.06);
+    const tc = new THREE.Color(); for (let i = 0; i < this.tufts.count; i++) { tc.setHSL(s === 'autumn' ? 0.12 + r() * 0.05 : s === 'winter' ? 0.14 : s === 'summer' ? 0.26 + r() * 0.05 : 0.23 + r() * 0.06, s === 'winter' ? 0.18 : 0.55, s === 'winter' ? 0.62 : 0.4 + r() * 0.14); this.tufts.setColorAt(i, tc); } this.tufts.instanceColor.needsUpdate = true;
     this.flowers.visible = s === 'spring' || s === 'summer';
   }
 
@@ -701,7 +747,7 @@ export class Hangang {
       p.s += p.dir * p.v * dt; p.t += dt;
       const q = this.at(p.s), f = Math.atan2(q.dx * p.dir, q.dz * p.dir);
       p.bears.forEach((b, i) => { const lat = p.lat + i * 0.75 * (p.dir > 0 ? 1 : -1); const [x, z] = this.world(p.s - (i > 1 ? 0.6 : 0) * p.dir, lat); b.root.position.set(x, 0, z); b.root.rotation.y = f; b.update(dt, p.v * 2, { noCrawl: true }); });
-      if (p.kind === 'couple') { p.heartT -= dt; if (p.heartT <= 0) { p.heartT = 4 + Math.random() * 6; p.heart ||= heartSprite(); this.scene.add(p.heart); p.heartLife = 1.6; } if (p.heartLife > 0) { p.heartLife -= dt; const b = p.bears[0].root.position; p.heart.position.set(b.x, 1.4 + (1.6 - p.heartLife) * 0.5, b.z); p.heart.material.opacity = Math.min(1, p.heartLife); } }
+      if (p.kind === 'couple') { p.heartT -= dt; if (p.heartT <= 0) { p.heartT = 4 + Math.random() * 6; p.heart ||= heartSprite(); this.scene.add(p.heart); p.heartLife = 1.6; } if (p.heartLife > 0) { p.heartLife -= dt; const b = p.bears[0].root.position; p.heart.position.set(b.x, 1.0 + (1.6 - p.heartLife) * 0.4, b.z); p.heart.material.opacity = Math.min(1, p.heartLife); } }
     }
     for (const p of [...this.people]) { const [x, z] = this.world(p.s, p.lat); if (Math.hypot(x - px, z - pz) > 260 || p.s < 2 || p.s > this.L - 2) { this.removePerson(p); this.people.splice(this.people.indexOf(p), 1); } }
   }
@@ -723,17 +769,17 @@ export class Hangang {
     // 빛
     const sunUp = smooth(-0.05, 0.25, sun.y);
     this.sun.position.copy(sun.y > 0.06 ? sun : moon).multiplyScalar(400).add(new THREE.Vector3(px, 0, pz)); this.sun.target.position.set(px, 0, pz);
-    this.sun.color.copy(sun.y > -0.05 ? sunCol : C('#9fb4ff')); this.sun.intensity = (sun.y > -0.05 ? 1.9 * sunUp : 0.35) * (1 - ck * 0.55);
-    this.hemi.color.copy(sk.top).lerp(C('#ffffff'), 0.35); this.hemi.groundColor.copy(sk.ground); this.hemi.intensity = lerp(0.55, 1.15, sunUp) * (1 - ck * 0.15);
+    this.sun.color.copy(sun.y > -0.05 ? sunCol : C('#9fb4ff')); this.sun.intensity = (sun.y > -0.05 ? 2.3 * sunUp : 0.4) * (1 - ck * 0.5);
+    this.hemi.color.copy(sk.top).lerp(C('#ffffff'), 0.45); this.hemi.groundColor.copy(sk.ground).lerp(C('#6f8a4a'), 0.35 * sunUp); this.hemi.intensity = lerp(0.6, 1.25, sunUp) * (1 - ck * 0.15);
     const fogC = sk.hor.clone().lerp(sk.top, 0.35), fd = wt === 'rain' ? 0.00085 : wt === 'snow' ? 0.0011 : wt === 'cloudy' ? 0.00034 : 0.00022;
     this.scene.fog.color.copy(fogC); this.scene.fog.density = lerp(this.scene.fog.density, fd, Math.min(1, dt * 0.5));
-    this.waterU.fogCol.value.copy(fogC); this.waterU.fogD.value = this.scene.fog.density; this.waterU.time.value = this.t; this.waterU.rain.value = lerp(this.waterU.rain.value, wt === 'rain' ? 1 : 0, Math.min(1, dt));
+    this.waterU.fogCol.value.copy(fogC); this.waterU.fogD.value = this.scene.fog.density; this.waterU.time.value = this.t; this.windU.value = this.t; this.waterU.rain.value = lerp(this.waterU.rain.value, wt === 'rain' ? 1 : 0, Math.min(1, dt));
     this.mtM.color.copy(sk.hor).lerp(sk.top, 0.25).multiplyScalar(0.82);
     // 밤: 창문 · 가로등 · 다리 불빛 · 자동차
     const lit = smooth(0.15, 0.8, night);
     for (const m of this.bldM) m.emissiveIntensity = lit * 0.95; if (this.signM) this.signM.emissiveIntensity = lit * 0.9; if (this.farM) this.farM.emissiveIntensity = lit * 0.9;
     this.lampGlow.material.opacity = lit; this.bridgeLights.material.opacity = lit; this.carPts.material.opacity = 0.25 + lit * 0.75;
-    this.lampPool.material.opacity = lit * 0.14;
+    this.lampPool.material.opacity = lit * 0.32;
     let pi = 0; for (const [x, z] of this.poleXZ) { if (pi >= this.pools.length) break; if (Math.abs(x - px) < 90 && Math.abs(z - pz) < 90) { this.pools[pi].position.set(x, 0.03, z); this.pools[pi].visible = true; pi++; } } for (; pi < this.pools.length; pi++) this.pools[pi].visible = false;
     // 자동차 불빛
     const cp = this.carPts.geometry.attributes.position;
@@ -748,7 +794,7 @@ export class Hangang {
     if (snowOn) { const a = this.snow.geometry.attributes.position, arr = a.array; for (let i = 0; i < arr.length; i += 3) { arr[i + 1] -= dt * (0.9 + (i % 7) * 0.08); arr[i] += Math.sin(this.t * 0.7 + i) * dt * 0.3; if (arr[i + 1] < 0) arr[i + 1] += 40; } a.needsUpdate = true; this.snow.position.set(camera.position.x, camera.position.y - 14, camera.position.z); }
     // 겨울 눈 오면 땅이 하얘진다
     const snowy = this.state.season === 'winter' && snowOn; this.snowK = lerp(this.snowK || 0, snowy ? 1 : 0, Math.min(1, dt * 0.05));
-    if (this.greenM.grass) { const base = C({ spring: '#94c470', summer: '#7fb05a', autumn: '#a7a85c', winter: '#a9a58e' }[this.state.season]); this.greenM.grass.color.copy(base).lerp(C('#eef2f6'), this.snowK * 0.85); }
+    if (this.greenM.grass) { const base = C({ spring: '#94c470', summer: '#7fb05a', autumn: '#a7a85c', winter: '#b3b89a' }[this.state.season]); this.greenM.grass.color.copy(base).lerp(C('#eef2f6'), this.snowK * 0.85); for (const m of this.wideM || []) m.color.copy(this.greenM.grass.color); this.stripM?.color.copy(this.greenM.grass.color); }
     this.landM.color.copy(C('#a3a39f')).lerp(C('#e6eaee'), this.snowK * 0.6);
     // 벌레: 낮엔 나비(봄 · 여름) · 잠자리(가을), 여름밤엔 반딧불
     const day = sunUp > 0.4 && !rainOn && !snowOn, season = this.state.season;
@@ -771,8 +817,8 @@ export class Hangang {
   tickCamera(dt, camera, bx, bz, fx, fz) {
     const k = 1 - Math.exp(-dt * ((this.dragT || 0) > 0 && (this.opt.cam || 0) === 0 ? 14 : 3)), mode = this.opt.cam || 0, y = this.y;
     let cx, cy, cz, lx, ly, lz;
-    if (mode === 0) { const pt = this.camPitch ?? 0.32, d = 4.6, hd = Math.cos(pt) * d; cx = bx - fx * hd; cy = 0.8 + Math.sin(pt) * d + y * 0.5; cz = bz - fz * hd; lx = bx + fx * 1.2; ly = 0.75 + y * 0.6; lz = bz + fz * 1.2; }
-    else if (mode === 1) { const p = this.at(this.s); cx = bx - p.rx * 6.5 + p.dx * 2; cy = 1.3; cz = bz - p.rz * 6.5 + p.dz * 2; lx = bx; ly = 0.8; lz = bz; }
+    if (mode === 0) { const pt = this.camPitch ?? 0.3, d = 4.8, hd = Math.cos(pt) * d; cx = bx - fx * hd; cy = 0.55 + Math.sin(pt) * d + y * 0.5; cz = bz - fz * hd; lx = bx + fx * 1.0; ly = 0.55 + y * 0.6; lz = bz + fz * 1.0; }
+    else if (mode === 1) { const p = this.at(this.s); cx = bx - p.rx * 5 + p.dx * 1.5; cy = 1.0; cz = bz - p.rz * 5 + p.dz * 1.5; lx = bx; ly = 0.6; lz = bz; }
     else { cx = bx - fx * 26; cy = 22; cz = bz - fz * 26; lx = bx + fx * 30; ly = 0; lz = bz + fz * 30; }
     if (!this.camInit) { camera.position.set(cx, cy, cz); this.camInit = true; }
     camera.position.x += (cx - camera.position.x) * k; camera.position.y += (cy - camera.position.y) * k; camera.position.z += (cz - camera.position.z) * k;

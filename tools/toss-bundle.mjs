@@ -17,6 +17,8 @@ cp('public/dream-runner', 'dream-runner');
 cp('public/shared', 'shared');
 cp('node_modules/three/build/three.module.js', 'vendor/three/three.module.js');
 cp('node_modules/three/examples/jsm/utils/BufferGeometryUtils.js', 'vendor/three/addons/utils/BufferGeometryUtils.js');
+cp('node_modules/three/examples/jsm/postprocessing', 'vendor/three/addons/postprocessing'); // 한강 러닝 화면 보정
+cp('node_modules/three/examples/jsm/shaders', 'vendor/three/addons/shaders');
 
 // 진입 화면: 드림 러너 index.html 을 맨 위로 옮기고 주소만 고친다
 let html = fs.readFileSync(path.join(ROOT, 'public/dream-runner/index.html'), 'utf8');
