@@ -988,7 +988,7 @@ async function hgGoRegion(G) {
   await startHangang(null); const back = (hg.gates || []).find((q) => q.id === from); if (back) hg.teleport(back.end === 0 ? 14 : hg.L - 14, 0);
 }
 hg.onRegionGate = (G) => hgGoRegion(G);
-hg.onFly = (on) => toast(on === 'fall' ? '🍂 날기를 멈췄어요' : on ? '🕊️ 날기! Space 꾹 = 위로 · S = 아래로 · Space 두 번 = 떨어지기' : '🐾 내려앉았어요', on === true ? 2600 : 1200);
+hg.onFly = (on) => toast(on === 'fall' ? '🍂 날기를 멈췄어요' : on ? '🕊️ 날기! Space 꾹 = 위로 · S = 아래로 · Space 두 번 빠르게 = 떨어지기' : '🐾 내려앉았어요', on === true ? 2600 : 1200);
 hg.onTurn = (txt) => toast(`🚧 ${txt}이에요 · 돌아서 달려요`, 2200);
 // 역 안: 실제 도착 정보를 계속 받아 안내판에 (hg.arrivals)
 hg.onInside = (st) => hg.onStation(st ? { name: st.name } : null);

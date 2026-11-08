@@ -1689,13 +1689,12 @@ export class Hangang {
     // 점프 · 2단 · 3단 점프(공중제비) · 숙이기 · 옥상 위에 서기
     const ground = this.groundAt(this.px, this.pz, this.y);
     if (!this.climb) {
-      // 날기 (젤리시티처럼): 점프 → 2단 점프 → 세 번째 Space 가 곧 날기. 날 때 Space 꾹 = 위로 · S = 아래로 · Space 두 번 빠르게 = 날기를 멈추고 떨어지기
+      // 날기: 점프 → 공중에서 Space 한 번 더 = 날기 (가게 · 역 · 몰 안에선 작은 2단 점프). 날 때 Space 꾹 = 위로 · S = 아래로 · Space 두 번 빠르게 = 날기를 멈추고 떨어지기
       if (inp.jump) {
         if (this.flying) { const now = this.time; if (now - (this.lastFlyTap ?? -9) < 0.35) { this.flying = false; this.jumps = 2; this.vy = 0; this.lastFlyTap = -9; this.onFly?.('fall'); } else this.lastFlyTap = now; }
         else if (this.y <= ground + 0.001) { this.vy = 5.2; this.jumps = 1; }
-        else if (this.jumps < 2) { this.vy = 4.9; this.jumps++; this.flipT = FLIP_T; }
-        else if (!this.inside && !this.inShop && !this.inMall) { this.flying = true; this.vy = 2; this.lastFlyTap = this.time; this.onFly?.(true); }
-        else if (this.jumps < 3) { this.vy = 4.6; this.jumps++; this.flipT = FLIP_T; } }
+        else if (!this.inside && !this.inShop && !this.inMall) { this.flying = true; this.vy = 2; this.lastFlyTap = this.time; this.onFly?.(true); } // 공중에서 한 번 더 = 바로 날기 (2단 점프 없음)
+        else if (this.jumps < 2) { this.vy = 4.9; this.jumps++; this.flipT = FLIP_T; } }
       if (this.flying) { const upIn = (inp.jumpHeld ? 1 : 0) - (this.flyDown || inp.slide ? 1 : 0); this.vy += (upIn * 9 - this.vy) * Math.min(1, dt * 4); this.y = Math.min(400, Math.max(ground, this.y + this.vy * dt)); if (this.y <= ground + 0.001 && this.vy <= 0) { this.flying = false; this.jumps = 0; this.vy = 0; this.onFly?.(false); } }
       else { this.vy -= 16 * dt; this.y = Math.max(ground, this.y + this.vy * dt); if (this.y <= ground) { this.vy = Math.max(0, this.vy); this.jumps = 0; } }
     }
