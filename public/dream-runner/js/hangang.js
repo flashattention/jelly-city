@@ -1682,6 +1682,8 @@ export class Hangang {
   }
   applySeason() {
     for (const ch of this.chunks?.values() || []) ch.applySeason(); // 서울 전체: 칸마다
+    // 남산 숲 (정상 둘레 둥근 나무): 계절 색 — 봄엔 벚꽃이 섞이고, 가을엔 단풍, 겨울엔 소나무만 푸르다
+    if (this.summitTrees) { const T = this.summitTrees, c = new THREE.Color(), s2 = this.state.season, P = { spring: ['#6f9a52', '#86ad5e', '#f4c6d8', '#5f8a4a', '#ffd6e4', '#7aa858'], summer: ['#3f6a3c', '#4f7a44', '#355f36', '#5a8a4a', '#2f5a34'], autumn: ['#c8502a', '#e0882e', '#d9a83a', '#a8402a', '#3f6a3c', '#e8b84a', '#b8662e'], winter: ['#3a5a3e', '#8a7f74', '#9a9088', '#7d746c', '#3f5f40'] }[s2] || []; for (let q = 0; q < T.count; q++) T.setColorAt(q, c.set(P[(q * 7 + (q >> 3)) % P.length])); if (T.instanceColor) T.instanceColor.needsUpdate = true; }
     if (!this.trees) return; // 서울 전체의 주인은 나무가 없다 (칸에 있다)
     const s = this.state.season, r = rnd(4242), c = new THREE.Color(), N = this.trees.length;
     const pal = { spring: ['#ffc9de', '#ffd6e6', '#ffb9d3', '#ffe3ee', '#ffc0d8'], summer: ['#3f8a3a', '#4f9a40', '#2f7a34', '#5aa548', '#3a7f40'], autumn: ['#e8742a', '#f2b233', '#c8402a', '#d9902a', '#9aa83a', '#f0c84a'], winter: ['#ffffff'] }[s];

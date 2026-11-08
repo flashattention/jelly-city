@@ -24,10 +24,10 @@ export function buildSummit(hg, { world = false } = {}) {
   const mtn = new THREE.Mesh(mg, lam({ vertexColors: true })); mtn.renderOrder = -61; mtn.receiveShadow = true; sc.add(mtn);
   }
   // 비탈 숲: 둥근 나무 덩어리 (봄 · 가을엔 계절 색이 조금)
-  const NT = 2600, tg = new THREE.IcosahedronGeometry(1, 1), tm = lam({ color: '#ffffff', vertexColors: false }), trees = new THREE.InstancedMesh(tg, tm, NT), o3 = new THREE.Object3D(), tc = new THREE.Color();
+  const NT = world ? 4600 : 2600, tg = new THREE.IcosahedronGeometry(1, 1), tm = lam({ color: '#ffffff', vertexColors: false }), trees = new THREE.InstancedMesh(tg, tm, NT), o3 = new THREE.Object3D(), tc = new THREE.Color();
   // 진짜 지형이면 높은 비탈(땅 높이 45m 위)에만 — 아래 동네(명동 · 이태원)에는 안 심는다
   const RIM_ = 1400;
-  let q = 0; for (let i = 0; i < NT * 3 && q < NT; i++) { const a = Math.random() * Math.PI * 2, r = R + 12 + Math.random() ** 0.8 * (RIM_ * 0.85 - R), tx = cx + Math.cos(a) * r, tz = cz + Math.sin(a) * r; if (world && (H(tx, tz) < 45 || hg.host.inWater(tx, tz))) continue; const k = Math.min(1, (r - R) / (RIM_ - R)), y = -DROP * (1 - Math.cos(k * Math.PI)) / 2, s2 = 3 + Math.random() * 4; o3.position.set(cx + Math.cos(a) * r, y + s2 * 0.6, cz + Math.sin(a) * r); o3.scale.set(s2, s2 * (0.8 + Math.random() * 0.5), s2); o3.updateMatrix(); trees.setMatrixAt(q, o3.matrix); trees.setColorAt(q, tc.set(['#3f6a3c', '#4f7a44', '#355f36', '#5a8a4a', '#2f5a34'][q % 5])); q++; }
+  let q = 0; for (let i = 0; i < NT * 5 && q < NT; i++) { const a = Math.random() * Math.PI * 2, r = R + 12 + Math.random() ** 0.8 * (RIM_ * 0.85 - R), tx = cx + Math.cos(a) * r, tz = cz + Math.sin(a) * r; if (world && (H(tx, tz) < 45 || hg.host.inWater(tx, tz))) continue; const k = Math.min(1, (r - R) / (RIM_ - R)), y = -DROP * (1 - Math.cos(k * Math.PI)) / 2, s2 = world ? 4.5 + Math.random() * 4.5 : 3 + Math.random() * 4; o3.position.set(cx + Math.cos(a) * r, y + s2 * 0.6, cz + Math.sin(a) * r); o3.scale.set(s2, s2 * (0.8 + Math.random() * 0.5), s2); o3.updateMatrix(); trees.setMatrixAt(q, o3.matrix); trees.setColorAt(q, tc.set(['#3f6a3c', '#4f7a44', '#355f36', '#5a8a4a', '#2f5a34'][q % 5])); q++; }
   trees.count = q; sc.add(trees); hg.summitTrees = trees;
   // 3) N서울타워 (실제 비율): 기단 → 흰 콘크리트 기둥(살짝 가늘어짐) → 전망대(여러 층 · 창 띠) → 위 기둥 → 빨강 · 흰 안테나 (꼭대기 236m)
   const T = new THREE.Group(); T.position.set(cx, 0, cz); sc.add(T); const conc = lam({ color: '#ecebe6' }), dark = lam({ color: '#3a3f47' });
