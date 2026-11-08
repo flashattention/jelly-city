@@ -68,10 +68,12 @@ const posAll = () => { try { const v = JSON.parse(store.get(POS_KEY) || 'null');
 const visits = () => { try { return new Set(JSON.parse(store.get(VISIT_KEY) || '[]')); } catch { return new Set(); } };
 
 // ---------- 출발: 모든 동네 ----------
+// 새로 채운 구: 대표 역 앞 길 위에서 시작 [이름, 구, 그림, x, z, 방향]
+const GU_SPOTS = [['마곡나루', '강서구', '🌿', -13433, -4018, 3.04], ['목동', '양천구', '🏙️', -10216, 414, 0.36], ['구로디지털', '구로구', '💻', -6816, 5012, -0.59], ['가산디지털', '금천구', '🏭', -8571, 5328, -2.8], ['노량진', '동작구', '🐟', -3354, 1815, 1.64], ['서울대입구', '관악구', '⛰️', -2407, 5390, -0.29], ['연신내', '은평구', '🛍️', -5201, -9815, 1.86], ['수유', '강북구', '🏔️', 4053, -11957, 2.45], ['창동', '도봉구', '🚉', 5843, -13541, -2.82], ['노원', '노원구', '🌳', 7105, -13767, 0.23], ['성신여대', '성북구', '🎒', 3229, -6938, -1.08], ['청량리', '동대문구', '🧺', 5726, -5535, 2.1], ['상봉', '중랑구', '🌸', 9303, -7338, -1.39], ['건대입구', '광진구', '🍢', 7990, -1081, -0.37], ['천호', '강동구', '🌉', 12659, -923, 2.83]];
 const HOODS = [['yeouido', '여의도 한강', '🌉'], ['banpo', '반포 한강', '🌈'], ['ttukseom', '뚝섬 한강', '🎶'], ['namsan', '남산타워', '🗼'], ['hongdae', '홍대', '🎸'], ['sinchon', '신촌', '🎓'], ['itaewon', '이태원', '🌍'], ['myeongdong', '명동', '🛍️'], ['insadong', '인사동 · 종로', '🏮'], ['bukchon', '북촌 한옥마을', '🏯'], ['seongsu', '성수', '☕'], ['gangnam', '강남역', '🏙️'], ['jamsil', '석촌호수', '🌸']];
 function renderStart() {
   const A = posAll();
-  $('hoods').innerHTML = HOODS.map(([id, name, ic]) => `<li><a href="${PLAY}?r=${id}&go=${A.regions[id] ? 'resume' : 'start'}"><i>${ic}</i><span>${name}</span>${A.regions[id] ? '<em>이어서</em>' : ''}</a></li>`).join('');
+  $('hoods').innerHTML = HOODS.map(([id, name, ic]) => `<li><a href="${PLAY}?r=${id}&go=${A.regions[id] ? 'resume' : 'start'}"><i>${ic}</i><span>${name}</span>${A.regions[id] ? '<em>이어서</em>' : ''}</a></li>`).join('') + GU_SPOTS.map(([n, gu, ic, x, z, f]) => `<li><a href="${PLAY}?x=${x}&z=${z}&f=${f}" title="${gu}"><i>${ic}</i><span>${n}</span></a></li>`).join('');
   const last = A.last && A.regions[A.last] ? A.regions[A.last] : null; $('resume').classList.toggle('hidden', !last);
   if (last) { $('resume').href = `${PLAY}?go=last`; $('resume-sub').textContent = last.where || ''; }
   for (const id of ['go-now', 'go-end', 'go-last', 'bar-go']) $(id).href = last ? `${PLAY}?go=last` : `${PLAY}?r=yeouido&go=start`;

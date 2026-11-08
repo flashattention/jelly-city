@@ -200,3 +200,11 @@ body.light .bar { color: #f3eee6; background: linear-gradient(180deg, rgba(7, 10
 @keyframes starglow { 50% { box-shadow: 0 0 30px rgba(255, 214, 120, .75), 0 0 80px rgba(255, 214, 120, .32), inset 0 1px 0 rgba(255, 255, 255, .7); } }
 .last .link { color: rgba(255, 236, 190, .85); border-bottom-color: rgba(255, 236, 190, .35); }
 @media (prefers-reduced-motion: reduce) { .last .btn, .end .btn { animation: none; } }
+
+/* 지역 28곳: 첫 화면에서 스크롤 없이 모두 보이게 세 줄로 촘촘히 */
+.intro { grid-template-columns: minmax(0, 1fr) min(470px, 40vw); }
+.start .hoods { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 14px; }
+.start .hoods a { gap: 7px; padding: 6px 2px 5px; font-size: 13.5px; }
+.start .hoods a i { font-size: 14px; }
+.start .hoods a span { overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 720px) { .intro { grid-template-columns: 1fr; } .start .hoods { grid-template-columns: repeat(2, minmax(0, 1fr)); } .start .hoods a { padding: 9px 2px 8px; font-size: 14.5px; } }
