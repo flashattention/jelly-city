@@ -30,6 +30,19 @@ const ringArea = (r) => { let a = 0; for (let i = 0; i < r.length; i++) { const 
 function inRing(x, z, r) { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { if (r[i][1] > z !== r[j][1] > z && x < ((r[j][0] - r[i][0]) * (z - r[i][1])) / (r[j][1] - r[i][1]) + r[i][0]) c = !c; } return c; }
 const inPoly = (x, z, poly) => inRing(x, z, poly[0]) && !poly.slice(1).some((h) => inRing(x, z, h));
 // 평평한 다각형들 → 한 덩어리 (구멍 포함)
+// 큰 삼각형(또는 긴 선)을 maxLen 보다 짧게 나눈다 (지형에 얹을 때 꺾여 따라가도록). 모든 속성(위치 · 법선 · uv · 색)을 함께 나눈다
+function subdivide(geo, n, maxLen) {
+  const g = geo.index ? geo.toNonIndexed() : geo, names = Object.keys(g.attributes), A = names.map((k) => g.attributes[k]), out = names.map(() => []), P = g.attributes.position, L2 = maxLen * maxLen;
+  const get = (i) => A.map((a) => { const r = []; for (let c = 0; c < a.itemSize; c++) r.push(a.array[i * a.itemSize + c]); return r; });
+  const mid = (a, b) => a.map((at, q) => at.map((x, c) => (x + b[q][c]) / 2)), d2 = (a, b) => { const p = a[0], q = b[0]; return (p[0] - q[0]) ** 2 + (p[2] - q[2]) ** 2; };
+  const put = (vs) => { for (const v of vs) v.forEach((at, q) => out[q].push(...at)); };
+  const tri = (a, b, c, depth) => { const ab = d2(a, b), bc = d2(b, c), ca = d2(c, a), m = Math.max(ab, bc, ca); if (m <= L2 || depth > 12) return put([a, b, c]);
+    if (m === ab) { const x = mid(a, b); tri(a, x, c, depth + 1); tri(x, b, c, depth + 1); } else if (m === bc) { const x = mid(b, c); tri(a, b, x, depth + 1); tri(a, x, c, depth + 1); } else { const x = mid(c, a); tri(a, b, x, depth + 1); tri(x, b, c, depth + 1); } };
+  const seg = (a, b, depth) => { if (d2(a, b) <= L2 || depth > 12) return put([a, b]); const x = mid(a, b); seg(a, x, depth + 1); seg(x, b, depth + 1); };
+  for (let i = 0; i + n - 1 < P.count; i += n) { if (n === 3) tri(get(i), get(i + 1), get(i + 2), 0); else seg(get(i), get(i + 1), 0); }
+  const r = new THREE.BufferGeometry(); names.forEach((k, q) => r.setAttribute(k, new THREE.BufferAttribute(new Float32Array(out[q]), A[q].itemSize, A[q].normalized))); for (const gr of g.groups) r.addGroup(gr.start, gr.count, gr.materialIndex);
+  return r;
+}
 function fillGeo(polys, y = 0, uvScale = 0) {
   const pos = [], idx = [], uv = [];
   for (const poly of polys) {
@@ -236,6 +249,7 @@ export class Hangang {
     if (id === 'seoul') { // 서울 전체: 2km 칸들을 곰 둘레로 불러오고 내린다
       const res = await fetch(new URL('../seoul/index.json', import.meta.url)); if (!res.ok) throw new Error('서울 지도를 불러오지 못했어요');
       this.world0 = await res.json(); this.tileHave = new Set(this.world0.have.map(([i, j]) => `${i}_${j}`));
+      try { await this.loadTerrain(); } catch (e) { console.warn('지형 없이', e); this.terr = null; }
       const E = []; this.map = { id: 'seoul', kind: 'world', name: '서울', sub: '', center: [0, 0], scale: 0.1, len: 400, route: [0, 0, 4000, 0], water: [], island: [], green: [], areas: [], roads: [], roadNames: [], alleys: [], bridges: [], rails: [], paths: [], buildings: [], binfo: [], colors: [], names: [], tall: [], stations: E, entrances: E, marks: [], labels: [], arches: [], far: [['남산서울타워', 0, 0, 236, 'tower']].slice(0, 0), shops: [] };
       this.id = id; this.build(); this.ready = true; return;
     }
@@ -253,6 +267,7 @@ export class Hangang {
     const f0 = this.foot.length, d0 = this.decks.length, [i, j] = key.split('_').map(Number);
     c.buildContent(rnd(((i * 73856093) ^ (j * 19349663)) >>> 0));
     for (let k = f0; k < this.foot.length; k++) this.foot[k].key ??= key; for (let k = d0; k < this.decks.length; k++) this.decks[k].key = key;
+    this.maskWater(key); this.drape(c); c.scene.userData.chunk = key;
     c.applySeason(); this.scene.add(c.scene); return c;
   }
   unloadChunk(key) {
@@ -276,6 +291,67 @@ export class Hangang {
     const want = []; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const key = `${ti + a}_${tj + b}`; if (this.tileHave.has(key) && !this.chunks.has(key) && !this.chunkFail?.has(key)) want.push([Math.hypot((ti + a + 0.5) * T - px, (tj + b + 0.5) * T - pz), key]); }
     if (!want.length) return; want.sort((a, b) => a[0] - b[0]); const key = want[0][1];
     this.chunkLoading = key; this.loadChunk(key).then((c) => { if (this.map.kind === 'world') { this.chunks.set(key, c); this.cityDirty = true; this.onChunk?.(key, this.chunks.size); } }).catch(() => { (this.chunkFail ||= new Set()).add(key); }).finally(() => { this.chunkLoading = null; });
+  }
+  // ---------- 지형 (서울 전체 높이 격자, 50m) ----------
+  async loadTerrain() {
+    const [jr, br] = await Promise.all([fetch(new URL('../seoul/terrain.json', import.meta.url)), fetch(new URL('../seoul/terrain.bin.gz', import.meta.url))]);
+    if (!jr.ok || !br.ok) throw new Error('지형 파일 없음');
+    const H = await jr.json(), buf = await new Response(br.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer(), dl = new Int16Array(buf), { nx, nz } = H, h = new Float32Array(nx * nz);
+    // 줄마다 앞 칸과의 차이로 저장 (첫 칸은 윗줄 첫 칸과의 차이)
+    let prev = 0; for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; prev = (i ? prev : j ? h[k - nx] * 10 : 0) + dl[k]; h[k] = prev / 10; }
+    this.terr = { ...H, h };
+  }
+  // 그 자리 땅 높이(m, 한강 물 높이 = 0). 가게 · 역 · 몰 안에서는 0 (안쪽 장면은 멀리 따로 있다). 전망대는 제자리라 그대로
+  terrAt(x, z, raw = false) {
+    const T = this.terr || this.host?.terr; if (!T) return 0;
+    if (!raw && (this.inside || this.inShop || this.inMall)) return 0;
+    // 격자 밖(서울 바깥 · 가게 안 장면이 있는 먼 곳)은 0
+    let fx = (x - T.x0) / T.step, fz = (z - T.z0) / T.step; if (fx < 0 || fz < 0 || fx > T.nx - 1 || fz > T.nz - 1) return 0; fx = Math.min(fx, T.nx - 1.001); fz = Math.min(fz, T.nz - 1.001); const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j, k = j * T.nx + i, h = T.h;
+    return (h[k] * (1 - u) + h[k + 1] * u) * (1 - v) + (h[k + T.nx] * (1 - u) + h[k + T.nx + 1] * u) * v;
+  }
+  // 칸 안 격자점 중 물 위인 곳은 높이 0 (지형 자료는 상류 강물이 기준보다 높게 나온다)
+  maskWater(key) {
+    const T = this.terr; if (!T) return; const [ti, tj] = key.split('_').map(Number), S = this.world0.tile;
+    const i0 = Math.max(0, Math.floor((ti * S - T.x0) / T.step)), i1 = Math.min(T.nx - 1, Math.ceil(((ti + 1) * S - T.x0) / T.step)), j0 = Math.max(0, Math.floor((tj * S - T.z0) / T.step)), j1 = Math.min(T.nz - 1, Math.ceil(((tj + 1) * S - T.z0) / T.step));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (T.h[j * T.nx + i] > 0 && this.inWater(T.x0 + i * T.step, T.z0 + j * T.step)) T.h[j * T.nx + i] = 0;
+  }
+  // 칸 하나를 지형 위에 얹는다: 넓은 것(땅 · 길 · 묶은 건물)은 꼭짓점마다, 작은 것(간판 · 출구)은 통째로, 나무 같은 인스턴스는 하나씩
+  drape(c) {
+    if (!this.terr) return; const H = (x, z) => this.terrAt(x, z, true), m4 = new THREE.Matrix4(), m4i = new THREE.Matrix4(), v = new THREE.Vector3(), done = (this.draped ||= new WeakSet());
+    const flatLike = (o) => { const ms = Array.isArray(o.material) ? o.material : [o.material]; return ms.some((m) => m?.userData?.order !== undefined); };
+    const vertices = (o) => {
+      o.updateWorldMatrix(true, false); let g = o.geometry; if (done.has(g)) g = o.geometry = g.clone(); done.add(g);
+      // 평평한 바닥 층은 큰 삼각형을 잘게 나눠야 언덕을 따라간다
+      if (flatLike(o) && (o.isMesh || o.isLineSegments) && !g.groups.length) g = o.geometry = subdivide(g.applyMatrix4(o.matrixWorld), o.isMesh ? 3 : 2, 24); else g.applyMatrix4(o.matrixWorld);
+      o.position.set(0, 0, 0); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1); o.updateMatrix(); o.updateMatrixWorld(true);
+      const p = g.attributes.position; for (let k = 0; k < p.count; k++) p.setY(k, p.getY(k) + H(p.getX(k), p.getZ(k))); p.needsUpdate = true; g.computeBoundingSphere(); g.computeBoundingBox();
+    };
+    const lift = (o) => { const b = new THREE.Box3().setFromObject(o); if (b.isEmpty()) return; b.getCenter(v); o.position.y += H(v.x, v.z); o.updateMatrixWorld(true); };
+    const inst = (o) => { o.updateWorldMatrix(true, false); m4i.copy(o.matrixWorld).invert(); const a = new THREE.Matrix4(); for (let k = 0; k < o.count; k++) { o.getMatrixAt(k, a); m4.multiplyMatrices(o.matrixWorld, a); v.setFromMatrixPosition(m4); const dy = H(v.x, v.z); m4.elements[13] += dy; a.multiplyMatrices(m4i, m4); o.setMatrixAt(k, a); } o.instanceMatrix.needsUpdate = true; o.computeBoundingSphere?.(); };
+    const visit = (o) => {
+      if (o.userData.noDrape) return;
+      if (o.isInstancedMesh) return inst(o);
+      if (o.material === this.waterM) return; // 물은 0 높이 그대로
+      const b = new THREE.Box3().setFromObject(o), size = b.isEmpty() ? 0 : Math.max(b.max.x - b.min.x, b.max.z - b.min.z);
+      if (size < 40 && !flatLike(o)) return lift(o);
+      if (o.isMesh || o.isLine || o.isPoints) return vertices(o);
+      for (const ch of [...o.children]) visit(ch);
+    };
+    c.scene.updateMatrixWorld(true); for (const o of [...c.scene.children]) visit(o);
+    // 땅: 칸마다 지형 격자 그대로 (바탕 도시 땅은 높이 0 이라 언덕 아래로 숨는다)
+    const S = this.world0.tile, [ti, tj] = c.chunkKey.split('_').map(Number), n = Math.round(S / this.terr.step), g = new THREE.PlaneGeometry(S, S, n, n); g.rotateX(-Math.PI / 2); g.translate((ti + 0.5) * S, 0, (tj + 0.5) * S);
+    { const p = g.attributes.position; for (let k = 0; k < p.count; k++) p.setY(k, H(p.getX(k), p.getZ(k)) - 0.05); g.computeVertexNormals(); }
+    if (!this.terrLandM) { const tx = groundTex('city'); tx.repeat.set(S / 9, S / 9); this.terrLandM = new THREE.MeshLambertMaterial({ color: '#a3a39f', map: tx }); }
+    const land = new THREE.Mesh(g, this.terrLandM); land.receiveShadow = true; land.renderOrder = -61; land.userData.noDrape = true; c.scene.add(land);
+    // 바닥 층은 깊이를 보도록 (언덕 뒤의 길이 앞 언덕 위에 그려지지 않게), 땅보다 살짝 앞으로
+    c.scene.traverse((o) => { const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of ms) if (m.userData?.order !== undefined && !m.depthTest) { m.depthTest = true; m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -4; m.needsUpdate = true; } });
+  }
+  // 움직이는 것(사람 · 차 · 버스 …)을 땅 높이에 맞춘다: 매 프레임, 지난번에 더한 만큼 빼고 다시 더한다
+  liftMovers() {
+    if (!this.terr) return; const fixed = this.fixedObjs;
+    for (const o of this.scene.children) { if (fixed?.has(o) || o.userData.chunk || o.userData.noDrape || o === this.bear?.root || o === this.shadow || Math.abs(o.position.x) > 60000) continue; const u = o.userData, t = this.terrAt(o.position.x, o.position.z);
+      // 지난번에 둔 높이에서 누가 바꿨으면(매 프레임 새로 놓는 것) 그게 새 바탕, 아니면 예전 바탕 그대로
+      if (u.ly === undefined || Math.abs(o.position.y - u.ly) > 1e-6) u.by = o.position.y; o.position.y = u.by + t; u.ly = o.position.y; }
   }
   addShopFronts(list) { const H = this.host || this; H.shopFronts ||= []; H.shopGrid ||= new Map(); for (const F of list) { F.key = this.chunkKey; const i = H.shopFronts.push(F) - 1, k = `${Math.floor(F.x / 40)},${Math.floor(F.z / 40)}`; if (!H.shopGrid.has(k)) H.shopGrid.set(k, []); H.shopGrid.get(k).push(i); } }
   // ---------- 코스 (실제 자전거길) ----------
@@ -500,9 +576,11 @@ export class Hangang {
         }` });
     this.waterM = waterM;
     if (M.kind !== 'world') this.buildContent(r);
-    if (M.kind === 'world') { this.chunks = new Map(); this.buildFar(); }
+    if (M.kind === 'world') { this.chunks = new Map(); this.buildFar(); waterM.depthTest = true; waterM.polygonOffset = true; waterM.polygonOffsetFactor = -2; waterM.polygonOffsetUnits = -4; }
     this.buildLights(r);
     this.buildSkyStuff(r);
+    // 여기까지는 땅 높이를 따르지 않는 것(하늘 · 빛 · 비 · 먼 풍경)
+    if (M.kind === 'world') this.fixedObjs = new Set(sc.children);
     this.buildPeople();
     this.buildTransit();
     // 내 곰돌이 그림자
@@ -568,6 +646,8 @@ export class Hangang {
     this.buildBuildings(P2);
     if (M.kind !== 'tile') this.buildFar(P2);
     if (M.kind === 'summit') this.summit = buildSummit(this);
+    // 서울 전체: 남산 칸이면 진짜 지형 위에 N서울타워 · 케이블카 · 전망대
+    else if (this.isChunk && M.names?.includes('남산서울타워')) this.summit = buildSummit(this, { world: true });
     if (this.id === 'hongdae') this.buildForestPath(r);
     this.buildPlants(inWater, r);
     // 큰 몰 정문: 더현대 서울 (가장 긴 벽 가운데, 바깥을 본다)
@@ -860,11 +940,13 @@ export class Hangang {
     const box = (x, y, z, w, h, d, c, rotY = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.rotateY(rotY); g.translate(x, y, z); const k = extras.P.length / 3, p = g.attributes.position, n = g.attributes.normal; for (let i = 0; i < p.count; i++) { extras.P.push(p.getX(i), p.getY(i), p.getZ(i)); extras.N.push(n.getX(i), n.getY(i), n.getZ(i)); extras.Cl.push(c.r, c.g, c.b); } for (const ix of g.index.array) extras.I.push(k + ix); };
     const campus = []; for (const [nm, L] of Object.entries(LANDMARKS)) { if (!L.campus) continue; const ni2 = M.names.indexOf(nm); const b2 = M.buildings.find((q) => q[4] === ni2); if (!b2) continue; let x = 0, z = 0, n = 0; for (let k = 7; k < b2.length; k += 2) { x += b2[k] * M.scale; z += b2[k + 1] * M.scale; n++; } campus.push({ x: x / n, z: z / n, r: L.campus, L, nm, kind: b2[2] >> 1, ring: P2(b2.slice(7)), self: b2 }); }
     this.lmParts = {}; const touches = (cp, b, ring) => cp.self !== b && (ring.some(([x, z]) => inRing(x, z, cp.ring)) || cp.ring.some(([x, z]) => inRing(x, z, ring)));
+    // 남산 정상 둘레(서울 전체 칸): 높이 자료가 잘못된 건물이 많아 정상 지도처럼 낮게 (타워 · 따로 만든 것 빼고)
+    const towerI = M.kind === 'tile' ? M.names.indexOf('남산서울타워') : -1, towerB = towerI >= 0 ? M.buildings.find((q) => q[4] === towerI) : null, towerC = towerB ? [towerB[7] * M.scale, towerB[8] * M.scale] : null;
     for (const [bi, b] of M.buildings.entries()) {
       const info = M.binfo?.[bi] || null;
       const [h0, mh, km, ci, ni, rci, dome] = b, kind = km >> 1, glassTag = km & 1, ring = P2(b.slice(7)); if (ring.length < 3) continue;
       // 돔 지붕 부분: 벽은 돔 아래까지, 그 위에 돔 (높이 · 색은 지도 데이터대로)
-      const domeR = dome ? Math.sqrt(Math.abs(ringArea(ring)) / Math.PI) : 0, domeH = dome ? (dome > 1 ? dome : domeR * 0.6) : 0, h = LANDMARKS[ni >= 0 ? M.names[ni] : '']?.height || Math.min(Math.max(mh + 0.5, h0 - domeH), M.kind === 'summit' && M.names[ni] !== '남산서울타워' ? 12 : 1e9);
+      const domeR = dome ? Math.sqrt(Math.abs(ringArea(ring)) / Math.PI) : 0, domeH = dome ? (dome > 1 ? dome : domeR * 0.6) : 0, h = LANDMARKS[ni >= 0 ? M.names[ni] : '']?.height || Math.min(Math.max(mh + 0.5, h0 - domeH), (M.kind === 'summit' || (towerC && Math.hypot(b[7] * M.scale - towerC[0], b[8] * M.scale - towerC[1]) < 160)) && M.names[ni] !== '남산서울타워' ? 12 : 1e9);
       const name = ni >= 0 ? M.names[ni] : '', cTag = ci >= 0 ? M.colors[ci] : '';
       // 외벽 종류
       let type = kind === 1 ? (h > 14 ? 'apt' : r() < 0.5 ? 'brick' : 'stone') : kind === 4 ? (r() < 0.6 ? 'brick' : 'stone') : kind === 5 ? 'brick' : kind === 3 ? 'stone' : kind === 2 || kind === 0 ? (glassTag || h > 55 || (h > 30 && r() < 0.5) ? 'glass' : 'stone') : 'stone';
@@ -1522,12 +1604,12 @@ export class Hangang {
     if (mo) add(mo); if (st.weather === 'rain') add('rain'); if (st.weather === 'snow') add('snow'); add(st.season);
     // 곰돌이
     const bx = this.px, bz = this.pz;
-    this.bear.root.position.set(bx, this.y, bz); this.bear.root.rotation.y = this.face; this.bear.root.visible = true;
+    const tb = this.terrAt(bx, bz); this.bear.root.position.set(bx, this.y + tb, bz); this.bear.root.rotation.y = this.face; this.bear.root.visible = true;
     this.bear.inner.rotation.set(0, 0, 0);
     this.bear.update(dt, Math.min(16, this.v * 1.7), { noCrawl: true });
     this.bear.climbing = !!this.climb;
     if (!this.climb) poseBear(this.bear, { ground: this.y <= this.groundAt(bx, bz, this.y) + 0.001, slide: this.slide, flip: this.flipT > 0 ? 1 - this.flipT / FLIP_T : null, vy: this.vy, alive: true }, dt);
-    this.shadow.position.set(bx, this.groundAt(bx, bz, this.y) + 0.02, bz); this.shadow.scale.setScalar(BEAR * (1 - Math.min(0.5, this.y * 0.2)));
+    this.shadow.position.set(bx, this.groundAt(bx, bz, this.y) + tb + 0.02, bz); this.shadow.scale.setScalar(BEAR * (1 - Math.min(0.5, this.y * 0.2)));
     this.tickSignals(this.time);
     this.worldT = (this.worldT || 0) - dt; if (this.worldT <= 0) { this.worldT = 0.5; this.tickWorld(bx, bz); }
     // 멀리 있는 작은 것(출구 · 동 번호 등)은 숨긴다 (0.5초마다)
@@ -1541,6 +1623,7 @@ export class Hangang {
     // 안에 있는 동안: 바깥 것은 새로 생긴 것(차 · 행인)까지 모두 숨긴다
     if (this.inside || this.inShop || this.inMall) { const keep = this.ride?.C.g || (this.inShop ? this.inShop.I.g : this.inMall ? this.inMall.I.g : this.inside?.S.g); this.hidden ||= []; for (const o of this.scene.children) if (o !== keep && o !== this.bear?.root && o !== this.shadow && o.visible) { o.visible = false; this.hidden.push(o); } } // 날씨 · 계절이 다시 켠 바깥 것들은 다시 숨긴다
     if ((this.inside || this.inShop || this.inMall) && this.scene.fog) { this.scene.fog.density = 0.004; this.scene.fog.color.set('#d8d2c8'); } // 역 안: 안개 거의 없이
+    if (this.chunks) this.liftMovers();
     this.tickCamera(dt, camera, bx, bz, Math.sin(this.camYaw), Math.cos(this.camYaw));
   }
   // 사람 수 · 구성: 계절 · 날씨 · 시간에 따라 (벚꽃 철엔 연인이 가득, 비 · 추위 · 한밤엔 드문드문 러너만)
@@ -1609,7 +1692,7 @@ export class Hangang {
     this.sky.position.set(camera.position.x, 0, camera.position.z);
     // 빛
     const sunUp = smooth(-0.05, 0.25, sun.y);
-    this.sun.position.copy(sun.y > 0.06 ? sun : moon).multiplyScalar(400).add(new THREE.Vector3(px, 0, pz)); this.sun.target.position.set(px, 0, pz);
+    { const ty = this.terrAt(px, pz); this.sun.position.copy(sun.y > 0.06 ? sun : moon).multiplyScalar(400).add(new THREE.Vector3(px, ty, pz)); this.sun.target.position.set(px, ty, pz); } // 그림자 상자가 곰을 따라 언덕 위로
     this.sun.color.copy(sun.y > -0.05 ? sunCol : C('#9fb4ff')); this.sun.intensity = (sun.y > -0.05 ? 2.3 * sunUp : 0.4) * (1 - ck * 0.5);
     this.hemi.color.copy(sk.top).lerp(C('#ffffff'), 0.45); this.hemi.groundColor.copy(sk.ground).lerp(C('#6f8a4a'), 0.35 * sunUp); this.hemi.intensity = lerp(0.6, 1.25, sunUp) * (1 - ck * 0.15);
     const fogC = sk.hor.clone().lerp(sk.top, 0.25).lerp(sunCol, (1 - smooth(0.05, 0.45, sun.y)) * sunUp * 0.35).lerp(C('#c9a7b8'), 0.12 * sunUp), fd = wt === 'rain' ? 0.00095 : wt === 'snow' ? 0.0012 : wt === 'cloudy' ? 0.00055 : 0.00042; // 먼 곳이 아련하게 (공기 원근)
@@ -1638,7 +1721,9 @@ export class Hangang {
     if (snowOn) { const a = this.snow.geometry.attributes.position, arr = a.array; for (let i = 0; i < arr.length; i += 3) { arr[i + 1] -= dt * (0.9 + (i % 7) * 0.08); arr[i] += Math.sin(this.t * 0.7 + i) * dt * 0.3; if (arr[i + 1] < 0) arr[i + 1] += 40; } a.needsUpdate = true; this.snow.position.set(camera.position.x, camera.position.y - 14, camera.position.z); }
     // 겨울 눈 오면 땅이 하얘진다
     const snowy = this.state.season === 'winter' && snowOn; this.snowK = lerp(this.snowK || 0, snowy ? 1 : 0, Math.min(1, dt * 0.05));
-    if (this.greenM.grass) { const base = C({ spring: '#9cbf7c', summer: '#86ab68', autumn: '#97a65e', winter: '#b3b89a' }[this.state.season]); this.greenM.grass.color.copy(base).lerp(C('#eef2f6'), this.snowK * 0.85); for (const m of this.wideM || []) m.color.copy(this.greenM.grass.color); this.stripM?.color.copy(this.greenM.grass.color); }
+    // 잔디 색(계절 · 눈) — 서울 전체면 칸마다
+    const grassC = C({ spring: '#9cbf7c', summer: '#86ab68', autumn: '#97a65e', winter: '#b3b89a' }[this.state.season]).lerp(C('#eef2f6'), this.snowK * 0.85);
+    for (const o of [this, ...(this.chunks?.values() || [])]) if (o.greenM?.grass) { o.greenM.grass.color.copy(grassC); for (const m of o.wideM || []) m.color.copy(grassC); o.stripM?.color.copy(grassC); }
     this.landM.color.copy(C('#a3a39f')).lerp(C('#e6eaee'), this.snowK * 0.6);
     // 벌레: 낮엔 나비(봄 · 여름) · 잠자리(가을), 여름밤엔 반딧불
     const day = sunUp > 0.4 && !rainOn && !snowOn, season = this.state.season;
@@ -1661,22 +1746,22 @@ export class Hangang {
   }
   // 카메라: 0 뒤에서 · 1 강 쪽에서 옆으로 · 2 높이서 (드론)
   tickCamera(dt, camera, bx, bz, fx, fz) {
-    const k = 1 - Math.exp(-dt * ((this.dragT || 0) > 0 && (this.opt.cam || 0) === 0 ? 14 : 3)), mode = this.opt.cam || 0, y = this.y;
+    const k = 1 - Math.exp(-dt * ((this.dragT || 0) > 0 && (this.opt.cam || 0) === 0 ? 14 : 3)), mode = this.opt.cam || 0, tb = this.terrAt(bx, bz), y = this.y + tb;
     let cx, cy, cz, lx, ly, lz;
     if (mode === 0) { const pt = this.camPitch ?? 0.3, d = (this.ride || this.inShop || this.inDeck ? 3.2 : 4.8) * (pt < 0 ? 1 + pt * 0.6 : 1), hd = Math.cos(pt) * d; cx = bx - fx * hd; cy = Math.max(0.35, 0.55 + Math.sin(pt) * d) + y; cz = bz - fz * hd; lx = bx + fx * 1.0; ly = 0.55 + y + (pt < 0 ? -pt * 7 : 0); lz = bz + fz * 1.0;
       // 벽 타기: 벽에서 6m 떨어져 살짝 아래에서 곰과 벽을 올려다본다
       // 마우스로 돌릴 수 있게: 시점 방향 그대로 따라가되, 벽 안쪽으로는 못 들어가게 벽 바깥 반쪽으로만
       if (this.climb) { const C = this.climb; let dx = -fx, dz = -fz; const dot = dx * C.nx + dz * C.nz; if (dot < 0.3) { dx += C.nx * (0.3 - dot); dz += C.nz * (0.3 - dot); const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L; } const D = 6 * Math.cos(pt), up = 0.6 + Math.sin(pt) * 6; cx = bx + dx * D; cz = bz + dz * D; cy = y + up; lx = bx; ly = y + 1.2; lz = bz; } }
-    else if (mode === 1) { const p = this.at(this.s); cx = bx - p.rx * 5 + p.dx * 1.5; cy = 1.0; cz = bz - p.rz * 5 + p.dz * 1.5; lx = bx; ly = 0.6; lz = bz; }
-    else { cx = bx - fx * 26; cy = 22; cz = bz - fz * 26; lx = bx + fx * 30; ly = 0; lz = bz + fz * 30; }
+    else if (mode === 1) { const p = this.at(this.s); cx = bx - p.rx * 5 + p.dx * 1.5; cy = 1.0 + y; cz = bz - p.rz * 5 + p.dz * 1.5; lx = bx; ly = 0.6 + y; lz = bz; }
+    else { cx = bx - fx * 26; cy = 22 + tb; cz = bz - fz * 26; lx = bx + fx * 30; ly = tb; lz = bz + fz * 30; }
     if (!this.camInit) { camera.position.set(cx, cy, cz); this.camInit = true; }
     const ky = this.climb || Math.abs(cy - camera.position.y) > 3 ? 1 - Math.exp(-dt * 12) : k; camera.position.x += (cx - camera.position.x) * k; camera.position.y += (cy - camera.position.y) * ky; // 높이: 벽 타기나 크게 벌어졌을 땐 빨리 따라간다 (작은 점프는 부드럽게)
-    camera.position.z += (cz - camera.position.z) * k; camera.position.y = Math.max(0.3, camera.position.y); { const dg = this.deckAt(camera.position.x, camera.position.z, this.y + 0.5); if (dg > 0.5 && this.y >= dg - 0.3) camera.position.y = Math.max(camera.position.y, dg + 0.6); } // 다리 위에 있을 땐 카메라가 다리 밑으로 안 내려간다
+    camera.position.z += (cz - camera.position.z) * k; camera.position.y = Math.max(0.3 + (tb ? Math.max(tb, this.terrAt(camera.position.x, camera.position.z)) : 0), camera.position.y); { const dg = this.deckAt(camera.position.x, camera.position.z, this.y + 0.5); if (dg > 0.5 && this.y >= dg - 0.3) camera.position.y = Math.max(camera.position.y, dg + tb + 0.6); } // 다리 위에 있을 땐 카메라가 다리 밑으로 안 내려간다
     if (this.inside) camera.position.y = Math.min(camera.position.y, this.ride ? 2.2 : 4.1);
     if (this.inShop) camera.position.y = Math.min(camera.position.y, 3.1);
     // 안에서는 카메라가 벽 밖으로 나가지 않게 (벽은 안쪽만 그려져서, 밖에 나가면 어두운 빈 곳만 보인다)
     { const B = this.interiorBox?.(); if (B) { const [x0, x1, z0, z1] = B, m = 0.35; camera.position.x = clamp(camera.position.x, x0 + m, x1 - m); camera.position.z = clamp(camera.position.z, z0 + m, z1 - m); } }
-    if (this.inDeck) { const D = this.deckInfo; camera.position.y = Math.min(Math.max(camera.position.y, D.DY + 0.6), D.DY + 3.1); const dx = camera.position.x - D.cx, dz = camera.position.z - D.cz, dd = Math.hypot(dx, dz); if (dd > D.DR - 0.6) { camera.position.x = D.cx + dx / dd * (D.DR - 0.6); camera.position.z = D.cz + dz / dd * (D.DR - 0.6); } if (dd < 4.9) { camera.position.x = D.cx + dx / (dd || 1) * 4.9; camera.position.z = D.cz + dz / (dd || 1) * 4.9; } }
+    if (this.inDeck) { const D = this.deckInfo; camera.position.y = Math.min(Math.max(camera.position.y, D.DY + tb + 0.6), D.DY + tb + 3.1); const dx = camera.position.x - D.cx, dz = camera.position.z - D.cz, dd = Math.hypot(dx, dz); if (dd > D.DR - 0.6) { camera.position.x = D.cx + dx / dd * (D.DR - 0.6); camera.position.z = D.cz + dz / dd * (D.DR - 0.6); } if (dd < 4.9) { camera.position.x = D.cx + dx / (dd || 1) * 4.9; camera.position.z = D.cz + dz / (dd || 1) * 4.9; } }
     this.look ||= new THREE.Vector3(lx, ly, lz); this.look.x += (lx - this.look.x) * k; this.look.y += (ly - this.look.y) * ky; this.look.z += (lz - this.look.z) * k;
     camera.lookAt(this.look);
     const fov = 56 + clamp(this.v - 6, 0, 18) * 0.8; if (Math.abs(camera.fov - fov) > 0.05 || camera.far < 20000) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 3); camera.far = 24000; camera.updateProjectionMatrix(); }

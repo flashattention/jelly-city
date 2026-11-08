@@ -19,12 +19,13 @@ export function decodePNG(buf) {
       row[i] = v & 255; } }
   return { w, h, bpp, px };
 }
-async function tile(cacheDir, x, y) {
-  const k = `${x}/${y}`; if (tiles.has(k)) return tiles.get(k);
+// 같은 타일을 동시에 여러 번 부르면 한 번만 받는다 (받는 중인 약속을 기억)
+function tile(cacheDir, x, y) { const k = `${x}/${y}`; if (!tiles.has(k)) tiles.set(k, tile0(cacheDir, x, y).catch((e) => { tiles.delete(k); throw e; })); return tiles.get(k); }
+async function tile0(cacheDir, x, y) {
   const f = path.join(cacheDir, 'terrain', String(Z), String(x), `${y}.png`); let buf;
   if (fs.existsSync(f)) buf = fs.readFileSync(f);
   else { for (let tr = 0; tr < 4 && !buf; tr++) { try { const r = await fetch(`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${Z}/${x}/${y}.png`, { signal: AbortSignal.timeout(20000) }); if (r.ok) buf = Buffer.from(await r.arrayBuffer()); } catch { await new Promise((res) => setTimeout(res, 2000)); } } if (!buf) throw new Error('지형 타일을 못 받았어요'); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, buf); }
-  const img = decodePNG(buf); tiles.set(k, img); return img;
+  return decodePNG(buf);
 }
 // 위도 · 경도 → 높이(m), 이웃 네 화소를 섞어서
 export async function heightAt(cacheDir, lat, lon) {
