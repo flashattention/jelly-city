@@ -18,7 +18,9 @@
   <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }</script>
 </head>
 <body>
-  <div class="loader" id="loader"><span class="spin" aria-hidden="true"></span><span class="ld-t">젤리 서울 러너</span><span class="ld-bar"><i id="ld-bar"></i></span><span class="ld-s" id="ld-s">서울을 불러오는 중</span></div>
+  <div class="loader" id="loader"><svg class="skyline" viewBox="0 0 240 90" aria-hidden="true"><defs><linearGradient id="skg" x1="0" x2="1"><stop offset="0" stop-color="#ffb89e" /><stop offset=".5" stop-color="#f59cc2" /><stop offset="1" stop-color="#b9a6ff" /></linearGradient></defs>
+      <circle class="sun" cx="0" cy="0" r="5" />
+      <path class="line" pathLength="1" d="M4 80 L20 80 L24 70 L30 70 L30 46 L36 40 L42 46 L42 70 L48 70 L52 80 L62 80 Q78 56 96 52 L104 50 L104 34 L101 31 L107 31 L107 22 L109 22 L109 8 L111 8 L111 22 L113 22 L113 31 L119 31 L116 34 L116 50 Q132 52 146 66 L150 70 L150 80 L160 80 L160 74 L164 74 L168 18 L170 12 L172 18 L176 74 L180 74 L180 80 L190 80 Q198 70 206 80 Q214 70 222 80 Q228 74 236 80" /></svg><span class="ld-t">젤리 서울 러너</span><span class="ld-bar"><i id="ld-bar"></i></span><span class="ld-s" id="ld-s">서울을 불러오는 중</span></div>
 
   <header class="bar">
     <a class="mark" href="#film">젤리 서울 러너</a>
@@ -49,7 +51,7 @@
       </div>
 
       <div class="chaps" id="chaps"></div>
-      <div class="end" id="end"><h2>이제 직접<br />걸어보세요</h2><a class="btn" id="go-end" href="/seoul-walk/play/?r=yeouido&amp;go=start">지금 걷기</a></div>
+      <div class="end" id="end"><h2>이제 직접<br />걸어보세요.</h2><a class="btn" id="go-end" href="/seoul-walk/play/?r=yeouido&amp;go=start">지금 걷기</a></div>
       <div class="prog" id="prog"><i id="prog-fill"></i><span id="prog-t">01 / 06</span></div>
       <p class="cue" id="cue">내려 보기</p>
     </div>

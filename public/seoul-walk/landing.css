@@ -156,3 +156,11 @@ body.light .bar nav { color: rgba(28, 33, 51, .62); } body.light .bar nav a:hove
 .loader .ld-t { color: #1c2133; } .loader .ld-s { color: rgba(28, 33, 51, .55); } .loader .ld-bar { background: rgba(28, 33, 51, .12); } .loader .ld-bar i { background: linear-gradient(90deg, #ffb89e, #f59cc2, #b9a6ff); }
 .spin { width: 54px; height: 54px; border-radius: 50%; background: conic-gradient(from 0deg, rgba(255, 184, 158, 0), #ffb89e 30%, #f59cc2 60%, #b9a6ff 95%); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px)); mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px)); animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* 불러오기 표시: 서울 스카이라인(63빌딩 · 남산과 N서울타워 · 롯데월드타워 · 한강 다리)이 그려졌다 지워지고, 해가 남산 위를 돈다 */
+.skyline { width: 220px; height: 84px; overflow: visible; }
+.skyline .line { fill: none; stroke: url(#skg); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: sky-draw 2.6s cubic-bezier(.6, 0, .3, 1) infinite; }
+@keyframes sky-draw { 0% { stroke-dashoffset: 1; } 55% { stroke-dashoffset: 0; } 75% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+.skyline .sun { fill: #ffb89e; offset-path: path('M70 60 A 42 42 0 0 1 154 60'); offset-rotate: 0deg; animation: sky-sun 2.6s ease-in-out infinite alternate; }
+@keyframes sky-sun { from { offset-distance: 0%; fill: #ffb89e; } to { offset-distance: 100%; fill: #b9a6ff; } }
+@media (prefers-reduced-motion: reduce) { .skyline .line { animation: none; stroke-dashoffset: 0; } .skyline .sun { animation: none; } }
