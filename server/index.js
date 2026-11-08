@@ -310,6 +310,18 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  // 웹 워커용 모듈(?w=1): 워커에선 import map 이 안 되므로 'three' · 'three/addons/…' 를 jsDelivr ESM 주소로 바꾸고, 상대 import 에도 ?w=1 을 붙여 준다 (젤리 서울 러너 랜딩의 3D 를 워커에서 그리려고)
+  if (url.searchParams.has('w') && url.pathname.endsWith('.js')) {
+    const wf = path.normalize(path.join(PUBLIC, decodeURIComponent(url.pathname)));
+    if (!wf.startsWith(PUBLIC) || !fs.existsSync(wf)) { res.writeHead(404); res.end('not found'); return; }
+    const key = wf + ':' + fs.statSync(wf).mtimeMs; let code = WMOD.get(key);
+    if (!code) {
+      const T = 'https://cdn.jsdelivr.net/npm/three@0.169.0';
+      code = fs.readFileSync(wf, 'utf8').replace(/(from\s*|import\s*\(\s*)(['"])three\2/g, `$1$2${T}/+esm$2`).replace(/(from\s*|import\s*\(\s*)(['"])three\/addons\/([^'"]+)\2/g, (m, a, q, f) => `${a}${q}${T}/examples/jsm/${f}/+esm${q}`).replace(/(from\s*|import\s*\(\s*|\bimport\s+)(['"])(\.{1,2}\/[^'"?]+\.js)\2/g, '$1$2$3?w=1$2'); // import './x.js' (부작용만 있는 import) 도
+      WMOD.set(key, code);
+    }
+    res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(code); return;
+  }
   let file = path.normalize(path.join(PUBLIC, decodeURIComponent(url.pathname)));
   if (!file.startsWith(PUBLIC)) { res.writeHead(403); res.end(); return; }
   if (fs.existsSync(file) && fs.statSync(file).isDirectory()) {
@@ -333,6 +345,7 @@ const server = http.createServer((req, res) => {
   });
 });
 const GZ = new Map(); let gzBytes = 0;
+const WMOD = new Map(); // 워커용으로 바꾼 모듈 (파일이 바뀌면 다시)
 
 // WS_COMPRESS=1 이면 메시지를 압축해서 보낸다 (트래픽 ↓, CPU ↑)
 const COMPRESS = process.env.WS_COMPRESS === '1';

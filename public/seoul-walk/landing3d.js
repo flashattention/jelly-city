@@ -33,8 +33,8 @@ export function start3d(canvas, opt = {}) {
   // 등급별: 해상도 · 그림자 · 빛 번짐(낮은 해상도로) · 스크롤 중 최대 장 수 · 사람 · 차 계산 횟수
   const dpr = devicePixelRatio || 1, Q = [
     { pr: 0.7, prMax: 0.8, shadows: false, bloom: false, bloomScale: 0.35, maxFps: 30, simHz: 15 },
-    { pr: Math.min(dpr, 0.85), prMax: Math.min(dpr, 1), shadows: false, bloom: true, bloomScale: 0.35, maxFps: 60, simHz: 20 },
-    { pr: Math.min(dpr, 1.15), prMax: Math.min(dpr, 1.4), shadows: true, bloom: true, bloomScale: 0.5, maxFps: 60, simHz: 30 },
+    { pr: Math.min(dpr, 0.85), prMax: Math.min(dpr, 1), shadows: false, bloom: true, bloomScale: 0.35, maxFps: 30, simHz: 20 },
+    { pr: Math.min(dpr, 1.15), prMax: Math.min(dpr, 1.4), shadows: true, bloom: true, bloomScale: 0.5, maxFps: 30, simHz: 30 },
   ][cl(tier, 0, 2)];
   Q.fps30 = Q.maxFps <= 30;
   const cam = new THREE.PerspectiveCamera(52, 1, 0.5, 24000), api = (p) => fetch(p).then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status))));

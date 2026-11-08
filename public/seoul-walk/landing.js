@@ -17,11 +17,11 @@ const CH = [
 const film = $('film'), N = CH.length; film.style.setProperty('--n', N);
 const frames = CH.map(([f]) => { const d = document.createElement('div'); d.className = 'f'; d.dataset.src = `/seoul-walk/img/${f}.webp`; $('frames').appendChild(d); return d; });
 const chaps = CH.map(([, place, co, when, title, txt], i) => { const d = document.createElement('div'); d.className = 'chap'; d.innerHTML = `<p class="lab"><b>${String(i + 1).padStart(2, '0')}</b><span>${place} · ${when}</span></p><h3>${title}</h3><p>${txt}</p>`; $('chaps').appendChild(d); return d; });
-let use3d = false; // 3D 가 돌면 그림은 쓰지 않는다 (불러오기 전 · 휴대폰 · 약한 기기만 그림)
+let use3d = false, W3D = null; // 3D 가 돌면 그림은 쓰지 않는다 (불러오기 전 · 휴대폰 · 약한 기기만 그림)
 const loadImg = (k) => { const d = frames[k]; if (d && !d.style.backgroundImage) d.style.backgroundImage = `url(${d.dataset.src})`; };
 let ticking = false, lastP = -1;
 function filmTick() {
-  ticking = false; const r = film.getBoundingClientRect(), span = film.offsetHeight - innerHeight, p = cl(-r.top / span), P = p * (N + 0.6); window.SW_FILM = { P: Math.min(P, N - 0.001), N };
+  ticking = false; const r = film.getBoundingClientRect(), span = film.offsetHeight - innerHeight, p = cl(-r.top / span), P = p * (N + 0.6); window.SW_FILM = { P: Math.min(P, N - 0.001), N }; W3D?.film(Math.min(P, N - 0.001), scrolled);
   if (Math.abs(P - lastP) < 1e-4) return; lastP = P;
   // 첫 화면 겹침(제목 · 출발)은 스크롤을 시작하면 걷힌다
   const io = 1 - ease(cl((P - 0.12) / 0.26)); $('intro').style.opacity = io.toFixed(3); $('intro').style.transform = `translate3d(0, ${(-(1 - io) * 40).toFixed(1)}px, 0)`; $('intro').style.pointerEvents = io > 0.5 ? 'auto' : 'none'; $('cue').style.opacity = (io * 0.9).toFixed(2);
@@ -30,10 +30,12 @@ function filmTick() {
     if (!use3d || !window.SW_HAS?.(i)) { if (t > -0.6 && t < 1.6) { loadImg(i); loadImg(i + 1); } const fin = i === 0 ? 1 : ease(cl((t + 0.3) / 0.3)), fout = i === N - 1 ? 1 - ease(cl((t - 1) / 0.6)) : 1 - ease(cl((t - 0.85) / 0.3)), o = Math.min(fin, fout), F = frames[i]; F.style.opacity = o.toFixed(3); if (o > 0) { const k = cl((t + 0.3) / 1.6); F.style.transform = `scale(${(1.04 + k * 0.16).toFixed(4)}) translate3d(${(-k * 1.6).toFixed(3)}%, ${(-k * 1.1).toFixed(3)}%, 0)`; } } else frames[i].style.opacity = '0';
     const a = i === 0 ? 0.42 : 0.08, ti = ease(cl((t - a) / 0.2)), to = 1 - ease(cl((t - 0.66) / 0.18)), co = Math.min(ti, to), C = chaps[i]; C.style.opacity = co.toFixed(3); C.style.transform = `translate3d(0, ${((1 - ti) * 40 - (1 - to) * 26).toFixed(1)}px, 0)`;
   }
+  // 워커 3D: 캔버스 비침은 여기서 (장면 끝 · 처음은 어둡게 녹아 넘어간다, 지도가 아직이면 그림)
+  if (W3D) { const ci = cl(Math.floor(P), 0, N - 1), ct = cl(P - ci), fade = Math.min(ease(cl(ct / 0.12)), ease(cl((1 - ct) / 0.12))); $('gl').style.opacity = W3D.has(ci) ? (ci === 0 ? (ct < 0.5 ? 1 : fade) : fade).toFixed(3) : '0'; }
   const k = cl(Math.floor(P), 0, N - 1); $('prog-fill').style.width = `${(cl(P / N) * 100).toFixed(2)}%`; $('prog-t').textContent = `${String(k + 1).padStart(2, '0')} / ${String(N).padStart(2, '0')}`;
   const e = ease(cl((P - N + 0.1) / 0.4)); $('end').style.opacity = e.toFixed(3); $('end').classList.toggle('on', e > 0.5); document.body.classList.toggle('light', r.bottom < 80 || e > 0.5); // 파스텔 마지막 장 · 아래에선 위 막대 글자를 짙게
 }
-addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(filmTick); } }, { passive: true });
+let scrolled = false; addEventListener('scroll', () => { scrolled = true; if (!ticking) { ticking = true; requestAnimationFrame(filmTick); } }, { passive: true });
 addEventListener('resize', () => { lastP = -1; filmTick(); });
 { const f = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', hour: 'numeric', minute: '2-digit' }), tick = () => { $('clock').textContent = `지금 서울은 ${f.format(new Date())}`; }; tick(); setInterval(tick, 15000); }
 
@@ -44,7 +46,19 @@ const want3d = (matchMedia('(min-width: 900px) and (pointer: fine)').matches && 
 if (want3d) {
   use3d = true; loader.set(0.08, '서울을 불러오는 중');
   const giveUp = setTimeout(() => { if (!$('loader').classList.contains('done')) fallbackImages(); }, 25000);
-  import('/seoul-walk/landing3d.js').then((m) => { const r = m.start3d($('gl'), { onProgress: (k, s) => loader.set(0.08 + k * 0.9, s), onReady: () => { clearTimeout(giveUp); loader.set(1); setTimeout(loader.done, 250); }, onFail: () => { clearTimeout(giveUp); fallbackImages(); } }); if (!r) { clearTimeout(giveUp); fallbackImages(); } }).catch(() => { clearTimeout(giveUp); fallbackImages(); });
+  const onReady = () => { clearTimeout(giveUp); loader.set(1); setTimeout(loader.done, 250); }, onFail = () => { clearTimeout(giveUp); fallbackImages(); };
+  const cv = $('gl'), qt = new URLSearchParams(location.search).get('tier');
+  if (cv.transferControlToOffscreen && typeof Worker === 'function' && !new URLSearchParams(location.search).has('inline')) {
+    // 3D 는 웹 워커에서 (메인 스레드는 스크롤 · 글자만 → 약한 컴퓨터에서도 스크롤이 부드럽다)
+    const off = cv.transferControlToOffscreen(), wk = new Worker('/seoul-walk/landing3d-worker.js', { type: 'module' }); let hasSet = new Set();
+    W3D = { film: (P, act) => wk.postMessage({ type: 'film', P, active: act }), has: (i) => hasSet.has(i) }; window.SW_HAS = W3D.has;
+    wk.onmessage = (e) => { const m = e.data; if (m.type === 'progress') loader.set(0.08 + m.k * 0.9, m.s); else if (m.type === 'ready') onReady(); else if (m.type === 'fail') onFail(); else if (m.type === 'has') { hasSet = new Set(m.list); lastP = -1; filmTick(); } else if (m.type === 'log') console.error('[3D 워커]', m.msg); };
+    wk.onerror = (e) => { console.warn('워커 3D 오류', e.message); onFail(); };
+    wk.postMessage({ type: 'init', canvas: off, w: innerWidth, h: innerHeight, dpr: devicePixelRatio || 1, tier: qt != null ? +qt : null }, [off]);
+    addEventListener('resize', () => wk.postMessage({ type: 'resize', w: innerWidth, h: innerHeight }));
+    new IntersectionObserver((es) => wk.postMessage({ type: 'vis', v: es[0].isIntersecting })).observe(film);
+    W3D.film(0, false);
+  } else import('/seoul-walk/landing3d.js').then((m) => { const r = m.start3d(cv, { onProgress: (k, s) => loader.set(0.08 + k * 0.9, s), onReady, onFail }); if (!r) onFail(); }).catch(onFail);
 } else fallbackImages();
 filmTick();
 
