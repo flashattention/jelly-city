@@ -53,7 +53,7 @@ jobs:
           curl -sf localhost:8123/jelly-hide/ > /dev/null
           curl -sf localhost:8123/jelly-arena/ > /dev/null
           curl -sf localhost:8123/jelly-odyssey/ > /dev/null
-          curl -sf localhost:8123/seoul-walk/ | grep -q "젤리 서울 산책"
+          curl -sf localhost:8123/seoul-walk/ | grep -q "젤리 서울 러너"
           curl -sf 'localhost:8123/api/surv/board?b=normal' > /dev/null
           curl -sf 'localhost:8123/api/ten/board?b=t120' > /dev/null
           # 이름이 바뀐 게임: 옛 주소가 새 주소로 넘어가는지

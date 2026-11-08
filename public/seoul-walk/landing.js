@@ -1,4 +1,4 @@
-// 젤리 서울 산책 랜딩: 첫 화면부터 실시간 3D 장면(스크롤로 카메라가 서울 곳곳을 지나간다) · 오른쪽 위 출발(모든 동네 · 지금 걷기 · 이어 걷기 · 지도) · 만든 이야기
+// 젤리 서울 러너 랜딩: 첫 화면부터 실시간 3D 장면(스크롤로 카메라가 서울 곳곳을 지나간다) · 오른쪽 위 출발(모든 동네 · 지금 걷기 · 이어 걷기 · 지도) · 만든 이야기
 import { account, store } from '/shared/js/account.js';
 import { SeoulMap } from '/dream-runner/js/seoul-map.js';
 

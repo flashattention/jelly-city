@@ -1,4 +1,4 @@
-/* 젤리 서울 산책 — 영화 · 잡지 같은 편집 디자인. 둥근 상자 · 카드 · 알약 단추 없이: 꽉 찬 장면, 큰 세리프, 얇은 가로줄, 각진 단추 */
+/* 젤리 서울 러너 — 영화 · 잡지 같은 편집 디자인. 둥근 상자 · 카드 · 알약 단추 없이: 꽉 찬 장면, 큰 세리프, 얇은 가로줄, 각진 단추 */
 :root {
   --bg: #07090f; --fg: #f3eee6; --mute: rgba(243, 238, 230, .64); --dim: rgba(243, 238, 230, .4); --line: rgba(243, 238, 230, .16); --gold: #e7c18b;
   --ko: 'Nanum Myeongjo', serif; --en: 'Cormorant Garamond', serif; --mono: 'IBM Plex Mono', 'Noto Sans KR', ui-monospace, monospace; --sans: 'Noto Sans KR', system-ui, sans-serif;

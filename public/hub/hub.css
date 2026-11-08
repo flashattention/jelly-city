@@ -316,7 +316,7 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .ody .ovirus { position: absolute; right: 9%; top: 18px; font-size: 30px; filter: hue-rotate(60deg) drop-shadow(0 0 10px #3dff74); animation: wob 2s ease-in-out infinite; }
 .ody .ofire { position: absolute; right: 24%; bottom: 14px; font-size: 26px; filter: drop-shadow(0 0 8px #ff8a3a); }
 .ody .new { position: absolute; right: 14px; bottom: 12px; padding: 4px 12px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-size: 13px; }
-/* 젤리 서울 산책 카드: 드림 러너와 나란히 둘 다 2칸 (사진 두 장) */
+/* 젤리 서울 러너 카드: 드림 러너와 나란히 둘 다 2칸 (사진 두 장) */
 .card.seoul.wide { grid-column: span 2; min-height: 380px; }
 .card.seoul.wide .art { bottom: 132px; display: grid; grid-template-columns: repeat(2, 1fr); background: #0f1726; }
 .card.seoul.wide:hover .dp { transform: scale(1.04); }
