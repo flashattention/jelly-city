@@ -80,6 +80,14 @@ function windowTex(glass, lit, seed) {
 function facadeTex(type, lit, seed) {
   const cv = document.createElement('canvas'); cv.width = cv.height = 256; const g = cv.getContext('2d'), r = rnd(seed + type.length * 7), C = 32;
   const wall = { apt: '#f4f2ee', glass: '#d6dde4', stone: '#e6e1d8', brick: '#d7d0c8', gold: '#f0e2c0', assembly: '#f6f3ec' }[type];
+  if (type === 'street' || type === 'street2') { // 거리 상가: 1층(그림 맨 아래 줄)은 통유리 가게, 위층은 창틀 창(street) / 가로 띠창(street2)
+    g.fillStyle = lit ? '#000' : '#ece8e2'; g.fillRect(0, 0, 256, 256);
+    for (let j = 0; j < 8; j++) { const y = j * 32, ground = j === 7;
+      if (ground) { for (let i = 0; i < 4; i++) { const x = i * 64; if (lit) { const gr = g.createLinearGradient(0, y, 0, y + 32); gr.addColorStop(0, 'hsl(38,90%,72%)'); gr.addColorStop(1, 'hsl(28,85%,55%)'); g.fillStyle = gr; g.fillRect(x + 3, y + 3, 58, 28); } else { g.fillStyle = '#3a4350'; g.fillRect(x + 3, y + 3, 58, 28); g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(x + 3, y + 3, 58, 5); g.fillStyle = '#2a2a2e'; g.fillRect(x + 31, y + 3, 2, 28); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x, y, 64, 3); } } continue; }
+      if (type === 'street2') { if (lit) { if (r() < 0.45) { g.fillStyle = `hsl(${r() < 0.7 ? 40 : 205},${r() < 0.7 ? 80 : 30}%,${66 + r() * 14}%)`; g.fillRect(4, y + 9, 248, 14); } continue; } g.fillStyle = `rgb(${70 + r() * 30},${82 + r() * 30},${96 + r() * 30})`; g.fillRect(4, y + 9, 248, 14); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(4, y + 9, 248, 3); g.fillStyle = 'rgba(0,0,0,.18)'; for (let x = 4; x < 252; x += 41) g.fillRect(x, y + 9, 2, 14); g.fillStyle = 'rgba(0,0,0,.08)'; g.fillRect(0, y + 28, 256, 2); continue; }
+      for (let i = 0; i < 8; i++) { const x = i * 32, on = r() < 0.4; if (lit) { if (on) { g.fillStyle = `hsl(${r() < 0.75 ? 36 : 205},${r() < 0.75 ? 85 : 30}%,${62 + r() * 16}%)`; g.fillRect(x + 8, y + 7, 16, 18); } continue; }
+        if (r() < 0.12) continue; g.fillStyle = '#f7f5f0'; g.fillRect(x + 6, y + 5, 20, 22); g.fillStyle = `rgb(${66 + r() * 28},${76 + r() * 28},${92 + r() * 28})`; g.fillRect(x + 8, y + 7, 16, 18); g.fillStyle = 'rgba(255,255,255,.3)'; g.fillRect(x + 8, y + 7, 16, 3); g.fillStyle = 'rgba(0,0,0,.15)'; g.fillRect(x + 15, y + 7, 2, 18); if (r() < 0.18) { g.fillStyle = '#d9d9d6'; g.fillRect(x + 7, y + 22, 18, 6); g.fillStyle = '#9a9a96'; g.fillRect(x + 9, y + 23, 6, 4); } } }
+    const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
   if (type === 'fins') { // 연회색 세로 핀 + 그 사이 좁은 유리 띠 (파크원)
     g.fillStyle = lit ? '#000' : '#e4e4e0'; g.fillRect(0, 0, 256, 256);
     for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { const x = i * 32, y = j * 32; if (lit) { if (r() < 0.45) { g.fillStyle = `hsl(${200 + r() * 20},20%,${78 + r() * 12}%)`; g.fillRect(x + 9, y + 2, 14, 27); } continue; } const k = 0.8 + r() * 0.2; g.fillStyle = `rgb(${120 * k},${136 * k},${150 * k})`; g.fillRect(x + 9, y + 2, 14, 27); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(x + 9, y + 2, 3, 27); g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(x + 23, y, 3, 32); }
@@ -636,12 +644,12 @@ export class Hangang {
   //   아파트(흰 벽 · 발코니 띠) · 유리 오피스(색 유리 · 멀리온) · 석재 오피스(창이 뚫린 돌벽) · 벽돌(학교 · 주택) · 금빛 유리(63빌딩)
   //   랜드마크: 63빌딩 금빛 유리 · 파크원 빨간 철골 기둥 · LG트윈타워 청동빛 유리 · IFC 푸른 유리 · 전경련회관 짙은 유리 · 국회의사당 흰 기둥 + 초록 돔
   buildBuildings(P2) {
-    const M = this.map, r = rnd(99), types = ['apt', 'glass', 'stone', 'brick', 'gold', 'assembly', 'church', 'panels', 'fins'];
+    const M = this.map, r = rnd(99), types = ['apt', 'glass', 'stone', 'brick', 'gold', 'assembly', 'church', 'panels', 'fins', 'street', 'street2'];
     const sets = Object.fromEntries(types.map((t) => [t, { P: [], N: [], U: [], Cl: [], I: [] }]));
     const extras = { P: [], N: [], Cl: [], I: [] }, domes = [], signs = { P: [], N: [], Cl: [], I: [] }, crosses = [];
     const col = new THREE.Color(), roofC = new THREE.Color();
     const GLASS = ['#6f8fb2', '#5f9aa2', '#8a96a4', '#6d9a86', '#9a8a70', '#55626f', '#7aa0c8', '#8fa8b8'], STONE = ['#d8cfbf', '#c9c4bc', '#b8b2a8', '#d9c8ae', '#a99c88', '#e2ddd2'], BRICK = ['#a8573e', '#9a4a36', '#b8694a', '#8a4a3a', '#c07a55'], APT = ['#f1ede4', '#ece4d4', '#e8e8e4', '#f2e9da', '#e4dccd', '#dfe3e6'];
-    const FLOOR = { apt: 2.9, glass: 3.9, stone: 3.6, brick: 3.2, gold: 3.9, assembly: 6, church: 7, panels: 8, fins: 3.9 }, BAY = { apt: 3.4, glass: 1.6, stone: 2.6, brick: 2.4, gold: 1.6, assembly: 3.5, church: 4.5, panels: 5, fins: 1.6 };
+    const FLOOR = { apt: 2.9, glass: 3.9, stone: 3.6, brick: 3.2, gold: 3.9, assembly: 6, church: 7, panels: 8, fins: 3.9, street: 3.4, street2: 3.6 }, BAY = { apt: 3.4, glass: 1.6, stone: 2.6, brick: 2.4, gold: 1.6, assembly: 3.5, church: 4.5, panels: 5, fins: 1.6, street: 2.6, street2: 3.2 };
     const box = (x, y, z, w, h, d, c, rotY = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.rotateY(rotY); g.translate(x, y, z); const k = extras.P.length / 3, p = g.attributes.position, n = g.attributes.normal; for (let i = 0; i < p.count; i++) { extras.P.push(p.getX(i), p.getY(i), p.getZ(i)); extras.N.push(n.getX(i), n.getY(i), n.getZ(i)); extras.Cl.push(c.r, c.g, c.b); } for (const ix of g.index.array) extras.I.push(k + ix); };
     const campus = []; for (const [nm, L] of Object.entries(LANDMARKS)) { if (!L.campus) continue; const ni2 = M.names.indexOf(nm); const b2 = M.buildings.find((q) => q[4] === ni2); if (!b2) continue; let x = 0, z = 0, n = 0; for (let k = 7; k < b2.length; k += 2) { x += b2[k] * M.scale; z += b2[k + 1] * M.scale; n++; } campus.push({ x: x / n, z: z / n, r: L.campus, L, nm, kind: b2[2] >> 1, ring: P2(b2.slice(7)), self: b2 }); }
     this.lmParts = {}; const touches = (cp, b, ring) => cp.self !== b && (ring.some(([x, z]) => inRing(x, z, cp.ring)) || cp.ring.some(([x, z]) => inRing(x, z, ring)));
@@ -666,13 +674,15 @@ export class Hangang {
       else if (campus.some((cp) => { const [x, z] = ring[0]; return cp.kind === kind && Math.hypot(x - cp.x, z - cp.z) < cp.r; })) { const cp = campus.find((q) => q.kind === kind && Math.hypot(ring[0][0] - q.x, ring[0][1] - q.z) < q.r); type = cp.L.campusFacade || cp.L.facade; c = cp.L.campusColor || cp.L.color; }
       else if (kind === 6 || /교회|성당|채플/.test(name)) { type = 'church'; c = '#efe9de'; crosses.push(ring); }
       else if (/^#?[0-9a-f]{6}$/i.test(cTag) || /^[a-z]+$/i.test(cTag)) { try { col.set(cTag); c = `#${col.getHexString()}`; } catch { c = null; } }
+      // 거리 지역(홍대 · 이태원 등) 낮은 상가: 외벽 색 · 창 무늬 · 층 높이를 건물마다 다르게
+      if (M.kind === 'street' && h < 32 && type !== 'apt' && type !== 'church' && !LANDMARKS[name] && !c) { type = r() < 0.62 ? 'street' : 'street2'; c = ['#f4f1ea', '#efe3cf', '#b5654a', '#a29e98', '#f2c6cf', '#bfe3d6', '#c8dcef', '#2f2f33', '#e8d9b5', '#8a5a44', '#d9cfc2', '#fff7e8'][Math.floor(r() * 12)]; }
       if (!c) c = type === 'apt' ? APT[Math.floor(r() * APT.length)] : type === 'glass' ? GLASS[Math.floor(r() * GLASS.length)] : type === 'brick' ? BRICK[Math.floor(r() * BRICK.length)] : STONE[Math.floor(r() * STONE.length)];
       col.set(c); if (type !== 'gold') col.offsetHSL((r() - 0.5) * 0.02, 0, (r() - 0.5) * 0.05);
       // 옥상: 여의도는 거의 다 민트색 방수 페인트 (위성사진). 아파트 일부와 낮은 건물은 회색 · 흰색
       const MINT = ['#6db894', '#62ad8a', '#78c09c', '#5ea585', '#82c4a2'], rr = r();
       try { roofC.set(rci >= 0 ? M.colors[rci] : type === 'apt' ? (rr < 0.72 ? MINT[Math.floor(r() * 5)] : '#d6d3cc') : h > 14 ? (rr < 0.68 ? MINT[Math.floor(r() * 5)] : '#9c9a95') : rr < 0.4 ? MINT[Math.floor(r() * 5)] : '#a8a49d'); } catch { roofC.set('#7d7b78'); }
       if (LANDMARKS[name]?.roof) roofC.set(LANDMARKS[name].roof);
-      const set = sets[type], s = ringArea(ring) > 0 ? 1 : -1, base = () => set.P.length / 3, FH = FLOOR[type] * 8, BW = BAY[type] * 8;
+      const street = type === 'street' || type === 'street2', set = sets[type], s = ringArea(ring) > 0 ? 1 : -1, base = () => set.P.length / 3, FH = FLOOR[type] * 8 * (street ? 0.9 + r() * 0.22 : 1), BW = BAY[type] * 8 * (street ? 0.85 + r() * 0.35 : 1), uOff = street ? Math.floor(r() * 8) / 8 : 0;
       // 위로 갈수록 좁아지는 건물 (63빌딩): 꼭대기 외곽선을 긴 축 방향으로 줄인다. scale 은 위아래 모두 줄인다 (꼭대기 왕관 조각)
       const LM = LANDMARKS[name], top = LM?.taper && h > (LM.taper.minH || 0) ? scaleRing(ring, LM.taper.long, LM.taper.short) : LM?.scale ? scaleRing(ring, LM.scale.long, LM.scale.short) : ring, bot = LM?.scale ? top : ring;
       // 달걀 모양 건물 (전경련 컨퍼런스센터): 상자 벽 대신 은색 타원 지붕만 (덧붙이는 곳에서 만든다), 부딪힘은 외곽선대로
@@ -685,7 +695,9 @@ export class Hangang {
         const nx = (s > 0 ? dz : -dz) / L, nz = (s > 0 ? -dx : dx) / L, k = base();
         set.P.push(a[0], mh, a[1], c2[0], mh, c2[1], tc[0], h, tc[1], ta[0], h, ta[1]);
         const lo = mh < 1 ? 0.72 : 0.92, hi = 1.06; for (let q = 0; q < 4; q++) { const k2 = q < 2 ? lo : hi; set.N.push(nx, 0, nz); set.Cl.push(col.r * k2, col.g * k2, col.b * k2); }
-        const u0 = acc / BW, u1 = (acc + L) / BW, v0 = mh / FH, v1 = h / FH; acc += L;
+        const u0 = acc / BW + uOff, u1 = (acc + L) / BW + uOff, v0 = mh / FH, v1 = h / FH;
+        // 거리 상가 외벽: 실외기 (층마다 가끔)
+        if (street && L > 3 && h > 7) for (let fl = 1; fl * FLOOR[type] < h - 2; fl++) if (r() < 0.22) { const t = 0.15 + r() * 0.7; box(a[0] + dx * t + nx * 0.25, fl * FLOOR[type] + 0.45, a[1] + dz * t + nz * 0.25, 0.85, 0.62, 0.38, new THREE.Color(r() < 0.8 ? '#dcdcd8' : '#a9aaa6'), -Math.atan2(dz, dx)); } acc += L;
         set.U.push(u0, v0, u1, v0, u1, v1, u0, v1);
         if (s < 0) set.I.push(k, k + 1, k + 2, k, k + 2, k + 3); else set.I.push(k, k + 2, k + 1, k, k + 3, k + 2);
         if (type !== 'glass' && type !== 'gold' && h - mh > 6) { const o = 0.18, q0 = extras.P.length / 3, cc = col.clone().lerp(new THREE.Color('#ffffff'), 0.45); extras.P.push(a[0] + nx * o, h - 0.9, a[1] + nz * o, c2[0] + nx * o, h - 0.9, c2[1] + nz * o, c2[0] + nx * o, h + 0.35, c2[1] + nz * o, a[0] + nx * o, h + 0.35, a[1] + nz * o); for (let t2 = 0; t2 < 4; t2++) { extras.N.push(nx, 0, nz); extras.Cl.push(cc.r, cc.g, cc.b); } if (s < 0) extras.I.push(q0, q0 + 1, q0 + 2, q0, q0 + 2, q0 + 3); else extras.I.push(q0, q0 + 2, q0 + 1, q0, q0 + 3, q0 + 2); }
@@ -700,6 +712,8 @@ export class Hangang {
       // 옥상 설비 (높은 건물)
       // 아파트 옆벽: 위쪽에 단지 이름 + 큰 동 번호 (한국 아파트처럼)
       if (type === 'apt' && h > 14) { const realNo = /(\d+)동$/.exec(name || '')?.[1], key = (name || '').replace(/\s*\d+동$/, '').replace(/\s*(아파트|APT)\s*/gi, '').replace(/\(.*?\)/g, '').trim().slice(0, 6); this.aptNo ||= {}; const no = realNo ? +realNo : (this.aptNo[key || '_'] = (this.aptNo[key || '_'] || 0) + 1) + (key ? 0 : 100); const edges = ring.map((a, i) => { const b = ring[(i + 1) % ring.length]; return { a, b, L: Math.hypot(b[0] - a[0], b[1] - a[1]) }; }).filter((e) => e.L > 6).sort((p, q) => p.L - q.L).slice(0, 2); for (const e of edges) { const mx = (e.a[0] + e.b[0]) / 2, mz = (e.a[1] + e.b[1]) / 2; let nx = mx - cx, nz = mz - cz; const nl = Math.hypot(nx, nz) || 1; nx /= nl; nz /= nl; (this.aptMarks ||= []).push({ x: mx + nx * 0.1, z: mz + nz * 0.1, y: h - 0.4, w: Math.min(e.L * 0.98, 18), hh: Math.min(10, h * 0.32), ry: Math.atan2(nx, nz), text: key, no }); } }
+      // 거리 상가 옥상: 옥탑방 · 물탱크 · 난간 (골목 감성)
+      if ((type === 'street' || type === 'street2') && h > 6) { const area = Math.abs(ringArea(ring)), w = Math.min(5, Math.sqrt(area) * 0.4); if (r() < 0.45) box(cx + (r() - 0.5) * w * 0.6, h + 1.3, cz + (r() - 0.5) * w * 0.6, w, 2.6, w * 0.8, new THREE.Color(['#e8e4dc', '#d9e3ea', '#f0e2d0', '#c9d8c4'][Math.floor(r() * 4)])); if (r() < 0.4) box(cx + (r() - 0.5) * w, h + 0.8, cz + (r() - 0.5) * w, 1.4, 1.6, 1.4, new THREE.Color(r() < 0.5 ? '#3d7fbf' : '#f2f2ee')); }
       // 높은 빌딩 옥상 헬리패드 (초록 바탕 · 흰 원 · H)
       const area0 = Math.abs(ringArea(ring)), heli = h > 45 && area0 > 520 && !LANDMARKS[name]?.crown && !/63|IFC/.test(name) && r() < 0.8; if (heli) { let xx = 0, zz = 0, xz = 0; for (const [x, z] of ring) { const dx = x - cx, dz = z - cz; xx += dx * dx; zz += dz * dz; xz += dx * dz; } const ang = 0.5 * Math.atan2(2 * xz, xx - zz); let half = Infinity; for (const [x, z] of ring) half = Math.min(half, Math.hypot(x - cx, z - cz)); (this.helis ||= []).push([cx, h + 0.12, cz, Math.min(12, Math.sqrt(area0) * 0.26, half * 0.62), -ang]); }
       if (h > 40 && !heli && !/63|IFC|파크원|전경련/.test(name)) { const area = Math.abs(ringArea(ring)), w = Math.sqrt(area) * 0.32; box(cx, h + 1.6, cz, w, 3.2, w * 0.8, new THREE.Color('#8e8c88')); }
@@ -883,9 +897,9 @@ export class Hangang {
   // 곰돌이 하나: 털색은 다양하게, 옷은 하는 일 · 계절 · 날씨에 맞게 (dress)
   mkBear(role, r, scale = 1, opt = {}) {
     const b = makeBear({ name: `hg${Math.floor(r() * 1e9)}`, color: opt.fur || FUR[Math.floor(r() * FUR.length)] });
-    b.root.scale.setScalar(BEAR * scale); b.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    b.root.scale.setScalar(BEAR * scale); b.root.traverse((o) => { if (o.isMesh) o.castShadow = false; }); // 행인 곰은 그림자 계산을 빼서 가볍게 (바닥 그림자 원은 따로)
     dress(b, role, r, { season: this.state.season, weather: this.state.weather, ...opt });
-    this.scene.add(b.root); return b;
+    b.root.userData.npc = true; this.scene.add(b.root); return b;
   }
   // 길 위의 사람들: 러너(혼자 · 둘) · 산책(혼자 · 할머니와 손자 · 연인 · 친구들 · 엄마와 아이)
   spawnPerson(kind, s, dir, lat, v, r) {
@@ -1023,8 +1037,8 @@ export class Hangang {
           const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.4, 6), new THREE.MeshLambertMaterial({ color: '#2a2a2a' })); stand.position.set(0.2, 0.7, 0.55); g.add(stand); const mic = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshLambertMaterial({ color: '#1d1d1f' })); mic.position.set(0.2, 1.42, 0.5); g.add(mic);
           const amp = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.35), new THREE.MeshLambertMaterial({ color: '#1d1d1f' })); amp.position.set(-0.8, 0.25, 0.1); g.add(amp); const grill = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.36), new THREE.MeshLambertMaterial({ color: '#4a4a4a' })); grill.position.set(-0.8, 0.27, 0.28); g.add(grill);
           const lamp = new THREE.PointLight('#ffd9a0', 6, 9, 1.6); lamp.position.set(0, 3, 1.5); g.add(lamp); const glow = new THREE.Mesh(new THREE.CircleGeometry(3.2, 32), new THREE.MeshBasicMaterial({ color: '#ffd9a0', transparent: true, opacity: 0.12, depthWrite: false })); glow.rotation.x = -Math.PI / 2; glow.position.y = 0.03; g.add(glow);
-          const crowd = []; for (let i = 0; i < 10; i++) { const a2 = -1.1 + (i / 9) * 2.2, rr = 3.2 + (i % 2) * 0.9, cb = this.mkBear(['street', 'stroll', 'cosplay', 'street', 'stroll'][i % 5], r, 0.92 + r() * 0.12); this.scene.remove(cb.root); cb.root.position.set(Math.sin(a2) * rr, 0, Math.cos(a2) * rr); cb.root.rotation.y = a2 + Math.PI; g.add(cb.root); crowd.push(cb); }
-          B.on = { g, bk, crowd, t: 0 }; }
+          const crowd = []; for (let i = 0; i < 7; i++) { const a2 = -1.1 + (i / 6) * 2.2, rr = 3.2 + (i % 2) * 0.9, cb = this.mkBear(['street', 'stroll', 'cosplay', 'street', 'stroll'][i % 5], r, 0.92 + r() * 0.12); this.scene.remove(cb.root); cb.root.position.set(Math.sin(a2) * rr, 0, Math.cos(a2) * rr); cb.root.rotation.y = a2 + Math.PI; g.add(cb.root); crowd.push(cb); }
+          B.on = { g, bk, crowd, t: 0 }; g.userData.npc = true; }
         else if (B.on && d > 320) { this.scene.remove(B.on.g); B.on = null; }
         if (B.on) { B.on.t += dt; B.on.bk.root.rotation.z = Math.sin(B.on.t * 2.2) * 0.06; B.on.bk.update(dt, 0, { noCrawl: true }); B.on.crowd.forEach((cb, i) => { cb.root.position.y = Math.max(0, Math.sin(B.on.t * 4.4 + i) * 0.05); cb.update(dt, 0, { noCrawl: true }); }); } } }
     // 가게 손님: 문에서 나와 벽을 따라 걸어가거나, 걸어와서 문으로 들어간다 (영업 시간대에 더 많이)
@@ -1266,7 +1280,9 @@ export class Hangang {
     this.shadow.position.set(bx, this.groundAt(bx, bz, this.y) + 0.02, bz); this.shadow.scale.setScalar(BEAR * (1 - Math.min(0.5, this.y * 0.2)));
     this.tickSignals(this.time);
     // 멀리 있는 작은 것(출구 · 동 번호 등)은 숨긴다 (0.5초마다)
-    this.lodT = (this.lodT || 0) - dt; if (this.lodT <= 0 && this.lodObjs) { this.lodT = 0.5; const v = new THREE.Vector3(); for (const o of this.lodObjs) { const bs = o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere); v.copy(bs.center).applyMatrix4(o.matrixWorld); o.visible = Math.hypot(v.x - bx, v.z - bz) - bs.radius < 400; } }
+    this.lodT = (this.lodT || 0) - dt; if (this.lodT <= 0) { this.lodT = 0.5; const v = new THREE.Vector3(); for (const o of this.lodObjs || []) { const bs = o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere); v.copy(bs.center).applyMatrix4(o.matrixWorld); o.visible = Math.hypot(v.x - bx, v.z - bz) - bs.radius < 400; }
+      // 곰(사람)은 70m 밖이면 숨긴다 (곰 하나가 부품 수십 개라 무겁다)
+      for (const c of this.scene.children) if (c.userData.npc) c.visible = Math.hypot(c.position.x - bx, c.position.z - bz) < 70; }
     this.tickPeople(dt, bx, bz); this.tickGroups(dt, bx, bz); this.tickCity(dt, bx, bz); this.tickTransit(dt, bx, bz); this.tickLabels(dt, camera, bx, bz);
     if (this.inside) { this.tickInside(dt); }
     if (this.inShop) this.tickShop(dt); else if (this.inMall) this.tickMall(dt);
@@ -1346,7 +1362,7 @@ export class Hangang {
     // 시간대별 켜진 정도: 집은 저녁 7 ~ 11시가 가장 밝고 새벽엔 거의 꺼짐, 회사는 퇴근 무렵 밝다가 밤이 깊으면 거의 꺼짐
     const hr = h, home = hr >= 17 && hr < 19 ? 0.6 : hr >= 19 && hr < 23 ? 1 : hr >= 23 || hr < 1 ? 0.55 : hr < 5 ? 0.12 : hr < 7 ? 0.3 : 0.2;
     const work = hr >= 17 && hr < 20 ? 1 : hr >= 20 && hr < 22 ? 0.55 : hr >= 22 || hr < 6 ? 0.08 : hr < 8 ? 0.35 : 0.3;
-    for (const [t, m] of Object.entries(this.bldByType || {})) m.emissiveIntensity = lit * (t === 'apt' || t === 'brick' ? home : work) * 0.5;
+    for (const [t, m] of Object.entries(this.bldByType || {})) m.emissiveIntensity = lit * (t.startsWith('street') ? (hr >= 2 && hr < 7 ? 0.3 : 1) : t === 'apt' || t === 'brick' ? home : work) * 0.5;
     if (this.signM) this.signM.emissiveIntensity = lit * (hr >= 1 && hr < 6 ? 0.15 : 0.45);
     if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; if (this.summit) tickSummit(this, dt, lit); for (const m of this.neonMs || []) m.emissiveIntensity = 0.2 + lit * 1.2; if (this.jbugM) this.jbugM.emissiveIntensity = 0.15 + lit * 0.7; if (this.id === 'banpo') this.tickBanpo(dt, lit); for (const m of this.shopSignMs || []) m.emissiveIntensity = 0.25 + lit * 0.85; for (const m of this.shopWinM || []) m.emissiveIntensity = 0.1 + lit * 0.42; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.35 * Math.max(0.2, (h >= 18 && h < 24 ? 1 : 0.4));
     this.lampGlow.material.opacity = lit; if (this.lampHeadM) this.lampHeadM.emissiveIntensity = 0.2 + lit * 2.2; this.bridgeLights.material.opacity = lit; this.carPts.material.opacity = 0.25 + lit * 0.75;
@@ -1656,7 +1672,7 @@ function makeVehicle(kind, r, busColor = null, routeNo = '') {
   const lm = new THREE.MeshLambertMaterial({ color: '#ffffff', emissive: '#fff4d8', emissiveIntensity: 0.3 }), tm = new THREE.MeshLambertMaterial({ color: '#8a1010', emissive: '#ff2a1a', emissiveIntensity: 0.8 });
   for (const sx of [-1, 1]) { const hl = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.16, 0.05), lm); hl.position.set(sx * (W / 2 - 0.35), 0.75, L / 2 + 0.01); g.add(hl); const tl = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.16, 0.05), tm); tl.position.set(sx * (W / 2 - 0.35), 0.8, -L / 2 - 0.01); g.add(tl); }
   g.userData.lights = { material: lm };
-  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  g.traverse((o) => { if (o.isMesh) o.castShadow = false; });
   return g;
 }
 // 역 · 호선 (서울 지하철 노선 색)
