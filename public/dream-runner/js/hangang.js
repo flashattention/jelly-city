@@ -983,6 +983,7 @@ export class Hangang {
           else if (area === 'home') roles = x < 0.25 ? ['grandma'] : x < 0.5 ? ['stroll', 'kid'] : x < 0.65 ? ['stroll', 'stroll', 'kid'] : x < 0.82 ? ['stroll'] : ['stroll', 'stroll'];
           else roles = x < 0.3 ? ['stroll', 'stroll'] : x < 0.5 ? ['stroll', 'stroll', 'stroll'] : x < 0.7 ? ['stroll'] : x < 0.85 ? ['office'] : ['stroll', 'stroll', 'stroll', 'stroll'];
           // 홍대: 스트리트 패션 · 코스프레 무리 · 친구 · 연인이 많다
+          if (this.id === 'itaewon') { const y = r(); roles = y < 0.3 ? ['street', 'street'] : y < 0.55 ? ['stroll', 'stroll'] : y < 0.7 ? ['stroll', 'stroll', 'stroll'] : y < 0.85 ? ['street'] : ['stroll', 'street', 'stroll']; }
           if (this.id === 'hongdae') { const y = r(); roles = y < 0.32 ? ['street', 'street', ...(r() < 0.5 ? ['street'] : [])] : y < 0.47 ? ['cosplay', 'cosplay', ...(r() < 0.4 ? ['cosplay'] : [])] : y < 0.6 ? ['street'] : y < 0.78 ? ['stroll', 'stroll'] : y < 0.9 ? ['stroll', 'street'] : ['stroll', 'stroll', 'stroll']; }
           if (rain) roles = roles.slice(0, 2);
           const sameTop = roles.length === 2 && r() < 0.3 ? TOPS_CASUAL[Math.floor(r() * TOPS_CASUAL.length)] : null;
@@ -1099,7 +1100,7 @@ export class Hangang {
       if (this.trainSeen.size > 400) this.trainSeen.clear();
     } catch { this.liveTrains = false; }
     try { const j = await this.api('/api/seoul/bus/pos'); this.busData = j.buses || []; } catch { /* 버스 정보 없음 */ }
-    if (!this.cityAt || Date.now() - this.cityAt > 300000) { this.cityAt = Date.now(); try { this.city = await this.api('/api/seoul/city?area=' + encodeURIComponent(this.id === 'hongdae' ? '홍대 관광특구' : this.id === 'namsan' ? '남산공원' : '여의도')); this.onCity?.(this.city); } catch { /* 도시 정보 없음 */ } }
+    if (!this.cityAt || Date.now() - this.cityAt > 300000) { this.cityAt = Date.now(); try { this.city = await this.api('/api/seoul/city?area=' + encodeURIComponent(this.id === 'hongdae' ? '홍대 관광특구' : this.id === 'namsan' ? '남산공원' : this.id === 'itaewon' ? '이태원 관광특구' : '여의도')); this.onCity?.(this.city); } catch { /* 도시 정보 없음 */ } }
   }
   tickTransit(dt, px, pz) {
     if (!this.trains) return;
@@ -1626,7 +1627,7 @@ function makeVehicle(kind, r, busColor = null, routeNo = '') {
 }
 // 역 · 호선 (서울 지하철 노선 색)
 const LINE_COLOR = { 1: '#0052A4', 2: '#00A84D', 3: '#EF7C1C', 4: '#00A5DE', 5: '#996CAC', 6: '#CD7C2F', 7: '#747F00', 8: '#E6186C', 9: '#BDB092', 경의중앙: '#77C4A3', 공항: '#0090D2', 신림: '#6789CA' };
-const STATION_LINES = { 여의나루: [5], 여의도: [5, 9], 국회의사당: [9], 샛강: [9, '신림'], 노들: [9], 노량진: [1, 9], 대방: [1, '신림'], 영등포: [1], 신길: [1, 5], 영등포시장: [5], 마포: [5], 공덕: [5, 6, '경의중앙', '공항'], 효창공원앞: [6, '경의중앙'], 대흥: [6], 광흥창: [6], 상수: [6], 합정: [2, 6], 홍대입구: [2, '공항', '경의중앙'], 망원: [6], 서강대: ['경의중앙'], 신촌: [2], 가좌: ['경의중앙'], 디지털미디어시티: [6, '경의중앙', '공항'] };
+const STATION_LINES = { 여의나루: [5], 여의도: [5, 9], 국회의사당: [9], 샛강: [9, '신림'], 노들: [9], 노량진: [1, 9], 대방: [1, '신림'], 영등포: [1], 신길: [1, 5], 영등포시장: [5], 마포: [5], 공덕: [5, 6, '경의중앙', '공항'], 효창공원앞: [6, '경의중앙'], 대흥: [6], 광흥창: [6], 상수: [6], 합정: [2, 6], 홍대입구: [2, '공항', '경의중앙'], 망원: [6], 서강대: ['경의중앙'], 신촌: [2], 가좌: ['경의중앙'], 디지털미디어시티: [6, '경의중앙', '공항'], 녹사평: [6], 이태원: [6], 한강진: [6], 삼각지: [4, 6], 버티고개: [6] };
 // 출구 지붕 앞 띠: 왼쪽 노란 네모에 출구 번호, 호선 색 동그라미, 역 이름
 const exitTexCache = new Map();
 function exitBandTex(name, lines, ref) {
