@@ -56,6 +56,24 @@ const COURSES = {
     labels: [], arches: [],
     far: [['남산서울타워', 37.5512, 126.9882, 236, 'tower'], ['롯데월드타워', 37.5126, 127.1025, 555, 'lotte']],
   },
+  // 강남역: 강남대로 (신논현 → 강남역 → 양재 쪽), 고층 유리 빌딩 · 대형 전광판
+  gangnam: { name: '강남역 거리 산책', sub: '신논현 → 강남대로 → 강남역', kind: 'street', bbox: [37.487, 127.015, 37.512, 127.040], path: '강남대로', lon: [127.022, 127.031], minLen: 600,
+    marks: [['신논현역', 37.5046, 127.0250], ['강남역', 37.4979, 127.0276]], labels: [], arches: [], far: [['남산서울타워', 37.5512, 126.9882, 236, 'tower'], ['롯데월드타워', 37.5126, 127.1025, 555, 'lotte']], },
+  // 잠실: 석촌호수 둘레 (롯데월드타워 · 롯데월드 성)
+  jamsil: { name: '석촌호수 산책', sub: '석촌호수 둘레 · 롯데월드타워', kind: 'street', bbox: [37.498, 127.088, 37.522, 127.118], path: '석촌호수로', lon: [127.096, 127.112], minLen: 500,
+    marks: [['석촌호수 서호', 37.5085, 127.1000], ['석촌호수 동호', 37.5100, 127.1060]], labels: [], arches: [], far: [['남산서울타워', 37.5512, 126.9882, 236, 'tower']] },
+  // 명동: 명동길 (명동역 → 명동성당 쪽)
+  myeongdong: { name: '명동 거리 산책', sub: '명동역 → 명동길 → 명동성당', kind: 'street', bbox: [37.552, 126.975, 37.574, 126.998], path: '명동길', lon: [126.980, 126.990], minLen: 300,
+    marks: [['명동역', 37.5609, 126.9863], ['명동성당', 37.5633, 126.9870]], labels: [], arches: [], far: [['남산서울타워', 37.5512, 126.9882, 236, 'tower'], ['롯데월드타워', 37.5126, 127.1025, 555, 'lotte']], },
+  // 종로 · 인사동: 인사동길 (안국 → 인사동 → 종로)
+  insadong: { name: '인사동 · 종로 산책', sub: '안국 → 인사동길 → 종로', kind: 'street', bbox: [37.562, 126.975, 37.585, 126.998], path: '인사동길', lon: [126.983, 126.990], minLen: 300,
+    marks: [['안국역', 37.5765, 126.9854], ['쌈지길', 37.5743, 126.9849]], labels: [], arches: [], far: [['남산서울타워', 37.5512, 126.9882, 236, 'tower'], ['롯데월드타워', 37.5126, 127.1025, 555, 'lotte']], },
+  // 북촌: 북촌로 (한옥마을)
+  bukchon: { name: '북촌 한옥 산책', sub: '안국 → 북촌로 → 한옥마을', kind: 'street', bbox: [37.570, 126.975, 37.592, 126.998], path: '북촌로', lon: [126.982, 126.990], minLen: 300,
+    marks: [['안국역', 37.5765, 126.9854], ['북촌 한옥마을', 37.5826, 126.9837]], labels: [], arches: [], far: [['남산서울타워', 37.5512, 126.9882, 236, 'tower'], ['롯데월드타워', 37.5126, 127.1025, 555, 'lotte']], },
+  // 신촌: 연세로 (신촌역 → 연세대 정문)
+  sinchon: { name: '신촌 거리 산책', sub: '신촌역 → 연세로 → 연세대', kind: 'street', bbox: [37.548, 126.925, 37.572, 126.950], path: '연세로', lon: [126.935, 126.940], minLen: 300,
+    marks: [['신촌역', 37.5552, 126.9369], ['연세대 정문', 37.5600, 126.9370]], labels: [], arches: [], far: [['남산서울타워', 37.5512, 126.9882, 236, 'tower'], ['롯데월드타워', 37.5126, 127.1025, 555, 'lotte']], },
   // 이태원: 녹사평역 → 이태원로 → 이태원역 → 한강진 (세계 음식 거리 · 루프탑 · 해밀톤호텔)
   itaewon: {
     name: '이태원 거리 산책', sub: '녹사평 → 이태원로 → 이태원역 → 한강진',
@@ -84,7 +102,7 @@ async function overpass(file, body) {
   if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf8'));
   const B = C.bbox.join(',');
   // 요청이 많으면(429 · 504) 잠깐 쉬었다가 다시 (최대 6번)
-  let r; for (let tr = 0; tr < 6; tr++) { r = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', headers: { 'User-Agent': 'jelly-games-hangang-map/1.0', 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(`[out:json][timeout:170];(${body.replaceAll('$B', B)});out geom;`) }); if (r.ok || (r.status !== 429 && r.status !== 504)) break; await new Promise((res) => setTimeout(res, 20000 * (tr + 1))); }
+  let r; for (let tr = 0; tr < 6; tr++) { r = await fetch(['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'][tr % 3], { method: 'POST', headers: { 'User-Agent': 'jelly-games-hangang-map/1.0', 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(`[out:json][timeout:170];(${body.replaceAll('$B', B)});out geom;`) }); if (r.ok || ![429, 502, 503, 504].includes(r.status)) break; await new Promise((res) => setTimeout(res, 20000 * (tr + 1))); }
   if (!r.ok) throw new Error(`Overpass ${r.status}`);
   const j = await r.json(); fs.writeFileSync(f, JSON.stringify(j)); return j;
 }
