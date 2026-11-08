@@ -16,7 +16,7 @@ async function page(box, n) {
   const url = `https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInRectangle?serviceKey=${KEY}&pageNo=${n}&numOfRows=1000&minx=${box[0]}&miny=${box[1]}&maxx=${box[2]}&maxy=${box[3]}&type=json`;
   for (let tr = 0; tr < 6; tr++) {
     try { const r = await fetch(url, { signal: AbortSignal.timeout(40000) }); const t = await r.text(); const j = JSON.parse(t); if (j.header?.resultCode === '03') return { total: 0, items: [] }; if (j.header?.resultCode !== '00') throw new Error(j.header?.resultMsg || t.slice(0, 120)); return { total: j.body.totalCount, items: j.body.items || [] }; }
-    catch (e) { if (tr === 5) throw e; await sleep(3000 * (tr + 1)); }
+    catch (e) { if (tr === 5) throw e; await sleep(3000 * (tr + 1)); } // 초당 요청 제한(23)이면 쉬었다가 다시
   }
 }
 let done = 0; const tiles = idx.all.filter(([i, j]) => !fs.existsSync(path.join(OUT, `t_${i}_${j}.json`)));
@@ -27,12 +27,13 @@ async function worker() {
     const box = [(LON0 + x0 / KX).toFixed(6), (LAT0 - z1 / KZ).toFixed(6), (LON0 + x1 / KX).toFixed(6), (LAT0 - z0 / KZ).toFixed(6)];
     try {
       const first = await page(box, 1), all = [...first.items], pages = Math.ceil(first.total / 1000);
-      for (let n = 2; n <= pages; n++) all.push(...(await page(box, n)).items);
+      for (let n = 2; n <= pages; n++) { await sleep(350); all.push(...(await page(box, n)).items); }
       const rows = all.map((s) => [s.bizesNm, s.indsSclsNm, s.indsMclsNm, s.indsLclsNm, s.flrNo || '', +(+s.lon).toFixed(7), +(+s.lat).toFixed(7), s.bldNm || '']);
       fs.writeFileSync(path.join(OUT, `t_${i}_${j}.json`), JSON.stringify(rows)); done++;
       console.log(`✓ t_${i}_${j} ${rows.length}곳 (${pages}쪽) · ${done}칸`);
     } catch (e) { console.log(`✗ t_${i}_${j} ${e.message}`); }
   }
 }
-await Promise.all([worker(), worker(), worker()]);
+// 초당 요청 제한이 있어 하나씩 (셋이 동시에 받으면 LIMITED_NUMBER_OF_SERVICE_REQUESTS_PER_SECOND)
+await worker();
 console.log('끝');

@@ -16,7 +16,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/seoul-walk/landing.css" />
   <link rel="preload" as="image" href="/seoul-walk/img/c1.webp" />
-  <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" } }</script>
+  <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }</script>
 </head>
 <body>
   <!-- 불러오기 -->
@@ -47,6 +47,7 @@
   <section class="film" id="film">
     <div class="stage">
       <div class="frames" id="frames" aria-hidden="true"></div>
+      <canvas id="gl" aria-hidden="true"></canvas>
       <div class="fveil" aria-hidden="true"></div>
       <div class="chaps" id="chaps"></div>
       <div class="end" id="end"><p class="kicker">THE END</p><h2>A Jelly Love Letter<br />to Seoul</h2><p>이제 직접 걸어 볼 차례예요.</p><a class="btn primary" id="go-end" href="/seoul-walk/play/?r=yeouido&amp;go=start"><span>지금 걷기</span></a></div>

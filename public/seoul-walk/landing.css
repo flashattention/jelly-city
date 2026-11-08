@@ -133,3 +133,6 @@ a { color: inherit; text-decoration: none; }
 .prog i { width: 2px; height: 22px; border-radius: 1px; background: rgba(255, 255, 255, .25); transition: background .4s, height .4s; } .prog i.on { height: 40px; background: var(--gold); }
 @media (max-width: 900px) { .fveil { background: linear-gradient(180deg, rgba(7, 11, 22, .35) 0%, transparent 25%, rgba(7, 11, 22, .25) 50%, rgba(7, 11, 22, .85) 100%); } .chap { bottom: 64px; } .hero-meta span:nth-child(3) { display: none; } }
 @media (prefers-reduced-motion: reduce) { .frames .f { transition: opacity .6s; } }
+
+/* 실시간 3D (게임 엔진): 그림 위에, 장면이 준비되면 보인다 */
+#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; }

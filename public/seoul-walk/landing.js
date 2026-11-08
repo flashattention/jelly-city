@@ -7,13 +7,12 @@ const PLAY = '/seoul-walk/play/';
 
 // ---------- 장면 이야기: 화면에 붙은 무대에서 스크롤에 맞춰 장면이 천천히 다가오고 다음 장면으로 녹아 바뀐다 ----------
 const CH = [
-  ['c1', '여의도', '37.5198° N · 126.9405° E', '오후 6:06 · 여름', 'Golden Hour', '해가 63빌딩 유리벽에 마지막 빛을 걸어 둘 때, 한강공원 잔디밭이 금빛으로 물들어요.'],
-  ['c2', '석촌호수 · 잠실', '37.5096° N · 127.1035° E', '오후 5:24 · 봄', 'Blossom Lake', '봄이면 호수 둘레가 벚꽃으로 덮이고, 555m 롯데월드타워가 분홍빛 노을에 잠겨요.'],
-  ['c3', '남산', '37.5512° N · 126.9882° E', '오후 8:36 · 가을', 'The Tower', '진짜 산 위, 해발 262m. 해가 지면 N서울타워에 불이 켜지고 서울이 발아래에서 반짝여요.'],
-  ['c4', '남산 정상', '37.5509° N · 126.9880° E', '오후 6:30 · 가을', 'City Below', '한양도성 길에 서면 지붕이 끝없이 이어져요. 저 아래 어디든, 걸어서 갈 수 있어요.'],
-  ['c5', '홍대', '37.5563° N · 126.9236° E', '오후 9:30 · 비', 'Neon Rain', '비 오는 밤의 골목. 간판 불빛이 젖은 길에 번지고, 어디선가 버스킹 소리가 들려요.'],
+  ['c1', '여의도 한강', '37.5198° N · 126.9405° E', '오후 6:09 · 여름', 'Golden Run', '63빌딩을 등지고 달리는 저녁. 한강 러닝 코스 위로 곰들이 하나둘 지나가요.'],
+  ['c2', '석촌호수 · 잠실', '37.5126° N · 127.1025° E', '오후 1:36 · 봄', 'Spring Tower', '벚꽃이 호수를 두르는 봄날 낮, 555m 롯데월드타워가 맑은 하늘을 찔러요.'],
+  ['c5', '홍대', '37.5563° N · 126.9236° E', '오후 6:33 · 노을', 'Sunset Alley', '해가 기우는 골목. 간판에 하나둘 불이 들어오고, 거리에 사람들이 모여들어요.'],
+  ['c7', '종로 · 인사동', '37.5740° N · 126.9850° E', '오후 5:18 · 눈', 'Snow in Jongno', '오래된 골목에 눈이 내려요. 처마 끝 등불 아래로 발자국이 이어져요.'],
+  ['c3', '남산', '37.5512° N · 126.9882° E', '오후 8:36 · 가을', 'The Tower', '진짜 산 위, 해발 262m. 밤이면 N서울타워에 불이 켜지고 서울이 발아래에서 반짝여요.'],
   ['c6', '한강', '37.5265° N · 126.9340° E', '오후 8:48 · 여름', 'River Lights', '강물 위로 도시의 불빛이 흔들려요. 실제 열차가 다리를 건너는 그 순간, 여기서도.'],
-  ['c7', '강남', '37.4979° N · 127.0276° E', '오후 8:12 · 첫눈', 'First Snow', '첫눈 오는 강남대로. 유리 빌딩 사이로 눈송이가 천천히, 아주 천천히 내려요.'],
 ];
 const film = $('film'), frames = CH.map(([f]) => { const d = document.createElement('div'); d.className = 'f'; d.dataset.src = `/seoul-walk/img/${f}.webp`; $('frames').appendChild(d); return d; });
 film.style.setProperty('--n', CH.length);
@@ -23,7 +22,7 @@ const load = (k) => { const d = frames[k]; if (d && !d.style.backgroundImage) d.
 const cl = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v)), ease = (x) => x * x * (3 - 2 * x);
 let ticking = false, lastP = -1;
 function filmTick() {
-  ticking = false; const r = film.getBoundingClientRect(), span = film.offsetHeight - innerHeight, p = cl(-r.top / span), N = CH.length, P = p * (N + 0.6); if (Math.abs(P - lastP) < 1e-4) return; lastP = P;
+  ticking = false; const r = film.getBoundingClientRect(), span = film.offsetHeight - innerHeight, p = cl(-r.top / span), N = CH.length, P = p * (N + 0.6); window.SW_FILM = { P: Math.min(P, N - 0.001), N }; if (Math.abs(P - lastP) < 1e-4) return; lastP = P;
   for (let i = 0; i < N; i++) {
     const t = P - i; // 이 장면 안에서의 진행 (0 ~ 1)
     if (t > -0.6 && t < 1.6) { load(i); load(i + 1); }
@@ -113,3 +112,6 @@ function observe() { io ||= new IntersectionObserver((es) => { for (const e of e
 document.querySelectorAll('.head, .trio article, .why > div, .col, .facts > div, .acct-in, .map-wrap').forEach((el) => el.classList.add('reveal'));
 
 renderHoods(); renderAcct(); setupMap(); setupAcct();
+
+// 실시간 3D: 컴퓨터(넓은 화면 · 마우스)에서만, 움직임 줄이기 설정이 아니면. 휴대폰은 같은 장면 그림으로
+if ((matchMedia('(min-width: 900px) and (pointer: fine)').matches && !matchMedia('(prefers-reduced-motion: reduce)').matches) || new URLSearchParams(location.search).has('3d')) import('/seoul-walk/landing3d.js').then((m) => m.start3d($('gl'))).catch((e) => console.warn('3D 없이', e));
