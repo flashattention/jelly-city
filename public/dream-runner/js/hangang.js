@@ -863,17 +863,30 @@ export class Hangang {
   buildTransit() {
     const M = this.map, S = M.scale; this.stations = (M.stations || []).map(([n, x, z]) => ({ name: n, x: x * S, z: z * S, lines: STATION_LINES[n] || [] }));
     this.entrances = [];
-    const glass = new THREE.MeshPhongMaterial({ color: '#cfe6f0', transparent: true, opacity: 0.38, shininess: 90, side: THREE.DoubleSide }), frame = new THREE.MeshLambertMaterial({ color: '#5a636e' }), pit = new THREE.MeshBasicMaterial({ color: '#2a2a30' }), stepM = new THREE.MeshLambertMaterial({ color: '#8a8a8e' });
+    const glass = new THREE.MeshPhongMaterial({ color: '#cfe6f0', transparent: true, opacity: 0.38, shininess: 90, side: THREE.DoubleSide }), frame = new THREE.MeshLambertMaterial({ color: '#5a636e' }), pit = new THREE.MeshBasicMaterial({ color: '#2a2a30' }), stepM = new THREE.MeshLambertMaterial({ color: '#9a9690' }), noseM = new THREE.MeshLambertMaterial({ color: '#e0b830' }), granite = new THREE.MeshLambertMaterial({ color: '#8f8a84' }), steel = new THREE.MeshPhongMaterial({ color: '#d8dce0', shininess: 80 }), exitLightM = new THREE.MeshLambertMaterial({ color: '#fff6e0', emissive: '#fff2d0', emissiveIntensity: 0.3 }), exitGlowM = new THREE.MeshBasicMaterial({ color: '#ffe2a8', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }); this.exitLightM = exitLightM; this.exitGlowM = exitGlowM;
     for (const [x0, z0, si, ref] of M.entrances || []) {
       const st = this.stations[si]; if (!st) continue; const x = x0 * S, z = z0 * S; if (this.inWater(x, z)) continue;
       const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = Math.atan2(st.x - x, st.z - z);
+      // 서울 지하철 출구: 내려가는 계단 구덩이 · 화강석 낮은 벽 + 유리벽 · 둥근 유리 지붕과 금속 틀 · 지붕 앞 노란 출구 번호 · 옆에 안내 기둥
       const p = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 4.2), pit); p.rotation.x = -Math.PI / 2; p.position.y = 0.04; g.add(p);
-      for (let k = 0; k < 6; k++) { const s2 = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.05, 0.5), stepM); s2.position.set(0, 0.06, -1.6 + k * 0.62); g.add(s2); }
-      for (const sx of [-1.25, 1.25]) { const wall = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.0, 4.4), glass); wall.position.set(sx, 0.55, 0); g.add(wall); const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.5, 0.1), frame); post.position.set(sx, 1.25, -2.15); g.add(post); const post2 = post.clone(); post2.position.z = 2.15; g.add(post2); }
-      const roof = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.08, 4.6), glass); roof.position.y = 2.5; roof.rotation.x = 0.06; g.add(roof);
-      const rf = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.12, 0.12), frame); rf.position.set(0, 2.5, -2.3); g.add(rf);
-      // 표지판: 호선 색 동그라미들 + 역 이름 판
-      const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.5), new THREE.MeshBasicMaterial({ map: stationSignTex(st.name, st.lines, ref), transparent: true, side: THREE.DoubleSide })); sign.position.set(0, 2.25, -2.32); g.add(sign);
+      for (let k = 0; k < 7; k++) { const s2 = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.06, 0.45), stepM); s2.position.set(0, 0.05 - k * 0.0, -1.7 + k * 0.55); s2.scale.y = 1; g.add(s2); const nose = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.02, 0.05), noseM); nose.position.set(0, 0.09, -1.48 + k * 0.55); g.add(nose); }
+      for (const sx of [-1.3, 1.3]) {
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.9, 4.6), granite); base.position.set(sx, 0.45, 0.05); g.add(base);
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.55, 4.4), glass); wall.position.set(sx, 1.68, 0.05); g.add(wall);
+        for (const pz of [-2.15, -0.7, 0.75, 2.2]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.09, 1.65, 0.09), frame); post.position.set(sx, 1.72, pz); g.add(post); }
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 4.4), steel); rail.position.set(sx * 0.92, 1.0, 0.05); g.add(rail);
+      }
+      // 둥근 지붕: 앞뒤로 긴 반원통을 납작하게
+      const vault = new THREE.Mesh(new THREE.CylinderGeometry(1.55, 1.55, 4.8, 18, 1, true, -Math.PI / 2, Math.PI), glass); vault.rotation.x = Math.PI / 2; vault.rotation.z = Math.PI / 2; vault.scale.set(1, 1, 0.32); vault.position.set(0, 2.5, 0.05); g.add(vault);
+      for (const pz of [-2.35, -0.8, 0.8, 2.4]) { const rib = new THREE.Mesh(new THREE.TorusGeometry(1.55, 0.05, 6, 18, Math.PI), frame); rib.scale.set(1, 0.32, 1); rib.position.set(0, 2.5, pz); g.add(rib); }
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.18, 0.14), frame); beam.position.set(0, 2.5, -2.38); g.add(beam);
+      // 지붕 아래 조명 띠 (밤에 계단을 따뜻하게 비춘다)
+      const lstrip = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.04, 4.2), exitLightM); lstrip.position.set(0, 2.42, 0.05); g.add(lstrip); const glow = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 4.0), exitGlowM); glow.rotation.x = -Math.PI / 2; glow.position.set(0, 0.12, 0.05); g.add(glow);
+      // 지붕 앞: 노란 출구 번호 + 역 이름 띠
+      const front = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 0.42), new THREE.MeshLambertMaterial({ map: exitBandTex(st.name, st.lines, ref), emissive: '#ffffff', emissiveMap: exitBandTex(st.name, st.lines, ref), emissiveIntensity: 0.2 })); front.position.set(0, 2.25, -2.46); front.rotation.y = Math.PI; g.add(front); (this.exitSignMs ||= []).push(front.material);
+      // 안내 기둥 (입구 옆, 길 쪽을 본다)
+      const tm = new THREE.MeshLambertMaterial({ map: exitTotemTex(st.name, st.lines, ref), emissive: '#ffffff', emissiveMap: exitTotemTex(st.name, st.lines, ref), emissiveIntensity: 0.25 }); (this.exitSignMs ||= []).push(tm);
+      const totem = new THREE.Mesh(new THREE.BoxGeometry(0.62, 2.7, 0.2), [frame, frame, frame, frame, tm, tm]); totem.position.set(1.95, 1.35, -2.2); g.add(totem);
       this.scene.add(g); this.entrances.push({ x, z, st, ref, g }); this.addCircle(x, z, 0.4, 2.6);
     }
     // 한강철교 선로 두 줄: 가장 긴 철교 둘
@@ -1103,7 +1116,7 @@ export class Hangang {
     const work = hr >= 17 && hr < 20 ? 1 : hr >= 20 && hr < 22 ? 0.55 : hr >= 22 || hr < 6 ? 0.08 : hr < 8 ? 0.35 : 0.3;
     for (const [t, m] of Object.entries(this.bldByType || {})) m.emissiveIntensity = lit * (t === 'apt' || t === 'brick' ? home : work) * 0.5;
     if (this.signM) this.signM.emissiveIntensity = lit * (hr >= 1 && hr < 6 ? 0.25 : 0.9);
-    if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.35 * Math.max(0.2, (h >= 18 && h < 24 ? 1 : 0.4));
+    if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.35 * Math.max(0.2, (h >= 18 && h < 24 ? 1 : 0.4));
     this.lampGlow.material.opacity = lit; if (this.lampHeadM) this.lampHeadM.emissiveIntensity = 0.2 + lit * 2.2; this.bridgeLights.material.opacity = lit; this.carPts.material.opacity = 0.25 + lit * 0.75;
     this.lampPool.material.opacity = lit * 0.32;
     let pi = 0; for (const [x, z] of this.poleXZ) { if (pi >= this.pools.length) break; if (Math.abs(x - px) < 90 && Math.abs(z - pz) < 90) { this.pools[pi].position.set(x, 0.03, z); this.pools[pi].visible = true; pi++; } } for (; pi < this.pools.length; pi++) this.pools[pi].visible = false;
@@ -1380,6 +1393,26 @@ function makeVehicle(kind, r, busColor = null, routeNo = '') {
 // 역 · 호선 (서울 지하철 노선 색)
 const LINE_COLOR = { 1: '#0052A4', 2: '#00A84D', 3: '#EF7C1C', 4: '#00A5DE', 5: '#996CAC', 6: '#CD7C2F', 7: '#747F00', 8: '#E6186C', 9: '#BDB092', 경의중앙: '#77C4A3', 공항: '#0090D2', 신림: '#6789CA' };
 const STATION_LINES = { 여의나루: [5], 여의도: [5, 9], 국회의사당: [9], 샛강: [9, '신림'], 노들: [9], 노량진: [1, 9], 대방: [1, '신림'], 영등포: [1], 신길: [1, 5], 영등포시장: [5], 마포: [5], 공덕: [5, 6, '경의중앙', '공항'], 효창공원앞: [6, '경의중앙'], 대흥: [6], 광흥창: [6], 상수: [6], 합정: [2, 6] };
+// 출구 지붕 앞 띠: 왼쪽 노란 네모에 출구 번호, 호선 색 동그라미, 역 이름
+const exitTexCache = new Map();
+function exitBandTex(name, lines, ref) {
+  const key = `b:${name}:${ref}`; if (exitTexCache.has(key)) return exitTexCache.get(key);
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 80; const g = cv.getContext('2d');
+  g.fillStyle = '#2b3039'; g.fillRect(0, 0, 512, 80); g.fillStyle = '#f6c400'; g.fillRect(8, 8, 64, 64); g.fillStyle = '#111'; g.font = 'bold 44px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(ref || '').slice(0, 3), 40, 43);
+  lines.forEach((l, i) => { g.fillStyle = LINE_COLOR[l] || '#888'; g.beginPath(); g.arc(104 + i * 44, 40, 18, 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = `bold ${String(l).length > 1 ? 12 : 22}px sans-serif`; g.fillText(String(l).slice(0, 2), 104 + i * 44, 41); });
+  g.fillStyle = '#fff'; g.textAlign = 'left'; g.font = 'bold 34px sans-serif'; g.fillText(name, 92 + lines.length * 44, 42);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; exitTexCache.set(key, t); return t;
+}
+// 출구 안내 기둥: 위에 출구 번호(노란 네모), 호선 색 띠, 역 이름(한글 · 영문)
+function exitTotemTex(name, lines, ref) {
+  const key = `t:${name}:${ref}`; if (exitTexCache.has(key)) return exitTexCache.get(key);
+  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 512; const g = cv.getContext('2d');
+  g.fillStyle = '#2b3039'; g.fillRect(0, 0, 128, 512); g.fillStyle = '#f6c400'; g.fillRect(14, 14, 100, 100); g.fillStyle = '#111'; g.font = 'bold 70px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(ref || '').slice(0, 3), 64, 68);
+  g.fillStyle = '#fff'; g.font = 'bold 18px sans-serif'; g.fillText('출구', 64, 134); g.font = '12px sans-serif'; g.fillText('Exit', 64, 152);
+  lines.forEach((l, i) => { g.fillStyle = LINE_COLOR[l] || '#888'; g.fillRect(14, 176 + i * 34, 100, 26); g.fillStyle = '#fff'; g.font = 'bold 16px sans-serif'; g.fillText(`${l}${String(l).length === 1 ? '호선' : ''}`, 64, 190 + i * 34); });
+  g.save(); g.translate(64, 400); g.rotate(Math.PI / 2); g.fillStyle = '#fff'; g.font = 'bold 34px sans-serif'; g.fillText(name, 0, -12); g.restore();
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; exitTexCache.set(key, t); return t;
+}
 function stationSignTex(name, lines, ref) {
   const cv = document.createElement('canvas'); cv.width = 320; cv.height = 100; const g = cv.getContext('2d');
   g.fillStyle = '#ffffff'; g.beginPath(); g.roundRect(2, 2, 316, 96, 14); g.fill();
