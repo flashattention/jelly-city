@@ -360,3 +360,28 @@ body.sw #title { visibility: hidden; }
 /* 따로 된 주소로 바로 온 사람(solo): 젤리게임즈 · 드림 러너 이야기는 숨긴다 */
 body.solo .hub-only, body:not(.solo) .solo-only { display: none; }
 body.solo #title { display: none; }
+
+/* ===== 젤리 서울 산책 랜딩 (/seoul-walk/) — 따로 된 게임처럼 ===== */
+#sw-bg, .sw-hero { display: none; }
+body.sw #hg-start { background: #0a1020; flex-direction: column; justify-content: flex-start; overflow-y: auto; padding: clamp(28px, 7vh, 72px) 20px 40px; }
+body.sw #sw-bg { display: block; position: fixed; inset: 0; z-index: -1; overflow: hidden; background: #0a1020; }
+#sw-bg .sl { position: absolute; inset: -2%; background-size: cover; background-position: center; opacity: 0; transition: opacity 2.4s ease; will-change: transform, opacity; }
+#sw-bg .sl.on { opacity: 1; animation: sw-kb 14s linear forwards; }
+@keyframes sw-kb { from { transform: scale(1.02) translate(0, 0); } to { transform: scale(1.14) translate(-1.6%, -1.2%); } }
+#sw-bg::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 40%, rgba(10, 16, 32, .05), rgba(10, 16, 32, .5) 80%), linear-gradient(180deg, rgba(10, 16, 32, .45), rgba(10, 16, 32, 0) 30%, rgba(10, 16, 32, .7)); }
+#sw-bg .cap { position: absolute; left: 26px; bottom: 26px; z-index: 1; display: flex; flex-direction: column; gap: 2px; color: #fff; text-shadow: 0 2px 10px rgba(0, 0, 0, .5); transition: opacity .8s; }
+#sw-bg .cap b { font-family: 'Jua', sans-serif; font-size: 20px; font-weight: normal; } #sw-bg .cap small { font-size: 12px; opacity: .75; }
+#sw-bg .dots { position: absolute; right: 26px; bottom: 32px; z-index: 1; display: flex; gap: 7px; }
+#sw-bg .dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .35); transition: all .5s; } #sw-bg .dots i.on { width: 22px; border-radius: 4px; background: #ffd98a; }
+body.sw .sw-hero { display: block; text-align: center; color: #fff; margin: 0 auto 26px; max-width: 760px; }
+.sw-pill { display: inline-block; padding: 5px 14px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .35); background: rgba(255, 255, 255, .08); font-size: 11px; letter-spacing: .22em; backdrop-filter: blur(6px); }
+.sw-hero h1 { margin: 14px 0 8px; font-family: 'Jua', sans-serif; font-weight: normal; font-size: clamp(42px, 8vw, 78px); line-height: 1.05; background: linear-gradient(100deg, #fff 10%, #ffd9a8 45%, #ff9ec4 80%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 6px 22px rgba(0, 0, 0, .45)); }
+.sw-hero p { margin: 0; font-size: clamp(14px, 2vw, 17px); opacity: .88; text-shadow: 0 2px 10px rgba(0, 0, 0, .6); }
+body.sw .hg-card { width: min(1080px, 100%); max-height: none; overflow: visible; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 28px; padding: 26px 28px; border-radius: 26px; background: rgba(14, 22, 44, .66); border: 1px solid rgba(255, 255, 255, .14); backdrop-filter: blur(18px) saturate(1.2); box-shadow: 0 30px 80px rgba(0, 0, 0, .45); }
+body.sw .hg-card h3 { font-size: 18px; opacity: .9; }
+body.sw #hg-how { margin: 0; background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .08); }
+body.sw #hg-how summary { pointer-events: none; padding: 14px 16px 4px; font-size: 18px; } body.sw #hg-how summary::after { content: ''; }
+body.sw #hg-how .how { max-height: 560px; padding: 0 16px 14px; }
+body.sw #hg-regions button { transition: transform .15s, background .2s; } body.sw #hg-regions button:hover { transform: translateY(-2px); }
+@media (max-width: 860px) { body.sw .hg-card { grid-template-columns: 1fr; padding: 20px 18px; gap: 18px; } body.sw #hg-how .how { max-height: none; } #sw-bg .cap { left: 16px; bottom: 16px; } #sw-bg .dots { right: 16px; bottom: 22px; } }
+@media (max-width: 860px) { #sw-bg .cap, #sw-bg .dots { display: none; } }
