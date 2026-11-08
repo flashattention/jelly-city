@@ -308,7 +308,7 @@ body.toss #title #play-btns:has(> .hg-go) { grid-template-columns: 1fr; }
 .hg-card.wide { width: min(720px, 100%); text-align: center; }
 .hg-card h3 small { font-family: 'Gowun Dodum'; font-size: 13px; opacity: .7; margin-left: 6px; }
 #hg-map-c { width: min(640px, 100%, 70vh); aspect-ratio: 1; border-radius: 16px; cursor: crosshair; background: #e9e5dc; touch-action: none; }
-.hg-map-btns { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+.hg-map-btns { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 10px; }
 #hg-mini { pointer-events: auto !important; cursor: pointer; }
 
 /* 지하철 출입구 앞: 실시간 도착 안내 (역 전광판 느낌) */
