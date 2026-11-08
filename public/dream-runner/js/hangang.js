@@ -488,10 +488,11 @@ export class Hangang {
     // 큰 몰 정문: 더현대 서울 (가장 긴 벽 가운데, 바깥을 본다)
     this.malls = []; for (const [want, mallName] of [['더현대 서울', '더현대 서울'], ['IFC mall (South Gate)', 'IFC몰'], ['IFC mall (North Gate)', 'IFC몰']]) { const fs2 = (this.foot || []).filter((f) => f.name === want); const f = fs2.sort((a, b) => Math.abs(ringArea(b.ring)) - Math.abs(ringArea(a.ring)))[0]; if (f) { const ring = f.ring, sg = ringArea(ring) > 0 ? 1 : -1; let best = null; for (let k = 0; k < ring.length; k++) { const a = ring[k], c = ring[(k + 1) % ring.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]); if (!best || L > best.L) best = { L, x: (a[0] + c[0]) / 2, z: (a[1] + c[1]) / 2, nx: (sg > 0 ? c[1] - a[1] : a[1] - c[1]) / L, nz: (sg > 0 ? a[0] - c[0] : c[0] - a[0]) / L }; } const D2 = { name: mallName, x: best.x + best.nx * 0.1, z: best.z + best.nz * 0.1, nx: best.nx, nz: best.nz }; this.malls.push(D2);
       const gd = new THREE.Group(); gd.position.set(D2.x, 0, D2.z); gd.rotation.y = Math.atan2(D2.nx, D2.nz); const glass = new THREE.Mesh(new THREE.PlaneGeometry(8, 5), new THREE.MeshPhongMaterial({ color: '#cfe2ee', emissive: '#ffe8c8', emissiveIntensity: 0.25, shininess: 100 })); glass.position.set(0, 2.5, 0.12); gd.add(glass); const fr = new THREE.Mesh(new THREE.BoxGeometry(8.6, 5.4, 0.12), new THREE.MeshLambertMaterial({ color: '#d9d4cc' })); fr.position.set(0, 2.7, 0.02); gd.add(fr); const cv = document.createElement('canvas'); cv.width = 512; cv.height = 96; const c2 = cv.getContext('2d'); c2.fillStyle = '#f4f1ea'; c2.fillRect(0, 0, 512, 96); c2.fillStyle = '#2f3a2f'; c2.font = 'bold 54px serif'; c2.textAlign = 'center'; c2.textBaseline = 'middle'; c2.fillText(mallName, 256, 50); const st = new THREE.CanvasTexture(cv); st.colorSpace = THREE.SRGBColorSpace; const sg2 = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.7), new THREE.MeshLambertMaterial({ map: st, emissive: '#ffffff', emissiveMap: st, emissiveIntensity: 0.3 })); sg2.position.set(0, 6.4, 0.1); gd.add(sg2); this.scene.add(gd); } }
-    if (M.kind === 'street') { this.buildNeon(r); this.buildAlleys(P2, r); }
+    if (M.kind === 'street') this.buildNeon(r);
+    if (M.kind !== 'summit') this.buildAlleys(P2, r);
     if (this.id === 'banpo') this.buildBanpo(P2);
     this.shopFronts = buildShopFronts(this, M.shops || [], M.scale); this.shopGrid = new Map(); this.shopFronts.forEach((F, i) => { const k = `${Math.floor(F.x / 40)},${Math.floor(F.z / 40)}`; if (!this.shopGrid.has(k)) this.shopGrid.set(k, []); this.shopGrid.get(k).push(i); });
-    if (M.kind === 'street') this.buildStreetSigns(P2, r);
+    if (M.kind !== 'summit') this.buildStreetSigns(P2, r);
     this.buildLights(r);
     this.buildSkyStuff(r);
     this.buildPeople();
@@ -606,7 +607,7 @@ export class Hangang {
     const list = [];
     for (const f of this.foot || []) { if (!(f.type === 'street' || f.type === 'street2') || f.h < 4) continue; const ring = f.ring, sg = ringArea(ring) > 0 ? 1 : -1;
       for (let k = 0; k < ring.length; k++) { const a = ring[k], c = ring[(k + 1) % ring.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]); if (L < 3.5) continue; const nx = (sg > 0 ? c[1] - a[1] : a[1] - c[1]) / L, nz = (sg > 0 ? a[0] - c[0] : c[0] - a[0]) / L, mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2;
-        if (nearRoad(mx + nx * 2, mz + nz * 2) > 9) continue; const q = this.project(mx, mz); if (Math.abs(q.lat) > 350) continue;
+        if (nearRoad(mx + nx * 2, mz + nz * 2) > 9) continue; const q = this.project(mx, mz); if (Math.abs(q.lat) > (M.kind === 'street' ? 350 : 900)) continue;
         const tx = (c[0] - a[0]) / L, tz = (c[1] - a[1]) / L, W1 = Math.min(L * 0.88, 10);
         list.push({ x: mx + nx * 0.14, z: mz + nz * 0.14, tx, tz, w: W1, y0: 3.0, y1: 3.75, n: pool[Math.floor(r() * pool.length)], st: Math.floor(r() * 5) });
         for (let fl = 1; fl <= 2; fl++) if (f.h > 3.4 * (fl + 1) && r() < (fl === 1 ? 0.55 : 0.3)) { const w2 = Math.min(L * 0.6, 6.5), off = (r() - 0.5) * (L - w2) * 0.8; list.push({ x: mx + tx * off + nx * 0.12, z: mz + tz * off + nz * 0.12, tx, tz, w: w2, y0: 3.4 * fl + 1.6, y1: 3.4 * fl + 2.4, n: pool[Math.floor(r() * pool.length)], st: Math.floor(r() * 5) }); }
@@ -720,7 +721,7 @@ export class Hangang {
       else if (kind === 6 || /교회|성당|채플/.test(name)) { type = 'church'; c = '#efe9de'; crosses.push(ring); }
       else if (/^#?[0-9a-f]{6}$/i.test(cTag) || /^[a-z]+$/i.test(cTag)) { try { col.set(cTag); c = `#${col.getHexString()}`; } catch { c = null; } }
       // 거리 지역(홍대 · 이태원 등) 낮은 상가: 외벽 색 · 창 무늬 · 층 높이를 건물마다 다르게
-      if (M.kind === 'street' && h < 32 && type !== 'apt' && type !== 'church' && !LANDMARKS[name] && !c) { type = r() < 0.62 ? 'street' : 'street2'; c = ['#f4f1ea', '#efe3cf', '#b5654a', '#a29e98', '#f2c6cf', '#bfe3d6', '#c8dcef', '#2f2f33', '#e8d9b5', '#8a5a44', '#d9cfc2', '#fff7e8'][Math.floor(r() * 12)]; }
+      if ((M.kind === 'street' || ((!M.kind || M.kind === 'river') && (kind === 2 || kind === 0) && h < 26 && M.shops?.length)) && h < 32 && type !== 'apt' && type !== 'church' && type !== 'glass' && !LANDMARKS[name] && !c) { type = r() < 0.62 ? 'street' : 'street2'; c = ['#f4f1ea', '#efe3cf', '#b5654a', '#a29e98', '#f2c6cf', '#bfe3d6', '#c8dcef', '#2f2f33', '#e8d9b5', '#8a5a44', '#d9cfc2', '#fff7e8'][Math.floor(r() * 12)]; }
       if (!c) c = type === 'apt' ? APT[Math.floor(r() * APT.length)] : type === 'glass' ? GLASS[Math.floor(r() * GLASS.length)] : type === 'brick' ? BRICK[Math.floor(r() * BRICK.length)] : STONE[Math.floor(r() * STONE.length)];
       col.set(c); if (type !== 'gold') col.offsetHSL((r() - 0.5) * 0.02, 0, (r() - 0.5) * 0.05);
       // 옥상: 여의도는 거의 다 민트색 방수 페인트 (위성사진). 아파트 일부와 낮은 건물은 회색 · 흰색

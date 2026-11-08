@@ -214,14 +214,14 @@ for (const e of lJ.elements) {
   if (mid[0] < rect[0] || mid[0] > rect[2] || mid[1] < rect[1] || mid[1] > rect[3]) continue;
   const bridge = t.bridge === 'yes' || t.bridge === 'viaduct';
   if (t.railway === 'rail' || t.railway === 'subway') { const pts = simplify(g, 1); if (bridge) out.bridges.push({ n: t.name || '', w: 7, rail: 1, p: flat(pts) }); else out.rails.push(flat(pts)); continue; }
-  const w0 = W[t.highway] || (C.kind === 'street' && /^(service|living_street|residential|unclassified)$/.test(t.highway) ? 5 : 0); if (!w0) continue;
+  const w0 = W[t.highway] || (C.kind !== 'summit' && /^(service|living_street|residential|unclassified)$/.test(t.highway) ? 5 : 0); if (!w0) continue;
   const lanes = +t.lanes || 0, w = t.highway in { cycleway: 1, footway: 1, path: 1, pedestrian: 1 } ? w0 : Math.max(w0, lanes * 3.3 + 1);
   const pts = simplify(g, 0.8);
   if (bridge && w0 >= 6) { out.bridges.push({ n: t['bridge:name'] || t.name || '', w, p: flat(pts) }); continue; }
   if (t.highway in { cycleway: 1, footway: 1, path: 1, pedestrian: 1 }) { if (t.name === C.path || near(mid, 450) < 450) out.paths.push([t.name === C.path ? 1 : 0, w, ...flat(pts)]); continue; }
   if (w0 >= 8) { out.roads.push([w, bridge ? 1 : 0, ...flat(pts)]); out.roadNames.push(String(t.name || '').slice(0, 12)); }
   // 거리 지역: 좁은 골목(서비스 도로 · 생활도로 · 좁은 주택가 길)도 담는다 (전봇대 · 전깃줄 · 스쿠터를 세운다)
-  else if (C.kind === 'street' && /service|living_street|residential|unclassified|alley/.test(t.highway) && near(mid, 0) < 700) out.alleys.push([Math.max(3, Math.min(6, w0)), ...flat(pts)]);
+  else if (C.kind !== 'summit' && /service|living_street|residential|unclassified|alley/.test(t.highway) && near(mid, 0) < (C.kind === 'street' ? 700 : 1300)) out.alleys.push([Math.max(3, Math.min(6, w0)), ...flat(pts)]);
 }
 
 // ---------- 건물 ----------
