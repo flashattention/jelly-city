@@ -1,0 +1,88 @@
+/* 젤리 오디세이: 밤의 신전 · 금빛 로마 · 초록 네온 바이러스 */
+:root { --gold: #f0c35a; --red: #c42a32; --neon: #3dff74; --ink: #1a120e; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #07060a; color: #fff; font-family: 'Gowun Dodum', sans-serif; user-select: none; -webkit-user-select: none; }
+#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#c.glitch { filter: hue-rotate(80deg) saturate(2) contrast(1.2); transform: translateX(3px); }
+.hidden { display: none !important; }
+/* 처음 화면: 같이 하기 · 코드 참가는 쓰지 않는다 (혼자 하는 스토리) */
+#multi-btn, .code-row { display: none !important; }
+#title .logo { font-family: 'Gowun Batang', serif; letter-spacing: 2px; background: linear-gradient(180deg, #ffe7a6, #d99a3a); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; }
+#title .card { background: radial-gradient(circle at 50% 0%, rgba(80, 30, 20, .92), rgba(16, 12, 20, .96)); border: 1px solid rgba(240, 195, 90, .35); }
+.ody-diff { display: flex; gap: 8px; justify-content: center; margin: 8px 0 4px; flex-wrap: wrap; }
+.ody-diff button { padding: 8px 14px; border-radius: 999px; border: 2px solid rgba(240, 195, 90, .3); background: rgba(255, 255, 255, .06); color: #ffe9c0; font-family: 'Jua'; font-size: 15px; cursor: pointer; }
+.ody-diff button.on { border-color: var(--gold); background: rgba(240, 195, 90, .25); }
+.ody-ch { margin: 10px auto 2px; max-width: 420px; padding: 12px 14px; border-radius: 14px; background: rgba(0, 0, 0, .3); border: 1px solid rgba(240, 195, 90, .25); font-size: 14px; line-height: 1.55; color: #f2e2c4; text-align: left; }
+.ody-ch b { color: var(--gold); font-family: 'Jua'; font-size: 16px; }
+/* 게임 화면 */
+#hud { position: fixed; inset: 0; pointer-events: none; }
+#hud button { pointer-events: auto; }
+#obj { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); padding: 8px 18px; border-radius: 999px; background: rgba(15, 10, 8, .62); border: 1px solid rgba(240, 195, 90, .4); font-family: 'Jua'; font-size: 17px; color: #ffe6b0; white-space: nowrap; text-shadow: 0 2px 4px #000; }
+#stut { position: absolute; top: 14px; left: 14px; padding: 6px 12px; border-radius: 12px; background: rgba(0, 0, 0, .45); font-size: 12px; color: #c8ffd8; display: grid; grid-template-columns: auto auto; gap: 2px 8px; align-items: center; }
+#stut b { font-family: 'Jua'; color: #fff; }
+#stut i { grid-column: 1 / -1; display: block; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+#stut u { display: block; height: 100%; background: linear-gradient(90deg, #3dff74, #f0c35a); width: 100%; transition: width .5s; }
+#boss { position: absolute; top: 58px; left: 50%; transform: translateX(-50%); width: min(560px, 80vw); text-align: center; }
+#boss .nm { font-family: 'Gowun Batang', serif; font-size: 20px; color: #c8ffd8; text-shadow: 0 0 10px #3dff74; }
+#boss .bar { height: 12px; border-radius: 6px; background: rgba(0, 0, 0, .55); border: 1px solid rgba(61, 255, 116, .5); overflow: hidden; margin-top: 4px; }
+#boss .bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #1dbf4a, #b6ff3a); transition: width .2s; }
+#boss .sub { font-size: 13px; color: #ffe6b0; margin-top: 4px; }
+#cross { position: absolute; left: 50%; top: 46%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: rgba(255, 240, 210, .85); box-shadow: 0 0 6px #000; }
+#cross.aim { width: 26px; height: 26px; margin: -13px; background: transparent; border: 2px solid rgba(255, 240, 210, .85); }
+#charge { position: absolute; left: 50%; top: calc(46% + 26px); width: 90px; height: 6px; margin-left: -45px; border-radius: 3px; background: rgba(0, 0, 0, .5); overflow: hidden; }
+#charge i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffe7a6, #ff8a3a); }
+#nums, #marks { position: absolute; inset: 0; }
+.num { position: absolute; font-family: 'Jua'; font-size: 20px; color: #fff; text-shadow: 0 2px 3px #000, 0 0 8px rgba(61, 255, 116, .7); transform: translate(-50%, -50%); animation: num .8s ease-out forwards; }
+.num.big { font-size: 28px; color: #ffe27a; }
+.num.parry { color: #ffe27a; font-size: 22px; }
+.num.hurt { color: #ff7a7a; text-shadow: 0 2px 3px #000; }
+@keyframes num { to { transform: translate(-50%, -150%); opacity: 0; } }
+.mk { position: absolute; transform: translate(-50%, -100%); font-size: 12px; font-family: 'Jua'; white-space: nowrap; text-shadow: 0 1px 3px #000; text-align: center; }
+.mk .hb { width: 46px; height: 5px; margin: 2px auto 0; border-radius: 3px; background: rgba(0, 0, 0, .55); overflow: hidden; }
+.mk .hb i { display: block; height: 100%; background: #3dff74; }
+.mk.ally { color: #ffe6b0; } .mk.ally .hb i { background: #ff9a4a; }
+.mk.warn { color: #ff5a5a; font-size: 14px; animation: blink .5s infinite alternate; }
+.mk.zz { color: #c8ffd8; font-size: 16px; }
+.mk.sus { color: #ffd04a; font-size: 18px; }
+.mk.goal { color: #ffe27a; font-size: 22px; filter: drop-shadow(0 0 6px #f0c35a); animation: bob 1s ease-in-out infinite alternate; }
+@keyframes blink { to { opacity: .35; } }
+@keyframes bob { to { transform: translate(-50%, -120%); } }
+#prompt { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); padding: 8px 16px; border-radius: 12px; background: rgba(15, 10, 8, .7); border: 1px solid rgba(240, 195, 90, .5); font-family: 'Jua'; font-size: 16px; color: #ffe6b0; text-align: center; }
+#prompt i { display: block; height: 5px; margin-top: 6px; border-radius: 3px; background: rgba(255, 255, 255, .15); overflow: hidden; }
+#prompt u { display: block; height: 100%; width: 0; background: var(--gold); }
+#hp { position: absolute; left: 18px; bottom: 18px; width: 260px; }
+#hp .who { font-family: 'Jua'; font-size: 18px; color: #ffe6b0; text-shadow: 0 2px 4px #000; }
+#hp .who small { font-family: 'Gowun Dodum'; font-size: 12px; color: #d9b98a; margin-left: 6px; }
+#hp .bar { height: 14px; border-radius: 7px; background: rgba(0, 0, 0, .55); border: 1px solid rgba(240, 195, 90, .5); overflow: hidden; margin-top: 4px; }
+#hp .bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #c42a32, #ff7a4a); transition: width .15s; }
+#weap { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 8px; }
+#weap .w { width: 70px; padding: 6px 0 4px; border-radius: 12px; background: rgba(15, 10, 8, .6); border: 2px solid rgba(240, 195, 90, .25); text-align: center; font-size: 24px; position: relative; }
+#weap .w.on { border-color: var(--gold); background: rgba(240, 195, 90, .2); }
+#weap .w small { display: block; font-size: 11px; color: #ffe6b0; font-family: 'Jua'; }
+#weap .w b { position: absolute; top: 2px; left: 6px; font-size: 11px; color: #d9b98a; }
+#cmd { position: absolute; right: 18px; bottom: 18px; padding: 8px 14px; border-radius: 12px; background: rgba(15, 10, 8, .6); border: 1px solid rgba(240, 195, 90, .35); font-family: 'Jua'; font-size: 14px; color: #ffe6b0; text-align: right; }
+#cmd small { display: block; font-family: 'Gowun Dodum'; font-size: 11px; color: #d9b98a; }
+#disg { position: absolute; left: 50%; top: 92px; transform: translateX(-50%); padding: 6px 14px; border-radius: 999px; background: rgba(10, 60, 25, .75); border: 1px solid var(--neon); color: #c8ffd8; font-family: 'Jua'; }
+#toast { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); padding: 10px 22px; border-radius: 14px; background: rgba(15, 10, 8, .72); border: 1px solid rgba(240, 195, 90, .5); font-family: 'Jua'; font-size: 22px; color: #ffe6b0; text-shadow: 0 2px 6px #000; }
+#hurt { position: absolute; inset: 0; box-shadow: inset 0 0 160px rgba(200, 20, 20, 0); transition: box-shadow .25s; }
+#keys { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); font-size: 12px; color: rgba(255, 240, 210, .55); white-space: nowrap; }
+.hud-r { position: absolute; right: 14px; top: 12px; display: flex; gap: 6px; }
+.hud-r button { width: 38px; height: 38px; border-radius: 50%; border: 0; background: rgba(0, 0, 0, .45); color: #fff; font-size: 16px; cursor: pointer; }
+/* 신탁 */
+#oracle { position: fixed; left: 50%; top: 66px; transform: translateX(-50%); width: min(600px, 86vw); padding: 10px 18px; border-radius: 16px; background: linear-gradient(180deg, rgba(30, 22, 10, .9), rgba(10, 8, 6, .92)); border: 1px solid rgba(240, 195, 90, .6); box-shadow: 0 0 30px rgba(240, 195, 90, .25); pointer-events: none; }
+#oracle .who { font-family: 'Gowun Batang', serif; color: var(--gold); font-size: 15px; margin-bottom: 4px; }
+#oracle .line { font-family: 'Gowun Batang', serif; font-size: 16px; line-height: 1.6; color: #fff3d6; }
+#oracle .line em { font-style: normal; color: #9bffb9; font-family: monospace; font-size: 15px; }
+/* 컷신 */
+#cut { position: fixed; inset: 0; pointer-events: none; }
+#cut .bar { position: absolute; left: 0; right: 0; height: 11vh; background: #000; }
+#cut .top { top: 0; } #cut .bot { bottom: 0; }
+#cut-cap { position: absolute; left: 50%; bottom: 14vh; transform: translateX(-50%); width: min(820px, 90vw); text-align: center; font-family: 'Gowun Batang', serif; font-size: 22px; line-height: 1.6; color: #fff3d6; text-shadow: 0 2px 8px #000; transition: opacity .6s; }
+#cut-title { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); text-align: center; font-family: 'Gowun Batang', serif; color: #ffe7a6; text-shadow: 0 0 30px rgba(240, 195, 90, .6), 0 4px 10px #000; animation: titleIn 2.5s ease-out; }
+#cut-title b { display: block; font-size: 64px; letter-spacing: 6px; }
+#cut-title small { display: block; font-size: 24px; margin-top: 8px; color: #c8ffd8; letter-spacing: 3px; }
+@keyframes titleIn { from { opacity: 0; letter-spacing: 30px; } }
+#cut-skip { position: absolute; right: 20px; bottom: 3vh; pointer-events: auto; padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .3); background: rgba(0, 0, 0, .5); color: #fff; font-family: 'Jua'; cursor: pointer; }
+#fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity .8s; }
+#lockmsg { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(5, 4, 8, .55); }
+#ov-title { font-family: 'Gowun Batang', serif; font-size: 34px; color: #ffe7a6; text-align: center; }
+#ov-body { margin: 12px 0; line-height: 1.7; color: #f2e2c4; text-align: center; }

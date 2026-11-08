@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>젤리 오디세이</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&family=Gowun+Batang:wght@700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/css/shell.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
+  <link rel="icon" href="/favicon-192.png" type="image/png" sizes="192x192" />
+  <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <script src="/shared/js/playtime.js" defer></script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="hud" class="hidden">
+    <div id="obj"></div>
+    <div id="stut"><span>🎞️ 세상의 연산력</span><b id="stut-n">100%</b><i><u id="stut-bar"></u></i></div>
+    <div id="boss" class="hidden"><div class="nm"></div><div class="bar"><i></i></div><div class="sub"></div></div>
+    <div id="cross"></div>
+    <div id="charge" class="hidden"><i></i></div>
+    <div id="nums"></div>
+    <div id="marks"></div>
+    <div id="prompt" class="hidden"><span></span><i><u></u></i></div>
+    <div id="hp"><div class="who"><span id="hp-name"></span><small id="hp-sub">로마 곰돌 군단</small></div><div class="bar"><i id="hp-bar"></i></div></div>
+    <div id="weap"></div>
+    <div id="cmd"></div>
+    <div id="disg" class="hidden">🦠 위장 중 <b></b></div>
+    <div id="toast" class="hidden"></div>
+    <div id="hurt"></div>
+    <div class="hud-r"><button id="b-mute" title="소리 (M)">🔊</button><button id="b-quit" title="나가기">✕</button></div>
+    <div id="keys">WASD 이동 · 마우스 시점 · 좌클릭 공격(꾹 = 창 던지기 · 활 당기기) · 우클릭 막기/조준 · Space 구르기 · Shift 달리기 · 1 2 3 무기 · E 동료 명령 · F 상호작용 · Q 위장</div>
+  </div>
+  <div id="oracle" class="hidden"><div class="who"></div><div class="line"></div></div>
+  <div id="cut" class="hidden"><i class="bar top"></i><i class="bar bot"></i><div id="cut-cap"></div><div id="cut-title" class="hidden"></div><button id="cut-skip">건너뛰기 ⏭ <small>Space</small></button></div>
+  <div id="fade"></div>
+  <div id="lockmsg" class="hidden"><div class="card"><div class="logo small">⚔️</div><b>화면을 클릭하면 계속해요</b><div class="note">마우스로 둘러보기 · Esc 로 마우스 풀기</div><div class="row2"><button id="lock-btn" class="btn big">▶ 계속하기</button><button id="quit-btn" class="btn ghost">처음으로</button></div></div></div>
+  <div id="over" class="screen hidden"><div class="card wide"><div id="ov-title"></div><div id="ov-body"></div><div class="row2"><button id="again-btn" class="btn big">🔁 다시 하기</button><button id="home-btn" class="btn ghost">처음으로</button></div></div></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
