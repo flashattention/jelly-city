@@ -1563,7 +1563,11 @@ export class Hangang {
     this.stations = st0; const mine = [];
     const glass = new THREE.MeshPhongMaterial({ color: '#cfe6f0', transparent: true, opacity: 0.38, shininess: 90, side: THREE.DoubleSide }), frame = new THREE.MeshLambertMaterial({ color: '#5a636e' }), pit = new THREE.MeshBasicMaterial({ color: '#2a2a30' }), stepM = new THREE.MeshLambertMaterial({ color: '#9a9690' }), noseM = new THREE.MeshLambertMaterial({ color: '#e0b830' }), granite = new THREE.MeshLambertMaterial({ color: '#8f8a84' }), steel = new THREE.MeshPhongMaterial({ color: '#d8dce0', shininess: 80 }), exitLightM = new THREE.MeshLambertMaterial({ color: '#fff6e0', emissive: '#fff2d0', emissiveIntensity: 0.3 }), exitGlowM = new THREE.MeshBasicMaterial({ color: '#ffe2a8', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }); this.exitLightM = exitLightM; this.exitGlowM = exitGlowM;
     for (const [x0, z0, si, ref] of M.entrances || []) {
-      const st = this.stations[si]; if (!st) continue; const x = x0 * S, z = z0 * S; if (this.inWater(x, z)) continue;
+      const st = this.stations[si]; if (!st) continue; let x = x0 * S, z = z0 * S; if (this.inWater(x, z)) continue;
+      // 출구가 건물 바닥 안에 있으면(건물 1층에 붙은 출구) 가장 가까운 벽 바깥으로 옮긴다 (벽에 막혀 들어갈 수 없었다)
+      { const inF = (px, pz) => (this.foot || []).find((f) => !f.deck && px >= f.x0 && px <= f.x1 && pz >= f.z0 && pz <= f.z1 && inRing(px, pz, f.ring)), f = inF(x, z);
+        if (f) { const r2 = f.ring, sg = ringArea(r2) > 0 ? 1 : -1; let best = Infinity, nx2 = 0, nz2 = 0, bx = x, bz = z; for (let k = 0; k < r2.length; k++) { const A = r2[k], B = r2[(k + 1) % r2.length], dx = B[0] - A[0], dz = B[1] - A[1], L = Math.hypot(dx, dz); if (L < 0.5) continue; const t = clamp(((x - A[0]) * dx + (z - A[1]) * dz) / (L * L), 0, 1), qx = A[0] + dx * t, qz = A[1] + dz * t, d = Math.hypot(qx - x, qz - z); if (d < best) { best = d; bx = qx; bz = qz; nx2 = (sg > 0 ? dz : -dz) / L; nz2 = (sg > 0 ? -dx : dx) / L; } }
+          const X2 = bx + nx2 * 3.4, Z2 = bz + nz2 * 3.4; if (best < 30 && !inF(X2, Z2) && !this.inWater(X2, Z2)) { x = X2; z = Z2; } } }
       const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = Math.atan2(st.x - x, st.z - z);
       // 서울 지하철 출구: 내려가는 계단 구덩이 · 화강석 낮은 벽 + 유리벽 · 둥근 유리 지붕과 금속 틀 · 지붕 앞 노란 출구 번호 · 옆에 안내 기둥
       const p = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 4.2), pit); p.rotation.x = -Math.PI / 2; p.position.y = 0.04; g.add(p);

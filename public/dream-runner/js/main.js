@@ -974,12 +974,14 @@ hg.api = (path) => account.api(path);
 const LCOL = { '1호선': '#0052A4', '2호선': '#00A84D', '5호선': '#996CAC', '6호선': '#CD7C2F', '9호선': '#BDB092', 경의중앙선: '#77C4A3', 공항철도: '#0090D2', 신림선: '#6789CA' };
 let hgSt = null, hgStT = null;
 async function hgStationRender() {
-  if (!hgSt) return; const el = $('hg-subway');
+  if (!hgSt) return; const el = $('hg-subway'), st0 = hgSt;
   try {
-    const j = await account.api(`/api/seoul/subway/arrival?station=${encodeURIComponent(hgSt.name)}`); hg.arrivals = j.trains || []; hg.arrivalsAt = Date.now();
+    const j = await account.api(`/api/seoul/subway/arrival?station=${encodeURIComponent(st0.name)}`); hg.arrivals = j.trains || []; hg.arrivalsAt = Date.now();
+    // 기다리는 사이 역에서 멀어졌으면(hgSt 가 바뀜) 그리지 않는다 (예전엔 null.name 오류)
+    if (hgSt !== st0) return;
     const rows = (j.trains || []).slice(0, 6).map((t) => `<div class="row"><span class="ln" style="background:${LCOL[t.line] || '#888'}">${String(t.line).replace('호선', '')}</span><span>${String(t.to || '').replace(/[<>&]/g, '')}</span><b>${String(t.msg || '').replace(/[<>&]/g, '')}</b></div>`).join('') || '<div class="row">곧 들어오는 열차가 없어요</div>';
     el.innerHTML = `<h4>🚇 ${hgSt.name}역${hgSt.ref ? ` · ${hgSt.ref}번 출구` : ''}</h4>${rows}<div class="note">실시간 · 서울 열린데이터광장</div>`;
-  } catch (e) { el.innerHTML = `<h4>🚇 ${hgSt.name}역${hgSt.ref ? ` · ${hgSt.ref}번 출구` : ''}</h4><div class="row">${/준비/.test(e.message) ? '실시간 도착 정보를 준비하고 있어요' : '도착 정보를 불러오지 못했어요'}</div>`; }
+  } catch (e) { if (hgSt !== st0) return; el.innerHTML = `<h4>🚇 ${hgSt.name}역${hgSt.ref ? ` · ${hgSt.ref}번 출구` : ''}</h4><div class="row">${/준비/.test(e.message) ? '실시간 도착 정보를 준비하고 있어요' : '도착 정보를 불러오지 못했어요'}</div>`; }
 }
 hg.onStation = (st) => { hgSt = st; clearInterval(hgStT); $('hg-subway').classList.toggle('hidden', !st); if (st) { $('hg-subway').innerHTML = `<h4>🚇 ${st.name}역</h4><div class="row">불러오는 중…</div>`; hgStationRender(); hgStT = setInterval(hgStationRender, 20000); } };
 // 실시간 도시데이터 안내: 들어간 지역의 실제 장소 이름으로 (사람 수는 만 명 · 천 명 단위로)

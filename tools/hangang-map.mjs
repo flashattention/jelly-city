@@ -308,6 +308,7 @@ const VI = await (async () => {
     let x = 0, z = 0; for (const p of ring) { x += p[0]; z += p[1]; } const c = [x / ring.length, z / ring.length];
     const cand = og.get(`${Math.floor(c[0] / G)},${Math.floor(c[1] / G)}`) || [];
     if (cand.some((i) => inPoly(c, items[i].o) || inPoly(items[i].c, v.ring))) continue; // 오픈스트리트맵 건물과 겹치면 그쪽을 쓴다
+    if (!(v.fl > 0)) continue; // 지상 층이 없는 것(지하 시설 · 지하철 출입구 덮개)은 세우지 않는다
     const t = { building: 'yes', _vw: '1' }; if (v.fl > 0) t['building:levels'] = String(v.fl); if (v.nm && !BADN.test(v.nm)) t.name = /\d+동$/.test(v.dc) ? `${v.nm} ${v.dc}` : v.nm;
     items.push({ t, o: ring, c, part: false }); added++;
   }
@@ -328,6 +329,8 @@ const parts = items.filter((b) => b.part);
 // 부분으로 그려진 건물: 외곽선의 이름 · 종류를 안쪽 부분들에 물려준다 (국회의사당 · 63빌딩처럼 이름표와 모습이 맞게)
 for (const b of items) { if (b.part || !b.t.name) continue; for (const p of parts) if (!p.t.name && Math.abs(p.c[0] - b.c[0]) < 250 && Math.abs(p.c[1] - b.c[1]) < 250 && inPoly(p.c, b.o)) { p.inherit = b.t.name; p.inheritKind = b.t.building; } }
 out.buildings = []; out.binfo = []; const bR = [];
+// 지하철 출구 자리: 그 위의 작은 건물(출구 덮개로 그려진 것)은 세우지 않는다 (10m 상자가 계단을 덮고 들어갈 수 없게 막았다)
+const exitPts = sJ.elements.filter((e) => e.type === 'node' && e.tags?.railway === 'subway_entrance').map((e) => P(e.lat, e.lon));
 let dropped = 0;
 for (const b of items) {
   const { t, o, c } = b;
@@ -336,6 +339,8 @@ for (const b of items) {
   const lv = num(t['building:levels']), h = num(t.height) || (lv ? lv * 3.3 + 1 : 0) || (t.building === 'house' ? 7 : 10);
   const mh = num(t.min_height) || (num(t['building:min_level']) ? num(t['building:min_level']) * 3.3 : 0);
   const a = Math.abs(area(o)), d = near(c, 1800);
+  if (/출구|출입구|지하쇼핑|지하상가|지하도|지하보도/.test(t.name || '') && !num(t['building:levels'])) { dropped++; continue; }
+  if (a < 400 && exitPts.some((p) => Math.abs(p[0] - c[0]) < 40 && Math.abs(p[1] - c[1]) < 40 && (inPoly(p, o) || Math.hypot(p[0] - c[0], p[1] - c[1]) < 3))) { dropped++; continue; }
   // 거리 지역(골목이 빽빽): 코스에서 600m 넘게 먼 낮은 건물은 뺀다 (무거워서 이동이 느려 보이지 않게)
   if (a < 25 || (d > 1800 && h < 45) || (d > 900 && h < 12 && a < 400) || (C.kind === 'street' && h < 30 && near(c, 0) > 600)) { dropped++; continue; }
   const s = simplify(o, a > 2000 ? 1.2 : 0.6);
