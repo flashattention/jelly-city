@@ -66,6 +66,7 @@ try {
 } catch (e) { console.error('복원 실패', e); }
 const world = new World({ dataDir: DATA_DIR });
 const dreamBoard = new DreamBoard(DATA_DIR); // 드림 러너 리더보드
+const GAME_IDS = fs.readdirSync(path.join(ROOT, 'public')).filter((d) => /^jelly-[a-z]+$/.test(d) && d !== 'jelly-city');
 const playtime = new PlayTime(DATA_DIR); // 게임마다 플레이 시간 (메인 화면 카드 · 인기순)
 const cosmetics = new Cosmetics(DATA_DIR); cosmetics.dream = dreamBoard; // 치장 · 업적 (모든 게임 공용)
 // 토스 미니앱: 계정 · 드림 러너 기록을 웹과 따로 (같은 서버 · 같은 게임 코드, 파일만 다르다)
@@ -184,7 +185,7 @@ async function api(req, res, url) {
   if (url.pathname.startsWith('/api/board/')) return boardApi(req, res, url, world.userOf(sid), board, json, isAdmin);
   if (url.pathname.startsWith('/api/dream/')) return dreamApi(req, res, url, world.userOf(sid), dreamBoard, json, isAdmin);
   if (url.pathname.startsWith('/api/merge/')) return mergeRecords.api(req, res, url, world.userOf(sid), json, '/api/merge');
-  if (url.pathname === '/api/playtime' && await playtimeApi(req, res, url, playtime, json)) return;
+  if (url.pathname.startsWith('/api/playtime') && await playtimeApi(req, res, url, playtime, json, () => ({ ids: ['dream-runner', 'jelly-city', ...GAME_IDS], dream: [dreamBoard, dreamToss], records: { 'jelly-ten': tenRecords, 'jelly-survivor': survRecords, 'jelly-type': typeRecords, 'jelly-merge': mergeRecords, 'jelly-slide': slideRecords, 'jelly-drift': driftRecords }, cityUsers: Object.keys(world.users || {}).length }))) return;
   if (url.pathname.startsWith('/api/slide/')) return slideRecords.api(req, res, url, world.userOf(sid), json, '/api/slide');
   if (url.pathname.startsWith('/api/drift/')) return driftRecords.api(req, res, url, world.userOf(sid), json, '/api/drift');
   if (url.pathname.startsWith('/api/rider/')) return driftRecords.api(req, res, url, world.userOf(sid), json, '/api/rider'); // 옛 주소
