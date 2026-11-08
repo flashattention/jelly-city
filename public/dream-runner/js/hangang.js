@@ -1390,6 +1390,7 @@ export class Hangang {
     if (this.opt.weather === 'auto') { if (this.city && this.city.rain !== undefined && this.city.at) { st.weather = /눈/.test(this.city.rain) ? 'snow' : this.city.rain ? 'rain' : /흐림|구름/.test(this.city.sky) ? 'cloudy' : st.weather === 'rain' || st.weather === 'snow' ? 'clear' : st.weather; } else { this.weatherT -= dt; if (this.weatherT <= 0) { this.weatherT = 240 + this.r() * 420; st.weather = this.randWeather(this.r); } } }
     // 속도 단계: Q · E · +/- 로 고른다. 움직이는 건 누르는 동안만 (W A S D · 조이스틱, 카메라가 보는 쪽 기준)
     if (inp.speedTo != null) { this.target = inp.speedTo; inp.speedTo = null; }
+    this.flyDown = (inp.mz || 0) < -0.3; if (this.flying && (inp.mz || 0) < 0) inp = { ...inp, mz: 0 }; // 날 때 S 는 뒤로 가기가 아니라 내려가기
     this.camYaw += inp.yaw || 0; this.camPitch = clamp((this.camPitch ?? 0.32) + (inp.pitch || 0), -0.6, 1.2); if (inp.yaw || inp.pitch) this.dragT = 2.5; this.dragT = Math.max(0, this.dragT - dt);
     const fx0 = Math.sin(this.camYaw), fz0 = Math.cos(this.camYaw);
     let mx = fx0 * (inp.mz || 0) - fz0 * (inp.mx || 0), mz = fz0 * (inp.mz || 0) + fx0 * (inp.mx || 0); const ml = Math.hypot(mx, mz);
@@ -1434,9 +1435,14 @@ export class Hangang {
     // 점프 · 2단 · 3단 점프(공중제비) · 숙이기 · 옥상 위에 서기
     const ground = this.groundAt(this.px, this.pz, this.y);
     if (!this.climb) {
-      // 날기 (젤리시티처럼): 3단 점프 뒤 공중에서 한 번 더 Space → 날기. Space 꾹 = 위로, C = 아래로, 땅 · 옥상에 닿으면 내려앉는다
-      if (inp.jump) { if (this.flying) { /* 날고 있을 땐 꾹 누르기로 오른다 */ } else if (this.y <= ground + 0.001) { this.vy = 5.2; this.jumps = 1; } else if (this.jumps < 3) { this.vy = this.jumps === 1 ? 4.9 : 4.6; this.jumps++; this.flipT = FLIP_T; } else if (!this.inside && !this.inShop && !this.inMall) { this.flying = true; this.vy = 2; this.onFly?.(true); } }
-      if (this.flying) { const upIn = (inp.jumpHeld ? 1 : 0) - (inp.slide ? 1 : 0); this.vy += (upIn * 9 - this.vy) * Math.min(1, dt * 4); this.y = Math.min(400, Math.max(ground, this.y + this.vy * dt)); if (this.y <= ground + 0.001 && this.vy <= 0) { this.flying = false; this.jumps = 0; this.vy = 0; this.onFly?.(false); } }
+      // 날기 (젤리시티처럼): 점프 → 2단 점프 → 세 번째 Space 가 곧 날기. 날 때 Space 꾹 = 위로 · S = 아래로 · Space 두 번 빠르게 = 날기를 멈추고 떨어지기
+      if (inp.jump) {
+        if (this.flying) { const now = this.time; if (now - (this.lastFlyTap ?? -9) < 0.35) { this.flying = false; this.jumps = 2; this.vy = 0; this.lastFlyTap = -9; this.onFly?.('fall'); } else this.lastFlyTap = now; }
+        else if (this.y <= ground + 0.001) { this.vy = 5.2; this.jumps = 1; }
+        else if (this.jumps < 2) { this.vy = 4.9; this.jumps++; this.flipT = FLIP_T; }
+        else if (!this.inside && !this.inShop && !this.inMall) { this.flying = true; this.vy = 2; this.lastFlyTap = this.time; this.onFly?.(true); }
+        else if (this.jumps < 3) { this.vy = 4.6; this.jumps++; this.flipT = FLIP_T; } }
+      if (this.flying) { const upIn = (inp.jumpHeld ? 1 : 0) - (this.flyDown || inp.slide ? 1 : 0); this.vy += (upIn * 9 - this.vy) * Math.min(1, dt * 4); this.y = Math.min(400, Math.max(ground, this.y + this.vy * dt)); if (this.y <= ground + 0.001 && this.vy <= 0) { this.flying = false; this.jumps = 0; this.vy = 0; this.onFly?.(false); } }
       else { this.vy -= 16 * dt; this.y = Math.max(ground, this.y + this.vy * dt); if (this.y <= ground) { this.vy = Math.max(0, this.vy); this.jumps = 0; } }
     }
     this.flipT = Math.max(0, this.flipT - dt); this.slide = !!inp.slide && this.y <= ground + 0.001 && !this.climb;
