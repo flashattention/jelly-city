@@ -19,6 +19,9 @@ const TICKET_TTL = 6 * 3600e3; // 출발표는 받은 뒤 6시간까지 (한 판
 const STAR_PTS = 10;       // 별사탕 하나 = 10점
 const TOP_GUARD = 10, DAY_STARS = 300000; // 확인 안 된 기록이 이 순위 안에 들면 비상 리포트 · 하루에 벌 수 있는 별 (사람이 닿지 못할 만큼 넉넉하게)
 
+// 운영 지표: 하루(한국 시간)마다 달린 사람 · 판수 · 광고 (기획 지표용, tools/metrics.mjs 가 읽는다)
+const dayKey = (t = Date.now()) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);
+const DAILY_KEEP = 120; // 이 날수보다 오래된 하루 기록은 지운다
 const MAPS = ['dream', 'hell', 'void'], mapOf = (m) => (m === 'hell' || m === 'void' ? m : 'dream'); // 꿈나라 · 지옥 · 이공간
 const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n);
 
@@ -30,13 +33,14 @@ export class DreamBoard {
     this.bestItem = {}; // 아이템전
     this.boards = {};   // 노멀(easy) 말고 다른 난이도: 'speed:hard' → { sub → 기록 } (노멀은 위 둘을 그대로 쓴다)
     this.stats = {};    // sub → { runs, time, by: { easy: { runs, time } } } (순위와 상관없이 달린 판수 · 시간)
+    this.daily = {}; this.first = {}; // 운영 지표: 날짜(한국 시간) → 하루 숫자 · sub → 처음 달린 날
     this.runs = 0; this.pending = []; this.reports = []; this.secret = crypto.randomBytes(24).toString('hex'); this.vstat = { ok: 0, bad: 0, none: 0, skip: 0 }; this.dayStars = new Map();
     this.lastPost = new Map();
     this.lastPlay = new Map();
     this.ipHits = new Map();
     try {
       const d = JSON.parse(fs.readFileSync(this.file, 'utf8'));
-      this.best = d.best || {}; this.bestItem = d.bestItem || {}; this.boards = d.boards || {}; this.stats = d.stats || {}; this.runs = d.runs || 0; this.reports = d.reports || []; this.secret = d.secret || this.secret;
+      this.best = d.best || {}; this.bestItem = d.bestItem || {}; this.boards = d.boards || {}; this.stats = d.stats || {}; this.daily = d.daily || {}; this.first = d.first || {}; this.runs = d.runs || 0; this.reports = d.reports || []; this.secret = d.secret || this.secret;
       // 예전 '확인 대기' 기록: 순위표에 올리고 비상 리포트로 옮긴다 (더는 기다리게 하지 않는다)
       for (const p of d.pending || []) { this.mig = true; const T = this.table(p.mode, p.diff, p.map); if (!T[p.sub] || p.e.score > T[p.sub].score) T[p.sub] = p.e; this.report('red', p.sub, p.mode, p.diff, p.map, p.why, p.e, p.r); }
     } catch { /* 처음 */ }
@@ -47,7 +51,7 @@ export class DreamBoard {
   save() {
     if (!this.dirty) return;
     this.dirty = false;
-    try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ best: this.best, bestItem: this.bestItem, boards: this.boards, stats: this.stats, runs: this.runs, reports: this.reports, secret: this.secret, used: this.tickets.dump(TICKET_TTL) })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('드림 러너 저장 실패', e); }
+    try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ best: this.best, bestItem: this.bestItem, boards: this.boards, stats: this.stats, daily: this.daily, first: this.first, runs: this.runs, reports: this.reports, secret: this.secret, used: this.tickets.dump(TICKET_TTL) })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('드림 러너 저장 실패', e); }
   }
   // map: 'hell' 은 난이도마다 따로 (꿈나라 노멀은 예전 표 그대로)
   table(mode, diff, map = 'dream') { if (map === 'hell' || map === 'void') return (this.boards[`${map}:${mode}:${diff}`] ||= {}); if (diff !== 'easy') return (this.boards[`${mode}:${diff}`] ||= {}); return mode === 'item' ? this.bestItem : this.best; }
@@ -111,6 +115,7 @@ export class DreamBoard {
     if (time > real + 5) throw new Error('기록이 이상해요'); // 실제로 지난 시간보다 오래 달릴 수는 없다
     const s = (this.stats[sub] ||= { runs: 0, time: 0, by: {} }), d = (s.by[diff] ||= { runs: 0, time: 0 });
     s.runs++; s.time += Math.round(time); d.runs++; d.time += Math.round(time); this.dirty = true;
+    const D = this.day(now); D.runs++; D.time += Math.round(time); D.diff[diff] = (D.diff[diff] || 0) + 1; D.map[map] = (D.map[map] || 0) + 1; if (!D.subs.includes(sub)) D.subs.push(sub); this.first[sub] ||= dayKey(now);
     // 별 지갑: 실제로 지난 시간 · 거리에 비해 말이 안 되는 별은 받지 않는다
     const stars = Math.floor(Number(b.stars)) || 0, dist = Math.floor(Number(b.dist)) || 0;
     let out = { earned: 0 };
@@ -119,7 +124,7 @@ export class DreamBoard {
       if (used < DAY_STARS) {
         const earned = getCos()?.earn(sub, stars, diff, map) || 0; this.dayStars.set(dk, used + earned);
         if (this.ads && earned > 0) { this.adGot.set(tk.id, { sub, earned, at: now }); if (this.adGot.size > 20000) for (const [k, v] of this.adGot) if (now - v.at > 3600e3) this.adGot.delete(k); }
-        out = { earned, ad: this.ads && earned > 0 };
+        out = { earned, ad: this.ads && earned > 0 }; if (out.ad) D.adOffer++;
       }
     }
     if (!out.earned) getCos()?.refresh(sub);
@@ -132,7 +137,14 @@ export class DreamBoard {
     const day = `${sub}:${Math.floor(now / 864e5)}`, n = this.adDay.get(day) || 0; if (n >= 40) throw new Error('오늘 광고 보너스는 다 받았어요');
     if (!this.tickets.once(tk.id, 'ad')) throw new Error('이미 받았어요');
     this.adDay.set(day, n + 1); if (this.adDay.size > 50000) this.adDay.clear(); this.adGot.delete(tk.id);
-    return { bonus: getCos()?.earnRaw?.(sub, got.earned) ?? 0 };
+    const bonus = getCos()?.earnRaw?.(sub, got.earned) ?? 0, D = this.day(now); D.adWatch++; D.adStars += bonus; if (!D.adSubs.includes(sub)) D.adSubs.push(sub); this.dirty = true;
+    return { bonus };
+  }
+  // 오늘(한국 시간) 지표 칸: 달린 사람(subs) · 판수 · 시간 · 난이도 · 맵 · 광고 제안(adOffer) · 시청(adWatch) · 광고로 준 별 · 광고 본 사람
+  day(now = Date.now()) {
+    const k = dayKey(now);
+    if (!this.daily[k]) { this.daily[k] = { runs: 0, time: 0, subs: [], diff: {}, map: {}, adOffer: 0, adWatch: 0, adStars: 0, adSubs: [] }; const old = dayKey(now - DAILY_KEEP * 864e5); for (const q of Object.keys(this.daily)) if (q < old) delete this.daily[q]; }
+    return this.daily[k];
   }
   // 내 기록 한눈에: 판수 · 시간 · 난이도 · 모드별 지금 순위
   myStats(sub, map = 'dream') {

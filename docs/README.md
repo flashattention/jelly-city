@@ -18,6 +18,10 @@
 
 ## 지표 다시 뽑기
 
+서버는 2026년 11월 8일부터 드림 러너 하루 지표를 쌓아요 (웹 · 토스 따로, 한국 시간 기준, 120일 보관).
+- 하루마다: 달린 사람 · 새로 온 사람 · 판수 · 난이도 · 맵 · 보상형 광고 제안 · 시청 · 광고로 준 별
+- 이걸로 `metrics.md`에 하루 지표 표, 다음 날 · 7일 뒤 재방문율(D1 · D7), 광고 시청률이 나와요.
+
 ```bash
 # 서버 저장 파일 받기 (개인 정보가 있으니 저장소 밖 폴더에)
 for f in world dream-runner dream-runner-toss cosmetics board jelly-drift jelly-merge jelly-slide jelly-survivor jelly-ten jelly-type; do

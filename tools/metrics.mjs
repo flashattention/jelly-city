@@ -94,12 +94,35 @@ if (dr) {
   p(`- 순위표에 올라간 기록 중 다시 돌려 확인된 비율: ${pct(verified, entries)}`);
   p();
 }
+// 하루 지표 (서버가 daily 를 쌓기 시작한 뒤부터): 달린 사람 · 새로 온 사람 · 판수 · 광고 · 재방문율
+function dailySection(title, B) {
+  const days = Object.keys(B?.daily || {}).sort(); if (!days.length) return;
+  const first = B.first || {}, newOn = {}; for (const d of Object.values(first)) newOn[d] = (newOn[d] || 0) + 1;
+  const plus = (d, n) => new Date(Date.parse(d) + n * DAY).toISOString().slice(0, 10), today = days[days.length - 1];
+  p(`### ${title}: 하루 지표 (최근 14일)`);
+  p();
+  p('| 날짜 | 달린 사람 | 새로 온 사람 | 판수 | 1인당 판수 | 광고 제안 | 광고 시청 | 시청률 | 광고 본 사람 |');
+  p('|---|---|---|---|---|---|---|---|---|');
+  for (const d of days.slice(-14)) { const x = B.daily[d], n = x.subs.length; p(`| ${d} | ${fmt(n)} | ${fmt(newOn[d] || 0)} | ${fmt(x.runs)} | ${n ? (x.runs / n).toFixed(1) : '-'} | ${fmt(x.adOffer || 0)} | ${fmt(x.adWatch || 0)} | ${pct(x.adWatch || 0, x.adOffer || 0)} | ${fmt((x.adSubs || []).length)} |`); }
+  p();
+  // 재방문율: 처음 달린 날(코호트) 기준으로 1일 · 7일 뒤에 다시 달린 비율. 아직 그날이 안 온 코호트는 뺀다
+  const ret = (n) => { let base = 0, back = 0; for (const [sub, d] of Object.entries(first)) { const t = plus(d, n); if (t > today) continue; base++; if (B.daily[t]?.subs.includes(sub)) back++; } return [back, base]; };
+  const [b1, n1] = ret(1), [b7, n7] = ret(7);
+  const all = days.reduce((a, d) => a + B.daily[d].runs, 0), offer = days.reduce((a, d) => a + (B.daily[d].adOffer || 0), 0), watch = days.reduce((a, d) => a + (B.daily[d].adWatch || 0), 0);
+  p(`- 기록 기간: ${days[0]} ~ ${today} (${days.length}일) · 처음 달린 사람 ${fmt(Object.keys(first).length)}명 · 판수 ${fmt(all)}판`);
+  p(`- 다음 날 다시 달린 비율 (D1): ${pct(b1, n1)} (${fmt(b1)}/${fmt(n1)}명) · 7일 뒤 (D7): ${pct(b7, n7)} (${fmt(b7)}/${fmt(n7)}명)`);
+  if (offer) p(`- 보상형 광고: 제안 ${fmt(offer)}번 · 시청 ${fmt(watch)}번 · 시청률 ${pct(watch, offer)}`);
+  p('- 처음 달린 날은 지표를 쌓기 시작한 날부터 세요. 그 전부터 달리던 사람도 그날 \'새로 온 사람\'으로 잡혀요.');
+  p();
+}
+if (dr) dailySection('웹', dr);
 if (drT) {
   const n = Object.values(drT.boards || {}).reduce((a, T) => a + Object.keys(T).length, 0) + Object.keys(drT.best || {}).length + Object.keys(drT.bestItem || {}).length;
   p('### 토스 미니앱');
   p();
-  p(`- 기록 ${fmt(n)}개 (출시 전)`);
+  p(`- 순위표 기록 ${fmt(n)}개`);
   p();
+  dailySection('토스 미니앱', drT);
 }
 
 // ---------- 치장 · 별 ----------
