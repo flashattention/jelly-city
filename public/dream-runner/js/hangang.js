@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { makeBear, poseBear, FLIP_T } from './runner.js';
 import { isPhone } from '../../shared/js/perf.js';
+import { buildStation } from './hangang-station.js';
 
 export const SEASONS = { spring: '🌸 봄', summer: '🌿 여름', autumn: '🍁 가을', winter: '❄️ 겨울' };
 export const WEATHERS = { clear: '☀️ 맑음', cloudy: '☁️ 구름', rain: '🌧️ 비', snow: '🌨️ 눈' };
@@ -245,6 +246,31 @@ export class Hangang {
   deckAt(x, z, y) {
     let g = -1; for (const si of this.deckGrid?.get(`${Math.floor(x / 40)},${Math.floor(z / 40)}`) || []) { const d = this.decks[si], ex = d.cx - d.ax, ez = d.cz - d.az, L2 = ex * ex + ez * ez || 1, t = clamp(((x - d.ax) * ex + (z - d.az) * ez) / L2, 0, 1); if (Math.hypot(x - d.ax - ex * t, z - d.az - ez * t) > d.hw) continue; const dy = d.ya + (d.yc - d.ya) * t; if (y >= dy - 1.0 && dy > g) g = dy; }
     return g;
+  }
+  // 부딪히는 외곽선 하나 더 (역 안 벽 · 출구 벽 등)
+  addFoot(f) { const fi = (this.foot ||= []).push(f) - 1; this.footGrid ||= new Map(); for (let gx = Math.floor(f.x0 / 40); gx <= Math.floor(f.x1 / 40); gx++) for (let gz = Math.floor(f.z0 / 40); gz <= Math.floor(f.z1 / 40); gz++) { const k = `${gx},${gz}`; if (!this.footGrid.has(k)) this.footGrid.set(k, []); this.footGrid.get(k).push(fi); } }
+  // ---------- 지하철역 안 ----------
+  //   출구 계단으로 내려가면 그 역 대합실로. 대합실 동쪽 계단 → 승강장, 서쪽 번호 계단 → 그 번호 출구로 나간다
+  enterStation(e) {
+    const si = this.stations.indexOf(e.st); this.stationInt ||= {};
+    const S = this.stationInt[si] ||= buildStation(this, e.st, si, this.entrances.filter((q) => q.st === e.st).map((q) => String(q.ref || '1')));
+    this.inside = { S, st: e.st, from: e }; this.hidden = [];
+    for (const o of this.scene.children) if (o !== S.g && o !== this.bear?.root && o !== this.shadow && o.visible) { this.hidden.push(o); o.visible = false; }
+    S.g.visible = true; const sp = S.spawnFromExit(String(e.ref || '1')); this.placeAt(sp.x, sp.z, sp.face); this.onInside?.({ name: e.st.name, lines: e.st.lines });
+  }
+  leaveStation(ref) {
+    const I = this.inside; if (!I) return; I.S.g.visible = false; for (const o of this.hidden || []) o.visible = true; this.hidden = null; this.inside = null;
+    const e = this.entrances.find((q) => q.st === I.st && String(q.ref) === String(ref)) || I.from, th = e.g.rotation.y;
+    this.placeAt(e.x - Math.sin(th) * 3.6, e.z - Math.cos(th) * 3.6, th + Math.PI); this.stationCool = 2; this.onInside?.(null);
+  }
+  placeAt(x, z, face) { this.px = x; this.pz = z; this.y = 0; this.vy = 0; this.climb = null; this.face = face; this.camYaw = face; this.camInit = false; this.mdx = null; this.onRoof = null; }
+  tickInside(dt) {
+    const I = this.inside, S = I.S; S.tick(dt, this.arrivals);
+    const z = S.zoneAt(this.px, this.pz); if (!z || (this.zoneCool || 0) > 0) { this.zoneCool = Math.max(0, (this.zoneCool || 0) - dt); return; }
+    this.zoneCool = 1.2;
+    if (z.kind === 'exit') this.leaveStation(z.ref);
+    else if (z.kind === 'down') { const sp = S.spawnPlatform(z.li); this.placeAt(sp.x, sp.z, sp.face); }
+    else if (z.kind === 'up') { const sp = S.spawnConcourse(z.li); this.placeAt(sp.x, sp.z, sp.face); }
   }
   nearDeck(x, z, m) {
     for (const si of this.deckGrid?.get(`${Math.floor(x / 40)},${Math.floor(z / 40)}`) || []) { const d = this.decks[si], ex = d.cx - d.ax, ez = d.cz - d.az, L2 = ex * ex + ez * ez || 1, t = clamp(((x - d.ax) * ex + (z - d.az) * ez) / L2, 0, 1); if (Math.hypot(x - d.ax - ex * t, z - d.az - ez * t) < d.hw + m) return true; }
@@ -887,7 +913,9 @@ export class Hangang {
       // 안내 기둥 (입구 옆, 길 쪽을 본다)
       const tm = new THREE.MeshLambertMaterial({ map: exitTotemTex(st.name, st.lines, ref), emissive: '#ffffff', emissiveMap: exitTotemTex(st.name, st.lines, ref), emissiveIntensity: 0.25 }); (this.exitSignMs ||= []).push(tm);
       const totem = new THREE.Mesh(new THREE.BoxGeometry(0.62, 2.7, 0.2), [frame, frame, frame, frame, tm, tm]); totem.position.set(1.95, 1.35, -2.2); g.add(totem);
-      this.scene.add(g); this.entrances.push({ x, z, st, ref, g }); this.addCircle(x, z, 0.4, 2.6);
+      this.scene.add(g); this.entrances.push({ x, z, st, ref, g });
+      // 부딪힘: 양옆 화강석 벽 · 뒤 벽 · 안내 기둥 (가운데 계단으로는 걸어 내려갈 수 있다)
+      { const th = g.rotation.y, W = (lx, lz) => [x + lx * Math.cos(th) + lz * Math.sin(th), z - lx * Math.sin(th) + lz * Math.cos(th)], rect = (a0, b0, a1, b1) => { const ring = [W(a0, b0), W(a1, b0), W(a1, b1), W(a0, b1)], xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); this.addFoot({ ring, h: 2.6, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), name: `${st.name}역 ${ref || ''}번 출구`, type: 'stone', noClimb: false }); }; rect(-1.45, -2.3, -1.15, 2.4); rect(1.15, -2.3, 1.45, 2.4); rect(-1.45, 2.3, 1.45, 2.6); this.addCircle(W(1.95, -2.2)[0], W(1.95, -2.2)[1], 0.4, 2.7); }
     }
     // 한강철교 선로 두 줄: 가장 긴 철교 둘
     // 한강철교(노량진 ↔ 용산, 북위 37.5172 · 동경 126.958) 근처 철교 중 긴 두 줄
@@ -926,6 +954,9 @@ export class Hangang {
     for (const o of this.buses.values()) { o.x += (o.tx - o.x) * Math.min(1, dt * 0.25); o.z += (o.tz - o.z) * Math.min(1, dt * 0.25); o.mesh.position.set(o.x, 0, o.z); if (o.yaw != null) o.mesh.rotation.y = o.yaw; }
     // 가까운 지하철 출입구
     let near = null; for (const e of this.entrances) { const d = Math.hypot(e.x - px, e.z - pz); if (d < 7 && (!near || d < near.d)) near = { ...e, d }; }
+    // 출구 계단을 반쯤 내려가면 역 안으로
+    this.stationCool = Math.max(0, (this.stationCool || 0) - dt);
+    if (near && near.d < 3 && !this.inside && !this.stationCool && this.y < 0.5) { const th = near.g.rotation.y, dx = px - near.x, dz = pz - near.z, lx = dx * Math.cos(th) - dz * Math.sin(th), lz = dx * Math.sin(th) + dz * Math.cos(th); if (Math.abs(lx) < 1.1 && lz > -0.4 && lz < 2.2) { this.enterStation(near); return; } }
     const key = near ? `${near.st.name}:${near.ref}` : null; if (key !== this.nearSt) { this.nearSt = key; this.onStation?.(near ? { name: near.st.name, ref: near.ref, lines: near.st.lines } : null); }
   }
   // ---------- 들어가기 · 나가기 ----------
@@ -1010,7 +1041,7 @@ export class Hangang {
       const res = this.pushOut(nx, nz, this.y, R0, this.onRoof);
       nx = res.x; nz = res.z;
       // 벽을 향해 계속 걸으면 벽 타기 (젤리시티처럼)
-      if (res.wall && this.mdx * res.wall.nx + this.mdz * res.wall.nz < -0.55 && res.wall.f.h > this.y + 1.2) { this.wallPush = (this.wallPush || 0) + dt; if (this.wallPush > 0.22) { this.climb = { f: res.wall.f, nx: res.wall.nx, nz: res.wall.nz, top: res.wall.f.h }; this.wallPush = 0; this.vy = 0; this.jumps = 0; } }
+      if (res.wall && !res.wall.f.noClimb && this.mdx * res.wall.nx + this.mdz * res.wall.nz < -0.55 && res.wall.f.h > this.y + 1.2) { this.wallPush = (this.wallPush || 0) + dt; if (this.wallPush > 0.22) { this.climb = { f: res.wall.f, nx: res.wall.nx, nz: res.wall.nz, top: res.wall.f.h }; this.wallPush = 0; this.vy = 0; this.jumps = 0; } }
       else this.wallPush = 0;
       ds = Math.hypot(nx - this.px, nz - this.pz); this.px = nx; this.pz = nz; this.dist += ds;
       const q2 = this.project(nx, nz); this.s = q2.s; this.lat = q2.lat;
@@ -1040,7 +1071,10 @@ export class Hangang {
     if (!this.climb) poseBear(this.bear, { ground: this.y <= this.groundAt(bx, bz, this.y) + 0.001, slide: this.slide, flip: this.flipT > 0 ? 1 - this.flipT / FLIP_T : null, vy: this.vy, alive: true }, dt);
     this.shadow.position.set(bx, this.groundAt(bx, bz, this.y) + 0.02, bz); this.shadow.scale.setScalar(BEAR * (1 - Math.min(0.5, this.y * 0.2)));
     this.tickPeople(dt, bx, bz); this.tickGroups(dt, bx, bz); this.tickCity(dt, bx, bz); this.tickTransit(dt, bx, bz); this.tickLabels(dt, camera, bx, bz);
+    if (this.inside) { this.tickInside(dt); }
     this.tickEnv(dt, camera, bx, bz);
+    if (this.inside) for (const o of this.hidden || []) o.visible = false; // 날씨 · 계절이 다시 켠 바깥 것들은 다시 숨긴다
+    if (this.inside && this.scene.fog) { this.scene.fog.density = 0.004; this.scene.fog.color.set('#d8d2c8'); } // 역 안: 안개 거의 없이
     this.tickCamera(dt, camera, bx, bz, Math.sin(this.camYaw), Math.cos(this.camYaw));
   }
   // 사람 수 · 구성: 계절 · 날씨 · 시간에 따라 (벚꽃 철엔 연인이 가득, 비 · 추위 · 한밤엔 드문드문 러너만)
@@ -1166,6 +1200,7 @@ export class Hangang {
     if (!this.camInit) { camera.position.set(cx, cy, cz); this.camInit = true; }
     const ky = this.climb || Math.abs(cy - camera.position.y) > 3 ? 1 - Math.exp(-dt * 12) : k; camera.position.x += (cx - camera.position.x) * k; camera.position.y += (cy - camera.position.y) * ky; // 높이: 벽 타기나 크게 벌어졌을 땐 빨리 따라간다 (작은 점프는 부드럽게)
     camera.position.z += (cz - camera.position.z) * k; camera.position.y = Math.max(0.3, camera.position.y); { const dg = this.deckAt(camera.position.x, camera.position.z, this.y + 0.5); if (dg > 0.5 && this.y >= dg - 0.3) camera.position.y = Math.max(camera.position.y, dg + 0.6); } // 다리 위에 있을 땐 카메라가 다리 밑으로 안 내려간다
+    if (this.inside) camera.position.y = Math.min(camera.position.y, 4.1);
     this.look ||= new THREE.Vector3(lx, ly, lz); this.look.x += (lx - this.look.x) * k; this.look.y += (ly - this.look.y) * ky; this.look.z += (lz - this.look.z) * k;
     camera.lookAt(this.look);
     const fov = 56 + clamp(this.v - 6, 0, 18) * 0.8; if (Math.abs(camera.fov - fov) > 0.05 || camera.far < 20000) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 3); camera.far = 24000; camera.updateProjectionMatrix(); }
@@ -1278,6 +1313,7 @@ export class Hangang {
   }
   // 지금 위치 설명: 다음 이정표까지
   where() {
+    if (this.inside) return `${this.inside.st.name}역 안`;
     const marks = this.map.marks || [], s = this.s, d = this.dir;
     const next = d > 0 ? marks.find(([, ms]) => ms > s + 5) : [...marks].reverse().find(([, ms]) => ms < s - 5);
     return next ? `${next[0]}까지 ${Math.round(Math.abs(next[1] - s))}m` : d > 0 ? `반환점까지 ${Math.round(this.L - s)}m` : `반환점까지 ${Math.round(s)}m`;
