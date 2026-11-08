@@ -94,28 +94,55 @@ if (dr) {
   p(`- 순위표에 올라간 기록 중 다시 돌려 확인된 비율: ${pct(verified, entries)}`);
   p();
 }
+// 지난 활동 추정: 하루 지표를 쌓기 전에는 판마다의 날짜가 없다. 대신 날짜가 남는 두 가지로 '그날 달렸다'를 추정한다
+//   ① 순위표 기록의 at (그날 최고 기록을 냈다) ② 드림 러너 업적을 딴 시각 (그날 달려서 업적을 땄다)
+//   기록을 깨지도 업적을 따지도 못한 날은 빠지니, 실제보다 적게 잡힌다 (재방문율도 실제보다 낮게 나온다)
+const kst = (t) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);
+function pastActivity(B, cosUsers, prefix = '') {
+  const act = new Map(), add = (sub, t) => { if (!t || !sub.startsWith(prefix)) return; if (!act.has(sub)) act.set(sub, new Set()); act.get(sub).add(kst(t)); };
+  for (const T of [...Object.values(B.boards || {}), B.best || {}, B.bestItem || {}]) for (const [sub, e] of Object.entries(T)) add(sub, e.at);
+  for (const [sub, u] of Object.entries(cosUsers || {})) if (B.stats?.[sub] || Object.values(B.boards || {}).some((T) => T[sub])) for (const [k, t] of Object.entries(u.ach || {})) if (k.startsWith('dr.')) add(sub, t);
+  return act;
+}
 // 하루 지표 (서버가 daily 를 쌓기 시작한 뒤부터): 달린 사람 · 새로 온 사람 · 판수 · 광고 · 재방문율
-function dailySection(title, B) {
-  const days = Object.keys(B?.daily || {}).sort(); if (!days.length) return;
-  const first = B.first || {}, newOn = {}; for (const d of Object.values(first)) newOn[d] = (newOn[d] || 0) + 1;
-  const plus = (d, n) => new Date(Date.parse(d) + n * DAY).toISOString().slice(0, 10), today = days[days.length - 1];
+function dailySection(title, B, past = new Map()) {
+  const days = Object.keys(B?.daily || {}).sort();
+  // 날마다 달린 사람: 하루 지표(정확) + 지난 활동(추정)
+  const active = {}; for (const [sub, ds] of past) for (const d of ds) (active[d] ||= new Set()).add(sub);
+  for (const d of days) for (const sub of B.daily[d].subs) (active[d] ||= new Set()).add(sub);
+  const allDays = Object.keys(active).sort(); if (!allDays.length) return;
+  const first = {}; for (const d of allDays) for (const sub of active[d]) first[sub] ||= d;
+  const newOn = {}; for (const d of Object.values(first)) newOn[d] = (newOn[d] || 0) + 1;
+  const est = past.size > 0, since = days[0] || '9999';
+  const plus = (d, n) => new Date(Date.parse(d) + n * DAY).toISOString().slice(0, 10), today = allDays[allDays.length - 1];
+  // 주간: 월요일 시작
+  const monday = (d) => { const t = new Date(`${d}T00:00:00Z`), w = (t.getUTCDay() + 6) % 7; return new Date(t - w * DAY).toISOString().slice(0, 10); };
+  const weeks = {}; for (const d of allDays) { const w = (weeks[monday(d)] ||= { subs: new Set(), fresh: 0 }); for (const sub of active[d]) w.subs.add(sub); w.fresh += newOn[d] || 0; }
+  p(`### ${title}: 주간 활동${est ? ' (지표를 쌓기 전은 추정)' : ''}`);
+  p();
+  p('| 주 (월요일) | 달린 사람 | 처음 온 사람 |');
+  p('|---|---|---|');
+  for (const [w, x] of Object.entries(weeks).sort()) p(`| ${w}${w < monday(since) ? ' (추정)' : ''} | ${fmt(x.subs.size)} | ${fmt(x.fresh)} |`);
+  p();
+  if (days.length) {
   p(`### ${title}: 하루 지표 (최근 14일)`);
   p();
   p('| 날짜 | 달린 사람 | 새로 온 사람 | 판수 | 1인당 판수 | 광고 제안 | 광고 시청 | 시청률 | 광고 본 사람 |');
   p('|---|---|---|---|---|---|---|---|---|');
+  // 판수 · 광고는 하루 지표를 쌓은 날만 정확하다
   for (const d of days.slice(-14)) { const x = B.daily[d], n = x.subs.length; p(`| ${d} | ${fmt(n)} | ${fmt(newOn[d] || 0)} | ${fmt(x.runs)} | ${n ? (x.runs / n).toFixed(1) : '-'} | ${fmt(x.adOffer || 0)} | ${fmt(x.adWatch || 0)} | ${pct(x.adWatch || 0, x.adOffer || 0)} | ${fmt((x.adSubs || []).length)} |`); }
   p();
+  }
   // 재방문율: 처음 달린 날(코호트) 기준으로 1일 · 7일 뒤에 다시 달린 비율. 아직 그날이 안 온 코호트는 뺀다
-  const ret = (n) => { let base = 0, back = 0; for (const [sub, d] of Object.entries(first)) { const t = plus(d, n); if (t > today) continue; base++; if (B.daily[t]?.subs.includes(sub)) back++; } return [back, base]; };
+  const ret = (n) => { let base = 0, back = 0; for (const [sub, d] of Object.entries(first)) { const t = plus(d, n); if (t > today) continue; base++; if (active[t]?.has(sub)) back++; } return [back, base]; };
   const [b1, n1] = ret(1), [b7, n7] = ret(7);
   const all = days.reduce((a, d) => a + B.daily[d].runs, 0), offer = days.reduce((a, d) => a + (B.daily[d].adOffer || 0), 0), watch = days.reduce((a, d) => a + (B.daily[d].adWatch || 0), 0);
-  p(`- 기록 기간: ${days[0]} ~ ${today} (${days.length}일) · 처음 달린 사람 ${fmt(Object.keys(first).length)}명 · 판수 ${fmt(all)}판`);
-  p(`- 다음 날 다시 달린 비율 (D1): ${pct(b1, n1)} (${fmt(b1)}/${fmt(n1)}명) · 7일 뒤 (D7): ${pct(b7, n7)} (${fmt(b7)}/${fmt(n7)}명)`);
+  p(`- 활동 기간: ${allDays[0]} ~ ${today} · 달린 사람 ${fmt(Object.keys(first).length)}명${days.length ? ` · 하루 지표는 ${days[0]}부터 (판수 ${fmt(all)}판)` : ''}`);
+  p(`- 다음 날 다시 달린 비율 (D1): ${pct(b1, n1)} (${fmt(b1)}/${fmt(n1)}명) · 7일 뒤 (D7): ${pct(b7, n7)} (${fmt(b7)}/${fmt(n7)}명)${est ? ' — 지난 기간은 기록을 깨거나 업적을 딴 날만 알 수 있어서 실제보다 낮게 나와요' : ''}`);
   if (offer) p(`- 보상형 광고: 제안 ${fmt(offer)}번 · 시청 ${fmt(watch)}번 · 시청률 ${pct(watch, offer)}`);
-  p('- 처음 달린 날은 지표를 쌓기 시작한 날부터 세요. 그 전부터 달리던 사람도 그날 \'새로 온 사람\'으로 잡혀요.');
   p();
 }
-if (dr) dailySection('웹', dr);
+if (dr) dailySection('웹', dr, pastActivity(dr, cos?.users));
 if (drT) {
   const n = Object.values(drT.boards || {}).reduce((a, T) => a + Object.keys(T).length, 0) + Object.keys(drT.best || {}).length + Object.keys(drT.bestItem || {}).length;
   p('### 토스 미니앱');
