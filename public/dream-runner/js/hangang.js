@@ -7,6 +7,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeBear, poseBear, FLIP_T } from './runner.js';
 import { isPhone } from '../../shared/js/perf.js';
 import { buildStation, buildCar } from './hangang-station.js';
+import { glyph, glyphTex, signMaterial } from './hangang-glyphs.js';
 import { buildShopFronts, buildShopInterior, foodMesh, SHOP_MENU, SHOP_KIND } from './hangang-shop.js';
 import { buildMall } from './hangang-mall.js';
 import { buildSummit, tickSummit, deckBears } from './hangang-summit.js';
@@ -294,6 +295,8 @@ export class Hangang {
   tickWorld(px, pz) {
     if (this.map.kind !== 'world') return;
     const T = this.world0.tile, ti = Math.floor(px / T), tj = Math.floor(pz / T); this.tileNow = [ti, tj];
+    // 먼 나무 칸은 그리지 않는다 (1.1km 넘게, 날 때는 높이만큼 더 멀리까지). 0.4초마다
+    if ((this.lodT = (this.lodT || 0) + 1) % 12 === 0) { const R = 1100 + Math.min(900, (this.y || 0) * 3); for (const c of this.chunks.values()) c.scene.traverse((o) => { const L = o.userData.lod; if (L) o.count = Math.hypot(L[0] - px, L[1] - pz) < R + 360 ? L[2] : 0; }); }
     // 칸을 쉬어 가며 만드는 중에는 내리지 않는다 (같이 쓰는 목록을 내리기가 새로 만들어 버리면 만드는 칸이 옛 목록에 쓴다)
     if (this.chunkLoading) return;
     for (const key of [...this.chunks.keys()]) { const [i, j] = key.split('_').map(Number); if (Math.max(Math.abs(i - ti), Math.abs(j - tj)) > 2) this.unloadChunk(key); }
@@ -341,7 +344,8 @@ export class Hangang {
     const lift = (o) => { const b = new THREE.Box3().setFromObject(o); if (b.isEmpty()) return; b.getCenter(v); o.position.y += H(v.x, v.z); o.updateMatrixWorld(true); };
     const inst = (o) => { o.updateWorldMatrix(true, false); m4i.copy(o.matrixWorld).invert(); const a = new THREE.Matrix4(); for (let k = 0; k < o.count; k++) { o.getMatrixAt(k, a); m4.multiplyMatrices(o.matrixWorld, a); v.setFromMatrixPosition(m4); const by = o.userData.baseY?.[k], dy = by === by && by !== undefined ? by : H(v.x, v.z); m4.elements[13] += dy; a.multiplyMatrices(m4i, m4); o.setMatrixAt(k, a); } o.instanceMatrix.needsUpdate = true; o.computeBoundingSphere?.(); };
     const visit = (o) => {
-      if (o.userData.noDrape) return;
+      // based = 이미 그 건물 바닥 높이에 올려 둔 것 (묶기는 그대로)
+      if (o.userData.noDrape || o.userData.based) return;
       if (o.isInstancedMesh) return inst(o);
       if (o.material === this.waterM) return; // 물은 0 높이 그대로
       const b = new THREE.Box3().setFromObject(o), size = b.isEmpty() ? 0 : Math.max(b.max.x - b.min.x, b.max.z - b.min.z);
@@ -892,11 +896,55 @@ export class Hangang {
     const bg = new THREE.IcosahedronGeometry(0.32, 1); bg.scale(1, 0.85, 1); bg.translate(0, 0.27, 0); const bim = mk(bg, new THREE.MeshLambertMaterial({ color: '#ffffff' }), bags.flatMap(([x, z]) => [[x, z], [x + 0.4, z + 0.2], [x - 0.1, z + 0.45]]), ([x, z]) => { o.position.set(x, 0, z); o.rotation.set(0, 0, 0); o.scale.setScalar(0.8 + Math.random() * 0.4); }); if (bim) { const c = new THREE.Color(); for (let i = 0; i < bim.count; i++) bim.setColorAt(i, c.set(i % 3 === 1 ? '#1d1d1f' : '#f2f0ea')); } o.scale.set(1, 1, 1);
   }
   // 거리 지역 간판: 길을 바라보는 낮은 상가 벽마다 1층 간판 띠 + 2 · 3층 가로 간판 (그 동네 실제 가게 이름, 스타일 여러 가지)
+  // 진짜 가게 간판 (소상공인 상가정보): 가게가 실제로 있는 건물의 길 쪽 벽에, 실제 층에. 1층은 가로 간판 + 들어갈 수 있는 문, 2층 위는 창문 글씨 간판
+  buildRealSigns(nearRoad, r) {
+    const M = this.map, byB = new Map(); for (const s2 of M.shops2) { let L = byB.get(s2[2]); if (!L) byB.set(s2[2], (L = [])); L.push(s2); }
+    // 업종마다 간판 색 (바탕, 글씨): 실제 서울 간판에서 흔한 조합
+    const ST = { cafe: [['#f4efe6', '#3b2a1e'], ['#2f5d4a', '#ffffff'], ['#1b1820', '#f2e6d0']], bakery: [['#fff3d6', '#7a3b2e'], ['#b5733d', '#ffffff']], korean: [['#7a3b2e', '#fff3d6'], ['#ffffff', '#c0392b'], ['#1f2a44', '#ffd23f'], ['#fff7c2', '#b8322a']], chicken: [['#ffd23f', '#c0392b'], ['#d8752a', '#ffffff']], pizza: [['#b8322a', '#ffffff'], ['#2f7a5a', '#ffffff']], burger: [['#c0392b', '#ffd23f']], chinese: [['#a8231d', '#ffd23f']], japanese: [['#2b2b2b', '#f4efe6'], ['#f4efe6', '#2b2b2b']], pub: [['#1b1820', '#ffb347'], ['#3b2a22', '#ffe2b0'], ['#2a2a6a', '#ff9ec0']], western: [['#f4efe6', '#2f5d4a'], ['#1b1820', '#ffffff']], mart: [['#2f7fd8', '#ffffff'], ['#ffffff', '#1f9d55'], ['#6a2bb8', '#ffffff']],
+      pharm: [['#1f9d55', '#ffffff']], hair: [['#ffffff', '#b8326a'], ['#1b1820', '#ff9ec0'], ['#f2c6cf', '#5a2a3a']], clinic: [['#ffffff', '#1f4fa8'], ['#1f4fa8', '#ffffff']], academy: [['#1f4fa8', '#ffffff'], ['#ffffff', '#2f7fd8'], ['#ff8a3d', '#ffffff']], realty: [['#ffffff', '#c0392b'], ['#ffd23f', '#1b1820']], cloth: [['#1b1820', '#ffffff'], ['#ffffff', '#1b1820']], super: [['#2f7a5a', '#ffffff'], ['#c0392b', '#ffffff']], laundry: [['#3db8ff', '#ffffff']], flower: [['#ffffff', '#2f7a5a']], motel: [['#6a2bb8', '#ffd23f']], store: [['#ffffff', '#1f4fa8'], ['#ffd23f', '#1b1820'], ['#2f7a5a', '#ffffff']], repair: [['#ffffff', '#1b1820']], sport: [['#1b1820', '#3db8ff']], office: [['#ffffff', '#1f4fa8'], ['#e8e8e4', '#2b2b2b']] };
+    const list = [], up = [], doors = [];
+    for (const f of this.foot) {
+      const L0 = f.bi === undefined ? null : byB.get(f.bi); if (!L0 || f.h < 3 || f.type === 'glass' || f.type === 'gold') continue;
+      const ring = f.ring, sg = ringArea(ring) > 0 ? 1 : -1, by = f.base === undefined ? NaN : f.base - 0.15, edges = [];
+      for (let k = 0; k < ring.length; k++) { const a = ring[k], c = ring[(k + 1) % ring.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]); if (L < 3) continue; const nx = (sg > 0 ? c[1] - a[1] : a[1] - c[1]) / L, nz = (sg > 0 ? a[0] - c[0] : c[0] - a[0]) / L, mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; let tx = (c[0] - a[0]) / L, tz = (c[1] - a[1]) / L; if (tx * nz - tz * nx < 0) { tx = -tx; tz = -tz; } edges.push({ L, nx, nz, mx, mz, tx, tz, d: nearRoad(mx + nx * 2, mz + nz * 2) }); }
+      if (!edges.length) continue; edges.sort((a, b) => (a.d > 10) - (b.d > 10) || b.L - a.L); const front = edges.filter((e) => e.d <= 10); if (!front.length) front.push(edges[0]);
+      const g1 = L0.filter((s2) => s2[3] <= 1), cap = front.reduce((n, e) => n + Math.max(1, Math.floor(e.L / 4.5)), 0);
+      // 1층: 길 쪽 벽들을 가게 수만큼 나눠 쓴다
+      let gi = 0; for (const e of front) { const n = Math.max(1, Math.floor(e.L / 4.5)), k0 = Math.min(n, g1.length - gi); if (k0 <= 0) break; const w = e.L / k0;
+        for (let q = 0; q < k0; q++, gi++) { const s2 = g1[gi], off = -e.L / 2 + w * (q + 0.5), x = e.mx + e.tx * off, z = e.mz + e.tz * off, pal = ST[s2[1]] || ST.store, st = pal[Math.floor(r() * pal.length)];
+          if (this.shopFronts.some((F) => !F.real && Math.abs(F.x - x) < 3.5 && Math.abs(F.z - z) < 3.5)) continue; // 오픈스트리트맵 가게(차양 · 간판이 따로 있는 곳)와 겹치지 않게
+          list.push({ x: x + e.nx * 0.14, z: z + e.nz * 0.14, tx: e.tx, tz: e.tz, w: Math.min(w * 0.9, 9), y0: s2[3] === 0 ? 0.5 : 2.95, y1: s2[3] === 0 ? 1.15 : 3.75, n: s2[0], bg: st[0], fg: st[1], by });
+          if (s2[3] === 1 && SHOP_KIND[s2[1]] && w > 2.4 && !this.shopFronts.some((F) => Math.abs(F.x - x) < 3 && Math.abs(F.z - z) < 3)) doors.push({ name: s2[0], kind: s2[1], x: x + e.nx * 0.05, z: z + e.nz * 0.05, nx: e.nx, nz: e.nz, by, real: 1 }); } }
+      void cap;
+      // 2층 위: 그 층 창문에 글씨 간판 (층 높이 3.3m)
+      const perFl = {}; for (const s2 of L0) { if (s2[3] < 2) continue; const yc = (s2[3] - 1) * 3.3 + 1.7; if (yc > f.h - 0.8) continue; const e = front[(perFl[s2[3]] || 0) % front.length], j = Math.floor((perFl[s2[3]] || 0) / front.length); perFl[s2[3]] = (perFl[s2[3]] || 0) + 1; const w = Math.min(e.L * 0.42, 5.5), off = (j % 2 ? 1 : -1) * Math.min(e.L * 0.25, 4) * (j > 0 ? 1 : 0), pal = ST[s2[1]] || ST.office, st = pal[Math.floor(r() * pal.length)];
+        up.push({ x: e.mx + e.tx * off + e.nx * 0.12, z: e.mz + e.tz * off + e.nz * 0.12, tx: e.tx, tz: e.tz, w, y0: yc - 0.45, y1: yc + 0.45, n: s2[0], bg: st[0], fg: st[1], by, fl: s2[3] }); }
+    }
+    // 한 칸 간판 7,000개까지: 1층 먼저, 낮은 층부터
+    up.sort((a, b) => a.fl - b.fl); const all = [...list, ...up].slice(0, 7000);
+    if (doors.length) { const o = new THREE.Object3D(), fg = new THREE.BoxGeometry(1.9, 2.5, 0.1); fg.translate(0, 1.25, 0.02); const dg = new THREE.PlaneGeometry(1.6, 2.3); dg.translate(0, 1.15, 0.08); const fm = new THREE.InstancedMesh(fg, new THREE.MeshLambertMaterial({ color: '#2b2d31' }), doors.length), dm = new THREE.InstancedMesh(dg, new THREE.MeshPhongMaterial({ color: '#d8c8a8', emissive: '#ffd9a0', emissiveIntensity: 0.25, shininess: 80 }), doors.length);
+      doors.forEach((D, i) => { o.position.set(D.x, 0, D.z); o.rotation.y = Math.atan2(D.nx, D.nz); o.updateMatrix(); fm.setMatrixAt(i, o.matrix); dm.setMatrixAt(i, o.matrix); D.key = this.chunkKey; const fi = this.shopFronts.push(D) - 1, k = `${Math.floor(D.x / 40)},${Math.floor(D.z / 40)}`; if (!this.shopGrid.has(k)) this.shopGrid.set(k, []); this.shopGrid.get(k).push(fi); });
+      fm.userData.baseY = dm.userData.baseY = doors.map((D) => D.by); this.scene.add(fm, dm); }
+    this.realSigns = all;
+    // 바탕 판(꼭짓점 색) 한 덩어리 + 글자 조각(글자 그림 한 장) 한 덩어리 = 칸마다 그리기 2번
+    const B = { P: [], C: [], I: [], Y: [] }, T = { P: [], C: [], U: [], I: [], Y: [] }, col = new THREE.Color();
+    const quad = (G, S, a0, a1, y0, y1, dz, c, uv) => { const k = G.P.length / 3, nx = -S.tz, nz = S.tx; for (const [a, y] of [[a0, y0], [a1, y0], [a1, y1], [a0, y1]]) { G.P.push(S.x + S.tx * a + nx * dz, y, S.z + S.tz * a + nz * dz); G.C.push(c.r, c.g, c.b); G.Y.push(S.by); } if (uv) G.U.push(uv.u0, uv.v0, uv.u1, uv.v0, uv.u1, uv.v1, uv.u0, uv.v1); G.I.push(k, k + 1, k + 2, k, k + 2, k + 3); };
+    for (const S of all) {
+      const hw = S.w / 2, H = S.y1 - S.y0; col.set(S.bg); quad(B, S, -hw, hw, S.y0, S.y1, 0, col);
+      const chars = [...S.n].filter((ch) => ch.trim()), gs = chars.map((ch) => glyph(ch)); if (!chars.length) continue;
+      let cs = H * 0.78; const tw = () => gs.reduce((n, g) => n + (g ? g.w : 0.5) * cs, 0); if (tw() > S.w * 0.9) cs *= (S.w * 0.9) / tw();
+      let a = -tw() / 2; const yc = (S.y0 + S.y1) / 2; col.set(S.fg);
+      for (const g of gs) { const gw = (g ? g.w : 0.5) * cs; if (g) { const pad = (cs - gw) / 2; quad(T, S, a - pad, a + gw + pad, yc - cs / 2, yc + cs / 2, 0.03, col, g); } a += gw; }
+    }
+    if (B.P.length) { const mk = (G, m) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(G.P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(G.C, 3)); if (G.U) g.setAttribute('uv', new THREE.Float32BufferAttribute(G.U, 2)); g.setIndex(G.I); g.computeVertexNormals(); g.userData.baseY = new Float32Array(G.Y); const me = new THREE.Mesh(g, m); this.scene.add(me); (this.shopSignMs ||= []).push(m); };
+      mk(B, signMaterial(false)); glyphTex(); mk(T, signMaterial(true)); }
+  }
   buildStreetSigns(P2, r) {
     const M = this.map, segs = new Map(), G = 20, addSeg = (a, b, hw) => { const k = `${Math.floor((a[0] + b[0]) / 2 / G)},${Math.floor((a[1] + b[1]) / 2 / G)}`; if (!segs.has(k)) segs.set(k, []); segs.get(k).push([a, b, hw]); };
     for (const rd of M.roads) { const p = P2(rd.slice(2)); for (let i = 1; i < p.length; i++) { const L = Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]), n = Math.max(1, Math.ceil(L / 15)); for (let k = 0; k < n; k++) addSeg([p[i - 1][0] + (p[i][0] - p[i - 1][0]) * k / n, p[i - 1][1] + (p[i][1] - p[i - 1][1]) * k / n], [p[i - 1][0] + (p[i][0] - p[i - 1][0]) * (k + 1) / n, p[i - 1][1] + (p[i][1] - p[i - 1][1]) * (k + 1) / n], rd[0] / 2); } }
     for (const [w, ...f] of M.alleys || []) { const p = P2(f); for (let i = 1; i < p.length; i++) addSeg(p[i - 1], p[i], w / 2); }
     const nearRoad = (x, z) => { let best = Infinity; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const [A, B, hw] of segs.get(`${Math.floor(x / G) + a},${Math.floor(z / G) + b}`) || []) { const dx = B[0] - A[0], dz = B[1] - A[1], L2 = dx * dx + dz * dz || 1, t = clamp(((x - A[0]) * dx + (z - A[1]) * dz) / L2, 0, 1); best = Math.min(best, Math.hypot(A[0] + dx * t - x, A[1] + dz * t - z) - hw); } return best; };
+    if (M.shops2?.length) return this.buildRealSigns(nearRoad, r);
     const pool = (M.shops || []).filter((s2) => s2[0].length >= 2); if (!pool.length) return; const doors = [];
     const list = [];
     for (const f of this.foot || []) { if (!(f.type === 'street' || f.type === 'street2' || f.type === 'factory') || f.h < 4) continue; const ring = f.ring, sg = ringArea(ring) > 0 ? 1 : -1;
@@ -1068,7 +1116,7 @@ export class Hangang {
       const k = base(); for (const [x, z] of top) { set.P.push(x, h, z); set.N.push(0, 1, 0); set.U.push(0.003, 0.003); set.Cl.push(roofC.r, roofC.g, roofC.b); }
       for (const t of tris) { const [A, B, Cc] = t.map((v) => ring[v]); const up = (B[1] - A[1]) * (Cc[0] - A[0]) - (B[0] - A[0]) * (Cc[1] - A[1]); if (up > 0) set.I.push(k + t[0], k + t[1], k + t[2]); else set.I.push(k + t[0], k + t[2], k + t[1]); }
       let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length;
-      { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } const fi = (this.foot ||= []).length; this.foot.push({ ring, h, x0, x1, z0, z1, name, type, base: curY === curY ? curY + 0.15 : undefined }); this.footGrid ||= new Map(); for (let gx = Math.floor(x0 / 40); gx <= Math.floor(x1 / 40); gx++) for (let gz = Math.floor(z0 / 40); gz <= Math.floor(z1 / 40); gz++) { const k = `${gx},${gz}`; if (!this.footGrid.has(k)) this.footGrid.set(k, []); this.footGrid.get(k).push(fi); } }
+      { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } const fi = (this.foot ||= []).length; this.foot.push({ ring, h, x0, x1, z0, z1, name, type, bi, base: curY === curY ? curY + 0.15 : undefined }); this.footGrid ||= new Map(); for (let gx = Math.floor(x0 / 40); gx <= Math.floor(x1 / 40); gx++) for (let gz = Math.floor(z0 / 40); gz <= Math.floor(z1 / 40); gz++) { const k = `${gx},${gz}`; if (!this.footGrid.has(k)) this.footGrid.set(k, []); this.footGrid.get(k).push(fi); } }
       // 옥상 설비 (높은 건물)
       // 아파트 옆벽: 위쪽에 단지 이름 + 큰 동 번호 (한국 아파트처럼)
       if (type === 'apt' && h > 14) { const realNo = /(\d+)동$/.exec(name || '')?.[1], key = (name || '').replace(/\s*\d+동$/, '').replace(/\s*(아파트|APT)\s*/gi, '').replace(/\(.*?\)/g, '').trim().slice(0, 6); this.aptNo ||= {}; const no = realNo ? +realNo : (this.aptNo[key || '_'] = (this.aptNo[key || '_'] || 0) + 1) + (key ? 0 : 100); const edges = ring.map((a, i) => { const b = ring[(i + 1) % ring.length]; return { a, b, L: Math.hypot(b[0] - a[0], b[1] - a[1]) }; }).filter((e) => e.L > 6).sort((p, q) => p.L - q.L).slice(0, 2); for (const e of edges) { const mx = (e.a[0] + e.b[0]) / 2, mz = (e.a[1] + e.b[1]) / 2; let nx = mx - cx, nz = mz - cz; const nl = Math.hypot(nx, nz) || 1; nx /= nl; nz /= nl; (this.aptMarks ||= []).push({ x: mx + nx * 0.1, z: mz + nz * 0.1, y: h - 0.4, w: Math.min(e.L * 0.98, 18), hh: Math.min(10, h * 0.32), ry: Math.atan2(nx, nz), text: key, no }); } }
@@ -1100,7 +1148,7 @@ export class Hangang {
     mk(extras, new THREE.MeshLambertMaterial({ vertexColors: true }));
     this.signM = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: '#ffffff', emissiveIntensity: 0, side: THREE.DoubleSide }); mk(signs, this.signM);
     this.crossM = new THREE.MeshLambertMaterial({ color: '#f4f1ea', emissive: '#ff3030', emissiveIntensity: 0 });
-    for (const ring of crosses) { const f = this.foot?.find((q) => q.ring === ring); if (!f) continue; let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length; const big = Math.sqrt(Math.abs(ringArea(ring))) > 40, H2 = big ? 14 : 6; const pole = new THREE.Mesh(new THREE.BoxGeometry(big ? 1.2 : 0.5, H2, big ? 1.2 : 0.5), this.crossM); pole.position.set(cx, f.h + H2 / 2, cz); const bar = new THREE.Mesh(new THREE.BoxGeometry(big ? 6 : 2.6, big ? 1.2 : 0.5, big ? 1.2 : 0.5), this.crossM); bar.position.set(cx, f.h + H2 * 0.72, cz); if (f.base !== undefined) { pole.position.y += f.base; bar.position.y += f.base; pole.userData.noDrape = bar.userData.noDrape = true; } this.scene.add(pole, bar); }
+    for (const ring of crosses) { const f = this.foot?.find((q) => q.ring === ring); if (!f) continue; let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length; const big = Math.sqrt(Math.abs(ringArea(ring))) > 40, H2 = big ? 14 : 6; const pole = new THREE.Mesh(new THREE.BoxGeometry(big ? 1.2 : 0.5, H2, big ? 1.2 : 0.5), this.crossM); pole.position.set(cx, f.h + H2 / 2, cz); const bar = new THREE.Mesh(new THREE.BoxGeometry(big ? 6 : 2.6, big ? 1.2 : 0.5, big ? 1.2 : 0.5), this.crossM); bar.position.set(cx, f.h + H2 * 0.72, cz); if (f.base !== undefined) { pole.position.y += f.base; bar.position.y += f.base; pole.userData.based = bar.userData.based = true; } this.scene.add(pole, bar); }
     { const best = {}; for (const q of this.lmQueue || []) { const v = Math.abs(ringArea(q.ring)) * q.h, b2 = best[q.name]; if (!b2 || v > b2.v) best[q.name] = { q, v }; } for (const q of this.lmQueue || []) if (best[q.name].q !== q) (this.lmParts[q.name] ||= []).push({ ring: q.ring, h: q.h }); for (const { q } of Object.values(best)) buildLandmarkExtras(this, q); }
     // 아파트 동 번호: 글씨 그림 한 장(2048 × 2048, 256 × 160 칸 96개)에 모아 그리고, 판은 한 덩어리로 (예전엔 번호마다 재질 하나 → 서울 칸 9개에서 900번 그리기)
     if (this.aptMarks?.length) {
@@ -1123,7 +1171,7 @@ export class Hangang {
     if (this.helis?.length) { const t = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const c = cv.getContext('2d'); c.fillStyle = '#4f9e7c'; c.fillRect(0, 0, 128, 128); c.strokeStyle = '#f4f4ee'; c.lineWidth = 7; c.beginPath(); c.arc(64, 64, 50, 0, 7); c.stroke(); c.fillStyle = '#f4f4ee'; c.font = 'bold 64px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('H', 64, 68); c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 3; c.strokeRect(4, 4, 120, 120); const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace; return tx; })();
       const hg2 = new THREE.PlaneGeometry(1, 1); hg2.rotateX(-Math.PI / 2); const im = new THREE.InstancedMesh(hg2, new THREE.MeshLambertMaterial({ map: t }), this.helis.length), o = new THREE.Object3D(); im.userData.baseY = this.helis.map((q) => q.by ?? NaN); this.helis.forEach(([x, y, z, sz, ry], i) => { o.position.set(x, y, z); o.scale.set(sz * 2, 1, sz * 2); o.rotation.y = ry; o.updateMatrix(); im.setMatrixAt(i, o.matrix); }); this.scene.add(im); }
     const dm = new THREE.MeshPhongMaterial({ color: '#4f9e8c', shininess: 40, emissive: '#2a5a50', emissiveIntensity: 0 }); this.domeM = dm;
-    for (const [x, y, z, rad, dh, rc, by] of domes) { const m2 = dm.clone(); m2.color.set(rc).offsetHSL(0, 0.05, -0.06); this.domeMs = [...(this.domeMs || []), m2]; const d = new THREE.Mesh(new THREE.SphereGeometry(rad, 40, 16, 0, Math.PI * 2, 0, Math.PI / 2), m2); d.scale.y = dh / rad; d.position.set(x, y, z); if (by === by && by !== undefined) { d.position.y += by; d.userData.noDrape = true; } this.scene.add(d); }
+    for (const [x, y, z, rad, dh, rc, by] of domes) { const m2 = dm.clone(); m2.color.set(rc).offsetHSL(0, 0.05, -0.06); this.domeMs = [...(this.domeMs || []), m2]; const d = new THREE.Mesh(new THREE.SphereGeometry(rad, 40, 16, 0, Math.PI * 2, 0, Math.PI / 2), m2); d.scale.y = dh / rad; d.position.set(x, y, z); if (by === by && by !== undefined) { d.position.y += by; d.userData.based = true; } this.scene.add(d); }
   }
   // 멀리: 높은 건물 상자들 (실제 위치) · 남산타워 · 산 능선
   buildFar() {
@@ -1223,13 +1271,16 @@ export class Hangang {
     for (let k = 0; k < 4; k++) { const g = new THREE.CylinderGeometry(0.02, 0.04, 1.2, 3); g.translate(0, 0.6, 0); g.rotateZ(-0.7); g.rotateY(k * 1.7); g.translate(0.6, 4.2, 0); twigs.push(g); }
     const twigG = mergeGeos(twigs), barkM = new THREE.MeshLambertMaterial({ color: '#7a5240', vertexColors: true }), twigM = new THREE.MeshLambertMaterial({ color: '#6a4838' });
     SHAPES.forEach((sh, t) => {
-      const idx = spots.map((_, i) => i).filter((i) => kindOf[i] === t), n = idx.length; if (!n) { this.crownSets.push(null); return; }
+      const idxAll = spots.map((_, i) => i).filter((i) => kindOf[i] === t); if (!idxAll.length) { this.crownSets.push(null); return; }
+      // 서울 전체 칸: 500m 칸마다 따로 (화면 밖 · 먼 칸은 그리지 않게. 칸 하나에 나무가 수천 그루라 삼각형이 가장 많았다)
+      const groups = new Map(); for (const i of idxAll) { const k = this.isChunk ? `${Math.floor(spots[i][0] / 500)},${Math.floor(spots[i][1] / 500)}` : '0'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); }
+      for (const [gk, idx] of groups) { const n = idx.length;
       const tg = sh.trunk;
       const cm = sh.pine ? new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true }) : new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true, map: this.leafTex ||= foliageTex(false), alphaTest: 0.42, side: THREE.DoubleSide }); windify(cm, this.windU, 0.05, true); if (!sh.pine) this.cardMats = [...(this.cardMats || []), cm];
       const crowns = new THREE.InstancedMesh(sh.crown, cm, n), trunks = new THREE.InstancedMesh(tg, barkM, n), tw = sh.pine ? null : new THREE.InstancedMesh(twigG, twigM, n);
       idx.forEach((si, q) => { const [x, z, k] = spots[si]; o.position.set(x, 0, z); o.rotation.set(0, r() * 6.28, 0); o.scale.set(k * (0.85 + r() * 0.3), k * (0.85 + r() * 0.35), k * (0.85 + r() * 0.3)); o.updateMatrix(); crowns.setMatrixAt(q, o.matrix); trunks.setMatrixAt(q, o.matrix); tw?.setMatrixAt(q, o.matrix); });
-      for (const m of [crowns, trunks, tw]) if (m) { m.castShadow = true; m.receiveShadow = false; this.scene.add(m); }
-      this.crownSets.push({ crowns, idx, pine: !!sh.pine }); if (tw) this.twigSets.push(tw);
+      for (const m of [crowns, trunks, tw]) if (m) { m.castShadow = true; m.receiveShadow = false; this.scene.add(m); if (this.isChunk) { const [gx, gz] = gk.split(',').map(Number); m.userData.lod = [(gx + 0.5) * 500, (gz + 0.5) * 500, n]; m.userData.noMerge = true; } }
+      this.crownSets.push({ crowns, idx, pine: !!sh.pine }); if (tw) this.twigSets.push(tw); }
     });
     this.treeSeed = r;
     // 풀포기 · 꽃 (길 가까이)

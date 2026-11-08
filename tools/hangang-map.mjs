@@ -327,7 +327,7 @@ const VI = await (async () => {
 const parts = items.filter((b) => b.part);
 // 부분으로 그려진 건물: 외곽선의 이름 · 종류를 안쪽 부분들에 물려준다 (국회의사당 · 63빌딩처럼 이름표와 모습이 맞게)
 for (const b of items) { if (b.part || !b.t.name) continue; for (const p of parts) if (!p.t.name && Math.abs(p.c[0] - b.c[0]) < 250 && Math.abs(p.c[1] - b.c[1]) < 250 && inPoly(p.c, b.o)) { p.inherit = b.t.name; p.inheritKind = b.t.building; } }
-out.buildings = []; out.binfo = [];
+out.buildings = []; out.binfo = []; const bR = [];
 let dropped = 0;
 for (const b of items) {
   const { t, o, c } = b;
@@ -343,8 +343,27 @@ for (const b of items) {
   const kind = KIND[t.building] ?? KIND[b.inheritKind] ?? KIND[t['building:part']] ?? 0, mat = t['building:material'] === 'glass' ? 1 : 0;
   // 돔 지붕: 지붕 높이(m)를 담는다 (없으면 외곽 크기로 짐작)
   const dome = t['roof:shape'] === 'dome' ? Math.max(1, Math.round(num(t['roof:height']) || 0)) : 0;
-  out.buildings.push([Math.round(h * 10) / 10, Math.round(mh * 10) / 10, kind * 2 + mat, cIdx(t['building:colour'] || ''), nIdx(t.name || b.inherit || ''), cIdx(t['roof:colour'] || ''), dome, ...flat(s)]); out.binfo.push(b.info || 0);
+  out.buildings.push([Math.round(h * 10) / 10, Math.round(mh * 10) / 10, kind * 2 + mat, cIdx(t['building:colour'] || ''), nIdx(t.name || b.inherit || ''), cIdx(t['roof:colour'] || ''), dome, ...flat(s)]); out.binfo.push(b.info || 0); bR.push(s);
 }
+// 진짜 가게(소상공인 상가정보, tools/seoul-shops.mjs 로 받은 .cache/shops/<칸>.json): 가게마다 들어 있는 건물 · 층을 찾아 담는다
+//   게임은 그 건물의 길 쪽 벽에 층마다 간판을 단다 (아무 가게 이름을 아무 건물에 붙이지 않게). [이름, 종류, 건물 번호, 층(0 = 지하)]
+{ const f = path.join(ROOT, '.cache', 'shops', `${id}.json`); out.shops2 = [];
+  if (TILE_MODE && fs.existsSync(f)) {
+    const kindOf = (sc, mc, lc) => /편의점/.test(sc) ? 'mart' : /커피|카페/.test(sc) ? 'cafe' : /빵|도넛|제과/.test(sc) ? 'bakery' : /치킨/.test(sc) ? 'chicken' : /피자/.test(sc) ? 'pizza' : /버거/.test(sc) ? 'burger' : /중식/.test(mc) ? 'chinese' : /일식/.test(mc) ? 'japanese' : /주점/.test(mc) ? 'pub' : /서양식|동남아|기타 외국/.test(mc) ? 'western' : lc === '음식' ? 'korean'
+      : /약국/.test(sc) ? 'pharm' : /미용|이용|네일|피부/.test(mc + sc) ? 'hair' : lc === '보건의료' ? 'clinic' : lc === '교육' ? 'academy' : lc === '부동산' ? 'realty' : /의복|신발|잡화/.test(mc) ? 'cloth' : /슈퍼/.test(sc) ? 'super' : /세탁/.test(mc) ? 'laundry' : /꽃/.test(sc) ? 'flower' : /모텔|여관|호텔/.test(sc) ? 'motel' : /고시원|기숙사|펜션/.test(sc) ? '' : lc === '숙박' ? 'motel' : lc === '소매' ? 'store' : lc === '수리·개인' ? 'repair' : lc === '예술·스포츠' ? 'sport' : 'office';
+    const grid = new Map(), G = 40; bR.forEach((r, i) => { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of r) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } for (let gx = Math.floor((x0 - 8) / G); gx <= Math.floor((x1 + 8) / G); gx++) for (let gz = Math.floor((z0 - 8) / G); gz <= Math.floor((z1 + 8) / G); gz++) { const k = `${gx},${gz}`; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(i); } });
+    const segD = (p, r) => { let m = Infinity; for (let i = 0; i < r.length; i++) { const a = r[i], b = r[(i + 1) % r.length], dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / L2)); m = Math.min(m, Math.hypot(a[0] + dx * t - p[0], a[1] + dz * t - p[1])); } return m; };
+    let miss = 0;
+    for (const [nm, sc, mc, lc, fl, lon, lat] of JSON.parse(fs.readFileSync(f, 'utf8'))) {
+      const kind = kindOf(sc || '', mc || '', lc || ''); if (!kind || !nm) continue;
+      const street = /음식|소매|수리|보건|부동산/.test(lc); let floor = /^(지|B)/i.test(fl) ? 0 : +fl || (street ? 1 : 0); if (!fl && !street) continue; if (kind === 'office' && floor > 4) continue; floor = Math.min(floor, 40);
+      const p = P(lat, lon); if (p[0] < rect[0] || p[0] > rect[2] || p[1] < rect[1] || p[1] > rect[3]) continue;
+      let bi = -1, bd = 9; for (const i of grid.get(`${Math.floor(p[0] / G)},${Math.floor(p[1] / G)}`) || []) { if (inPoly(p, bR[i])) { bi = i; break; } const d = segD(p, bR[i]); if (d < bd) { bd = d; bi = i; } }
+      if (bi < 0) { miss++; continue; }
+      out.shops2.push([String(nm).replace(/\s*\(.*?\)\s*/g, '').trim().slice(0, 16), kind, bi, floor]);
+    }
+    console.log(`진짜 가게 ${out.shops2.length} (건물 못 찾음 ${miss})`);
+  } }
 out.colors = colors; out.names = names;
 
 // ---------- 먼 높은 건물 (스카이라인): 방향 있는 상자로 ----------
