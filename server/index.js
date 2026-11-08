@@ -5,6 +5,7 @@
 //   - /ws  WebSocket: 공유 세계 동기화
 //   - /api/*  구글 로그인 · 캐릭터 목록/생성/삭제
 //   - 환경변수: PORT, GAME_PASSWORD, GOOGLE_CLIENT_ID, OPENAI_API_KEY, OPENAI_MODEL, OPENAI_BASE_URL, TIME_SPEED, DATA_DIR
+import zlib from 'zlib';
 import crypto from 'node:crypto';
 import './env.js';
 import http from 'node:http';
@@ -305,10 +306,20 @@ const server = http.createServer((req, res) => {
   }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); res.end('not found'); return; }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+    const type = MIME[path.extname(file)] || 'application/octet-stream';
+    // 글자 파일(지도 json · js · css · html)은 gzip 으로 (서울 칸 지도 하나 500KB → 100KB 남짓). 만든 것은 조금 기억 (파일이 바뀌면 다시)
+    if (data.length > 2048 && /json|javascript|css|html|svg|text/.test(type) && /\bgzip\b/.test(req.headers['accept-encoding'] || '')) {
+      const st = fs.statSync(file), key = file + ':' + st.mtimeMs, hit = GZ.get(key);
+      const send = (gz) => { res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-cache', 'Content-Encoding': 'gzip', Vary: 'Accept-Encoding' }); res.end(gz); };
+      if (hit) { GZ.delete(key); GZ.set(key, hit); send(hit); return; }
+      zlib.gzip(data, { level: 6 }, (e2, gz) => { if (e2) { res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-cache' }); res.end(data); return; } GZ.set(key, gz); gzBytes += gz.length; for (const [k, v] of GZ) { if (gzBytes <= 40e6) break; GZ.delete(k); gzBytes -= v.length; } send(gz); });
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-cache' });
     res.end(data);
   });
 });
+const GZ = new Map(); let gzBytes = 0;
 
 // WS_COMPRESS=1 이면 메시지를 압축해서 보낸다 (트래픽 ↓, CPU ↑)
 const COMPRESS = process.env.WS_COMPRESS === '1';
