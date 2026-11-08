@@ -456,6 +456,7 @@ export class Hangang {
       const k = base(); for (const [x, z] of ring) { set.P.push(x, h, z); set.N.push(0, 1, 0); set.U.push(0.003, 0.003); set.Cl.push(roofC.r, roofC.g, roofC.b); }
       for (const t of tris) { const [A, B, Cc] = t.map((v) => ring[v]); const up = (B[1] - A[1]) * (Cc[0] - A[0]) - (B[0] - A[0]) * (Cc[1] - A[1]); if (up > 0) set.I.push(k + t[0], k + t[1], k + t[2]); else set.I.push(k + t[0], k + t[2], k + t[1]); }
       let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length;
+      { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } const fi = (this.foot ||= []).length; this.foot.push({ ring, h, x0, x1, z0, z1, name }); this.footGrid ||= new Map(); for (let gx = Math.floor(x0 / 40); gx <= Math.floor(x1 / 40); gx++) for (let gz = Math.floor(z0 / 40); gz <= Math.floor(z1 / 40); gz++) { const k = `${gx},${gz}`; if (!this.footGrid.has(k)) this.footGrid.set(k, []); this.footGrid.get(k).push(fi); } }
       // 옥상 설비 (높은 건물)
       if (h > 40 && !/63|IFC|파크원/.test(name)) { const area = Math.abs(ringArea(ring)), w = Math.sqrt(area) * 0.32; box(cx, h + 1.6, cz, w, 3.2, w * 0.8, new THREE.Color('#8e8c88')); }
       // 파크원: 모서리를 따라 오르는 빨간 철골 기둥과 가로대
@@ -941,6 +942,18 @@ export class Hangang {
     for (const [n, x, z, h] of M.labels || []) best.set(n, { name: n, x: x * S, z: z * S, h });
     this.labels = [...best.values()];
   }
+  // 카메라 → 이름표 자리 사이를 다른 건물이 가리는지 (외곽선 · 높이로 확인, 4m 간격)
+  occluded(cam, l) {
+    const ax = cam.x, ay = cam.y, az = cam.z, bx = l.x, by = l.y, bz = l.z, L = Math.hypot(bx - ax, bz - az), n = Math.ceil(L / 4);
+    // 이름표의 건물 자신(이름 없는 부분 포함)은 가림에서 뺀다
+    const own = new Set((this.footGrid?.get(`${Math.floor(bx / 40)},${Math.floor(bz / 40)}`) || []).filter((fi) => { const f = this.foot[fi]; return bx >= f.x0 - 3 && bx <= f.x1 + 3 && bz >= f.z0 - 3 && bz <= f.z1 + 3 && (inRing(bx, bz, f.ring) || Math.hypot((f.x0 + f.x1) / 2 - bx, (f.z0 + f.z1) / 2 - bz) < 25); }));
+    for (let i = 1; i < n; i++) {
+      const t = i / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t, y = ay + (by - ay) * t;
+      const cell = this.footGrid?.get(`${Math.floor(x / 40)},${Math.floor(z / 40)}`); if (!cell) continue;
+      for (const fi of cell) { const f = this.foot[fi]; if (own.has(fi) || f.name === l.name || f.h < y || x < f.x0 || x > f.x1 || z < f.z0 || z > f.z1) continue; if (inRing(x, z, f.ring)) return true; }
+    }
+    return false;
+  }
   project0(x, z) { let best = Infinity, bs = 0, bl = 0; for (let i = 0; i < this.rp.length - 1; i += 2) { const a = this.rp[i], d = (a[0] - x) ** 2 + (a[1] - z) ** 2; if (d < best) { best = d; bs = i * this.step; } } const p = this.at(bs); bl = (x - p.x) * p.rx + (z - p.z) * p.rz; return { s: bs, lat: bl }; }
   tickLabels(dt, camera, px, pz) {
     if (!this.labels) this.setupLabels();
@@ -952,11 +965,15 @@ export class Hangang {
       this.labT = 0.25; const v = this.labV ||= new THREE.Vector3(), picks = [];
       for (const l of this.labels) {
         const d = Math.hypot(l.x - px, l.z - pz), range = Math.min(1300, 160 + l.h * 3.2); if (d > range) continue;
-        v.set(l.x, Math.min(l.h * 0.62, 90), l.z).project(camera); if (v.z > 1 || Math.abs(v.x) > 0.42 || v.y < -0.7 || v.y > 0.95) continue;
+        const ty = Math.min(l.h * 0.62, 90); v.set(l.x, ty, l.z).project(camera); if (v.z > 1 || Math.abs(v.x) > 0.95 || v.y < -0.85 || v.y > 0.95) continue;
+        if (this.occluded(camera.position, { x: l.x, y: ty, z: l.z, name: l.name })) continue;
         picks.push({ l, score: Math.abs(v.x) + d / range * 0.4 });
       }
       picks.sort((a, b) => a.score - b.score);
-      for (const { l } of picks.slice(0, 2)) { const a = this.activeLabels.find((q) => q.name === l.name); if (a) a.seen = 1.4; else if (this.activeLabels.length < 2) this.activeLabels.push({ ...l, t: 0, seen: 1.4, y: Math.min(l.h * 0.62, 90) }); }
+      // 지금 보이는(가려지지 않은) 이름 있는 건물은 모두 (너무 많으면 가까운 8개)
+      const shown = new Set(picks.slice(0, 8).map((q) => q.l.name));
+      for (const a of this.activeLabels) if (!shown.has(a.name)) a.seen = Math.min(a.seen, 0.5);
+      for (const { l } of picks.slice(0, 8)) { const a = this.activeLabels.find((q) => q.name === l.name); if (a) a.seen = 1.0; else this.activeLabels.push({ ...l, t: 0, seen: 1.0, y: Math.min(l.h * 0.62, 90) }); }
     }
     // 구역: 이정표(다리 등) 근처 → 이름 있는 공원 · 섬 (작은 곳 먼저)
     let name = null; for (const [n, ms] of this.map.marks || []) if (Math.abs(ms - this.s) < 30) { name = n; break; }
