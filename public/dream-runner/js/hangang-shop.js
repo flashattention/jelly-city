@@ -55,6 +55,15 @@ export function buildShopFronts(hg, raw, S) {
   // 진열 창은 문 옆으로 (문을 가리지 않게 살짝 옆)
   fronts.forEach((F, i) => { o.position.set(F.x + F.nz * 2.0, 0, F.z - F.nx * 2.0); o.rotation.y = Math.atan2(F.nx, F.nz); o.scale.set(0.42, 1, 1); o.updateMatrix(); win.setMatrixAt(i, o.matrix); o.scale.set(1, 1, 1); });
   hg.scene.add(frame, door, win, awn); hg.shopWinM = [door.material, win.material];
+  // 가게 앞: 문 양옆 화분(초록 잎 · 가끔 꽃) · 식당 · 카페 앞엔 입간판(A자 칠판)
+  { const pots = [], boards = []; fronts.forEach((F, i) => { const tx = F.nz, tz = -F.nx; if (i % 3 !== 2) for (const sd of [-1, 1]) pots.push([F.x + F.nx * 0.55 + tx * sd * 1.25, F.z + F.nz * 0.55 + tz * sd * 1.25, i]); if (!/mart|pub/.test(F.kind) && i % 2 === 0) boards.push([F.x + F.nx * 1.6 + tx * 1.9, F.z + F.nz * 1.6 + tz * 1.9, Math.atan2(F.nx, F.nz)]); });
+    const potG = new THREE.CylinderGeometry(0.28, 0.22, 0.5, 12); potG.translate(0, 0.25, 0); const leafG = new THREE.IcosahedronGeometry(0.34, 1); leafG.scale(1, 1.25, 1); leafG.translate(0, 0.92, 0);
+    const pm = new THREE.InstancedMesh(potG, lam({ color: '#ffffff' }), pots.length), lm = new THREE.InstancedMesh(leafG, lam({ color: '#ffffff' }), pots.length), c = new THREE.Color();
+    pots.forEach(([x, z, i], k) => { o.position.set(x, 0, z); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1); o.updateMatrix(); pm.setMatrixAt(k, o.matrix); lm.setMatrixAt(k, o.matrix); pm.setColorAt(k, c.set(['#d9cfc2', '#6b5a4a', '#e8e4dc', '#3a3f47', '#b5733d'][i % 5])); lm.setColorAt(k, c.set(i % 4 === 0 ? '#ff9ec0' : ['#4f8a4a', '#5f9a52', '#3f7a44'][i % 3])); hg.addCircle(x, z, 0.3, 1.2); });
+    hg.scene.add(pm, lm);
+    const bT = tex(64, 96, (c2) => { c2.fillStyle = '#2a2a2a'; c2.fillRect(0, 0, 64, 96); c2.strokeStyle = '#a8865a'; c2.lineWidth = 6; c2.strokeRect(3, 3, 58, 90); c2.fillStyle = '#ffffff'; c2.font = 'bold 13px sans-serif'; c2.textAlign = 'center'; c2.fillText('오늘의', 32, 28); c2.fillText('메뉴', 32, 46); c2.fillStyle = '#ffd98a'; c2.fillRect(14, 60, 36, 3); c2.fillRect(14, 70, 30, 3); c2.fillRect(14, 80, 34, 3); });
+    const boardG = new THREE.BoxGeometry(0.7, 1.05, 0.05); boardG.rotateX(-0.18); boardG.translate(0, 0.55, 0.1); const board2 = boardG.clone(); board2.rotateY(Math.PI); const bm = new THREE.InstancedMesh(boardG, lam({ map: bT }), boards.length), bm2 = new THREE.InstancedMesh(board2, lam({ map: bT }), boards.length);
+    boards.forEach(([x, z, ry], k) => { o.position.set(x, 0, z); o.rotation.set(0, ry, 0); o.updateMatrix(); bm.setMatrixAt(k, o.matrix); bm2.setMatrixAt(k, o.matrix); hg.addCircle(x, z, 0.3, 0.9); }); hg.scene.add(bm, bm2); }
   // 간판: 256 × 64 칸, 2048 × 2048 그림 하나에 256 개
   const PER = 256; for (let a0 = 0; a0 < N; a0 += PER) {
     const list = fronts.slice(a0, a0 + PER), cv = document.createElement('canvas'); cv.width = cv.height = 2048; const c = cv.getContext('2d');
