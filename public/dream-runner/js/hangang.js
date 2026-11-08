@@ -344,20 +344,25 @@ export class Hangang {
   buildBridges(P2, inWater) {
     const deck = { P: [], I: [] }, side = { P: [], I: [] }, piers = [], lamps = [];
     const rails = [], rails2 = [];
-    for (const b of this.map.bridges) {
-      const pts = P2(b.p); if (pts.length < 2) continue;
-      // 잘게 나눠 높이를 정한다 (물 위 14m, 땅에서는 끝으로 갈수록 내려간다)
+    // 다리 높이: 서로 이어진 고가끼리 묶어서, 다른 고가와 이어지지 않은 끝(땅의 길과 만나는 곳)은 땅까지 비스듬히 내려온다
+    const ways = this.map.bridges.map((b) => ({ b, pts: P2(b.p) })).filter((w) => w.pts.length > 1);
+    for (const w of ways) w.wet = w.pts.some(([x, z]) => inWater(x, z));
+    const nearAny = (p, self) => ways.some((w) => w !== self && w.pts.some((q) => Math.abs(q[0] - p[0]) < 2.5 && Math.abs(q[1] - p[1]) < 2.5));
+    const linkedWet = (self) => ways.some((w) => w !== self && w.wet && (w.pts.some((q) => Math.hypot(q[0] - self.pts[0][0], q[1] - self.pts[0][1]) < 2.5 || Math.hypot(q[0] - self.pts[self.pts.length - 1][0], q[1] - self.pts[self.pts.length - 1][1]) < 2.5)));
+    for (const w of ways) { w.free0 = !nearAny(w.pts[0], w); w.free1 = !nearAny(w.pts[w.pts.length - 1], w); w.top = w.wet || linkedWet(w) ? 14 : 7.5; }
+    for (const w of ways) {
+      const b = w.b, pts = w.pts;
       const fine = []; for (let i = 1; i < pts.length; i++) { const [a, c] = [pts[i - 1], pts[i]], L = Math.hypot(c[0] - a[0], c[1] - a[1]), n = Math.max(1, Math.ceil(L / 15)); for (let k = 0; k < n; k++) fine.push([lerp(a[0], c[0], k / n), lerp(a[1], c[1], k / n)]); } fine.push(pts[pts.length - 1]);
-      const wet = fine.map(([x, z]) => inWater(x, z)), anyWet = wet.some(Boolean), top = anyWet ? 14 : 7;
-      const dist = fine.map(() => Infinity); for (let i = 0; i < fine.length; i++) if (wet[i]) dist[i] = 0;
-      for (let pass = 0; pass < 2; pass++) for (let i = 1; i < fine.length; i++) { const d = Math.hypot(fine[i][0] - fine[i - 1][0], fine[i][1] - fine[i - 1][1]); dist[i] = Math.min(dist[i], dist[i - 1] + d); } for (let i = fine.length - 2; i >= 0; i--) { const d = Math.hypot(fine[i][0] - fine[i + 1][0], fine[i][1] - fine[i + 1][1]); dist[i] = Math.min(dist[i], dist[i + 1] + d); }
-      const ys = fine.map((_, i) => (anyWet ? clamp(top - Math.max(0, dist[i] - 30) * 0.045, 4.5, top) : top));
+      const wet = fine.map(([x, z]) => inWater(x, z)), anyWet = wet.some(Boolean), top = w.top;
+      const acc = [0]; for (let i = 1; i < fine.length; i++) acc.push(acc[i - 1] + Math.hypot(fine[i][0] - fine[i - 1][0], fine[i][1] - fine[i - 1][1]));
+      const total = acc[acc.length - 1];
+      const ys = fine.map((_, i) => { if (wet[i]) return top; const d0 = w.free0 ? acc[i] : Infinity, d1 = w.free1 ? total - acc[i] : Infinity; return Math.min(top, 0.25 + Math.min(d0, d1) * 0.07); });
       ribbonInto(deck.P, deck.I, fine, b.w, (i) => ys[i]);
       ribbonInto(side.P, side.I, fine, b.w + 0.4, (i) => ys[i] - 1.6);
       // 난간 (양쪽 낮은 벽)
       for (const sgn of [-1, 1]) { const off = fine.map((p, i) => { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1; return [p[0] - dz / L * (b.w / 2) * sgn, p[1] + dx / L * (b.w / 2) * sgn]; }); rails2.push({ off, ys }); }
       if (b.rail) rails.push({ fine, ys, w: b.w });
-      for (let i = 0; i < fine.length; i += 4) { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], ang = Math.atan2(c[1] - a[1], c[0] - a[0]) + Math.PI / 2; if (anyWet && wet[i]) piers.push([fine[i][0], fine[i][1], ys[i], b.w, ang]); else if (!anyWet && i % 8 === 0) piers.push([fine[i][0], fine[i][1], ys[i], b.w * 0.6, ang]); }
+      for (let i = 0; i < fine.length; i += 2) { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], ang = Math.atan2(c[1] - a[1], c[0] - a[0]) + Math.PI / 2; if (ys[i] < 3) continue; if (wet[i]) { if (i % 4 === 0) piers.push([fine[i][0], fine[i][1], ys[i], b.w, ang]); } else piers.push([fine[i][0], fine[i][1], ys[i], b.w * 0.6, ang]); }
       if (anyWet) for (let i = 0; i < fine.length; i += 3) { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1; for (const sgn of [-1, 1]) lamps.push(fine[i][0] - dz / L * b.w / 2 * sgn, ys[i] + 1.2, fine[i][1] + dx / L * b.w / 2 * sgn); }
     }
     const dm = new THREE.MeshLambertMaterial({ color: '#a9a49c' }), sm = new THREE.MeshLambertMaterial({ color: '#e4ddd2', side: THREE.DoubleSide });
@@ -722,7 +727,7 @@ export class Hangang {
     }
     for (const tw of this.twigSets) tw.visible = s === 'winter';
     this.blossomTex ||= foliageTex(true); for (const m of this.cardMats || []) { m.map = s === 'spring' ? this.blossomTex : this.leafTex; m.needsUpdate = true; }
-    const grass = { spring: '#9cbf7c', summer: '#86ab68', autumn: '#ab a46a'.replace(' ', ''), winter: '#b3b89a' }[s];
+    const grass = { spring: '#9cbf7c', summer: '#86ab68', autumn: '#97a65e', winter: '#b3b89a' }[s];
     this.greenM.grass?.color.set(grass); for (const m of this.wideM || []) m.color.set(grass); this.stripM?.color.set(grass); this.greenM.wild?.color.set(grass).offsetHSL(0, -0.05, -0.03); this.greenM.wood?.color.set({ spring: '#6f9a52', summer: '#4f7f40', autumn: '#a8763a', winter: '#8a8270' }[s]); this.islandM.color.set(grass).offsetHSL(0, 0, -0.06);
     const tc = new THREE.Color(); for (let i = 0; i < this.tufts.count; i++) { tc.setHSL(s === 'autumn' ? 0.12 + r() * 0.05 : s === 'winter' ? 0.14 : s === 'summer' ? 0.26 + r() * 0.05 : 0.23 + r() * 0.06, s === 'winter' ? 0.18 : 0.55, s === 'winter' ? 0.62 : 0.4 + r() * 0.14); this.tufts.setColorAt(i, tc); } this.tufts.instanceColor.needsUpdate = true;
     this.flowers.visible = s === 'spring' || s === 'summer';
@@ -874,7 +879,7 @@ export class Hangang {
     if (snowOn) { const a = this.snow.geometry.attributes.position, arr = a.array; for (let i = 0; i < arr.length; i += 3) { arr[i + 1] -= dt * (0.9 + (i % 7) * 0.08); arr[i] += Math.sin(this.t * 0.7 + i) * dt * 0.3; if (arr[i + 1] < 0) arr[i + 1] += 40; } a.needsUpdate = true; this.snow.position.set(camera.position.x, camera.position.y - 14, camera.position.z); }
     // 겨울 눈 오면 땅이 하얘진다
     const snowy = this.state.season === 'winter' && snowOn; this.snowK = lerp(this.snowK || 0, snowy ? 1 : 0, Math.min(1, dt * 0.05));
-    if (this.greenM.grass) { const base = C({ spring: '#9cbf7c', summer: '#86ab68', autumn: '#aba46a', winter: '#b3b89a' }[this.state.season]); this.greenM.grass.color.copy(base).lerp(C('#eef2f6'), this.snowK * 0.85); for (const m of this.wideM || []) m.color.copy(this.greenM.grass.color); this.stripM?.color.copy(this.greenM.grass.color); }
+    if (this.greenM.grass) { const base = C({ spring: '#9cbf7c', summer: '#86ab68', autumn: '#97a65e', winter: '#b3b89a' }[this.state.season]); this.greenM.grass.color.copy(base).lerp(C('#eef2f6'), this.snowK * 0.85); for (const m of this.wideM || []) m.color.copy(this.greenM.grass.color); this.stripM?.color.copy(this.greenM.grass.color); }
     this.landM.color.copy(C('#a3a39f')).lerp(C('#e6eaee'), this.snowK * 0.6);
     // 벌레: 낮엔 나비(봄 · 여름) · 잠자리(가을), 여름밤엔 반딧불
     const day = sunUp > 0.4 && !rainOn && !snowOn, season = this.state.season;

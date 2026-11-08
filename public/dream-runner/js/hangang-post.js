@@ -10,7 +10,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 // 감성 보정: 그림자는 라벤더 · 밝은 곳은 금빛(스플릿 토닝) · 위아래 살짝 흐리게(틸트 시프트, 미니어처 같은 느낌) · 필름 결 · 비네트
 const Grade = {
   uniforms: { tDiffuse: { value: null }, res: { value: new THREE.Vector2(1280, 720) }, time: { value: 0 }, sat: { value: 0.9 }, contrast: { value: 0.97 }, tint: { value: new THREE.Color(1, 1, 1) },
-    shadowCol: { value: new THREE.Vector3(0.86, 0.84, 1.12) }, hiCol: { value: new THREE.Vector3(1.08, 1.0, 0.9) }, split: { value: 0.6 }, vig: { value: 0.42 }, blur: { value: 0.7 }, grain: { value: 0.04 } },
+    shadowCol: { value: new THREE.Vector3(0.86, 0.84, 1.12) }, hiCol: { value: new THREE.Vector3(1.08, 1.0, 0.9) }, split: { value: 0.6 }, vig: { value: 0.42 }, blur: { value: 0.7 }, grain: { value: 0.0 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 res; uniform float time, sat, contrast, split, vig, blur, grain; uniform vec3 tint; uniform vec3 shadowCol, hiCol; varying vec2 vUv;
     float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
