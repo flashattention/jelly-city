@@ -943,7 +943,8 @@ export class Hangang {
         up.push({ x: e.mx + e.tx * off + e.nx * 0.12, z: e.mz + e.tz * off + e.nz * 0.12, tx: e.tx, tz: e.tz, w, y0: yc - 0.45, y1: yc + 0.45, n: s2[0], bg: st[0], fg: st[1], by, fl: s2[3] }); }
     }
     // 한 칸 간판 7,000개까지: 1층 먼저, 낮은 층부터
-    up.sort((a, b) => a.fl - b.fl); const all = [...list, ...up].slice(0, 7000);
+    // 휴대폰: 1층 간판만 2,500개까지 (메모리 · 그리기 줄이기)
+    up.sort((a, b) => a.fl - b.fl); const all = isPhone ? list.slice(0, 2500) : [...list, ...up].slice(0, 7000);
     if (doors.length) { const o = new THREE.Object3D(), fg = new THREE.BoxGeometry(1.9, 2.5, 0.1); fg.translate(0, 1.25, 0.02); const dg = new THREE.PlaneGeometry(1.6, 2.3); dg.translate(0, 1.15, 0.08); const fm = new THREE.InstancedMesh(fg, new THREE.MeshLambertMaterial({ color: '#2b2d31' }), doors.length), dm = new THREE.InstancedMesh(dg, new THREE.MeshPhongMaterial({ color: '#d8c8a8', emissive: '#ffd9a0', emissiveIntensity: 0.25, shininess: 80 }), doors.length);
       doors.forEach((D, i) => { o.position.set(D.x, 0, D.z); o.rotation.y = Math.atan2(D.nx, D.nz); o.updateMatrix(); fm.setMatrixAt(i, o.matrix); dm.setMatrixAt(i, o.matrix); D.key = this.chunkKey; const fi = this.shopFronts.push(D) - 1, k = `${Math.floor(D.x / 40)},${Math.floor(D.z / 40)}`; if (!this.shopGrid.has(k)) this.shopGrid.set(k, []); this.shopGrid.get(k).push(fi); });
       fm.userData.baseY = dm.userData.baseY = doors.map((D) => D.by); this.scene.add(fm, dm); }
