@@ -785,7 +785,7 @@ export class Hangang {
       const info = M.binfo?.[bi] || null;
       const [h0, mh, km, ci, ni, rci, dome] = b, kind = km >> 1, glassTag = km & 1, ring = P2(b.slice(7)); if (ring.length < 3) continue;
       // 돔 지붕 부분: 벽은 돔 아래까지, 그 위에 돔 (높이 · 색은 지도 데이터대로)
-      const domeR = dome ? Math.sqrt(Math.abs(ringArea(ring)) / Math.PI) : 0, domeH = dome ? (dome > 1 ? dome : domeR * 0.6) : 0, h = Math.min(Math.max(mh + 0.5, h0 - domeH), M.kind === 'summit' && M.names[ni] !== '남산서울타워' ? 12 : 1e9);
+      const domeR = dome ? Math.sqrt(Math.abs(ringArea(ring)) / Math.PI) : 0, domeH = dome ? (dome > 1 ? dome : domeR * 0.6) : 0, h = LANDMARKS[ni >= 0 ? M.names[ni] : '']?.height || Math.min(Math.max(mh + 0.5, h0 - domeH), M.kind === 'summit' && M.names[ni] !== '남산서울타워' ? 12 : 1e9);
       const name = ni >= 0 ? M.names[ni] : '', cTag = ci >= 0 ? M.colors[ci] : '';
       // 외벽 종류
       let type = kind === 1 ? (h > 14 ? 'apt' : r() < 0.5 ? 'brick' : 'stone') : kind === 4 ? (r() < 0.6 ? 'brick' : 'stone') : kind === 5 ? 'brick' : kind === 3 ? 'stone' : kind === 2 || kind === 0 ? (glassTag || h > 55 || (h > 30 && r() < 0.5) ? 'glass' : 'stone') : 'stone';
@@ -817,7 +817,8 @@ export class Hangang {
       if (LANDMARKS[name]?.roof) roofC.set(LANDMARKS[name].roof);
       const street = type === 'street' || type === 'street2', set = sets[type], s = ringArea(ring) > 0 ? 1 : -1, base = () => set.P.length / 3, FH = FLOOR[type] * 8 * (street ? 0.9 + r() * 0.22 : 1), BW = BAY[type] * 8 * (street ? 0.85 + r() * 0.35 : 1), uOff = street ? Math.floor(r() * 8) / 8 : 0;
       // 위로 갈수록 좁아지는 건물 (63빌딩): 꼭대기 외곽선을 긴 축 방향으로 줄인다. scale 은 위아래 모두 줄인다 (꼭대기 왕관 조각)
-      const LM = LANDMARKS[name], top = LM?.taper && h > (LM.taper.minH || 0) ? scaleRing(ring, LM.taper.long, LM.taper.short) : LM?.scale ? scaleRing(ring, LM.scale.long, LM.scale.short) : ring, bot = LM?.scale ? top : ring;
+      // taper.H 가 있으면 높이에 비례해서 (위아래 조각 모두 같은 선 위로) 가늘어진다
+      const LM = LANDMARKS[name], tf = (y) => Math.min(1, y / (LM.taper.H || h)), tp = (y) => scaleRing(ring, 1 + (LM.taper.long - 1) * tf(y), 1 + (LM.taper.short - 1) * tf(y), LM.taper.H ? (this.taperC ||= {})[name] ||= (() => { let x = 0, z = 0, n = 0; const ni2 = M.names.indexOf(name); for (const b2 of M.buildings) if (b2[4] === ni2 && b2[1] < 1) for (let k = 7; k < b2.length; k += 2) { x += b2[k] * M.scale; z += b2[k + 1] * M.scale; n++; } return n ? [x / n, z / n] : null; })() : null), top = LM?.taper && (LM.taper.H || h > (LM.taper.minH || 0)) ? tp(h) : LM?.scale ? scaleRing(ring, LM.scale.long, LM.scale.short) : ring, bot = LM?.scale ? top : LM?.taper?.H ? tp(mh) : ring;
       // 달걀 모양 건물 (전경련 컨퍼런스센터): 상자 벽 대신 은색 타원 지붕만 (덧붙이는 곳에서 만든다), 부딪힘은 외곽선대로
       if (M.kind === 'summit' && /봉수대/.test(name)) continue;
       if (name === '남산서울타워' && mh > 1) continue; // 타워 위쪽 조각은 따로 만든 실제 모양으로
@@ -846,7 +847,7 @@ export class Hangang {
       // 아파트 옆벽: 위쪽에 단지 이름 + 큰 동 번호 (한국 아파트처럼)
       if (type === 'apt' && h > 14) { const realNo = /(\d+)동$/.exec(name || '')?.[1], key = (name || '').replace(/\s*\d+동$/, '').replace(/\s*(아파트|APT)\s*/gi, '').replace(/\(.*?\)/g, '').trim().slice(0, 6); this.aptNo ||= {}; const no = realNo ? +realNo : (this.aptNo[key || '_'] = (this.aptNo[key || '_'] || 0) + 1) + (key ? 0 : 100); const edges = ring.map((a, i) => { const b = ring[(i + 1) % ring.length]; return { a, b, L: Math.hypot(b[0] - a[0], b[1] - a[1]) }; }).filter((e) => e.L > 6).sort((p, q) => p.L - q.L).slice(0, 2); for (const e of edges) { const mx = (e.a[0] + e.b[0]) / 2, mz = (e.a[1] + e.b[1]) / 2; let nx = mx - cx, nz = mz - cz; const nl = Math.hypot(nx, nz) || 1; nx /= nl; nz /= nl; (this.aptMarks ||= []).push({ x: mx + nx * 0.1, z: mz + nz * 0.1, y: h - 0.4, w: Math.min(e.L * 0.98, 18), hh: Math.min(10, h * 0.32), ry: Math.atan2(nx, nz), text: key, no }); } }
       // 한옥 기와지붕: 처마가 벽 밖으로 나오고 끝이 살짝 들린 우진각 지붕 (짙은 회색 기와)
-      if (type === 'hanok') (this.hanokRoofs ||= []).push({ ring, h });
+      if (type === 'hanok') (this.hanokRoofs ||= []).push({ ring, h, rh: LANDMARKS[name]?.roofH });
       // 거리 상가 옥상: 옥탑방 · 물탱크 · 난간 (골목 감성)
       if ((type === 'street' || type === 'street2') && h > 6) { const area = Math.abs(ringArea(ring)), w = Math.min(5, Math.sqrt(area) * 0.4); if (r() < 0.45) box(cx + (r() - 0.5) * w * 0.6, h + 1.3, cz + (r() - 0.5) * w * 0.6, w, 2.6, w * 0.8, new THREE.Color(['#e8e4dc', '#d9e3ea', '#f0e2d0', '#c9d8c4'][Math.floor(r() * 4)])); if (r() < 0.4) box(cx + (r() - 0.5) * w, h + 0.8, cz + (r() - 0.5) * w, 1.4, 1.6, 1.4, new THREE.Color(r() < 0.5 ? '#3d7fbf' : '#f2f2ee')); }
       // 높은 빌딩 옥상 헬리패드 (초록 바탕 · 흰 원 · H)
@@ -876,7 +877,7 @@ export class Hangang {
     { const best = {}; for (const q of this.lmQueue || []) { const v = Math.abs(ringArea(q.ring)) * q.h, b2 = best[q.name]; if (!b2 || v > b2.v) best[q.name] = { q, v }; } for (const q of this.lmQueue || []) if (best[q.name].q !== q) (this.lmParts[q.name] ||= []).push({ ring: q.ring, h: q.h }); for (const { q } of Object.values(best)) buildLandmarkExtras(this, q); }
     if (this.aptMarks?.length) { const cache = new Map(), matOf = (text, no) => { const k = `${text}|${no}`; if (cache.has(k)) return cache.get(k); const cv = document.createElement('canvas'); cv.width = 256; cv.height = 160; const c = cv.getContext('2d'); c.fillStyle = '#eeebe4'; c.fillRect(0, 0, 256, 160); c.fillStyle = '#4d6994'; c.textAlign = 'center'; c.textBaseline = 'middle'; if (text) { c.font = 'bold 30px sans-serif'; c.fillText(text, 128, 34, 220); } c.font = 'bold 84px sans-serif'; c.fillText(String(no), 128, text ? 104 : 84); const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; const m = new THREE.MeshLambertMaterial({ map: t, polygonOffset: true, polygonOffsetFactor: -2 }); cache.set(k, m); return m; };
       const pg = new THREE.PlaneGeometry(1, 1); pg.translate(0, -0.5, 0); const grp = new THREE.Group(); for (const a of this.aptMarks) { const m = new THREE.Mesh(pg, matOf(a.text, a.no)); m.scale.set(a.w, a.hh, 1); m.position.set(a.x, a.y, a.z); m.rotation.y = a.ry; grp.add(m); } this.scene.add(grp); batchStatic(this.scene, [grp], (this.lodObjs ||= [])); }
-    if (this.hanokRoofs?.length) { const P = [], I = []; for (const { ring, h } of this.hanokRoofs) { let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length; const out = ring.map(([x, z]) => [cx + (x - cx) * 1.22, cz + (z - cz) * 1.22]), mid = ring.map(([x, z]) => [cx + (x - cx) * 0.55, cz + (z - cz) * 0.55]), top = ring.map(([x, z]) => [cx + (x - cx) * 0.12, cz + (z - cz) * 0.12]), size = Math.sqrt(Math.abs(ringArea(ring))), H = Math.min(4, size * 0.32), n = ring.length, b = P.length / 3;
+    if (this.hanokRoofs?.length) { const P = [], I = []; for (const { ring, h, rh } of this.hanokRoofs) { let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length; const out = ring.map(([x, z]) => [cx + (x - cx) * 1.22, cz + (z - cz) * 1.22]), mid = ring.map(([x, z]) => [cx + (x - cx) * 0.55, cz + (z - cz) * 0.55]), top = ring.map(([x, z]) => [cx + (x - cx) * 0.12, cz + (z - cz) * 0.12]), size = Math.sqrt(Math.abs(ringArea(ring))), H = rh || Math.min(4, size * 0.32), n = ring.length, b = P.length / 3;
         for (const [x, z] of out) P.push(x, h + 0.35, z); for (const [x, z] of mid) P.push(x, h + H * 0.62, z); for (const [x, z] of top) P.push(x, h + H, z);
         for (let i = 0; i < n; i++) { const j = (i + 1) % n; for (const [a0, b0] of [[0, n], [n, 2 * n]]) I.push(b + a0 + i, b + a0 + j, b + b0 + j, b + a0 + i, b + b0 + j, b + b0 + i); } for (let i = 1; i < n - 1; i++) I.push(b + 2 * n, b + 2 * n + i, b + 2 * n + i + 1); }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(I); g.computeVertexNormals();
@@ -1815,6 +1816,15 @@ export const LANDMARKS = {
   테크노마트: { facade: 'glass', color: '#7f93a3', crown: { rise: 12, dir: [0, 1] } }, 롯데백화점: { facade: 'stone', color: '#ece4d4', topSign: { text: 'LOTTE', color: '#e8102c', bg: '#ffffff' } },
   '갤러리아백화점 이스트': { facade: 'panels', color: '#dfe6ea', rimLight: true }, '갤러리아백화점 웨스트': { facade: 'panels', color: '#dfe6ea', rimLight: true },
   이스트윙: { facade: 'glass', color: '#c8d6de' }, 웨스트윙: { facade: 'glass', color: '#c8d6de' }, 사우스윙: { facade: 'glass', color: '#c8d6de' },
+  // 잠실: 롯데월드타워(위로 갈수록 가늘어지는 흰 유리 붓 모양 · 꼭대기 갈라진 왕관) · 롯데호텔월드 · 롯데백화점
+  롯데월드타워: { facade: 'glass', color: '#e3e9ec', taper: { long: 0.3, short: 0.3, H: 555 } },
+  롯데호텔월드: { facade: 'stone', color: '#e6dccb', topSign: { text: 'LOTTE', color: '#e8102c', bg: '#ffffff' } },
+  // 명동: 명동대성당(붉은 벽돌 고딕 · 뾰족 종탑) · 신세계 본점 헤리티지(옛 석조) · 한국은행 화폐박물관(석조 · 돔) · 롯데시티호텔
+  '명동대성당 본당': { facade: 'church', color: '#9a4a36', spire: { h: 45, color: '#7a3a2c' } },
+  '신세계백화점 본점 더 헤리티지': { facade: 'stone', color: '#e8dcc0' }, '한국은행 화폐박물관': { facade: 'assembly', color: '#e0d2b8' },
+  롯데시티호텔: { facade: 'glass', color: '#a9b8c2', topSign: { text: 'LOTTE', color: '#e8102c', bg: '#ffffff' } },
+  // 종로 · 북촌: 경복궁 · 건춘문 · 조계사 (한옥, 큰 기와지붕)
+  경복궁: { facade: 'hanok', color: '#e8dccb', height: 9, roofH: 7 }, '경복궁 건춘문': { facade: 'hanok', color: '#e8dccb', height: 9, roofH: 5 }, 조계사: { facade: 'hanok', color: '#e8dccb', roofH: 7 },
   여의도순복음교회: { facade: 'panels', color: '#5d4f48', campus: 160, campusFacade: 'stone', campusColor: '#a08a7a', front: { w: 16, d: 9, up: 13, face: 'west', screen: true, cross: true, sign: '여의도순복음교회' }, rimLight: true },
 };
 const CAR_COLORS = ['#f4f4f2', '#f4f4f2', '#1d1d1f', '#9aa0a6', '#c9ccd0', '#2a3a5a', '#7a1d22', '#3d4a3a', '#d8d2c4'];
@@ -1883,6 +1893,12 @@ function buildLandmarkExtras(hg, { name, ring, h, L }) {
   const parts = [{ ring, h }, ...(hg.lmParts?.[name] || [])];
   if (L.rimLight) { const m = new THREE.LineBasicMaterial({ color: '#fff4e0', transparent: true, opacity: 0.3 }); for (const q of parts) { const pts = [...q.ring, q.ring[0]].map(([x, z]) => new THREE.Vector3(x, q.h + 0.2, z)); hg.scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), m)); } (hg.lmLights ||= []).push(m); }
   if (L.crown) buildCrown(hg, ring, h, L);
+  if (L.spire) { // 뾰족 종탑: 외곽선에서 가운데서 가장 먼 점 쪽 (정면 끝)에 네모 탑 + 뾰족 지붕 + 십자가
+    let far = ring[0], fd = 0; for (const p of ring) { const d = Math.hypot(p[0] - cx, p[1] - cz); if (d > fd) { fd = d; far = p; } } const tx = far[0] + (cx - far[0]) * 0.18, tz = far[1] + (cz - far[1]) * 0.18, m = new THREE.MeshLambertMaterial({ color: L.spire.color }), W = 6;
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(W, h + 10, W), m); tower.position.set(tx, (h + 10) / 2, tz); hg.scene.add(tower);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(W * 0.72, L.spire.h - h - 10, 4), new THREE.MeshLambertMaterial({ color: '#4a5560' })); cone.rotation.y = Math.PI / 4; cone.position.set(tx, h + 10 + (L.spire.h - h - 10) / 2, tz); hg.scene.add(cone);
+    const cm = hg.crossM || new THREE.MeshLambertMaterial({ color: '#f4f1ea' }); const pole = new THREE.Mesh(new THREE.BoxGeometry(0.4, 3, 0.4), cm); pole.position.set(tx, L.spire.h + 1.5, tz); const bar = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.4, 0.4), cm); bar.position.set(tx, L.spire.h + 2, tz); hg.scene.add(pole, bar);
+    hg.addFoot({ ring: [[tx - W / 2, tz - W / 2], [tx + W / 2, tz - W / 2], [tx + W / 2, tz + W / 2], [tx - W / 2, tz + W / 2]], h: h + 10, x0: tx - W / 2, x1: tx + W / 2, z0: tz - W / 2, z1: tz + W / 2, name: '', type: 'brick' }); }
   if (L.jbug) buildJBug(hg, ring);
   if (L.egg) { // 은색 타원 지붕: 외곽선의 긴 축 · 짧은 축에 맞춘 반타원체
     const xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); let xx = 0, zz = 0, xz = 0; for (const [x, z] of ring) { const dx = x - cx, dz = z - cz; xx += dx * dx; zz += dz * dz; xz += dx * dz; } const ang = 0.5 * Math.atan2(2 * xz, xx - zz), ux = Math.cos(ang), uz = Math.sin(ang); let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity; for (const [x, z] of ring) { const a = (x - cx) * ux + (z - cz) * uz, b = -(x - cx) * uz + (z - cz) * ux; a0 = Math.min(a0, a); a1 = Math.max(a1, a); b0 = Math.min(b0, b); b1 = Math.max(b1, b); } void xs; void zs;
@@ -1994,8 +2010,8 @@ function buildCrown(hg, ring, h, L) {
   const lm = new THREE.LineBasicMaterial({ color: '#e8f6ff', transparent: true, opacity: 0.2 }); hg.scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([...ring, ring[0]].map(([x, z], i) => new THREE.Vector3(x, up[i % ring.length] + 0.1, z))), lm)); (hg.lmLights ||= []).push(lm);
 }
 // 외곽선을 긴 축(주축) 방향으로 long 배, 짧은 축으로 short 배 줄인다 (가운데 기준)
-function scaleRing(ring, long, short) {
-  let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length;
+function scaleRing(ring, long, short, C = null) {
+  let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length; if (C) { cx = C[0]; cz = C[1]; }
   let xx = 0, zz = 0, xz = 0; for (const [x, z] of ring) { const dx = x - cx, dz = z - cz; xx += dx * dx; zz += dz * dz; xz += dx * dz; }
   const ang = 0.5 * Math.atan2(2 * xz, xx - zz), ux = Math.cos(ang), uz = Math.sin(ang);
   return ring.map(([x, z]) => { const dx = x - cx, dz = z - cz, a = dx * ux + dz * uz, b = -dx * uz + dz * ux, a2 = a * long, b2 = b * short; return [cx + a2 * ux - b2 * uz, cz + a2 * uz + b2 * ux]; });
