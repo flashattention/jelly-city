@@ -972,6 +972,12 @@ async function hgStationRender() {
 }
 hg.onStation = (st) => { hgSt = st; clearInterval(hgStT); $('hg-subway').classList.toggle('hidden', !st); if (st) { $('hg-subway').innerHTML = `<h4>🚇 ${st.name}역</h4><div class="row">불러오는 중…</div>`; hgStationRender(); hgStT = setInterval(hgStationRender, 20000); } };
 hg.onCity = (c) => { if (c?.congest) toast(`📡 지금 실제 여의도: ${c.congest} · 약 ${Math.round((c.pplMin + c.pplMax) / 2 / 10000)}만 명 · 도로 ${c.road || '-'}${c.temp != null ? ` · ${c.temp}°C` : ''}`, 3200); };
+// 이웃 지역으로 걸어 들어가기: 지금 지역을 정리하고 그 지역 코스의 이쪽 끝에서 이어 걷는다
+async function hgGoRegion(G) {
+  hgReport(true); hg.exitInterior?.(); hg.onShop(null); hg.onStation(null); const from = hgRegion; hg.leave(); hgUse(G.id); toast(`${G.label}(으)로 걸어가요…`, 2200);
+  await startHangang(null); const back = (hg.gates || []).find((q) => q.id === from); if (back) hg.teleport(back.end === 0 ? 14 : hg.L - 14, 0);
+}
+hg.onRegionGate = (G) => hgGoRegion(G);
 hg.onTurn = (txt) => toast(`🚧 ${txt}이에요 · 돌아서 달려요`, 2200);
 // 역 안: 실제 도착 정보를 계속 받아 안내판에 (hg.arrivals)
 hg.onInside = (st) => hg.onStation(st ? { name: st.name } : null);
