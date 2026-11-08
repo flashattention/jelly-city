@@ -1565,7 +1565,7 @@ export class Hangang {
     // 실시간 버스: GPS → 지도 좌표, 받은 위치로 부드럽게
     const S = this.map, cx = S.center[0], cz = S.center[1];
     for (const b of this.busData || []) {
-      const x = (b.lon - 126.98) * 111320 * Math.cos(37.53 * Math.PI / 180) - cx, z = -(b.lat - 37.53) * 110574 - cz; if (Math.abs(x) > 2600 || Math.abs(z) > 2600) continue;
+      const x = (b.lon - 126.98) * 111320 * Math.cos(37.53 * Math.PI / 180) - cx, z = -(b.lat - 37.53) * 110574 - cz; if (this.chunks ? Math.hypot(x - this.px, z - this.pz) > 1500 : Math.abs(x) > 2600 || Math.abs(z) > 2600) continue;
       let o = this.buses.get(b.id); if (!o) { const mesh = makeVehicle('bus', Math.random, b.type === 4 ? '#47a83c' : '#3a63b8', b.route); this.scene.add(mesh); o = { mesh, x, z, tx: x, tz: z, r: 2.6 }; this.buses.set(b.id, o); }
       if (Math.hypot(x - o.tx, z - o.tz) > 0.5) { o.yaw = Math.atan2(x - o.tx, z - o.tz); o.tx = x; o.tz = z; }
     }
@@ -1669,7 +1669,9 @@ export class Hangang {
       let slopeK = 1; if (this.terr && !this.flying && this.y < 0.5) { const g = (this.terrAt(this.px + this.mdx * 3, this.pz + this.mdz * 3) - this.terrAt(this.px, this.pz)) / 3; slopeK = g > 0 ? 1 - Math.min(0.4, g * 2.2) : 1 + Math.min(0.15, -g * 0.8); }
       let nx = this.px + this.mdx * this.v * slopeK * dt, nz = this.pz + this.mdz * this.v * slopeK * dt;
       // 지도 밖 · 물속(코스 다리 제외)은 못 간다
-      nx = clamp(nx, -2500, 2500); nz = clamp(nz, -2500, 2500);
+      // 지역 지도는 가운데 ±2.5km 상자 안. 서울 전체는 서울 좌표라 그 상자에 갇히면 안 된다(마포 같은 곳에서 앞으로 못 가던 것) → 서울 지형 격자 끝까지
+      if (this.chunks) { const T = this.terr; if (T) { nx = clamp(nx, T.x0 + 50, T.x0 + (T.nx - 1) * T.step - 50); nz = clamp(nz, T.z0 + 50, T.z0 + (T.nz - 1) * T.step - 50); } }
+      else { nx = clamp(nx, -2500, 2500); nz = clamp(nz, -2500, 2500); }
       const qn = this.project(nx, nz);
       // 물 위로는 점프 중에도 못 나간다 (2 · 3단 점프로 한강을 건너지 못하게)
       if (!(this.flying && this.y > 1.5) && !this.walkable(nx, nz, qn.lat) && this.deckAt(nx, nz, this.y) < 0) { if (this.walkable(nx, this.pz, qn.lat)) nz = this.pz; else if (this.walkable(this.px, nz, qn.lat)) nx = this.px; else { nx = this.px; nz = this.pz; } }
