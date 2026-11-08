@@ -21,6 +21,10 @@ h1 .logo { width: 1.1em; height: 1.1em; vertical-align: -0.2em; margin-right: .2
 #account { display: flex; align-items: center; gap: 8px; font-size: 15px; }
 #account b { font-family: 'Jua', sans-serif; font-size: 18px; }
 section { position: relative; max-width: 1100px; margin: 0 auto; padding: 8px 16px; }
+/* 내 캐릭터 · 게시판을 나란히 (좁은 화면에서는 게시판이 위로) */
+.duo { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: start; }
+.duo > section { max-width: none; margin: 0; min-width: 0; }
+@media (max-width: 860px) { .duo { grid-template-columns: 1fr; } .duo #board-sec { order: -1; } }
 .sec-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 14px 0 10px; }
 h2 { font-family: 'Jua', sans-serif; font-size: 26px; margin: 0; }
 .sec-sub, .lead { color: var(--soft); font-size: 14px; }
