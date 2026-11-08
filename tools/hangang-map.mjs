@@ -268,7 +268,8 @@ for (const b of items) {
   const lv = num(t['building:levels']), h = num(t.height) || (lv ? lv * 3.3 + 1 : 0) || (t.building === 'house' ? 7 : 10);
   const mh = num(t.min_height) || (num(t['building:min_level']) ? num(t['building:min_level']) * 3.3 : 0);
   const a = Math.abs(area(o)), d = near(c, 1800);
-  if (a < 25 || (d > 1800 && h < 45) || (d > 900 && h < 12 && a < 400)) { dropped++; continue; }
+  // 거리 지역(골목이 빽빽): 코스에서 600m 넘게 먼 낮은 건물은 뺀다 (무거워서 이동이 느려 보이지 않게)
+  if (a < 25 || (d > 1800 && h < 45) || (d > 900 && h < 12 && a < 400) || (C.kind === 'street' && d > 600 && h < 30)) { dropped++; continue; }
   const s = simplify(o, a > 2000 ? 1.2 : 0.6);
   if (s.length < 3) continue;
   const kind = KIND[t.building] ?? KIND[b.inheritKind] ?? KIND[t['building:part']] ?? 0, mat = t['building:material'] === 'glass' ? 1 : 0;

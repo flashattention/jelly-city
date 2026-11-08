@@ -758,7 +758,8 @@ $('cos-btn').onclick = () => openWardrobe('shop', () => { renderAccount(); }, { 
 function frame() {
   requestAnimationFrame(frame);
   // 프레임 시간을 0.1ms 단위로 (기록과 똑같이 다시 돌릴 수 있게 · 몸으로 느낄 수 없는 차이)
-  const dtRaw = Math.min(0.05, clock.getDelta()) + (game.dtCarry || 0), dtT = Math.round(dtRaw * 10000), dt = dtT / 10000; game.dtCarry = dtRaw - dt;
+  // 서울 산책은 느린 기기에서도 실제 속도대로 (한 프레임 0.1초까지), 러너는 규칙대로 0.05초
+  const dtRaw = Math.min(game.mode === 'hangang' ? 0.1 : 0.05, clock.getDelta()) + (game.dtCarry || 0), dtT = Math.round(dtRaw * 10000), dt = dtT / 10000; game.dtCarry = dtRaw - dt;
   t += dt;
   readInput();
   if (game.mode === 'hangang') { hgFrame(dt); return; }

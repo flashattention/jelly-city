@@ -726,7 +726,7 @@ export class Hangang {
     for (const ring of crosses) { const f = this.foot?.find((q) => q.ring === ring); if (!f) continue; let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length; const big = Math.sqrt(Math.abs(ringArea(ring))) > 40, H2 = big ? 14 : 6; const pole = new THREE.Mesh(new THREE.BoxGeometry(big ? 1.2 : 0.5, H2, big ? 1.2 : 0.5), this.crossM); pole.position.set(cx, f.h + H2 / 2, cz); const bar = new THREE.Mesh(new THREE.BoxGeometry(big ? 6 : 2.6, big ? 1.2 : 0.5, big ? 1.2 : 0.5), this.crossM); bar.position.set(cx, f.h + H2 * 0.72, cz); this.scene.add(pole, bar); }
     { const best = {}; for (const q of this.lmQueue || []) { const v = Math.abs(ringArea(q.ring)) * q.h, b2 = best[q.name]; if (!b2 || v > b2.v) best[q.name] = { q, v }; } for (const q of this.lmQueue || []) if (best[q.name].q !== q) (this.lmParts[q.name] ||= []).push({ ring: q.ring, h: q.h }); for (const { q } of Object.values(best)) buildLandmarkExtras(this, q); }
     if (this.aptMarks?.length) { const cache = new Map(), matOf = (text, no) => { const k = `${text}|${no}`; if (cache.has(k)) return cache.get(k); const cv = document.createElement('canvas'); cv.width = 256; cv.height = 160; const c = cv.getContext('2d'); c.fillStyle = '#eeebe4'; c.fillRect(0, 0, 256, 160); c.fillStyle = '#4d6994'; c.textAlign = 'center'; c.textBaseline = 'middle'; if (text) { c.font = 'bold 30px sans-serif'; c.fillText(text, 128, 34, 220); } c.font = 'bold 84px sans-serif'; c.fillText(String(no), 128, text ? 104 : 84); const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; const m = new THREE.MeshLambertMaterial({ map: t, polygonOffset: true, polygonOffsetFactor: -2 }); cache.set(k, m); return m; };
-      const pg = new THREE.PlaneGeometry(1, 1); pg.translate(0, -0.5, 0); const grp = new THREE.Group(); for (const a of this.aptMarks) { const m = new THREE.Mesh(pg, matOf(a.text, a.no)); m.scale.set(a.w, a.hh, 1); m.position.set(a.x, a.y, a.z); m.rotation.y = a.ry; grp.add(m); } this.scene.add(grp); batchStatic(this.scene, [grp]); }
+      const pg = new THREE.PlaneGeometry(1, 1); pg.translate(0, -0.5, 0); const grp = new THREE.Group(); for (const a of this.aptMarks) { const m = new THREE.Mesh(pg, matOf(a.text, a.no)); m.scale.set(a.w, a.hh, 1); m.position.set(a.x, a.y, a.z); m.rotation.y = a.ry; grp.add(m); } this.scene.add(grp); batchStatic(this.scene, [grp], (this.lodObjs ||= [])); }
     if (this.helis?.length) { const t = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const c = cv.getContext('2d'); c.fillStyle = '#4f9e7c'; c.fillRect(0, 0, 128, 128); c.strokeStyle = '#f4f4ee'; c.lineWidth = 7; c.beginPath(); c.arc(64, 64, 50, 0, 7); c.stroke(); c.fillStyle = '#f4f4ee'; c.font = 'bold 64px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('H', 64, 68); c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 3; c.strokeRect(4, 4, 120, 120); const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace; return tx; })();
       const hg2 = new THREE.PlaneGeometry(1, 1); hg2.rotateX(-Math.PI / 2); const im = new THREE.InstancedMesh(hg2, new THREE.MeshLambertMaterial({ map: t }), this.helis.length), o = new THREE.Object3D(); this.helis.forEach(([x, y, z, sz, ry], i) => { o.position.set(x, y, z); o.scale.set(sz * 2, 1, sz * 2); o.rotation.y = ry; o.updateMatrix(); im.setMatrixAt(i, o.matrix); }); this.scene.add(im); }
     const dm = new THREE.MeshPhongMaterial({ color: '#4f9e8c', shininess: 40, emissive: '#2a5a50', emissiveIntensity: 0 }); this.domeM = dm;
@@ -1099,7 +1099,7 @@ export class Hangang {
       // 부딪힘: 양옆 화강석 벽 · 뒤 벽 · 안내 기둥 (가운데 계단으로는 걸어 내려갈 수 있다)
       { const th = g.rotation.y, W = (lx, lz) => [x + lx * Math.cos(th) + lz * Math.sin(th), z - lx * Math.sin(th) + lz * Math.cos(th)], rect = (a0, b0, a1, b1) => { const ring = [W(a0, b0), W(a1, b0), W(a1, b1), W(a0, b1)], xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); this.addFoot({ ring, h: 2.6, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), name: `${st.name}역 ${ref || ''}번 출구`, type: 'stone', noClimb: false }); }; rect(-1.45, -2.3, -1.15, 2.4); rect(1.15, -2.3, 1.45, 2.4); rect(-1.45, 2.3, 1.45, 2.6); this.addCircle(W(1.95, -2.2)[0], W(1.95, -2.2)[1], 0.4, 2.7); }
     }
-    batchStatic(this.scene, this.entrances.map((e) => e.g)); // 출구 수백 개를 재질별로 묶는다
+    batchStatic(this.scene, this.entrances.map((e) => e.g), (this.lodObjs ||= [])); // 출구 수백 개를 재질별로 묶고, 멀면 숨긴다
     // 한강철교 선로 두 줄: 가장 긴 철교 둘
     // 한강철교(노량진 ↔ 용산, 북위 37.5172 · 동경 126.958) 근처 철교 중 긴 두 줄
     const M2 = this.map, hx = (126.958 - 126.98) * 111320 * Math.cos(37.53 * Math.PI / 180) - M2.center[0], hz = -(37.5172 - 37.53) * 110574 - M2.center[1];
@@ -1265,6 +1265,8 @@ export class Hangang {
     if (!this.climb) poseBear(this.bear, { ground: this.y <= this.groundAt(bx, bz, this.y) + 0.001, slide: this.slide, flip: this.flipT > 0 ? 1 - this.flipT / FLIP_T : null, vy: this.vy, alive: true }, dt);
     this.shadow.position.set(bx, this.groundAt(bx, bz, this.y) + 0.02, bz); this.shadow.scale.setScalar(BEAR * (1 - Math.min(0.5, this.y * 0.2)));
     this.tickSignals(this.time);
+    // 멀리 있는 작은 것(출구 · 동 번호 등)은 숨긴다 (0.5초마다)
+    this.lodT = (this.lodT || 0) - dt; if (this.lodT <= 0 && this.lodObjs) { this.lodT = 0.5; const v = new THREE.Vector3(); for (const o of this.lodObjs) { const bs = o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere); v.copy(bs.center).applyMatrix4(o.matrixWorld); o.visible = Math.hypot(v.x - bx, v.z - bz) - bs.radius < 400; } }
     this.tickPeople(dt, bx, bz); this.tickGroups(dt, bx, bz); this.tickCity(dt, bx, bz); this.tickTransit(dt, bx, bz); this.tickLabels(dt, camera, bx, bz);
     if (this.inside) { this.tickInside(dt); }
     if (this.inShop) this.tickShop(dt); else if (this.inMall) this.tickMall(dt);
@@ -1524,10 +1526,11 @@ export class Hangang {
 
 // ---------- 곰돌이 소품 ----------
 // 가만히 있는 물체 묶기: 같은 재질끼리 하나로 합쳐 그리기 호출을 줄인다 (원래 물체는 뺀다, 묶음은 장면에 바로)
-function batchStatic(scene, roots) {
+function batchStatic(scene, roots, out = null) {
   const byMat = new Map(); for (const r of roots) { r.updateMatrixWorld(true); r.traverse((o) => { if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material)) return; (byMat.has(o.material) ? byMat.get(o.material) : byMat.set(o.material, []).get(o.material)).push(o); }); }
   for (const [m, list] of byMat) { if (list.length < 2) continue; const P = [], N = [], U = []; for (const o of list) { const g = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()); g.applyMatrix4(o.matrixWorld); const p = g.attributes.position, n = g.attributes.normal, uv = g.attributes.uv; for (let i = 0; i < p.count; i++) { P.push(p.getX(i), p.getY(i), p.getZ(i)); N.push(n ? n.getX(i) : 0, n ? n.getY(i) : 1, n ? n.getZ(i) : 0); U.push(uv ? uv.getX(i) : 0, uv ? uv.getY(i) : 0); } o.parent?.remove(o); }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); const me = new THREE.Mesh(g, m); me.frustumCulled = false; scene.add(me); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); g.computeBoundingSphere(); const me = new THREE.Mesh(g, m); scene.add(me); out?.push(me); }
+  if (out) for (const r of roots) r.traverse((o) => { if (o.isMesh && o.parent) out.push(o); });
 }
 function mergeGeos(list) {
   const P = [], N = [], I = []; let base = 0;
