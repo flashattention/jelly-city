@@ -1088,7 +1088,7 @@ function hgLabels() {
   for (const l of list) {
     labV.set(l.x, l.y, l.z).project(camera); if (labV.z > 1) continue;
     const x = (labV.x * 0.5 + 0.5) * W, y = (-labV.y * 0.5 + 0.5) * H; if (x < -40 || x > W + 40 || y < -40 || y > H + 40) continue;
-    const a = l.t < 0.4 ? l.t / 0.4 : l.t > 4.2 ? Math.max(0, 1 - (l.t - 4.2) / 1.2) : 1, side = x > W * 0.6 ? -1 : 1, lx = 70 * side, ly = -60;
+    const a = Math.min(l.t / 0.4, Math.min(1, (l.seen ?? 1) / 0.6)), side = x > W * 0.6 ? -1 : 1, lx = 70 * side, ly = -60;
     const el = document.createElement('div'); el.className = 'hg-lab'; el.style.transform = `translate(${x}px, ${y}px)`; el.style.opacity = a;
     el.innerHTML = `<i></i><svg width="1" height="1"><line x1="0" y1="0" x2="${lx}" y2="${ly}" stroke="#ff2d55" stroke-width="2.5"/></svg><b style="left:${side > 0 ? lx : lx - 4}px;top:${ly - 14}px;${side < 0 ? 'transform:translateX(-100%)' : ''}">${l.name.replace(/[<>&]/g, '')}</b>`;
     box.appendChild(el);

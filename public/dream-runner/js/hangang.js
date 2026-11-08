@@ -930,14 +930,19 @@ export class Hangang {
   project0(x, z) { let best = Infinity, bs = 0, bl = 0; for (let i = 0; i < this.rp.length - 1; i += 2) { const a = this.rp[i], d = (a[0] - x) ** 2 + (a[1] - z) ** 2; if (d < best) { best = d; bs = i * this.step; } } const p = this.at(bs); bl = (x - p.x) * p.rx + (z - p.z) * p.rz; return { s: bs, lat: bl }; }
   tickLabels(dt, camera, px, pz) {
     if (!this.labels) this.setupLabels();
-    this.activeLabels = (this.activeLabels || []).filter((l) => (l.t += dt) < 5.5);
-    if (this.activeLabels.length < 2) {
-      const fx = Math.sin(this.camYaw), fz = Math.cos(this.camYaw);
+    // 바라보는 건물에 이름표: 화면 가운데 쪽에 들어온 건물 (높을수록 멀리서도) · 시선을 돌리면 서서히 사라지고 다시 보면 또 뜬다
+    this.activeLabels ||= []; this.labT = (this.labT || 0) - dt;
+    for (const l of this.activeLabels) { l.t += dt; l.seen = Math.max(0, (l.seen ?? 1) - dt); }
+    this.activeLabels = this.activeLabels.filter((l) => l.seen > 0 || l.t < 0.4);
+    if (this.labT <= 0) {
+      this.labT = 0.25; const v = this.labV ||= new THREE.Vector3(), picks = [];
       for (const l of this.labels) {
-        if (this.seenLabel?.has(l.name)) continue; const dx = l.x - px, dz = l.z - pz, d = Math.hypot(dx, dz), near = 110 + Math.min(260, l.h * 1.2);
-        if (d > near) continue; if ((dx * fx + dz * fz) / d < 0.25) continue;
-        (this.seenLabel ||= new Set()).add(l.name); this.activeLabels.push({ ...l, t: 0, y: Math.min(l.h * 0.62, 60) }); break;
+        const d = Math.hypot(l.x - px, l.z - pz), range = Math.min(1300, 160 + l.h * 3.2); if (d > range) continue;
+        v.set(l.x, Math.min(l.h * 0.62, 90), l.z).project(camera); if (v.z > 1 || Math.abs(v.x) > 0.42 || v.y < -0.7 || v.y > 0.95) continue;
+        picks.push({ l, score: Math.abs(v.x) + d / range * 0.4 });
       }
+      picks.sort((a, b) => a.score - b.score);
+      for (const { l } of picks.slice(0, 2)) { const a = this.activeLabels.find((q) => q.name === l.name); if (a) a.seen = 1.4; else if (this.activeLabels.length < 2) this.activeLabels.push({ ...l, t: 0, seen: 1.4, y: Math.min(l.h * 0.62, 90) }); }
     }
     // 구역: 이정표(다리 등) 근처 → 이름 있는 공원 · 섬 (작은 곳 먼저)
     let name = null; for (const [n, ms] of this.map.marks || []) if (Math.abs(ms - this.s) < 30) { name = n; break; }
