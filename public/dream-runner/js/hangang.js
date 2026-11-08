@@ -320,6 +320,8 @@ export class Hangang {
   // 곰이 있는 칸 둘레 3 × 3 을 불러오고(가까운 것부터 하나씩), 5 × 5 밖은 내린다
   tickWorld(px, pz) {
     if (this.map.kind !== 'world') return;
+    // 역 · 가게 · 몰 · 열차 안은 먼 좌표에 있다: 그동안 서울 칸을 내리거나 엉뚱한 칸을 부르지 않는다 (나오면 빈 땅이었다)
+    if (this.inside || this.inShop || this.inMall || this.ride) return;
     const T = this.world0.tile, ti = Math.floor(px / T), tj = Math.floor(pz / T); this.tileNow = [ti, tj];
     // 먼 나무 칸은 그리지 않는다 (1.1km 넘게, 날 때는 높이만큼 더 멀리까지). 0.4초마다
     if ((this.treeLodN = (this.treeLodN || 0) + 1) % 12 === 1) { const R = 1100 + Math.min(900, (this.y || 0) * 3); for (const c of this.chunks.values()) c.scene.traverse((o) => { const L = o.userData.lod; if (L) o.count = Math.hypot(L[0] - px, L[1] - pz) < R + 360 ? L[2] : 0; const V = o.userData.lodV; if (V) o.visible = Math.hypot(V[0] - px, V[1] - pz) < V[2] + Math.min(600, (this.y || 0) * 2); }); }
