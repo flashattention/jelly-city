@@ -12,7 +12,7 @@ export const TIMES = { sunrise: ['🌅 일출', 5.9], day: ['🌤️ 낮', 11.5]
 export const SPEEDS = [['🚶 걷기', 3.2], ['🏃 조깅', 6.4], ['🏃 러닝', 9.2], ['💨 빠르게', 13.2], ['⚡ 전력 질주', 19]];
 export const V_MIN = 2.0, V_MAX = 26;
 const BEAR = 0.42; // 한강의 곰돌이들은 작게 (사람 크기쯤)
-const LAT_MIN = -11, LAT_MAX = 24; // 코스 밖으로는 못 나간다 (강 쪽 · 공원 쪽)
+const LAT_MIN = -600, LAT_MAX = 400; // 강가부터 공원 · 녹지까지 (물속 · 도시 길로는 못 간다: walkable)
 
 const rnd = (seed) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
 const lerp = (a, b, k) => a + (b - a) * k;
@@ -162,6 +162,17 @@ function foliageTex(blossom) {
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
 }
 function petalTex() { const cv = document.createElement('canvas'); cv.width = cv.height = 32; const g = cv.getContext('2d'); g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(16, 16, 12, 7, 0.6, 0, 7); g.fill(); return new THREE.CanvasTexture(cv); }
+// 나비 날개 그림: 위 · 아래 날개 + 무늬 (종류 4가지: 노랑나비 · 흰나비 · 호랑나비 · 푸른부전나비)
+function butterflyTex(kind) {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d');
+  const [base, edge, spot] = [['#ffd84a', '#3a2a10', '#fff2a8'], ['#f6f3ea', '#4a4a4a', '#ffffff'], ['#ff9a2e', '#1d1410', '#ffe08a'], ['#7fb8ff', '#1d2a55', '#e8f2ff']][kind];
+  g.fillStyle = edge; g.beginPath(); g.ellipse(30, 22, 30, 19, -0.35, 0, 7); g.fill(); g.beginPath(); g.ellipse(24, 46, 20, 15, 0.45, 0, 7); g.fill();
+  g.fillStyle = base; g.beginPath(); g.ellipse(29, 22, 25, 14.5, -0.35, 0, 7); g.fill(); g.beginPath(); g.ellipse(23, 45, 15.5, 11, 0.45, 0, 7); g.fill();
+  g.fillStyle = edge; for (const [x, y, r2] of [[40, 16, 3.2], [30, 26, 2.6], [22, 47, 2.4]]) { g.beginPath(); g.arc(x, y, r2, 0, 7); g.fill(); }
+  g.fillStyle = spot; for (const [x, y] of [[50, 12], [55, 20], [46, 30]]) { g.beginPath(); g.arc(x, y, 1.8, 0, 7); g.fill(); }
+  // 왼쪽 끝(몸통 쪽)이 날개 뿌리
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
 function cloudTex() {
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const g = cv.getContext('2d'), r = rnd(7);
   for (let i = 0; i < 26; i++) { const x = 40 + r() * 176, y = 50 + r() * 40, rad = 18 + r() * 34, gr = g.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, rad, 0, 7); g.fill(); }
@@ -211,6 +222,15 @@ export class Hangang {
     return { x: lerp(a[0], b[0], t), z: lerp(a[1], b[1], t), dx, dz, rx: -dz, rz: dx };
   }
   world(s, lat) { const p = this.at(s); return [p.x + p.rx * lat, p.z + p.rz * lat]; }
+  // 걸어갈 수 있는 곳: 물이 아니고, 코스 둘레 45m 안이거나 공원 · 녹지 · 섬 안 (5m 칸마다 기억)
+  walkable(x, z, lat) {
+    if (this.inWater(x, z)) return false;
+    if (Math.abs(lat) < 45) return true;
+    const key = `${Math.round(x / 5)},${Math.round(z / 5)}`; this.walkCache ||= new Map();
+    let v = this.walkCache.get(key);
+    if (v === undefined) { v = this.greenPolys.some((g) => inPoly(x, z, g)) || (this.map.areas || []).some(([n, ...f]) => /한강공원|공원|섬/.test(n) && inRing(x, z, unpack(f, this.map.scale))); this.walkCache.set(key, v); if (this.walkCache.size > 60000) this.walkCache.clear(); }
+    return v;
+  }
   // 위치 → 코스 위 (s, 옆으로 얼마나)
   project(x, z) {
     const R = this.rp, n = R.length; let best = Infinity, bi = this.ri || 0, bt = 0;
@@ -569,8 +589,8 @@ export class Hangang {
     const SN = isPhone ? 1200 : 2600, sp = new Float32Array(SN * 3); for (let i = 0; i < SN; i++) sp.set([(r() - 0.5) * 90, r() * 40, (r() - 0.5) * 90], i * 3);
     const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp, 3)); this.snow = new THREE.Points(sg, new THREE.PointsMaterial({ color: '#ffffff', size: 0.22, map: this.dot ||= dotTex(), transparent: true, depthWrite: false })); this.snow.frustumCulled = false; this.scene.add(this.snow);
     // 나비 · 잠자리 (낮) · 반딧불 (여름밤): 내 주변을 맴돈다
-    this.bugs = []; const wingG = new THREE.CircleGeometry(0.055, 8); wingG.scale(1.3, 1, 1); wingG.translate(0.07, 0, 0);
-    for (let i = 0; i < 14; i++) { const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({ color: '#ffffff', side: THREE.DoubleSide, transparent: true }); const a = new THREE.Mesh(wingG, m), b = new THREE.Mesh(wingG, m); b.rotation.y = Math.PI; g.add(a, b); g.userData = { a, b, m, ph: r() * 6, ox: (r() - 0.5) * 14, oz: (r() - 0.5) * 14, h: 0.5 + r() * 1.2 }; this.scene.add(g); this.bugs.push(g); }
+    this.bugs = []; const wingG = new THREE.PlaneGeometry(0.16, 0.16); wingG.translate(0.08, 0, 0); const bodyG = new THREE.CylinderGeometry(0.008, 0.012, 0.11, 5); bodyG.rotateX(Math.PI / 2); const wingTex = [0, 1, 2, 3].map((k) => butterflyTex(k));
+    for (let i = 0; i < 14; i++) { const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({ color: '#ffffff', map: wingTex[i % 4], side: THREE.DoubleSide, alphaTest: 0.4 }); const a = new THREE.Mesh(wingG, m), b = new THREE.Mesh(wingG, m); b.scale.x = -1; a.rotation.x = b.rotation.x = -Math.PI / 2; const wa = new THREE.Group(), wb = new THREE.Group(); wa.add(a); wb.add(b); g.add(wa, wb, new THREE.Mesh(bodyG, new THREE.MeshBasicMaterial({ color: '#2a2018' }))); g.userData = { a: wa, b: wb, m, ph: r() * 6, ox: (r() - 0.5) * 14, oz: (r() - 0.5) * 14, h: 0.5 + r() * 1.2 }; this.scene.add(g); this.bugs.push(g); }
     const PN = isPhone ? 140 : 320, pp = new Float32Array(PN * 3); this.petals = []; for (let i = 0; i < PN; i++) this.petals.push({ ox: (r() - 0.5) * 40, oz: (r() - 0.5) * 40, y: r() * 8, ph: r() * 6, v: 0.5 + r() * 0.6 });
     const pg2 = new THREE.BufferGeometry(); pg2.setAttribute('position', new THREE.BufferAttribute(pp, 3)); this.petalPts = new THREE.Points(pg2, new THREE.PointsMaterial({ color: '#ffd1e3', size: 0.13, map: petalTex(), transparent: true, depthWrite: false, alphaTest: 0.2 })); this.petalPts.frustumCulled = false; this.scene.add(this.petalPts);
     const FN = 90, fp = new Float32Array(FN * 3); this.ff = []; for (let i = 0; i < FN; i++) this.ff.push({ ox: (r() - 0.5) * 50, oz: (r() - 0.5) * 50, h: 0.3 + r() * 2, ph: r() * 6 });
@@ -712,12 +732,13 @@ export class Hangang {
     if (this.opt.weather === 'auto') { this.weatherT -= dt; if (this.weatherT <= 0) { this.weatherT = 240 + this.r() * 420; st.weather = this.randWeather(this.r); } }
     // 속도 단계: Q · E · +/- 로 고른다. 움직이는 건 누르는 동안만 (W A S D · 조이스틱, 카메라가 보는 쪽 기준)
     if (inp.speedTo != null) { this.target = inp.speedTo; inp.speedTo = null; }
-    this.camYaw += inp.yaw || 0; this.camPitch = clamp((this.camPitch ?? 0.32) + (inp.pitch || 0), -0.15, 1.2); if (inp.yaw || inp.pitch) this.dragT = 2.5; this.dragT = Math.max(0, this.dragT - dt);
+    this.camYaw += inp.yaw || 0; this.camPitch = clamp((this.camPitch ?? 0.32) + (inp.pitch || 0), -0.6, 1.2); if (inp.yaw || inp.pitch) this.dragT = 2.5; this.dragT = Math.max(0, this.dragT - dt);
     const fx0 = Math.sin(this.camYaw), fz0 = Math.cos(this.camYaw);
     let mx = fx0 * (inp.mz || 0) - fz0 * (inp.mx || 0), mz = fz0 * (inp.mz || 0) + fx0 * (inp.mx || 0); const ml = Math.hypot(mx, mz);
     if (ml > 1) { mx /= ml; mz /= ml; }
     // Shift(휴대폰은 💨 버튼)를 누르는 동안 가속: 지금 단계보다 확 빨라진다
-    const boost = !!inp.sprint && ml > 0.05, want = Math.min(V_MAX, this.target * Math.min(1, ml) * (boost ? 1.8 : 1) + (boost ? 3 : 0));
+    if (inp.sprint && ml > 0.05) this.boostOn = true; if (ml <= 0.05) this.boostOn = false;
+    const boost = !!this.boostOn, want = Math.min(V_MAX, this.target * Math.min(1, ml) * (boost ? 1.8 : 1) + (boost ? 3 : 0));
     this.v += (want - this.v) * Math.min(1, dt * (want > this.v ? (boost ? 4.5 : 1.8) : 4)); this.boosting = boost;
     let ds = 0;
     if (ml > 0.05) { this.mdx = mx / ml; this.mdz = mz / ml; }
@@ -726,7 +747,9 @@ export class Hangang {
       const q = this.project(nx, nz);
       const lat = clamp(q.lat, LAT_MIN, LAT_MAX), s2 = clamp(q.s, 2, this.L - 2);
       let [cx, cz] = (lat !== q.lat || s2 !== q.s) ? this.world(s2, lat) : [nx, nz];
-      if (this.inWater(cx, cz)) { cx = this.px; cz = this.pz; }
+      if (!this.walkable(cx, cz, q.lat)) { // 막히면 한 축씩 미끄러져 본다 (벽을 따라 걷듯)
+        if (this.walkable(nx, this.pz, q.lat)) cz = this.pz; else if (this.walkable(this.px, nz, q.lat)) cx = this.px; else { cx = this.px; cz = this.pz; }
+        cx = cx === nx ? nx : cx; }
       ds = Math.hypot(cx - this.px, cz - this.pz); this.px = cx; this.pz = cz; this.dist += ds;
       const q2 = this.project(cx, cz); this.s = q2.s; this.lat = q2.lat;
       const tg = this.at(this.s); this.dir = this.mdx * tg.dx + this.mdz * tg.dz >= 0 ? 1 : -1;
@@ -853,8 +876,8 @@ export class Hangang {
       u.ph += dt * (season === 'autumn' ? 30 : 14);
       const x = px + u.ox + Math.sin(this.t * 0.3 + i) * 3, z = pz + u.oz + Math.cos(this.t * 0.27 + i * 2) * 3;
       b.position.set(x, u.h + Math.sin(this.t * 1.7 + i) * 0.25, z); b.rotation.y = this.t * 0.5 + i;
-      const flap = Math.sin(u.ph) * (season === 'autumn' ? 0.25 : 1.1); u.a.rotation.z = flap; u.b.rotation.z = -flap;
-      u.m.color.set(Array.isArray(bugCol) ? bugCol[i % bugCol.length] : bugCol);
+      const flap = season === 'autumn' ? Math.sin(u.ph) * 0.25 : 0.25 + Math.sin(u.ph) * 0.95; u.a.rotation.z = flap; u.b.rotation.z = -flap;
+      u.m.color.set(season === 'autumn' ? '#c8502a' : '#ffffff');
       if (season === 'autumn') { u.a.scale.set(1.8, 0.35, 1); u.b.scale.set(1.8, 0.35, 1); } else { u.a.scale.set(1, 1, 1); u.b.scale.set(1, 1, 1); }
       
     });
@@ -868,11 +891,11 @@ export class Hangang {
   tickCamera(dt, camera, bx, bz, fx, fz) {
     const k = 1 - Math.exp(-dt * ((this.dragT || 0) > 0 && (this.opt.cam || 0) === 0 ? 14 : 3)), mode = this.opt.cam || 0, y = this.y;
     let cx, cy, cz, lx, ly, lz;
-    if (mode === 0) { const pt = this.camPitch ?? 0.3, d = 4.8, hd = Math.cos(pt) * d; cx = bx - fx * hd; cy = 0.55 + Math.sin(pt) * d + y * 0.5; cz = bz - fz * hd; lx = bx + fx * 1.0; ly = 0.55 + y * 0.6; lz = bz + fz * 1.0; }
+    if (mode === 0) { const pt = this.camPitch ?? 0.3, d = 4.8 * (pt < 0 ? 1 + pt * 0.6 : 1), hd = Math.cos(pt) * d; cx = bx - fx * hd; cy = Math.max(0.35, 0.55 + Math.sin(pt) * d) + y * 0.5; cz = bz - fz * hd; lx = bx + fx * 1.0; ly = 0.55 + y * 0.6 + (pt < 0 ? -pt * 7 : 0); lz = bz + fz * 1.0; }
     else if (mode === 1) { const p = this.at(this.s); cx = bx - p.rx * 5 + p.dx * 1.5; cy = 1.0; cz = bz - p.rz * 5 + p.dz * 1.5; lx = bx; ly = 0.6; lz = bz; }
     else { cx = bx - fx * 26; cy = 22; cz = bz - fz * 26; lx = bx + fx * 30; ly = 0; lz = bz + fz * 30; }
     if (!this.camInit) { camera.position.set(cx, cy, cz); this.camInit = true; }
-    camera.position.x += (cx - camera.position.x) * k; camera.position.y += (cy - camera.position.y) * k; camera.position.z += (cz - camera.position.z) * k;
+    camera.position.x += (cx - camera.position.x) * k; camera.position.y += (cy - camera.position.y) * k; camera.position.z += (cz - camera.position.z) * k; camera.position.y = Math.max(0.3, camera.position.y);
     this.look ||= new THREE.Vector3(lx, ly, lz); this.look.x += (lx - this.look.x) * k; this.look.y += (ly - this.look.y) * k; this.look.z += (lz - this.look.z) * k;
     camera.lookAt(this.look);
     const fov = 56 + clamp(this.v - 6, 0, 18) * 0.8; if (Math.abs(camera.fov - fov) > 0.05 || camera.far < 20000) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 3); camera.far = 24000; camera.updateProjectionMatrix(); }
