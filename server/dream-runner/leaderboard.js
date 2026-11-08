@@ -142,14 +142,14 @@ export class DreamBoard {
     const bonus = getCos()?.earnRaw?.(sub, got.earned) ?? 0, D = this.day(now); D.adWatch++; D.adStars += bonus; if (!D.adSubs.includes(sub)) D.adSubs.push(sub); this.dirty = true;
     return { bonus };
   }
-  // 🌉 한강 러닝: 장애물이 없는 힐링 맵이라 순위표는 없다. 달린 거리는 실제로 흐른 시간으로만 믿는다 (초속 12m 까지)
+  // 🌉 한강 러닝: 장애물이 없는 힐링 맵이라 순위표는 없다. 달린 거리는 실제로 흐른 시간으로만 믿는다 (초속 26m 까지)
   hgStart() { return this.tickets.issue({ seed: 0, diff: 'hg', map: 'hangang', mode: 'hangang' }); }
   hgRun(sub, b) {
     const now = Date.now(), tk = this.tickets.read(b.tk);
     if (!tk || tk.mode !== 'hangang' || now - tk.at > HG_TTL || tk.at - now > 5000) throw new Error('한강 출발표가 없거나 오래됐어요');
     const S = (this.hgSess[tk.id] ||= { sub, m: 0, sec: 0, mo: {}, at: tk.at });
     if (S.sub !== sub) throw new Error('다른 사람의 달리기예요');
-    const real = (now - tk.at) / 1000, m = Math.max(0, Math.min(Math.floor(Number(b.m)) || 0, real * 12 + 30)), sec = Math.max(0, Math.min(Math.floor(Number(b.sec)) || 0, real + 5));
+    const real = (now - tk.at) / 1000, m = Math.max(0, Math.min(Math.floor(Number(b.m)) || 0, real * 26 + 30)), sec = Math.max(0, Math.min(Math.floor(Number(b.sec)) || 0, real + 5));
     const U = (this.hg[sub] ||= { m: 0, best: 0, runs: 0, sec: 0, mo: {} }), delta = Math.max(0, m - S.m);
     if (!S.counted) { S.counted = 1; U.runs++; }
     U.m += delta; U.sec += Math.max(0, sec - S.sec); S.m = Math.max(S.m, m); S.sec = Math.max(S.sec, sec); U.best = Math.max(U.best, S.m);

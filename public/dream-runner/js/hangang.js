@@ -9,8 +9,8 @@ import { isPhone } from '../../shared/js/perf.js';
 export const SEASONS = { spring: '🌸 봄', summer: '🌿 여름', autumn: '🍁 가을', winter: '❄️ 겨울' };
 export const WEATHERS = { clear: '☀️ 맑음', cloudy: '☁️ 구름', rain: '🌧️ 비', snow: '🌨️ 눈' };
 export const TIMES = { sunrise: ['🌅 일출', 5.9], day: ['🌤️ 낮', 11.5], sunset: ['🌇 노을', 18.4], night: ['🌙 밤', 21.5], dawn: ['🌌 새벽', 4.4] };
-export const SPEEDS = [['🚶 걷기', 1.6], ['🏃 조깅', 3.2], ['🏃 러닝', 4.6], ['💨 빠르게', 6.6], ['⚡ 전력 질주', 9.5]];
-export const V_MIN = 1.0, V_MAX = 13;
+export const SPEEDS = [['🚶 걷기', 3.2], ['🏃 조깅', 6.4], ['🏃 러닝', 9.2], ['💨 빠르게', 13.2], ['⚡ 전력 질주', 19]];
+export const V_MIN = 2.0, V_MAX = 26;
 const BEAR = 0.6; // 한강의 곰돌이들은 작게 (사람 크기쯤)
 const LAT_MIN = -11, LAT_MAX = 24; // 코스 밖으로는 못 나간다 (강 쪽 · 공원 쪽)
 
@@ -575,7 +575,7 @@ export class Hangang {
   // ---------- 들어가기 · 나가기 ----------
   enter(bear, opt = {}) {
     this.bear = bear; this.prevParent = bear.root.parent; this.scene.add(bear.root);
-    this.s = opt.s ?? 30; this.dir = 1; this.lat = -4.3; this.v = 0; this.target = 3.2; this.y = 0; this.vy = 0; this.dist = 0; this.time = 0; this.moments = {}; this.turnT = 0;
+    this.s = opt.s ?? 30; this.dir = 1; this.lat = -4.3; this.v = 0; this.target = 6.4; this.y = 0; this.vy = 0; this.dist = 0; this.time = 0; this.moments = {}; this.turnT = 0;
     const p0 = this.at(this.s); [this.px, this.pz] = this.world(this.s, this.lat); this.face = Math.atan2(p0.dx, p0.dz); this.camYaw = this.face; this.ri = Math.round(this.s / this.step); this.dragT = 0; this.camInit = false; this.mdx = null;
     bear.root.scale.setScalar(BEAR); bear.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     const r = rnd((Date.now() / 1000) | 0);
@@ -777,7 +777,7 @@ export class Hangang {
     camera.position.x += (cx - camera.position.x) * k; camera.position.y += (cy - camera.position.y) * k; camera.position.z += (cz - camera.position.z) * k;
     this.look ||= new THREE.Vector3(lx, ly, lz); this.look.x += (lx - this.look.x) * k; this.look.y += (ly - this.look.y) * k; this.look.z += (lz - this.look.z) * k;
     camera.lookAt(this.look);
-    const fov = 56 + clamp(this.v - 3, 0, 9) * 1.5; if (Math.abs(camera.fov - fov) > 0.05 || camera.far < 20000) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 3); camera.far = 24000; camera.updateProjectionMatrix(); }
+    const fov = 56 + clamp(this.v - 6, 0, 18) * 0.8; if (Math.abs(camera.fov - fov) > 0.05 || camera.far < 20000) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 3); camera.far = 24000; camera.updateProjectionMatrix(); }
   }
   // 이름표: 건물 가까이 처음 오면 건물에 빨간 동그라미 + 선 + 이름 (5초 뒤 사라짐)
   setupLabels() {
