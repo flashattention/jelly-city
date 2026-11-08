@@ -3,7 +3,7 @@
 import { appLogin, loadFullScreenAd, showFullScreenAd } from '@apps-in-toss/web-framework';
 
 // 보상형 광고 그룹 아이디: 콘솔에서 받은 것으로 바꾼다 (아래는 개발용 시험 아이디)
-const AD_GROUP = 'ait-ad-test-rewarded-id';
+const AD_GROUP = 'ait.v2.live.05380489906a496f'; // 콘솔에서 받은 보상형 광고 그룹 (운영)
 let ready = false;
 function preload() {
   if (loadFullScreenAd.isSupported && !loadFullScreenAd.isSupported()) return; // 광고를 못 띄우는 환경
