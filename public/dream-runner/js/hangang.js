@@ -805,6 +805,8 @@ export class Hangang {
       else if (/^#?[0-9a-f]{6}$/i.test(cTag) || /^[a-z]+$/i.test(cTag)) { try { col.set(cTag); c = `#${col.getHexString()}`; } catch { c = null; } }
       // 실제 건축물 정보(용도 · 구조 · 사용승인 연도)로 외벽을 정한다 (틀 찍어내기 대신 그 건물의 실제 정보대로)
       if (info && !c && !LANDMARKS[name] && type !== 'church' && type !== 'gold' && type !== 'assembly') { const st = styleOf(info, h, r); if (st) { type = st[0]; c = st[1]; } }
+      // 한옥 마을(북촌 · 인사동): 정보가 없는 단층 작은 집도 한옥으로
+      if (!info && (this.id === 'bukchon' || this.id === 'insadong') && h <= 5 && Math.abs(ringArea(ring)) < 350 && !name) { type = 'hanok'; c = '#f2ece0'; }
       // 거리 지역(홍대 · 이태원 등) 낮은 상가: 외벽 색 · 창 무늬 · 층 높이를 건물마다 다르게
       if ((M.kind === 'street' || ((!M.kind || M.kind === 'river') && (kind === 2 || kind === 0) && h < 26 && M.shops?.length)) && h < 32 && type !== 'apt' && type !== 'church' && type !== 'glass' && !LANDMARKS[name] && !c) { type = r() < 0.62 ? 'street' : 'street2'; c = ['#f4f1ea', '#efe3cf', '#b5654a', '#a29e98', '#f2c6cf', '#bfe3d6', '#c8dcef', '#2f2f33', '#e8d9b5', '#8a5a44', '#d9cfc2', '#fff7e8'][Math.floor(r() * 12)]; }
       if (!c) c = type === 'apt' ? APT[Math.floor(r() * APT.length)] : type === 'glass' ? GLASS[Math.floor(r() * GLASS.length)] : type === 'brick' ? BRICK[Math.floor(r() * BRICK.length)] : STONE[Math.floor(r() * STONE.length)];
@@ -1941,8 +1943,8 @@ function skyGlass(m, skyU, gold) {
 // 건축물 정보 → 외벽 [종류, 색]. use: 1 단독 · 2 공동주택 · 3 · 4 근린생활 · 6 종교 · 7 판매 · 9 의료 · 10 교육 · 14 업무 · 15 숙박, st: 11 · 12 · 13 · 19 조적(벽돌 · 블록 · 돌) · 21 · 22 철근콘크리트 · 3x 철골, yr: 사용승인 연도
 function styleOf([use, st, yr], h, r) {
   const pick2 = (a) => a[Math.floor(r() * a.length)], masonry = st >= 11 && st <= 19, steel = st >= 31 && st <= 39, era = yr ? (yr < 1990 ? 0 : yr < 2005 ? 1 : 2) : 1;
-  // 한옥: 목구조(41 ~ 49) 낮은 집 (북촌 · 서촌 · 인사동) → 흰 회벽 · 나무 기둥 · 기와 지붕은 따로 얹는다
-  if (st >= 41 && st <= 49 && h < 9) return ['hanok', '#f2ece0'];
+  // 한옥: 목구조(건축물대장 구조 코드 51 ~ 59 = 일반목구조 · 통나무 등) 낮은 집 (북촌 · 서촌 · 인사동) → 흰 회벽 · 나무 기둥 · 기와 지붕은 따로 얹는다
+  if (st >= 51 && st <= 59 && h < 9) return ['hanok', '#f2ece0'];
   if (use === 6) return ['church', '#efe9de'];
   // 공장 · 창고 (성수 붉은 벽돌 공장 카페 등): 짙은 붉은 벽돌 + 큰 공장 창
   if ((use === 17 || use === 18) && h > 22) return ['glass', pick2(['#9fb2c0', '#a9bccb', '#b8c6cf'])]; // 지식산업센터 (공장 용도인 높은 유리 빌딩)
