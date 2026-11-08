@@ -107,7 +107,7 @@ async function overpass(file, body) {
   if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf8'));
   const B = C.bbox.join(',');
   // 요청이 많으면(429 · 504) 잠깐 쉬었다가 다시 (최대 6번)
-  let r; for (let tr = 0; tr < 6; tr++) { try { r = await fetch(['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'][tr % 3], { method: 'POST', headers: { 'User-Agent': 'jelly-games-hangang-map/1.0', 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(`[out:json][timeout:170];(${body.replaceAll('$B', B)});out geom;`) }); } catch { r = { ok: false, status: 599 }; await new Promise((res) => setTimeout(res, 5000)); continue; } if (r.ok || ![429, 502, 503, 504, 599].includes(r.status)) break; await new Promise((res) => setTimeout(res, 20000 * (tr + 1))); }
+  let r; for (let tr = 0; tr < 6; tr++) { try { r = await fetch(['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'][(tr + +(process.env.OVERPASS_START || 0)) % 3], { method: 'POST', headers: { 'User-Agent': 'jelly-games-hangang-map/1.0', 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(`[out:json][timeout:170];(${body.replaceAll('$B', B)});out geom;`) }); } catch { r = { ok: false, status: 599 }; await new Promise((res) => setTimeout(res, 5000)); continue; } if (r.ok || ![429, 502, 503, 504, 599].includes(r.status)) break; await new Promise((res) => setTimeout(res, 20000 * (tr + 1))); }
   if (!r.ok) throw new Error(`Overpass ${r.status}`);
   const j = await r.json(); fs.writeFileSync(f, JSON.stringify(j)); return j;
 }
