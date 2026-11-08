@@ -257,6 +257,11 @@ out.tall = [];
 }
 
 // ---------- 지하철역 · 출입구 ----------
+// 가게 (실제 이름 · 종류): 카페 · 식당 · 분식 · 빵집 · 편의점 · 술집 → 건물 1층에 문과 간판을 달고 들어가서 주문할 수 있게
+{ const pJ = await overpass('pois.json', 'node["amenity"~"^(cafe|restaurant|fast_food|bar|pub|ice_cream|food_court)$"]["name"]($B);node["shop"~"^(convenience|bakery|pastry|supermarket|deli)$"]["name"]($B);');
+  const kindOf = (t) => { const a = t.amenity, sh = t.shop, cu = String(t.cuisine || ''); if (sh === 'convenience' || sh === 'supermarket') return 'mart'; if (sh === 'bakery' || sh === 'pastry') return 'bakery'; if (a === 'cafe' || a === 'ice_cream') return 'cafe'; if (a === 'bar' || a === 'pub') return 'pub'; if (/chicken/.test(cu)) return 'chicken'; if (/pizza/.test(cu)) return 'pizza'; if (/burger/.test(cu) || a === 'fast_food') return 'burger'; if (/chinese/.test(cu)) return 'chinese'; if (/japanese|sushi|ramen/.test(cu)) return 'japanese'; return 'korean'; };
+  out.shops = []; for (const e of pJ.elements) { if (e.type !== 'node') continue; const [x, z] = P(e.lat, e.lon); if (x < rect[0] || x > rect[2] || z < rect[1] || z > rect[3]) continue; if (near([x, z], 1800) > 1800) continue; out.shops.push([String(e.tags.name).slice(0, 24), kindOf(e.tags), ...q([x, z])]); }
+  console.log(`가게 ${out.shops.length}`); }
 out.stations = []; out.entrances = [];
 {
   const st = sJ.elements.filter((e) => e.type === 'node' && e.tags?.name && (e.tags.railway === 'station' || e.tags.public_transport === 'station') && (e.tags.subway === 'yes' || e.tags.station === 'subway' || e.tags.train === 'yes' || /역$/.test(e.tags.name) || e.tags.railway === 'station'));

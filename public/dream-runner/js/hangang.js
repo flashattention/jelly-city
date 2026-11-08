@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { makeBear, poseBear, FLIP_T } from './runner.js';
 import { isPhone } from '../../shared/js/perf.js';
 import { buildStation, buildCar } from './hangang-station.js';
+import { buildShopFronts, buildShopInterior, foodMesh, SHOP_MENU, SHOP_KIND } from './hangang-shop.js';
 
 export const SEASONS = { spring: '🌸 봄', summer: '🌿 여름', autumn: '🍁 가을', winter: '❄️ 겨울' };
 export const WEATHERS = { clear: '☀️ 맑음', cloudy: '☁️ 구름', rain: '🌧️ 비', snow: '🌨️ 눈' };
@@ -263,6 +264,8 @@ export class Hangang {
     const e = this.entrances.find((q) => q.st === I.st && String(q.ref) === String(ref)) || I.from, th = e.g.rotation.y;
     this.placeAt(e.x - Math.sin(th) * 3.6, e.z - Math.cos(th) * 3.6, th + Math.PI); this.stationCool = 2; this.onInside?.(null);
   }
+  // 한강을 나갈 때: 가게 · 역 · 열차 안이면 바깥으로 되돌려 놓는다 (다음에 들어왔을 때 바깥이 숨겨져 있지 않게)
+  exitInterior() { if (this.inShop) this.leaveShop(); if (this.ride) { this.ride.C.g.visible = false; this.ride = null; } if (this.inside) this.leaveStation(this.inside.from?.ref); }
   placeAt(x, z, face) { this.px = x; this.pz = z; this.y = 0; this.vy = 0; this.climb = null; this.face = face; this.camYaw = face; this.camInit = false; this.mdx = null; this.onRoof = null; }
   // 열차 타기: 열린 문 앞에 서면 탄다 → 열차 안에서 잠깐 달리고 → 다음 역 승강장에 내린다 (그 역이 지도 밖이면 같은 역 반대편으로)
   startRide(p, T) {
@@ -289,6 +292,32 @@ export class Hangang {
     if (z.kind === 'exit') this.leaveStation(z.ref);
     else if (z.kind === 'down') { const sp = S.spawnPlatform(z.li); this.placeAt(sp.x, sp.z, sp.face); }
     else if (z.kind === 'up') { const sp = S.spawnConcourse(z.li); this.placeAt(sp.x, sp.z, sp.face); }
+  }
+  // ---------- 가게 안 ----------
+  //   가게 문 앞(벽 쪽으로)으로 걸어가면 들어간다. 계산대 앞에 서면 메뉴 (onShop) → shopOrder(번호, 'here' | 'togo')
+  hideOutdoor(keep) { this.hidden = []; for (const o of this.scene.children) if (o !== keep && o !== this.bear?.root && o !== this.shadow && o.visible) { this.hidden.push(o); o.visible = false; } }
+  showOutdoor() { for (const o of this.hidden || []) o.visible = true; this.hidden = null; }
+  enterShop(F) {
+    this.shopInt ||= {}; const kinds = Object.keys(SHOP_KIND), I = this.shopInt[F.kind] ||= buildShopInterior(this, F.kind, kinds.indexOf(F.kind), makeBear);
+    I.drawMenu(F.name); this.hideOutdoor(I.g); I.g.visible = true; this.inShop = { F, I, ordered: null, menuShown: false }; this.placeAt(I.spawn.x, I.spawn.z, I.spawn.face); this.onShopEnter?.({ name: F.name, kind: F.kind, label: SHOP_KIND[F.kind].label });
+  }
+  leaveShop() {
+    const S2 = this.inShop; if (!S2) return; S2.I.g.visible = false; if (S2.food) S2.I.g.remove(S2.food); this.showOutdoor(); this.inShop = null; this.eating = null;
+    const F = S2.F; this.placeAt(F.x + F.nx * 2.2, F.z + F.nz * 2.2, Math.atan2(F.nx, F.nz)); this.shopCool = 2; this.onShop?.(null); this.onShopEnter?.(null);
+  }
+  shopOrder(idx, mode) {
+    const S2 = this.inShop; if (!S2) return; const item = (SHOP_MENU[S2.F.kind] || [])[idx]; if (!item) return; S2.ordered = { item, mode, t: 1.6 }; this.onShop?.(null);
+  }
+  tickShop(dt) {
+    const S2 = this.inShop, I = S2.I;
+    if (S2.ordered) { S2.ordered.t -= dt; if (S2.ordered.t <= 0) { const { item, mode } = S2.ordered; S2.ordered = null;
+      if (mode === 'here' && I.seats.length) { const seat = I.seats[Math.floor(Math.random() * I.seats.length)], f = foodMesh(S2.F.kind, item); f.position.set(seat.tx - I.O.x - 0.3, 0.81, seat.tz - I.O.z); I.g.add(f); S2.food = f; this.placeAt(seat.x, seat.z, Math.atan2(seat.tx - seat.x, 0)); this.eating = { t: 7, item }; this.onEat?.({ item, mode }); }
+      else { const f = foodMesh(S2.F.kind, item); f.scale.setScalar(2.2); f.position.set(0.55, 1.0, 0.35); this.bear.root.add(f); this.carry && this.bear.root.remove(this.carry); this.carry = f; this.carryT = 180; this.onEat?.({ item, mode: 'togo' }); } } }
+    if (this.eating) { this.eating.t -= dt; this.bear.inner.position.y = Math.abs(Math.sin(this.t * 6)) * 0.04; if (this.eating.t <= 0) { this.bear.inner.position.y = 0; if (S2.food) { I.g.remove(S2.food); S2.food = null; } this.onEat?.({ item: this.eating.item, mode: 'done' }); this.eating = null; } return; }
+    const dc = Math.hypot(this.px - I.counter.x, this.pz - I.counter.z), dd = Math.hypot(this.px - I.door.x, this.pz - I.door.z);
+    if (dc < 1.4 && !S2.menuShown && !S2.ordered) { S2.menuShown = true; this.onShop?.({ name: S2.F.name, kind: S2.F.kind, label: SHOP_KIND[S2.F.kind].label, emoji: SHOP_KIND[S2.F.kind].emoji, menu: SHOP_MENU[S2.F.kind] || [] }); }
+    if (dc > 2.4 && S2.menuShown && !S2.ordered) { S2.menuShown = false; this.onShop?.(null); }
+    if (dd < 0.9) this.leaveShop();
   }
   nearDeck(x, z, m) {
     for (const si of this.deckGrid?.get(`${Math.floor(x / 40)},${Math.floor(z / 40)}`) || []) { const d = this.decks[si], ex = d.cx - d.ax, ez = d.cz - d.az, L2 = ex * ex + ez * ez || 1, t = clamp(((x - d.ax) * ex + (z - d.az) * ez) / L2, 0, 1); if (Math.hypot(x - d.ax - ex * t, z - d.az - ez * t) < d.hw + m) return true; }
@@ -437,6 +466,7 @@ export class Hangang {
     this.buildBuildings(P2);
     this.buildFar(P2);
     this.buildPlants(inWater, r);
+    this.shopFronts = buildShopFronts(this, M.shops || [], M.scale); this.shopGrid = new Map(); this.shopFronts.forEach((F, i) => { const k = `${Math.floor(F.x / 40)},${Math.floor(F.z / 40)}`; if (!this.shopGrid.has(k)) this.shopGrid.set(k, []); this.shopGrid.get(k).push(i); });
     this.buildLights(r);
     this.buildSkyStuff(r);
     this.buildPeople();
@@ -1018,6 +1048,9 @@ export class Hangang {
     for (const o of this.buses.values()) { o.x += (o.tx - o.x) * Math.min(1, dt * 0.25); o.z += (o.tz - o.z) * Math.min(1, dt * 0.25); o.mesh.position.set(o.x, 0, o.z); if (o.yaw != null) o.mesh.rotation.y = o.yaw; }
     // 가까운 지하철 출입구
     let near = null; for (const e of this.entrances) { const d = Math.hypot(e.x - px, e.z - pz); if (d < 7 && (!near || d < near.d)) near = { ...e, d }; }
+    // 가게 문 앞에서 벽 쪽으로 다가가면 가게 안으로
+    this.shopCool = Math.max(0, (this.shopCool || 0) - dt); if (this.carry) { this.carryT -= dt; if (this.carryT <= 0) { this.bear.root.remove(this.carry); this.carry = null; } }
+    if (!this.inShop && !this.inside && !this.shopCool && this.y < 0.5) for (const i of this.shopGrid?.get(`${Math.floor(px / 40)},${Math.floor(pz / 40)}`) || []) { const F = this.shopFronts[i]; if (Math.hypot(px - F.x, pz - F.z) < 0.9 && (this.mdx ?? 0) * F.nx + (this.mdz ?? 0) * F.nz < -0.3) { this.enterShop(F); return; } }
     // 출구 계단을 반쯤 내려가면 역 안으로
     this.stationCool = Math.max(0, (this.stationCool || 0) - dt);
     if (near && near.d < 3 && !this.inside && !this.stationCool && this.y < 0.5) { const th = near.g.rotation.y, dx = px - near.x, dz = pz - near.z, lx = dx * Math.cos(th) - dz * Math.sin(th), lz = dx * Math.sin(th) + dz * Math.cos(th); if (Math.abs(lx) < 1.1 && lz > -0.4 && lz < 2.2) { this.enterStation(near); return; } }
@@ -1137,9 +1170,10 @@ export class Hangang {
     this.tickSignals(this.time);
     this.tickPeople(dt, bx, bz); this.tickGroups(dt, bx, bz); this.tickCity(dt, bx, bz); this.tickTransit(dt, bx, bz); this.tickLabels(dt, camera, bx, bz);
     if (this.inside) { this.tickInside(dt); }
+    if (this.inShop) this.tickShop(dt);
     this.tickEnv(dt, camera, bx, bz);
-    if (this.inside) for (const o of this.hidden || []) o.visible = false; // 날씨 · 계절이 다시 켠 바깥 것들은 다시 숨긴다
-    if (this.inside && this.scene.fog) { this.scene.fog.density = 0.004; this.scene.fog.color.set('#d8d2c8'); } // 역 안: 안개 거의 없이
+    if (this.inside || this.inShop) for (const o of this.hidden || []) o.visible = false; // 날씨 · 계절이 다시 켠 바깥 것들은 다시 숨긴다
+    if ((this.inside || this.inShop) && this.scene.fog) { this.scene.fog.density = 0.004; this.scene.fog.color.set('#d8d2c8'); } // 역 안: 안개 거의 없이
     this.tickCamera(dt, camera, bx, bz, Math.sin(this.camYaw), Math.cos(this.camYaw));
   }
   // 사람 수 · 구성: 계절 · 날씨 · 시간에 따라 (벚꽃 철엔 연인이 가득, 비 · 추위 · 한밤엔 드문드문 러너만)
@@ -1215,7 +1249,7 @@ export class Hangang {
     const work = hr >= 17 && hr < 20 ? 1 : hr >= 20 && hr < 22 ? 0.55 : hr >= 22 || hr < 6 ? 0.08 : hr < 8 ? 0.35 : 0.3;
     for (const [t, m] of Object.entries(this.bldByType || {})) m.emissiveIntensity = lit * (t === 'apt' || t === 'brick' ? home : work) * 0.5;
     if (this.signM) this.signM.emissiveIntensity = lit * (hr >= 1 && hr < 6 ? 0.25 : 0.9);
-    if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.35 * Math.max(0.2, (h >= 18 && h < 24 ? 1 : 0.4));
+    if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; for (const m of this.shopSignMs || []) m.emissiveIntensity = 0.25 + lit * 0.85; for (const m of this.shopWinM || []) m.emissiveIntensity = 0.1 + lit * 0.42; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.35 * Math.max(0.2, (h >= 18 && h < 24 ? 1 : 0.4));
     this.lampGlow.material.opacity = lit; if (this.lampHeadM) this.lampHeadM.emissiveIntensity = 0.2 + lit * 2.2; this.bridgeLights.material.opacity = lit; this.carPts.material.opacity = 0.25 + lit * 0.75;
     this.lampPool.material.opacity = lit * 0.32;
     let pi = 0; for (const [x, z] of this.poleXZ) { if (pi >= this.pools.length) break; if (Math.abs(x - px) < 90 && Math.abs(z - pz) < 90) { this.pools[pi].position.set(x, 0.03, z); this.pools[pi].visible = true; pi++; } } for (; pi < this.pools.length; pi++) this.pools[pi].visible = false;
@@ -1257,7 +1291,7 @@ export class Hangang {
   tickCamera(dt, camera, bx, bz, fx, fz) {
     const k = 1 - Math.exp(-dt * ((this.dragT || 0) > 0 && (this.opt.cam || 0) === 0 ? 14 : 3)), mode = this.opt.cam || 0, y = this.y;
     let cx, cy, cz, lx, ly, lz;
-    if (mode === 0) { const pt = this.camPitch ?? 0.3, d = (this.ride ? 3.2 : 4.8) * (pt < 0 ? 1 + pt * 0.6 : 1), hd = Math.cos(pt) * d; cx = bx - fx * hd; cy = Math.max(0.35, 0.55 + Math.sin(pt) * d) + y; cz = bz - fz * hd; lx = bx + fx * 1.0; ly = 0.55 + y + (pt < 0 ? -pt * 7 : 0); lz = bz + fz * 1.0;
+    if (mode === 0) { const pt = this.camPitch ?? 0.3, d = (this.ride || this.inShop ? 3.2 : 4.8) * (pt < 0 ? 1 + pt * 0.6 : 1), hd = Math.cos(pt) * d; cx = bx - fx * hd; cy = Math.max(0.35, 0.55 + Math.sin(pt) * d) + y; cz = bz - fz * hd; lx = bx + fx * 1.0; ly = 0.55 + y + (pt < 0 ? -pt * 7 : 0); lz = bz + fz * 1.0;
       // 벽 타기: 벽에서 6m 떨어져 살짝 아래에서 곰과 벽을 올려다본다
       if (this.climb) { const C = this.climb; cx = bx + C.nx * 6; cz = bz + C.nz * 6; cy = y + 0.6; lx = bx; ly = y + 1.4; lz = bz; } }
     else if (mode === 1) { const p = this.at(this.s); cx = bx - p.rx * 5 + p.dx * 1.5; cy = 1.0; cz = bz - p.rz * 5 + p.dz * 1.5; lx = bx; ly = 0.6; lz = bz; }
@@ -1266,6 +1300,7 @@ export class Hangang {
     const ky = this.climb || Math.abs(cy - camera.position.y) > 3 ? 1 - Math.exp(-dt * 12) : k; camera.position.x += (cx - camera.position.x) * k; camera.position.y += (cy - camera.position.y) * ky; // 높이: 벽 타기나 크게 벌어졌을 땐 빨리 따라간다 (작은 점프는 부드럽게)
     camera.position.z += (cz - camera.position.z) * k; camera.position.y = Math.max(0.3, camera.position.y); { const dg = this.deckAt(camera.position.x, camera.position.z, this.y + 0.5); if (dg > 0.5 && this.y >= dg - 0.3) camera.position.y = Math.max(camera.position.y, dg + 0.6); } // 다리 위에 있을 땐 카메라가 다리 밑으로 안 내려간다
     if (this.inside) camera.position.y = Math.min(camera.position.y, this.ride ? 2.2 : 4.1);
+    if (this.inShop) camera.position.y = Math.min(camera.position.y, 3.1);
     this.look ||= new THREE.Vector3(lx, ly, lz); this.look.x += (lx - this.look.x) * k; this.look.y += (ly - this.look.y) * ky; this.look.z += (lz - this.look.z) * k;
     camera.lookAt(this.look);
     const fov = 56 + clamp(this.v - 6, 0, 18) * 0.8; if (Math.abs(camera.fov - fov) > 0.05 || camera.far < 20000) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 3); camera.far = 24000; camera.updateProjectionMatrix(); }
@@ -1380,6 +1415,7 @@ export class Hangang {
   where() {
     if (this.ride) return `${this.ride.line}${String(this.ride.line).length === 1 ? '호선' : '선'} 열차 안 · 다음 ${this.ride.dest.name}`;
     if (this.inside) return `${this.inside.st.name}역 안`;
+    if (this.inShop) return `${SHOP_KIND[this.inShop.F.kind].emoji} ${this.inShop.F.name}`;
     const marks = this.map.marks || [], s = this.s, d = this.dir;
     const next = d > 0 ? marks.find(([, ms]) => ms > s + 5) : [...marks].reverse().find(([, ms]) => ms < s - 5);
     return next ? `${next[0]}까지 ${Math.round(Math.abs(next[1] - s))}m` : d > 0 ? `반환점까지 ${Math.round(this.L - s)}m` : `반환점까지 ${Math.round(s)}m`;

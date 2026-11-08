@@ -960,7 +960,7 @@ let hgSt = null, hgStT = null;
 async function hgStationRender() {
   if (!hgSt) return; const el = $('hg-subway');
   try {
-    const j = await account.api(`/api/seoul/subway/arrival?station=${encodeURIComponent(hgSt.name)}`);
+    const j = await account.api(`/api/seoul/subway/arrival?station=${encodeURIComponent(hgSt.name)}`); hg.arrivals = j.trains || [];
     const rows = (j.trains || []).slice(0, 6).map((t) => `<div class="row"><span class="ln" style="background:${LCOL[t.line] || '#888'}">${String(t.line).replace('호선', '')}</span><span>${String(t.to || '').replace(/[<>&]/g, '')}</span><b>${String(t.msg || '').replace(/[<>&]/g, '')}</b></div>`).join('') || '<div class="row">곧 들어오는 열차가 없어요</div>';
     el.innerHTML = `<h4>🚇 ${hgSt.name}역${hgSt.ref ? ` · ${hgSt.ref}번 출구` : ''}</h4>${rows}<div class="note">실시간 · 서울 열린데이터광장</div>`;
   } catch (e) { el.innerHTML = `<h4>🚇 ${hgSt.name}역${hgSt.ref ? ` · ${hgSt.ref}번 출구` : ''}</h4><div class="row">${/준비/.test(e.message) ? '실시간 도착 정보를 준비하고 있어요' : '도착 정보를 불러오지 못했어요'}</div>`; }
@@ -968,6 +968,20 @@ async function hgStationRender() {
 hg.onStation = (st) => { hgSt = st; clearInterval(hgStT); $('hg-subway').classList.toggle('hidden', !st); if (st) { $('hg-subway').innerHTML = `<h4>🚇 ${st.name}역</h4><div class="row">불러오는 중…</div>`; hgStationRender(); hgStT = setInterval(hgStationRender, 20000); } };
 hg.onCity = (c) => { if (c?.congest) toast(`📡 지금 실제 여의도: ${c.congest} · 약 ${Math.round((c.pplMin + c.pplMax) / 2 / 10000)}만 명 · 도로 ${c.road || '-'}${c.temp != null ? ` · ${c.temp}°C` : ''}`, 3200); };
 hg.onTurn = (txt) => toast(`🚧 ${txt}이에요 · 돌아서 달려요`, 2200);
+// 역 안: 실제 도착 정보를 계속 받아 안내판에 (hg.arrivals)
+hg.onInside = (st) => hg.onStation(st ? { name: st.name } : null);
+// 가게: 들어가면 인사, 계산대 앞에서 메뉴 (숫자 키 1 ~ 5 = 먹고 가기, Shift + 숫자 = 포장)
+const hgEsc = (t) => String(t || '').replace(/[<>&"]/g, '');
+let hgShop = null;
+hg.onShopEnter = (s) => { if (s) toast(`🔔 어서 오세요! ${hgEsc(s.name)}`, 2000); };
+hg.onShop = (s) => {
+  hgShop = s; const el = $('hg-shop'); if (!s) { el.classList.add('hidden'); return; }
+  if (document.pointerLockElement) document.exitPointerLock?.();
+  el.innerHTML = `<h4>${s.emoji} ${hgEsc(s.name)} <small>${s.label}</small></h4><div class="menu">${s.menu.map(([n, p, e], i) => `<button data-i="${i}"><span>${e} ${n}</span><b>${p.toLocaleString()}원</b><i>${i + 1}</i></button>`).join('')}</div><div class="mode"><label><input type="radio" name="hgm" value="here" checked> 🍽️ 먹고 가기</label><label><input type="radio" name="hgm" value="togo"> 🛍️ 포장</label></div>`;
+  el.classList.remove('hidden'); el.querySelectorAll('button').forEach((b) => { b.onclick = () => hg.shopOrder(+b.dataset.i, el.querySelector('input[name=hgm]:checked').value); });
+};
+addEventListener('keydown', (e) => { if (!hgShop || !/^Digit[1-9]$/.test(e.code)) return; const i = +e.code.slice(5) - 1; if (i < hgShop.menu.length) hg.shopOrder(i, e.shiftKey ? 'togo' : 'here'); });
+hg.onEat = ({ item, mode }) => { if (mode === 'here') toast(`${item[2]} ${item[0]} 나왔어요 · 맛있게 먹는 중…`, 3000); else if (mode === 'done') toast(`😋 ${item[0]} 잘 먹었어요!`, 2400); else toast(`🛍️ ${item[0]} 포장했어요 · 들고 산책해요`, 2600); };
 const HG_OPT_KEY = 'dreamrunner.hangang';
 try { Object.assign(hg.opt, JSON.parse(store.get(HG_OPT_KEY) || '{}')); } catch { /* 기본 */ }
 const hgSave = () => store.set(HG_OPT_KEY, JSON.stringify(hg.opt));
@@ -1011,7 +1025,7 @@ function hgReport(final = false) {
   account.api('/api/dream/hangang/run', { method: 'POST', body }).then((r) => { if (r?.fresh?.length) setTimeout(notifyNew, 300); }).catch(() => {});
 }
 function leaveHangang() {
-  hgReport(true); if (document.pointerLockElement) document.exitPointerLock?.(); $('hg-labels').innerHTML = ''; hg.onStation(null);
+  hgReport(true); if (document.pointerLockElement) document.exitPointerLock?.(); $('hg-labels').innerHTML = ''; hg.onStation(null); hg.exitInterior?.(); hg.onShop(null);
   hg.leave(); document.body.classList.remove('hg'); $('t-shove').textContent = '🫸';
   $('hg-hud').classList.add('hidden'); $('hg-set').classList.add('hidden');
   camera.far = 1600; camera.fov = 62; camera.updateProjectionMatrix();

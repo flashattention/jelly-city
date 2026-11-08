@@ -320,3 +320,16 @@ body.toss #title #play-btns:has(> .hg-go) { grid-template-columns: 1fr; }
 #hg-subway .row b { margin-left: auto; color: #ffd84d; font-family: 'Jua'; white-space: nowrap; }
 #hg-subway .note { opacity: .6; font-size: 11px; margin-top: 6px; }
 body.touch #hg-subway { top: 200px; }
+
+/* 한강 가게 메뉴 */
+#hg-shop { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); width: min(380px, 92vw); padding: 14px 16px; border-radius: 18px; background: rgba(28, 22, 18, .88); backdrop-filter: blur(6px); color: #fff; font-family: 'Gowun Dodum'; box-shadow: 0 10px 30px rgba(0,0,0,.4); z-index: 20; }
+#hg-shop.hidden { display: none; }
+#hg-shop h4 { margin: 0 0 10px; font-family: 'Jua'; font-size: 18px; display: flex; gap: 8px; align-items: baseline; }
+#hg-shop h4 small { font-size: 12px; opacity: .7; }
+#hg-shop .menu { display: grid; gap: 6px; }
+#hg-shop .menu button { display: grid; grid-template-columns: 1fr auto 22px; gap: 8px; align-items: center; padding: 9px 12px; border: 0; border-radius: 12px; background: rgba(255,255,255,.1); color: #fff; font: inherit; font-size: 14px; cursor: pointer; text-align: left; }
+#hg-shop .menu button:hover { background: rgba(255, 210, 140, .25); }
+#hg-shop .menu button b { color: #ffd98a; font-weight: 700; }
+#hg-shop .menu button i { font-style: normal; font-size: 11px; opacity: .55; text-align: center; border: 1px solid rgba(255,255,255,.35); border-radius: 6px; }
+#hg-shop .mode { display: flex; gap: 14px; margin-top: 10px; font-size: 13px; }
+#hg-shop .mode label { display: flex; gap: 5px; align-items: center; cursor: pointer; }
