@@ -296,7 +296,7 @@ export class Hangang {
     if (this.map.kind !== 'world') return;
     const T = this.world0.tile, ti = Math.floor(px / T), tj = Math.floor(pz / T); this.tileNow = [ti, tj];
     // 먼 나무 칸은 그리지 않는다 (1.1km 넘게, 날 때는 높이만큼 더 멀리까지). 0.4초마다
-    if ((this.lodT = (this.lodT || 0) + 1) % 12 === 0) { const R = 1100 + Math.min(900, (this.y || 0) * 3); for (const c of this.chunks.values()) c.scene.traverse((o) => { const L = o.userData.lod; if (L) o.count = Math.hypot(L[0] - px, L[1] - pz) < R + 360 ? L[2] : 0; }); }
+    if ((this.treeLodN = (this.treeLodN || 0) + 1) % 12 === 1) { const R = 1100 + Math.min(900, (this.y || 0) * 3); for (const c of this.chunks.values()) c.scene.traverse((o) => { const L = o.userData.lod; if (L) o.count = Math.hypot(L[0] - px, L[1] - pz) < R + 360 ? L[2] : 0; const V = o.userData.lodV; if (V) o.visible = Math.hypot(V[0] - px, V[1] - pz) < V[2] + Math.min(600, (this.y || 0) * 2); }); }
     // 칸을 쉬어 가며 만드는 중에는 내리지 않는다 (같이 쓰는 목록을 내리기가 새로 만들어 버리면 만드는 칸이 옛 목록에 쓴다)
     if (this.chunkLoading) return;
     for (const key of [...this.chunks.keys()]) { const [i, j] = key.split('_').map(Number); if (Math.max(Math.abs(i - ti), Math.abs(j - tj)) > 2) this.unloadChunk(key); }
@@ -349,7 +349,7 @@ export class Hangang {
       if (o.isInstancedMesh) return inst(o);
       if (o.material === this.waterM) return; // 물은 0 높이 그대로
       const b = new THREE.Box3().setFromObject(o), size = b.isEmpty() ? 0 : Math.max(b.max.x - b.min.x, b.max.z - b.min.z);
-      if (size < 40 && !flatLike(o)) return lift(o);
+      if (size < 40 && !flatLike(o) && !o.geometry?.userData.baseY) return lift(o);
       if (o.isMesh || o.isLine || o.isPoints) return vertices(o);
       for (const ch of [...o.children]) visit(ch);
     };
@@ -902,7 +902,7 @@ export class Hangang {
     const scG = (() => { const gs = []; const b = new THREE.BoxGeometry(0.42, 0.42, 1.1); b.translate(0, 0.55, 0); gs.push(b); const f = new THREE.BoxGeometry(0.38, 0.75, 0.22); f.translate(0, 0.8, 0.5); gs.push(f); const s2 = new THREE.BoxGeometry(0.36, 0.12, 0.6); s2.translate(0, 0.82, -0.15); gs.push(s2); for (const z of [-0.48, 0.55]) { const w = new THREE.CylinderGeometry(0.22, 0.22, 0.12, 12); w.rotateZ(Math.PI / 2); w.translate(0, 0.22, z); gs.push(w); } return mergeGeos(gs); })();
     const sim = mk(scG, new THREE.MeshLambertMaterial({ color: '#ffffff' }), scoot, ([x, z, ry]) => { o.position.set(x, 0, z); o.rotation.set(0, ry, 0); }); if (sim) { const c = new THREE.Color(); scoot.forEach((sc, i) => sim.setColorAt(i, c.set(['#e8e4dc', '#d8352a', '#2f6bff', '#1d1d1f', '#7be07b'][sc[3]]))); }
     for (const [x, z] of scoot) this.addCircle(x, z, 0.45, 1);
-    const bg = new THREE.IcosahedronGeometry(0.32, 1); bg.scale(1, 0.85, 1); bg.translate(0, 0.27, 0); const bim = mk(bg, new THREE.MeshLambertMaterial({ color: '#ffffff' }), bags.flatMap(([x, z]) => [[x, z], [x + 0.4, z + 0.2], [x - 0.1, z + 0.45]]), ([x, z]) => { o.position.set(x, 0, z); o.rotation.set(0, 0, 0); o.scale.setScalar(0.8 + Math.random() * 0.4); }); if (bim) { const c = new THREE.Color(); for (let i = 0; i < bim.count; i++) bim.setColorAt(i, c.set(i % 3 === 1 ? '#1d1d1f' : '#f2f0ea')); } o.scale.set(1, 1, 1);
+    const bg = new THREE.IcosahedronGeometry(0.32, 0); bg.scale(1, 0.85, 1); bg.translate(0, 0.27, 0); const bim = mk(bg, new THREE.MeshLambertMaterial({ color: '#ffffff' }), bags.flatMap(([x, z]) => [[x, z], [x + 0.4, z + 0.2], [x - 0.1, z + 0.45]]), ([x, z]) => { o.position.set(x, 0, z); o.rotation.set(0, 0, 0); o.scale.setScalar(0.8 + Math.random() * 0.4); }); if (bim) { const c = new THREE.Color(); for (let i = 0; i < bim.count; i++) bim.setColorAt(i, c.set(i % 3 === 1 ? '#1d1d1f' : '#f2f0ea')); } o.scale.set(1, 1, 1);
   }
   // 거리 지역 간판: 길을 바라보는 낮은 상가 벽마다 1층 간판 띠 + 2 · 3층 가로 간판 (그 동네 실제 가게 이름, 스타일 여러 가지)
   // 진짜 가게 간판 (소상공인 상가정보): 가게가 실제로 있는 건물의 길 쪽 벽에, 실제 층에. 1층은 가로 간판 + 들어갈 수 있는 문, 2층 위는 창문 글씨 간판
@@ -946,7 +946,9 @@ export class Hangang {
       for (const g of gs) { const gw = (g ? g.w : 0.5) * cs; if (g) { const pad = (cs - gw) / 2; quad(T, S, a - pad, a + gw + pad, yc - cs / 2, yc + cs / 2, 0.03, col, g); } a += gw; }
     }
     if (B.P.length) { const mk = (G, m) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(G.P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(G.C, 3)); if (G.U) g.setAttribute('uv', new THREE.Float32BufferAttribute(G.U, 2)); g.setIndex(G.I); g.computeVertexNormals(); g.userData.baseY = new Float32Array(G.Y); const me = new THREE.Mesh(g, m); this.scene.add(me); (this.shopSignMs ||= []).push(m); };
-      mk(B, signMaterial(false)); glyphTex(); mk(T, signMaterial(true)); }
+      const mB = signMaterial(false), mT = (glyphTex(), signMaterial(true)); (this.shopSignMs ||= []).push(mB, mT);
+      // 1km 칸으로 나눠 650m 밖 간판은 그리지 않는다
+      for (const [G, m] of [[B, mB], [T, mT]]) for (const part of splitCells(G, 1000)) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(part.P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(part.C, 3)); if (part.U) g.setAttribute('uv', new THREE.Float32BufferAttribute(part.U, 2)); g.setIndex(part.I); g.computeVertexNormals(); g.userData.baseY = new Float32Array(part.Y); const me = new THREE.Mesh(g, m); me.userData.lodV = [part.cx, part.cz, 650]; me.userData.noMerge = true; this.scene.add(me); } }
   }
   buildStreetSigns(P2, r) {
     const M = this.map, segs = new Map(), G = 20, addSeg = (a, b, hw) => { const k = `${Math.floor((a[0] + b[0]) / 2 / G)},${Math.floor((a[1] + b[1]) / 2 / G)}`; if (!segs.has(k)) segs.set(k, []); segs.get(k).push([a, b, hw]); };
@@ -1161,7 +1163,9 @@ export class Hangang {
       const mesh = new THREE.Mesh(g, m); mesh.castShadow = false; mesh.receiveShadow = true; this.scene.add(mesh); this.bldM.push(m); (this.bldByType ||= {})[t] = m;
     }
     const mk = (S, m) => { if (!S.P.length) return null; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(S.P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(S.N, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(S.Cl, 3)); g.setIndex(S.I); if (S.Y) g.userData.baseY = new Float32Array(S.Y); const me = new THREE.Mesh(g, m); this.scene.add(me); return me; };
-    mk(extras, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    // 옥상 설비 · 실외기 · 난간 띠: 서울 전체 칸에서는 500m 칸으로 나눠 900m 밖은 그리지 않는다 (칸 하나에 삼각형이 가장 많은 덩어리였다)
+    if (this.isChunk) { const em = new THREE.MeshLambertMaterial({ vertexColors: true }); for (const part of splitCells(extras, 500)) { const me = mk(part, em); if (me) { me.userData.lodV = [part.cx, part.cz, 900]; me.userData.noMerge = true; } } }
+    else mk(extras, new THREE.MeshLambertMaterial({ vertexColors: true }));
     this.signM = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: '#ffffff', emissiveIntensity: 0, side: THREE.DoubleSide }); mk(signs, this.signM);
     this.crossM = new THREE.MeshLambertMaterial({ color: '#f4f1ea', emissive: '#ff3030', emissiveIntensity: 0 });
     for (const ring of crosses) { const f = this.foot?.find((q) => q.ring === ring); if (!f) continue; let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length; const big = Math.sqrt(Math.abs(ringArea(ring))) > 40, H2 = big ? 14 : 6; const pole = new THREE.Mesh(new THREE.BoxGeometry(big ? 1.2 : 0.5, H2, big ? 1.2 : 0.5), this.crossM); pole.position.set(cx, f.h + H2 / 2, cz); const bar = new THREE.Mesh(new THREE.BoxGeometry(big ? 6 : 2.6, big ? 1.2 : 0.5, big ? 1.2 : 0.5), this.crossM); bar.position.set(cx, f.h + H2 * 0.72, cz); if (f.base !== undefined) { pole.position.y += f.base; bar.position.y += f.base; pole.userData.based = bar.userData.based = true; } this.scene.add(pole, bar); }
@@ -2117,6 +2121,14 @@ function buildGate(ring, LM) {
   roof(W * 0.92, D * 1.0, B + 9.6, 4.2, 0.22, TILE); box(W * 0.46, 0.7, 0.9, B + 13.6, '#3a3d44');
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
   return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
+}
+// 삼각형을 땅 위 칸(size m)으로 나눈다: { P, N?, C?/Cl?, U?, Y?, I, cx, cz } 목록 (멀리 있는 칸을 통째로 숨기려고)
+function splitCells(G, size) {
+  const cells = new Map(), P = G.P, keys = Object.keys(G).filter((k) => Array.isArray(G[k]) && k !== 'I' && G[k].length && G[k].length % (P.length / 3) === 0);
+  for (let t = 0; t < G.I.length; t += 3) { const a = G.I[t], x = (P[a * 3] + P[G.I[t + 1] * 3] + P[G.I[t + 2] * 3]) / 3, z = (P[a * 3 + 2] + P[G.I[t + 1] * 3 + 2] + P[G.I[t + 2] * 3 + 2]) / 3, k = `${Math.floor(x / size)},${Math.floor(z / size)}`;
+    let c = cells.get(k); if (!c) { c = { map: new Map(), I: [], cx: (Math.floor(x / size) + 0.5) * size, cz: (Math.floor(z / size) + 0.5) * size }; for (const kk of keys) c[kk] = []; cells.set(k, c); }
+    for (let q = 0; q < 3; q++) { const v = G.I[t + q]; let nv = c.map.get(v); if (nv === undefined) { nv = c.P.length / 3; c.map.set(v, nv); for (const kk of keys) { const w = G[kk].length / (P.length / 3); for (let e = 0; e < w; e++) c[kk].push(G[kk][v * w + e]); } } c.I.push(nv); } }
+  return [...cells.values()];
 }
 function mergeGeos(list) {
   const P = [], N = [], I = []; let base = 0;
