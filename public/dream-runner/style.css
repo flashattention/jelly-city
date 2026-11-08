@@ -1,6 +1,8 @@
 :root { --ink: #fffaf3; --soft: rgba(255, 250, 243, .75); --card: rgba(24, 14, 52, .72); --pink: #ff8fc4; --gold: #ffd84d; --mint: #7cf0c8; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; height: 100%; overflow: hidden; background: #140d2e; color: var(--ink); font-family: 'Gowun Dodum', sans-serif; user-select: none; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #140d2e; color: var(--ink); font-family: 'Gowun Dodum', sans-serif; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+/* 휴대폰: 길게 누르거나 여러 손가락으로 눌러도 화면이 파랗게 선택되지 않게 (글 쓰는 칸만 선택 가능) */
+input, textarea { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
 #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; transition: filter 1.2s; }
 .hidden { display: none !important; }
 button { font-family: inherit; cursor: pointer; }
@@ -127,13 +129,14 @@ h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 
 /* 휴대폰 버튼 */
 #touch { position: fixed; inset: auto 0 0 0; display: flex; justify-content: space-between; padding: 16px; z-index: 4; pointer-events: none; }
-#touch > div { display: flex; gap: 12px; align-items: flex-end; pointer-events: auto; }
+#touch > div { display: flex; gap: 12px; align-items: flex-end; pointer-events: auto; touch-action: none; }
 #touch button { width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); background: rgba(20,8,50,.4); color: #fff; font-size: 26px; touch-action: none; }
 #touch button.big { width: 80px; height: 80px; }
-#joy { position: relative; width: 148px; height: 76px; border-radius: 999px; border: 2px solid rgba(255,255,255,.4); background: rgba(20,8,50,.4); touch-action: none; display: flex; align-items: center; justify-content: center; }
-#joy::before, #joy::after { content: '◀'; position: absolute; left: 12px; color: rgba(255,255,255,.45); font-size: 16px; pointer-events: none; }
-#joy::after { content: '▶'; left: auto; right: 12px; }
-#joy-knob { width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,.85); box-shadow: 0 3px 10px rgba(0,0,0,.35); transition: transform .08s; pointer-events: none; }
+/* 조이스틱: 큰 원 안에서 작은 원이 사방으로 움직이지만, 게임에는 좌우만 들어간다 */
+#joy { position: relative; width: 132px; height: 132px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); background: radial-gradient(circle, rgba(255,255,255,.08) 0 30%, rgba(20,8,50,.45) 31%); touch-action: none; display: flex; align-items: center; justify-content: center; }
+#joy::before, #joy::after { content: '◀'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,.5); font-size: 15px; pointer-events: none; }
+#joy::after { content: '▶'; left: auto; right: 10px; }
+#joy-knob { width: 58px; height: 58px; border-radius: 50%; background: rgba(255,255,255,.85); box-shadow: 0 3px 10px rgba(0,0,0,.35); transition: transform .08s; pointer-events: none; }
 #joy.on #joy-knob { background: #fff; transition: none; }
 @media (max-width: 520px) { .btns { grid-template-columns: 1fr; } #h-score { font-size: 32px; } #h-dream { font-size: 14px; } .hud-c { top: 84px; } }
 

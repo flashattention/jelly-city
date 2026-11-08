@@ -97,9 +97,15 @@ for (const b of document.querySelectorAll('#touch button')) {
 }
 // 휴대폰 조이스틱: 좌우로 밀면 그쪽으로 (입력 기록은 왼쪽 · 가운데 · 오른쪽 셋이라 가운데 조금은 쉬는 자리)
 let joyDir = 0, joyId = null;
+// 휴대폰: 터치하다가 화면 글자가 파랗게 선택되거나 길게 누르기 메뉴가 뜨지 않게 (글 쓰는 칸은 그대로)
+const typing = (t) => !!t?.closest?.('input, textarea, [contenteditable]');
+document.addEventListener('selectstart', (e) => { if (!typing(e.target)) e.preventDefault(); });
+document.addEventListener('contextmenu', (e) => { if (!typing(e.target)) e.preventDefault(); });
+document.addEventListener('touchstart', (e) => { if (!typing(e.target)) { const sel = window.getSelection?.(); if (sel && sel.rangeCount && !typing(document.activeElement)) sel.removeAllRanges(); } }, { passive: true });
 {
-  const joy = $('joy'), knob = $('joy-knob'), R = 46, DEAD = 14;
-  const move = (e) => { const r = joy.getBoundingClientRect(), dx = Math.max(-R, Math.min(R, e.clientX - (r.left + r.width / 2))); knob.style.transform = `translateX(${dx}px)`; joyDir = dx > DEAD ? 1 : dx < -DEAD ? -1 : 0; joy.classList.toggle('on', joyDir !== 0); };
+  const joy = $('joy'), knob = $('joy-knob'), R = 40, DEAD = 12;
+  // 작은 원은 큰 원 안에서 사방으로 움직이고, 좌우로 기운 만큼만 방향이 된다
+  const move = (e) => { const r = joy.getBoundingClientRect(); let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2); const d = Math.hypot(dx, dy); if (d > R) { dx *= R / d; dy *= R / d; } knob.style.transform = `translate(${dx}px, ${dy}px)`; joyDir = dx > DEAD ? 1 : dx < -DEAD ? -1 : 0; joy.classList.toggle('on', joyDir !== 0); };
   const end = (e) => { if (e.pointerId !== joyId) return; joyId = null; joyDir = 0; knob.style.transform = ''; joy.classList.remove('on'); };
   joy.addEventListener('pointerdown', (e) => { e.preventDefault(); unlock(); joyId = e.pointerId; joy.setPointerCapture(e.pointerId); move(e); });
   joy.addEventListener('pointermove', (e) => { if (e.pointerId === joyId) move(e); });
