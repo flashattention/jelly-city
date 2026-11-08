@@ -61,10 +61,30 @@
   <!-- 한강 러닝 -->
   <div id="hg-hud" class="hidden">
     <div class="hg-stat"><b id="hg-dist">0.00</b><span>km</span><div id="hg-sub">00:00 · --'--"/km · 0km/h</div></div>
-    <div class="hg-where" id="hg-where">📍</div>
-    <div class="hg-r"><span id="hg-clock">🕐 12:00</span><button id="hg-set-btn" class="btn ghost mini" aria-label="설정">⚙️</button><button id="hg-cam" class="btn ghost mini" aria-label="시점">🎥</button><button id="hg-exit" class="btn ghost mini" aria-label="나가기">✕</button></div>
+    <div class="hg-top"><span class="hg-where" id="hg-where">📍</span><button id="hg-clock" class="hg-chip" title="시간 바꾸기">🕐 12:00</button><button id="hg-season-c" class="hg-chip" title="계절 바꾸기">🌸</button><button id="hg-weather-c" class="hg-chip" title="날씨 바꾸기">☀️</button></div>
+    <div id="hg-region" class="hidden"></div>
+    <div id="hg-labels"></div>
+    <canvas id="hg-mini" width="360" height="360"></canvas>
+    <div class="hg-r"><button id="hg-set-btn" class="btn ghost mini" aria-label="설정">⚙️</button><button id="hg-cam" class="btn ghost mini" aria-label="시점">🎥</button><button id="hg-exit" class="btn ghost mini" aria-label="나가기">✕</button></div>
     <div class="hg-speed"><button id="hg-slow" class="btn ghost" aria-label="느리게">-</button><div><b id="hg-pace-name">🏃 조깅</b><div class="hg-bar"><i id="hg-bar"></i></div></div><button id="hg-fast" class="btn ghost" aria-label="빠르게">+</button></div>
-    <div class="hg-keys">W · S 속도 · A · D 옆으로 · Space 점프 · V 시점</div>
+    <div class="hg-keys">W A S D 이동 · 마우스 시점 (화면 클릭) · Q E 속도 · Shift 빠르게 · Space 점프(두 번 = 2단) · C 숙이기 · V 시점</div>
+  </div>
+  <div id="hg-start" class="hidden">
+    <div class="hg-card">
+      <h3>🌉 한강 러닝</h3>
+      <p class="hg-tip">어디서부터 달릴까요?</p>
+      <button id="hg-resume" class="btn big hidden">▶ 이어 달리기 <small id="hg-resume-sub"></small></button>
+      <button id="hg-from-start" class="btn big">🚩 서강대교에서 시작</button>
+      <button id="hg-pick" class="btn big alt">🗺️ 지도에서 위치 고르기</button>
+      <button id="hg-start-x" class="btn ghost">닫기</button>
+    </div>
+  </div>
+  <div id="hg-map" class="hidden">
+    <div class="hg-card wide">
+      <h3>🗺️ 여의도 한강공원 <small>가고 싶은 곳을 누르세요 (빨간 선이 러닝 코스)</small></h3>
+      <canvas id="hg-map-c" width="900" height="900"></canvas>
+      <div class="hg-map-btns"><button id="hg-go" class="btn big" disabled>📍 새 위치로 이동</button><button id="hg-map-x" class="btn ghost">닫기</button></div>
+    </div>
   </div>
   <div id="hg-set" class="hidden">
     <div class="hg-card">

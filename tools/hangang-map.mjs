@@ -18,6 +18,8 @@ const COURSES = {
     // 길 위의 이정표 (가까운 길 지점에 붙인다)
     marks: [['서강대교', 37.5325, 126.9232], ['밤섬', 37.5375, 126.9310], ['마포대교', 37.5300, 126.9332], ['여의도 물빛광장', 37.5280, 126.9365], ['원효대교', 37.5240, 126.9425], ['63빌딩', 37.5205, 126.9400]],
     // 멀리 보이는 랜드마크 (지도 범위 밖)
+    // 이름표를 꼭 붙일 건물 (OSM 에서 이름 없이 부분으로만 그려진 것)
+    labels: [['63빌딩', 37.51985, 126.94025, 250]],
     // 다리 위 아치 (서강대교: 밤섬 위 150m 닐센 아치)
     arches: [['서강대교', 37.538472, 126.925972, 150]],
     far: [['남산서울타워', 37.5512, 126.9882, 236, 'tower'], ['롯데월드타워', 37.5126, 127.1025, 555, 'lotte']],
@@ -152,6 +154,13 @@ for (const e of lJ.elements) {
   for (const pp of polysOf(e)) { const o = polyOut(pp); if (!o) continue; if (kind === 'water' || kind === 'pond') out.water.push(o); else if (kind === 'island') out.island.push(o); else out.green.push([sub, ...o]); }
 }
 
+// ---------- 이름 있는 구역 (공원 · 광장 · 섬): 들어가면 화면에 이름이 뜬다 ----------
+out.areas = [];
+for (const e of [...lJ.elements, ...wJ.elements]) {
+  const t = e.tags || {}; if (!t.name || !(t.leisure === 'park' || t.leisure === 'garden' || t.place === 'square' || t.place === 'islet' || t.place === 'island' || t.natural === 'wetland' || t.natural === 'grassland') || t.name === '여의도') continue;
+  for (const pp of polysOf(e)) { const c = centroid(pp.o); if (near(c, 900) > 900 && !pp.o.some((p) => near(p, 60) < 60)) continue; const o = clipRect(simplify(pp.o, 3), rect); if (o.length < 3 || Math.abs(area(o)) < 800) continue; if (out.areas.some((a) => a[0] === t.name)) continue; out.areas.push([t.name, ...flat(o)]); }
+}
+
 // ---------- 길 · 철길 · 다리 ----------
 const W = { motorway: 22, trunk: 18, primary: 14, secondary: 10, tertiary: 8, trunk_link: 6, primary_link: 6, secondary_link: 6, motorway_link: 6, cycleway: 3, footway: 2.4, path: 2, pedestrian: 4 };
 out.roads = []; out.bridges = []; out.rails = []; out.paths = [];
@@ -220,6 +229,7 @@ out.tall = [];
 // ---------- 이정표 · 먼 랜드마크 ----------
 const along = (p) => { let best = Infinity, bs = 0, acc = 0; for (let i = 1; i < route.length; i++) { const a = route[i - 1], b = route[i], dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz), t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / (L * L || 1))), d = Math.hypot(a[0] + dx * t - p[0], a[1] + dz * t - p[1]); if (d < best) { best = d; bs = acc + L * t; } acc += L; } return Math.round(bs); };
 out.marks = C.marks.map(([n, lat, lon]) => [n, along(P(lat, lon))]).sort((a, b) => a[1] - b[1]);
+out.labels = (C.labels || []).map(([n, lat, lon, h]) => [n, ...q(P(lat, lon)), h]);
 out.arches = (C.arches || []).map(([n, lat, lon, span]) => [n, ...q(P(lat, lon)), span]);
 out.far = C.far.map(([n, lat, lon, h, k]) => [n, ...q(P(lat, lon)), h, k]);
 
@@ -228,4 +238,4 @@ fs.mkdirSync(path.dirname(file), { recursive: true });
 fs.writeFileSync(file, JSON.stringify(out));
 console.log(`먼 물줄기 ${out.water.length} · 먼 높은 건물 ${out.tall.length}`);
 console.log(`${C.name}: 코스 ${Math.round(routeLen)}m · 물 ${out.water.length} · 섬 ${out.island.length} · 녹지 ${out.green.length} · 길 ${out.roads.length} · 산책로 ${out.paths.length} · 다리 ${out.bridges.length} · 철길 ${out.rails.length} · 건물 ${out.buildings.length} (뺀 것 ${dropped}) · ${(fs.statSync(file).size / 1024).toFixed(0)}KB`);
-console.log('이정표', JSON.stringify(out.marks));
+console.log('이정표', JSON.stringify(out.marks)); console.log('구역', out.areas.map((a) => a[0]).join(', '));

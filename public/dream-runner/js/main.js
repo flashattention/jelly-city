@@ -97,7 +97,7 @@ for (const b of document.querySelectorAll('#touch button')) {
   for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) b.addEventListener(ev, () => touchHeld.delete(k));
 }
 // 휴대폰 조이스틱: 좌우로 밀면 그쪽으로 (입력 기록은 왼쪽 · 가운데 · 오른쪽 셋이라 가운데 조금은 쉬는 자리)
-let joyDir = 0, joyId = null, joyY = 0;
+let joyDir = 0, joyId = null, joyY = 0, joyX = 0;
 // 휴대폰: 터치하다가 화면 글자가 파랗게 선택되거나 길게 누르기 메뉴가 뜨지 않게 (글 쓰는 칸은 그대로)
 const typing = (t) => !!t?.closest?.('input, textarea, [contenteditable]');
 document.addEventListener('selectstart', (e) => { if (!typing(e.target)) e.preventDefault(); });
@@ -106,8 +106,8 @@ document.addEventListener('touchstart', (e) => { if (!typing(e.target)) { const 
 {
   const joy = $('joy'), knob = $('joy-knob'), R = 40, DEAD = 12;
   // 작은 원은 큰 원 안에서 사방으로 움직이고, 좌우로 기운 만큼만 방향이 된다
-  const move = (e) => { const r = joy.getBoundingClientRect(); let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2); const d = Math.hypot(dx, dy); if (d > R) { dx *= R / d; dy *= R / d; } knob.style.transform = `translate(${dx}px, ${dy}px)`; joyDir = dx > DEAD ? 1 : dx < -DEAD ? -1 : 0; joyY = Math.abs(dy) > DEAD ? -dy / R : 0; joy.classList.toggle('on', joyDir !== 0); };
-  const end = (e) => { if (e.pointerId !== joyId) return; joyId = null; joyDir = 0; joyY = 0; knob.style.transform = ''; joy.classList.remove('on'); };
+  const move = (e) => { const r = joy.getBoundingClientRect(); let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2); const d = Math.hypot(dx, dy); if (d > R) { dx *= R / d; dy *= R / d; } knob.style.transform = `translate(${dx}px, ${dy}px)`; joyDir = dx > DEAD ? 1 : dx < -DEAD ? -1 : 0; joyY = Math.abs(dy) > DEAD ? -dy / R : 0; joyX = Math.abs(dx) > DEAD ? dx / R : 0; joy.classList.toggle('on', joyDir !== 0); };
+  const end = (e) => { if (e.pointerId !== joyId) return; joyId = null; joyDir = 0; joyY = 0; joyX = 0; knob.style.transform = ''; joy.classList.remove('on'); };
   joy.addEventListener('pointerdown', (e) => { e.preventDefault(); unlock(); joyId = e.pointerId; joy.setPointerCapture(e.pointerId); move(e); });
   joy.addEventListener('pointermove', (e) => { if (e.pointerId === joyId) move(e); });
   for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) joy.addEventListener(ev, end);
@@ -255,7 +255,6 @@ $('code-btn2').onclick = () => joinByCode($('code-in2').value);
 $('code-in').onkeydown = (e) => { if (e.key === 'Enter') $('code-btn').click(); };
 $('code-in2').onkeydown = (e) => { if (e.key === 'Enter') $('code-btn2').click(); };
 $('solo-btn').onclick = () => { unlock(); startSoloFresh(); };
-$('hg-btn').onclick = () => { unlock(); startHangang(); };
 $('multi-btn').onclick = () => { unlock(); openLobby(); };
 // ---------- 스피드전 · 아이템전 ----------
 const modeName = (m) => (m === 'item' ? '🎁 아이템전' : '⚡ 스피드전');
@@ -954,18 +953,34 @@ setTimeout(() => { if (game.mode === 'title' && !new URLSearchParams(location.se
 // ---------- 🌉 한강 러닝 ----------
 //   장애물 · 탈락 없이 내 속도로 달리는 힐링 맵. 거리 · 순간(노을 · 비 · 눈 …)은 서버에 모여 업적이 된다
 const hg = new Hangang();
-hg.onTurn = (txt) => toast(`🔄 ${txt}! 돌아서 계속 달려요`, 2200);
+hg.onTurn = (txt) => toast(`🚧 ${txt}이에요 · 돌아서 달려요`, 2200);
 const HG_OPT_KEY = 'dreamrunner.hangang';
 try { Object.assign(hg.opt, JSON.parse(store.get(HG_OPT_KEY) || '{}')); } catch { /* 기본 */ }
 const hgSave = () => store.set(HG_OPT_KEY, JSON.stringify(hg.opt));
 const hgRun = { tk: null, sent: 0, sendT: 0 };
-async function startHangang() {
+// 입장: 이어 달리기 · 서강대교에서 · 지도에서 고르기
+const HG_POS_KEY = 'dreamrunner.hangang.pos';
+function hgSavedPos() { try { return JSON.parse(store.get(HG_POS_KEY) || 'null'); } catch { return null; } }
+$('hg-btn').onclick = () => { unlock(); const p = hgSavedPos(); $('hg-resume').classList.toggle('hidden', !p); if (p) $('hg-resume-sub').textContent = p.where || ''; $('hg-start').classList.remove('hidden'); };
+$('hg-start-x').onclick = () => $('hg-start').classList.add('hidden');
+$('hg-resume').onclick = () => { $('hg-start').classList.add('hidden'); const p = hgSavedPos(); startHangang(p ? { s: p.s, lat: p.lat } : null); };
+$('hg-from-start').onclick = () => { $('hg-start').classList.add('hidden'); startHangang({ s: 30, lat: -4.3 }); };
+$('hg-pick').onclick = async () => { $('hg-start').classList.add('hidden'); try { await hg.load('yeouido'); } catch (e) { toast(e.message); return; } hgOpenMap(true); };
+let hgPick = null, hgMapStart = false;
+function hgOpenMap(start = false) { hgMapStart = start; hgPick = null; $('hg-go').disabled = true; $('hg-go').textContent = start ? '🏃 여기서 시작' : '📍 새 위치로 이동'; $('hg-map').classList.remove('hidden'); if (document.pointerLockElement) document.exitPointerLock?.(); hgDrawMap(); }
+function hgDrawMap() { const c = $('hg-map-c'); hg.drawBigMap(c.getContext('2d'), c.width, hgPick); }
+$('hg-map-c').addEventListener('pointerdown', (e) => { const r = e.currentTarget.getBoundingClientRect(); hgPick = hg.pickAt((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height); $('hg-go').disabled = false; hgDrawMap(); });
+$('hg-go').onclick = () => { if (!hgPick) return; $('hg-map').classList.add('hidden'); if (hgMapStart || game.mode !== 'hangang') startHangang({ s: hgPick.s, lat: hgPick.lat }); else { hg.teleport(hgPick.s, hgPick.lat); toast('📍 새 위치로 왔어요', 1400); } };
+$('hg-map-x').onclick = () => $('hg-map').classList.add('hidden');
+$('hg-mini').onclick = () => { if (game.mode === 'hangang') hgOpenMap(false); };
+async function startHangang(pos = null) {
   const b = $('hg-btn'); b.disabled = true;
   try { if (!hg.ready) toast('🌉 한강 지도를 펼치는 중…', 4000); await hg.load('yeouido'); }
   catch (e) { toast(`한강 지도를 불러오지 못했어요 · ${e.message}`, 2600); b.disabled = false; return; }
   b.disabled = false;
   hideScreens(); game.mode = 'hangang'; document.body.classList.add('hg');
-  runner.shadow.visible = false; hg.enter(runner.bear); runner.bear.root.scale.setScalar(1);
+  runner.shadow.visible = false; hg.enter(runner.bear, pos ? { s: pos.s } : {}); if (pos) hg.teleport(pos.s, pos.lat);
+  renderer.shadowMap.enabled = !isPhone; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
   $('hg-hud').classList.remove('hidden'); if (document.body.classList.contains('touch')) $('touch').classList.remove('hidden');
   setMusic(['pent', 62, 66, 'sine']); hgRun.tk = null; hgRun.sent = 0; hgRun.sendT = 20;
   account.api('/api/dream/hangang/start', { method: 'POST', body: logged() ? {} : { anon: anonId() } }).then((r) => { hgRun.tk = r.tk; }).catch(() => {});
@@ -978,10 +993,12 @@ function hgReport(final = false) {
   account.api('/api/dream/hangang/run', { method: 'POST', body }).then((r) => { if (r?.fresh?.length) setTimeout(notifyNew, 300); }).catch(() => {});
 }
 function leaveHangang() {
-  hgReport(true);
+  hgReport(true); if (document.pointerLockElement) document.exitPointerLock?.(); $('hg-labels').innerHTML = '';
   hg.leave(); document.body.classList.remove('hg');
   $('hg-hud').classList.add('hidden'); $('hg-set').classList.add('hidden');
   camera.far = 1600; camera.fov = 62; camera.updateProjectionMatrix();
+  renderer.shadowMap.enabled = false; renderer.toneMapping = THREE.NoToneMapping; renderer.toneMappingExposure = 1;
+  hgSavePos();
   runner.shadow.visible = true; scene.add(runner.bear.root);
   if (hg.dist > 50) toast(`🌉 ${(hg.dist / 1000).toFixed(2)}km · ${hgTime(hg.time)} 달렸어요. 수고했어요!`, 3000);
   toTitle();
@@ -1018,24 +1035,60 @@ $('hg-set-close').onclick = () => $('hg-set').classList.add('hidden');
 function hgFrame(dt) {
   const L = keys.has('KeyA') || keys.has('ArrowLeft'), R = keys.has('KeyD') || keys.has('ArrowRight');
   const U = keys.has('KeyW') || keys.has('ArrowUp'), D = keys.has('KeyS') || keys.has('ArrowDown');
-  const inp = { lat: (R ? 1 : 0) - (L ? 1 : 0) + (Math.abs(joyDir) ? joyDir * Math.min(1, Math.abs(joyY) < 0.5 ? 1 : 0.6) : 0), up: (U ? 1 : 0) - (D ? 1 : 0) + joyY, jump: input.jump };
-  if (!$('hg-set').classList.contains('hidden')) { inp.lat = 0; inp.up = 0; inp.jump = false; }
+  const look = hgLook; hgLook = { yaw: 0, pitch: 0 };
+  const inp = { mx: (R ? 1 : 0) - (L ? 1 : 0) + joyX, mz: (U ? 1 : 0) - (D ? 1 : 0) + joyY, yaw: look.yaw, pitch: look.pitch, jump: input.jump, sprint: keys.has('ShiftLeft') || keys.has('ShiftRight'), slide: keys.has('KeyC') || keys.has('ControlLeft') || touchHeld.has('slide') };
+  if (!$('hg-set').classList.contains('hidden')) { inp.mx = inp.mz = 0; inp.jump = false; }
   hg.update(dt, inp, camera);
   input.jump = input.slide = input.shove = input.item = false;
   renderer.render(hg.scene, camera);
+  if (hg.activeLabels?.length || $('hg-labels').childElementCount) hgLabels();
   // 화면 글씨는 0.2초마다
   game.hgT = (game.hgT || 0) + dt; if (game.hgT < 0.2) return; game.hgT = 0;
   const km = hg.dist / 1000, pace = hg.v > 0.3 ? 1000 / hg.v : 0;
   $('hg-dist').textContent = km.toFixed(2);
   $('hg-sub').textContent = `${hgTime(hg.time)} · ${pace ? `${Math.floor(pace / 60)}'${String(Math.floor(pace % 60)).padStart(2, '0')}"` : `--'--"`}/km · ${(hg.v * 3.6).toFixed(1)}km/h`;
   $('hg-where').textContent = `📍 ${hg.where()}`;
+  const mini = $('hg-mini'); hg.drawMinimap(mini.getContext('2d'), mini.width);
   const h = hg.state.hour, icon = h >= 5.3 && h < 6.9 ? '🌅' : h >= 17.9 && h < 19.4 ? '🌇' : h >= 20 || h < 5.3 ? '🌙' : '☀️';
-  $('hg-clock').textContent = `${icon} ${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')} · ${SEASONS[hg.state.season].split(' ')[0]} ${WEATHERS[hg.state.weather].split(' ')[0]}`;
+  $('hg-clock').textContent = `${icon} ${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
+  $('hg-season-c').textContent = SEASONS[hg.state.season]; $('hg-weather-c').textContent = WEATHERS[hg.state.weather];
   $('hg-pace-name').textContent = SPEEDS[hgSpeedIdx()][0];
   $('hg-bar').style.width = `${Math.round(((hg.v - V_MIN) / (V_MAX - V_MIN)) * 100)}%`;
-  hgRun.sendT -= 0.2; if (hgRun.sendT <= 0) { hgRun.sendT = 20; hgReport(); }
+  hgRun.sendT -= 0.2; if (hgRun.sendT <= 0) { hgRun.sendT = 20; hgReport(); hgSavePos(); }
 }
 addEventListener('pagehide', () => { if (game.mode === 'hangang') hgReport(true); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && game.mode === 'hangang') hgReport(true); });
 // 바로 가기: /dream-runner/#hangang 으로 들어오면 한강 러닝부터
-if (location.hash === '#hangang') setTimeout(() => { if (game.mode === 'title') startHangang(); }, 700);
+if (location.hash === '#hangang') setTimeout(() => { if (game.mode === 'title') { const p = hgSavedPos(); startHangang(p ? { s: p.s, lat: p.lat } : null); } }, 700);
+
+// 한강: 마우스로 시점 (화면을 누르면 마우스가 잠기고, Esc 로 풀린다) · 휴대폰은 화면을 끌어서
+let hgLook = { yaw: 0, pitch: 0 }, hgDrag = null;
+const cv = $('c');
+cv.addEventListener('mousedown', (e) => { if (game.mode === 'hangang' && e.button === 0 && $('hg-set').classList.contains('hidden')) cv.requestPointerLock?.()?.catch?.(() => {}); });
+document.addEventListener('mousemove', (e) => { if (game.mode !== 'hangang' || document.pointerLockElement !== cv) return; hgLook.yaw -= (e.movementX || 0) * 0.0026; hgLook.pitch += (e.movementY || 0) * 0.002; });
+cv.addEventListener('pointerdown', (e) => { if (game.mode === 'hangang' && e.pointerType !== 'mouse') hgDrag = { id: e.pointerId, x: e.clientX, y: e.clientY }; });
+cv.addEventListener('pointermove', (e) => { if (!hgDrag || e.pointerId !== hgDrag.id) return; hgLook.yaw -= (e.clientX - hgDrag.x) * 0.006; hgLook.pitch += (e.clientY - hgDrag.y) * 0.004; hgDrag.x = e.clientX; hgDrag.y = e.clientY; });
+for (const ev of ['pointerup', 'pointercancel']) cv.addEventListener(ev, (e) => { if (hgDrag?.id === e.pointerId) hgDrag = null; });
+// 위쪽 칩: 누를 때마다 시간 · 계절 · 날씨가 바뀐다
+const cycle = (list, cur) => list[(list.indexOf(cur) + 1) % list.length];
+$('hg-clock').onclick = () => { const k = cycle(Object.keys(TIMES), hg.lastTime || 'day'); hg.lastTime = k; hg.setOpt('time', k); hg.opt.time = 'auto'; hgSave(); toast(TIMES[k][0], 1200); };
+$('hg-season-c').onclick = () => { const k = cycle(Object.keys(SEASONS), hg.state.season); hg.setOpt('season', k); hgSave(); };
+$('hg-weather-c').onclick = () => { const k = cycle(Object.keys(WEATHERS), hg.state.weather); hg.setOpt('weather', k); hgSave(); };
+// 지역 이름: 화면 가운데 위에 3초
+hg.onRegion = (name) => { const el = $('hg-region'); el.textContent = /공원|광장|마당/.test(name) ? `🌳 ${name}` : /대교|철교/.test(name) ? `🌉 ${name}` : /섬/.test(name) ? `🏝️ ${name}` : `📍 ${name}`; el.classList.remove('hidden'); clearTimeout(el.h); el.h = setTimeout(() => el.classList.add('hidden'), 3000); };
+// 건물 이름표: 건물에 빨간 동그라미 → 선 → 이름 (5초 뒤 사라짐)
+const labV = new THREE.Vector3();
+function hgLabels() {
+  const box = $('hg-labels'), W = innerWidth, H = innerHeight, list = hg.activeLabels || [];
+  box.innerHTML = '';
+  for (const l of list) {
+    labV.set(l.x, l.y, l.z).project(camera); if (labV.z > 1) continue;
+    const x = (labV.x * 0.5 + 0.5) * W, y = (-labV.y * 0.5 + 0.5) * H; if (x < -40 || x > W + 40 || y < -40 || y > H + 40) continue;
+    const a = l.t < 0.4 ? l.t / 0.4 : l.t > 4.2 ? Math.max(0, 1 - (l.t - 4.2) / 1.2) : 1, side = x > W * 0.6 ? -1 : 1, lx = 70 * side, ly = -60;
+    const el = document.createElement('div'); el.className = 'hg-lab'; el.style.transform = `translate(${x}px, ${y}px)`; el.style.opacity = a;
+    el.innerHTML = `<i></i><svg width="1" height="1"><line x1="0" y1="0" x2="${lx}" y2="${ly}" stroke="#ff2d55" stroke-width="2.5"/></svg><b style="left:${side > 0 ? lx : lx - 4}px;top:${ly - 14}px;${side < 0 ? 'transform:translateX(-100%)' : ''}">${l.name.replace(/[<>&]/g, '')}</b>`;
+    box.appendChild(el);
+  }
+}
+
+function hgSavePos() { if (!hg.ready || hg.px == null) return; store.set(HG_POS_KEY, JSON.stringify({ s: Math.round(hg.s), lat: Math.round(hg.lat * 10) / 10, where: `${hg.regionName || hg.map.name} 근처 · ${(hg.s / 1000).toFixed(1)}km 지점` })); }
