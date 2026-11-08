@@ -1122,7 +1122,7 @@ export class Hangang {
       if (this.trainSeen.size > 400) this.trainSeen.clear();
     } catch { this.liveTrains = false; }
     try { const j = await this.api('/api/seoul/bus/pos'); this.busData = j.buses || []; } catch { /* 버스 정보 없음 */ }
-    if (!this.cityAt || Date.now() - this.cityAt > 300000) { this.cityAt = Date.now(); try { this.city = await this.api('/api/seoul/city?area=' + encodeURIComponent(this.id === 'hongdae' ? '홍대 관광특구' : this.id === 'namsan' ? '남산공원' : this.id === 'itaewon' ? '이태원 관광특구' : this.id === 'banpo' ? '반포한강공원' : '여의도')); this.onCity?.(this.city); } catch { /* 도시 정보 없음 */ } }
+    if (!this.cityAt || Date.now() - this.cityAt > 300000) { this.cityAt = Date.now(); try { this.city = await this.api('/api/seoul/city?area=' + encodeURIComponent(this.id === 'hongdae' ? '홍대 관광특구' : this.id === 'namsan' ? '남산공원' : this.id === 'itaewon' ? '이태원 관광특구' : this.id === 'banpo' ? '반포한강공원' : this.id === 'ttukseom' ? '뚝섬한강공원' : '여의도')); this.onCity?.(this.city); } catch { /* 도시 정보 없음 */ } }
   }
   tickTransit(dt, px, pz) {
     if (!this.trains) return;
