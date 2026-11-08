@@ -952,6 +952,19 @@ export class Hangang {
       w.bears.forEach((b, i) => { const q = this.lineAt(w.L, w.d - i * 0.25 * w.dir, w.side + (i - (w.bears.length - 1) / 2) * 0.7); b.root.position.set(q.x, 0, q.z); b.root.rotation.y = Math.atan2(q.dx * w.dir, q.dz * w.dir); b.update(dt, w.v * 2, { noCrawl: true }); });
     }
     for (const w of [...this.walkers]) { const p0 = w.bears[0].root.position; if (Math.hypot(p0.x - px, p0.z - pz) > 240) { this.removePerson(w); this.walkers.splice(this.walkers.indexOf(w), 1); } }
+    // 가게 손님: 문에서 나와 벽을 따라 걸어가거나, 걸어와서 문으로 들어간다 (영업 시간대에 더 많이)
+    this.shoppers ||= []; this.shopT = (this.shopT || 0) - dt; const open = h >= 8 && h < 23;
+    if (this.shopT <= 0 && this.shopFronts?.length && this.shoppers.length < (isPhone ? 4 : 10) * (open ? 1 : 0.3)) { this.shopT = 0.8 + r() * 1.2;
+      const cand = []; for (let a = -3; a <= 3; a++) for (let b = -3; b <= 3; b++) for (const i of this.shopGrid.get(`${Math.floor(px / 40) + a},${Math.floor(pz / 40) + b}`) || []) { const F = this.shopFronts[i], d = Math.hypot(F.x - px, F.z - pz); if (d > 12 && d < 110) cand.push(F); }
+      if (cand.length) { const F = cand[Math.floor(r() * cand.length)], out = r() < 0.5, sd = r() < 0.5 ? 1 : -1, tx = F.nz * sd, tz = -F.nx * sd, door = [F.x + F.nx * 0.4, F.z + F.nz * 0.4], step = [F.x + F.nx * 2.2, F.z + F.nz * 2.2], far = [step[0] + tx * 22, step[1] + tz * 22];
+        const path = out ? [door, step, far] : [far, step, door], roles = r() < 0.35 ? ['stroll', 'stroll'] : [h >= 7 && h < 20 && this.areaKind(F.x, F.z) === 'office' ? 'suit' : 'stroll'];
+        const sp = { path, k: 0, t: 0, v: 1.1 + r() * 0.3, bears: roles.map((ro) => this.mkBear(ro, r, 0.95 + r() * 0.1)), kind: 'walker' }; this.shoppers.push(sp); } }
+    for (const sp of [...this.shoppers]) {
+      const a = sp.path[sp.k], b = sp.path[sp.k + 1]; if (!b) { this.removePerson(sp); this.shoppers.splice(this.shoppers.indexOf(sp), 1); continue; }
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 0.01; sp.t += sp.v * dt / L; if (sp.t >= 1) { sp.k++; sp.t = 0; continue; }
+      const x = a[0] + (b[0] - a[0]) * sp.t, z = a[1] + (b[1] - a[1]) * sp.t, ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
+      sp.bears.forEach((bb, i) => { bb.root.position.set(x - uz * (i - (sp.bears.length - 1) / 2) * 0.7, 0, z + ux * (i - (sp.bears.length - 1) / 2) * 0.7); bb.root.rotation.y = Math.atan2(ux, uz); bb.update(dt, sp.v * 2, { noCrawl: true }); });
+    }
     // 차: 오른쪽 차로로, 출퇴근 시간엔 많고 밤엔 적게 · 앞에 곰돌이가 있으면 멈춘다
     const rush = (h >= 7 && h < 9.5) || (h >= 17 && h < 20), jam = { 원활: 1, 서행: 1.35, 정체: 1.7 }[this.city?.road] || (rush ? 1.3 : 1), maxC = Math.round((isPhone ? 10 : 34) * jam * (h >= 23 || h < 6 ? 0.35 : 0.9)); this.jamSpeed = this.city?.roadSpd ? clamp(this.city.roadSpd / 40, 0.25, 1.1) : 1;
     this.carT -= dt;
@@ -1067,7 +1080,7 @@ export class Hangang {
     if (this.opt.weather === 'auto') this.state.weather = this.randWeather(r);
     if (this.opt.time === 'auto') this.state.hour = [5.9, 6.4, 9.5, 15.8, 16.6, 17.2, 17.7, 18.1, 18.4, 19.2, 21, 13][Math.floor(r() * 12)]; // 감성적인 시간(늦은 오후 · 노을 · 해 뜰 녘)이 더 자주
     this.applySeason(); this.weatherT = 240 + r() * 360; this.r = r;
-    for (const p of this.people) this.removePerson(p); this.people = []; for (const gd of this.groups) this.removeGroup(gd); this.groups = []; for (const w of this.walkers || []) this.removePerson(w); this.walkers = []; for (const c of this.cars3 || []) this.scene.remove(c.mesh); this.cars3 = []; this.seenLabel = new Set(); this.activeLabels = []; this.regionName = null; this.regionSeen = new Map(); this.jumps = 0; this.flipT = 0;
+    for (const p of this.people) this.removePerson(p); this.people = []; for (const gd of this.groups) this.removeGroup(gd); this.groups = []; for (const w of this.walkers || []) this.removePerson(w); this.walkers = []; for (const w of this.shoppers || []) this.removePerson(w); this.shoppers = []; for (const c of this.cars3 || []) this.scene.remove(c.mesh); this.cars3 = []; this.seenLabel = new Set(); this.activeLabels = []; this.regionName = null; this.regionSeen = new Map(); this.jumps = 0; this.flipT = 0;
   }
   leave() { if (this.bear) { this.bear.root.traverse((o) => { if (o.isMesh) o.castShadow = false; }); this.bear.root.scale.setScalar(1); this.bear.inner.rotation.set(0, 0, 0); this.bear.inner.position.set(0, 0, 0); } if (this.bear && this.prevParent) this.prevParent.add(this.bear.root); for (const p of this.people) this.removePerson(p); this.people = []; for (const gd of this.groups) this.removeGroup(gd); this.groups = []; this.bear = null; }
   randWeather(r) { const s = this.state.season, x = r(); if (s === 'winter') return x < 0.45 ? 'clear' : x < 0.75 ? 'cloudy' : 'snow'; return x < 0.55 ? 'clear' : x < 0.82 ? 'cloudy' : 'rain'; }
