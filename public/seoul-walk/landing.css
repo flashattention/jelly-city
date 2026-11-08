@@ -136,3 +136,15 @@ a { color: inherit; text-decoration: none; }
 
 /* 실시간 3D (게임 엔진): 그림 위에, 장면이 준비되면 보인다 */
 #gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; }
+
+/* 사용한 데이터 · API, 건물 외형 */
+.tech { display: grid; gap: 22px; }
+.tech-h { margin: 18px 0 0; font-family: 'Gowun Batang', serif; font-size: clamp(22px, 2.6vw, 30px); color: #fff; } .tech-h small { display: block; margin-top: 6px; font-family: var(--sans); font-size: 13px; font-weight: 400; color: var(--mute); }
+.api { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.api .row { padding: 18px 20px; border-radius: 18px; background: rgba(255, 255, 255, .035); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.api .who { font-size: 11px; letter-spacing: .12em; color: var(--gold); } .api b { font-weight: 500; color: #fff; font-size: 15px; } .api code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 1px 6px; border-radius: 6px; background: rgba(156, 199, 255, .12); color: var(--sky); }
+.api p { margin: 0; font-size: 13.5px; line-height: 1.7; color: var(--mute); } .api em { font-style: normal; color: var(--rose); }
+.steps { margin: 0; padding: 0; list-style: none; counter-reset: st; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.steps li { counter-increment: st; position: relative; padding: 20px 20px 20px 58px; border-radius: 18px; background: rgba(255, 255, 255, .035); border: 1px solid var(--line); font-size: 13.5px; line-height: 1.75; color: var(--mute); }
+.steps li::before { content: counter(st, decimal-leading-zero); position: absolute; left: 18px; top: 18px; font-family: 'Gowun Batang', serif; font-size: 20px; color: var(--gold); }
+.steps li b { display: block; margin-bottom: 4px; color: #fff; font-weight: 500; font-size: 15px; }

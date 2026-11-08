@@ -109,7 +109,7 @@ async function setupAcct() {
 // ---------- 스크롤에 나타나기 ----------
 let io = null;
 function observe() { io ||= new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }, { threshold: 0.12 }); document.querySelectorAll('.reveal:not(.in)').forEach((el, i) => { el.style.transitionDelay = `${(i % 6) * 60}ms`; io.observe(el); }); }
-document.querySelectorAll('.head, .trio article, .why > div, .col, .facts > div, .acct-in, .map-wrap').forEach((el) => el.classList.add('reveal'));
+document.querySelectorAll('.head, .trio article, .why > div, .api .row, .steps li, .facts > div, .acct-in, .map-wrap').forEach((el) => el.classList.add('reveal'));
 
 renderHoods(); renderAcct(); setupMap(); setupAcct();
 
