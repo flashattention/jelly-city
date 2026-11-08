@@ -44,7 +44,7 @@ export function makePost(renderer, scene, camera) {
       grade.uniforms.tint.value.setRGB(1.03 + golden * 0.08 - n * 0.05, 1 + golden * 0.02 - n * 0.02, 0.97 - golden * 0.06 + n * 0.08);
       if (n > 0.5) grade.uniforms.shadowCol.value.set(0.78, 0.86, 1.22); else grade.uniforms.shadowCol.value.set(0.86, 0.82, 1.14); if (n > 0.5) grade.uniforms.hiCol.value.set(1.12, 1.0, 0.82); else if (golden > 0.3) grade.uniforms.hiCol.value.set(1.14, 0.98, 0.82); else grade.uniforms.hiCol.value.set(1.06, 1.0, 0.92);
       grade.uniforms.time.value = (grade.uniforms.time.value + 1.37) % 1000;
-      bloom.strength = 0.35 + n * 0.6 + golden * 0.25; bloom.threshold = 0.82 - n * 0.3;
+      bloom.strength = 0.22 + n * 0.22 + golden * 0.12; bloom.threshold = 0.88 - n * 0.12; // 은은하게 (밤에도 건물이 하얗게 날아가지 않게)
     },
     render() { composer.render(); },
     setSize(w, h) { composer.setSize(w, h); bloom.resolution.set(w, h); grade.uniforms.res.value.set(w, h); },
