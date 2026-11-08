@@ -8,11 +8,11 @@ const PLAY = '/seoul-walk/play/', cl = (v, a = 0, b = 1) => Math.min(b, Math.max
 // ---------- 장 (landing3d.js 의 장면과 같은 순서) ----------
 const CH = [
   ['c1', '여의도 한강', '북위 37.5198° · 동경 126.9405°', '오후 6:09 · 여름', '해 질 녘 러닝', '63빌딩을 등지고 달리는 저녁. 한강 러닝 코스 위로 곰들이 하나둘 지나가요.'],
-  ['c2', '석촌호수 · 잠실', '북위 37.5126° · 동경 127.1025°', '오후 1:36 · 봄', '봄날의 타워', '벚꽃이 호수를 두르는 봄날 낮, 555m 롯데월드타워가 맑은 하늘을 찔러요.'],
+  ['c2', '석촌호수 · 잠실', '북위 37.5126° · 동경 127.1025°', '오후 1:36 · 봄', '봄날의 석촌호수', '벚꽃이 호수를 두르는 봄날 낮, 555m 롯데월드타워가 맑은 하늘을 찔러요.'],
   ['c5', '홍대', '북위 37.5563° · 동경 126.9236°', '오후 6:33 · 노을', '노을 골목', '해가 기우는 골목. 간판에 하나둘 불이 들어오고, 거리에 사람들이 모여들어요.'],
   ['c7', '종로 · 인사동', '북위 37.5740° · 동경 126.9850°', '오후 5:18 · 눈', '눈 오는 종로', '오래된 골목에 눈이 내려요. 처마 끝 등불 아래로 발자국이 이어져요.'],
-  ['c3', '남산', '북위 37.5512° · 동경 126.9882°', '오후 8:36 · 가을', '밤의 타워', '진짜 산 위, 해발 262m. 밤이면 N서울타워에 불이 켜지고 서울이 발아래에서 반짝여요.'],
-  ['c6', '한강', '북위 37.5265° · 동경 126.9340°', '오후 8:48 · 여름', '강 위의 불빛', '강물 위로 도시의 불빛이 흔들려요. 실제 열차가 다리를 건너는 그 순간, 여기서도.'],
+  ['c3', '남산', '북위 37.5512° · 동경 126.9882°', '오후 8:36 · 가을', '밤의 서울타워', '진짜 산 위, 해발 262m. 밤이면 N서울타워에 불이 켜지고 서울이 발아래에서 반짝여요.'],
+  ['c6', '여의도 한강', '북위 37.5265° · 동경 126.9340°', '오후 8:48 · 여름', '여의도 한강의 밤', '강물 위로 도시의 불빛이 흔들려요. 실제 열차가 다리를 건너는 그 순간, 여기서도.'],
 ];
 const film = $('film'), N = CH.length; film.style.setProperty('--n', N);
 const frames = CH.map(([f]) => { const d = document.createElement('div'); d.className = 'f'; d.dataset.src = `/seoul-walk/img/${f}.webp`; $('frames').appendChild(d); return d; });
@@ -21,7 +21,7 @@ let use3d = false; // 3D 가 돌면 그림은 쓰지 않는다 (불러오기 전
 const loadImg = (k) => { const d = frames[k]; if (d && !d.style.backgroundImage) d.style.backgroundImage = `url(${d.dataset.src})`; };
 let ticking = false, lastP = -1;
 function filmTick() {
-  ticking = false; const r = film.getBoundingClientRect(), span = film.offsetHeight - innerHeight, p = cl(-r.top / span), P = p * (N + 0.6); window.SW_FILM = { P: Math.min(P, N - 0.001), N }; document.body.classList.toggle('light', r.bottom < 80);
+  ticking = false; const r = film.getBoundingClientRect(), span = film.offsetHeight - innerHeight, p = cl(-r.top / span), P = p * (N + 0.6); window.SW_FILM = { P: Math.min(P, N - 0.001), N };
   if (Math.abs(P - lastP) < 1e-4) return; lastP = P;
   // 첫 화면 겹침(제목 · 출발)은 스크롤을 시작하면 걷힌다
   const io = 1 - ease(cl((P - 0.12) / 0.26)); $('intro').style.opacity = io.toFixed(3); $('intro').style.transform = `translate3d(0, ${(-(1 - io) * 40).toFixed(1)}px, 0)`; $('intro').style.pointerEvents = io > 0.5 ? 'auto' : 'none'; $('cue').style.opacity = (io * 0.9).toFixed(2);
@@ -31,7 +31,7 @@ function filmTick() {
     const a = i === 0 ? 0.42 : 0.08, ti = ease(cl((t - a) / 0.2)), to = 1 - ease(cl((t - 0.66) / 0.18)), co = Math.min(ti, to), C = chaps[i]; C.style.opacity = co.toFixed(3); C.style.transform = `translate3d(0, ${((1 - ti) * 40 - (1 - to) * 26).toFixed(1)}px, 0)`;
   }
   const k = cl(Math.floor(P), 0, N - 1); $('prog-fill').style.width = `${(cl(P / N) * 100).toFixed(2)}%`; $('prog-t').textContent = `${String(k + 1).padStart(2, '0')} / ${String(N).padStart(2, '0')}`;
-  const e = ease(cl((P - N + 0.1) / 0.4)); $('end').style.opacity = e.toFixed(3); $('end').classList.toggle('on', e > 0.5);
+  const e = ease(cl((P - N + 0.1) / 0.4)); $('end').style.opacity = e.toFixed(3); $('end').classList.toggle('on', e > 0.5); document.body.classList.toggle('light', r.bottom < 80 || e > 0.5); // 파스텔 마지막 장 · 아래에선 위 막대 글자를 짙게
 }
 addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(filmTick); } }, { passive: true });
 addEventListener('resize', () => { lastP = -1; filmTick(); });
