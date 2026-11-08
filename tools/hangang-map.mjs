@@ -182,7 +182,7 @@ for (const e of [...lJ.elements, ...wJ.elements]) {
 
 // ---------- 길 · 철길 · 다리 ----------
 const W = { motorway: 22, trunk: 18, primary: 14, secondary: 10, tertiary: 8, trunk_link: 6, primary_link: 6, secondary_link: 6, motorway_link: 6, cycleway: 3, footway: 2.4, path: 2, pedestrian: 4 };
-out.roads = []; out.bridges = []; out.rails = []; out.paths = [];
+out.roads = []; out.roadNames = []; out.bridges = []; out.rails = []; out.paths = [];
 for (const e of lJ.elements) {
   const t = e.tags || {}; if (e.type !== 'way' || !e.geometry || t.tunnel === 'yes' || t.tunnel === 'building_passage' || +t.layer < 0) continue;
   const g = geo(e.geometry), mid = g[Math.floor(g.length / 2)];
@@ -194,7 +194,7 @@ for (const e of lJ.elements) {
   const pts = simplify(g, 0.8);
   if (bridge && w0 >= 6) { out.bridges.push({ n: t['bridge:name'] || t.name || '', w, p: flat(pts) }); continue; }
   if (t.highway in { cycleway: 1, footway: 1, path: 1, pedestrian: 1 }) { if (t.name === C.path || near(mid, 450) < 450) out.paths.push([t.name === C.path ? 1 : 0, w, ...flat(pts)]); continue; }
-  if (w0 >= 8) out.roads.push([w, bridge ? 1 : 0, ...flat(pts)]);
+  if (w0 >= 8) { out.roads.push([w, bridge ? 1 : 0, ...flat(pts)]); out.roadNames.push(String(t.name || '').slice(0, 12)); }
 }
 
 // ---------- 건물 ----------
