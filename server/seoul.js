@@ -4,7 +4,10 @@
 //   같은 질문은 15 ~ 20초 동안 기억해서 돌려준다 (호출 수 제한 · 키 보호)
 const KEY = process.env.SEOUL_SUBWAY_KEY || '';
 // 버스 위치 (공공데이터포털 서울 버스위치정보): 키 SEOUL_BUS_KEY (인코딩된 그대로), 보여 줄 노선 아이디 SEOUL_BUS_ROUTES (쉼표)
-const BUS_KEY = process.env.SEOUL_BUS_KEY || '', BUS_ROUTES = (process.env.SEOUL_BUS_ROUTES || '100100124').split(',').map((x) => x.trim()).filter((x) => /^\d{9}$/.test(x)).slice(0, 12);
+const BUS_KEY = process.env.SEOUL_BUS_KEY || '';
+// 여의도를 지나는 실제 노선 (노선정보조회로 찾은 아이디 · 3 간선 파랑 · 4 지선 초록)
+const BUS_ROUTES = [['100100043', '261', 3], ['100100044', '262', 3], ['100100057', '360', 3], ['100100071', '461', 3], ['100100605', '463', 3], ['100100078', '503', 3], ['100100085', '600', 3], ['100100550', '662', 3], ['100100118', '753', 3], ['100100034', '162', 3], ['100100033', '160', 3], ['100100272', '5615', 4], ['100100275', '5618', 4], ['100100301', '6623', 4], ['100100347', '7613', 4]];
+const busCache = new Map(); let busTurn = 0;
 // 서울 실시간 도시데이터 (인구 혼잡도 · 도로 소통 · 날씨): 키 SEOUL_CITY_KEY · 장소는 정해 둔 곳만
 const CITY_KEY = process.env.SEOUL_CITY_KEY || '', CITY_AREAS = ['여의도', '여의도한강공원', '홍대 관광특구', '남산공원', '이태원 관광특구'];
 const LINE_OF = { 1001: '1호선', 1002: '2호선', 1003: '3호선', 1004: '4호선', 1005: '5호선', 1006: '6호선', 1007: '7호선', 1008: '8호선', 1009: '9호선', 1063: '경의중앙선', 1065: '공항철도', 1067: '경춘선', 1075: '수인분당선', 1077: '신분당선', 1092: '우이신설선', 1032: 'GTX-A' };
@@ -38,7 +41,12 @@ export async function seoulApi(req, res, url, json) {
   if (url.pathname === '/api/seoul/bus/pos') {
     if (!BUS_KEY) return json(res, 503, { error: '버스 정보 준비 중이에요' }), true;
     try {
-      const all = await cached('bus', 15000, async () => { const out = []; for (const rid of BUS_ROUTES) { const r = await fetch(`http://ws.bus.go.kr/api/rest/buspos/getBusPosByRtid?serviceKey=${BUS_KEY}&busRouteId=${rid}&resultType=json`, { signal: AbortSignal.timeout(6000) }); const j = await r.json(); for (const b of j.msgBody?.itemList || []) out.push({ id: b.vehId, route: rid, lon: +b.gpsX, lat: +b.gpsY, no: String(b.plainNo || '').slice(-4), t: b.dataTm, full: b.congetion }); } return out; });
+      // 하루 호출 수 제한이 있어서: 부를 때마다 2개 노선만 새로 받고, 노선마다 3분 기억 (오래된 것부터 차례로)
+      const all = await cached('bus', 20000, async () => {
+        const stale = BUS_ROUTES.filter(([id]) => !busCache.has(id) || Date.now() - busCache.get(id).at > 180000);
+        for (const [id, no, type] of stale.slice(0, 2)) { try { const r = await fetch(`http://ws.bus.go.kr/api/rest/buspos/getBusPosByRtid?serviceKey=${BUS_KEY}&busRouteId=${id}&resultType=json`, { signal: AbortSignal.timeout(6000) }); const j = await r.json(); busCache.set(id, { at: Date.now(), list: (j.msgBody?.itemList || []).map((b) => ({ id: b.vehId, route: no, type, lon: +b.gpsX, lat: +b.gpsY, t: b.dataTm })) }); } catch { /* 다음에 */ } }
+        busTurn++; return [...busCache.values()].flatMap((c) => c.list);
+      });
       return json(res, 200, { buses: all, t: Date.now() }), true;
     } catch (e) { return json(res, 502, { error: e.message }), true; }
   }

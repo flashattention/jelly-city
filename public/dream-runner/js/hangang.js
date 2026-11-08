@@ -875,7 +875,7 @@ export class Hangang {
     const S = this.map, cx = S.center[0], cz = S.center[1];
     for (const b of this.busData || []) {
       const x = (b.lon - 126.98) * 111320 * Math.cos(37.53 * Math.PI / 180) - cx, z = -(b.lat - 37.53) * 110574 - cz; if (Math.abs(x) > 2600 || Math.abs(z) > 2600) continue;
-      let o = this.buses.get(b.id); if (!o) { const mesh = makeVehicle('bus', Math.random); this.scene.add(mesh); o = { mesh, x, z, tx: x, tz: z, r: 2.6 }; this.buses.set(b.id, o); }
+      let o = this.buses.get(b.id); if (!o) { const mesh = makeVehicle('bus', Math.random, b.type === 4 ? '#47a83c' : '#3a63b8', b.route); this.scene.add(mesh); o = { mesh, x, z, tx: x, tz: z, r: 2.6 }; this.buses.set(b.id, o); }
       if (Math.hypot(x - o.tx, z - o.tz) > 0.5) { o.yaw = Math.atan2(x - o.tx, z - o.tz); o.tx = x; o.tz = z; }
     }
     for (const o of this.buses.values()) { o.x += (o.tx - o.x) * Math.min(1, dt * 0.25); o.z += (o.tz - o.z) * Math.min(1, dt * 0.25); o.mesh.position.set(o.x, 0, o.z); if (o.yaw != null) o.mesh.rotation.y = o.yaw; }
@@ -1298,12 +1298,13 @@ function dress(b, role, r, env = {}) {
 }
 // 차: 승용차 · 택시 · 시내버스 (몸체 · 유리 · 바퀴 · 앞뒤 불빛)
 const CAR_COLORS = ['#f4f4f2', '#f4f4f2', '#1d1d1f', '#9aa0a6', '#c9ccd0', '#2a3a5a', '#7a1d22', '#3d4a3a', '#d8d2c4'];
-function makeVehicle(kind, r) {
+function makeVehicle(kind, r, busColor = null, routeNo = '') {
   const g = new THREE.Group(), M2 = (c, o = {}) => new THREE.MeshLambertMaterial({ color: c, ...o });
   const L = kind === 'bus' ? 11 : 4.5, W = kind === 'bus' ? 2.5 : 1.8, H = kind === 'bus' ? 2.9 : 0.75;
-  const color = kind === 'taxi' ? (r() < 0.6 ? '#f39a2b' : '#f4f4f2') : kind === 'bus' ? ['#3a63b8', '#47a83c', '#3a63b8', '#47a83c', '#d8352a'][Math.floor(r() * 5)] : CAR_COLORS[Math.floor(r() * CAR_COLORS.length)];
+  const color = kind === 'taxi' ? (r() < 0.6 ? '#f39a2b' : '#f4f4f2') : kind === 'bus' ? busColor || ['#3a63b8', '#47a83c', '#3a63b8', '#47a83c', '#d8352a'][Math.floor(r() * 5)] : CAR_COLORS[Math.floor(r() * CAR_COLORS.length)];
   const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, L), M2(color)); body.position.y = 0.35 + H / 2; g.add(body);
   if (kind === 'bus') { const win = new THREE.Mesh(new THREE.BoxGeometry(W + 0.02, 0.9, L - 1.2), M2('#2a3442')); win.position.set(0, 2.25, 0.2); g.add(win); const roof = new THREE.Mesh(new THREE.BoxGeometry(W - 0.2, 0.25, L - 0.6), M2('#e8e8e8')); roof.position.y = 3.37; g.add(roof); }
+  if (kind === 'bus' && routeNo) { const cv = document.createElement('canvas'); cv.width = 128; cv.height = 40; const c2 = cv.getContext('2d'); c2.fillStyle = '#111'; c2.fillRect(0, 0, 128, 40); c2.fillStyle = '#ffb020'; c2.font = 'bold 30px sans-serif'; c2.textAlign = 'center'; c2.textBaseline = 'middle'; c2.fillText(routeNo, 64, 22); const t = new THREE.CanvasTexture(cv); const sm = new THREE.MeshBasicMaterial({ map: t }); const f = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.38), sm); f.position.set(0, 2.95, L / 2 + 0.02); g.add(f); const sd = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.44), sm); sd.position.set(W / 2 + 0.02, 2.95, 2); sd.rotation.y = Math.PI / 2; g.add(sd); }
   else {
     const cab = new THREE.Mesh(new THREE.BoxGeometry(W - 0.15, 0.6, L * 0.52), M2('#24303c')); cab.position.set(0, 0.35 + H + 0.3, -0.15); g.add(cab);
     const top = new THREE.Mesh(new THREE.BoxGeometry(W - 0.25, 0.06, L * 0.46), M2(color)); top.position.set(0, 0.35 + H + 0.62, -0.15); g.add(top);
