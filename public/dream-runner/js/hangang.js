@@ -590,7 +590,7 @@ export class Hangang {
       ribbonInto(side.P, side.I, fine, b.w + 0.4, (i) => ys[i] - 1.6);
       // 난간 (양쪽 낮은 벽)
       for (const sgn of [-1, 1]) { const off = fine.map((p, i) => { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1; return [p[0] - dz / L * (b.w / 2) * sgn, p[1] + dx / L * (b.w / 2) * sgn]; }); rails2.push({ off, ys }); }
-      if (b.rail) rails.push({ fine, ys, w: b.w });
+      if (b.rail) rails.push({ fine, ys, w: b.w, n: b.n || '' });
       for (let i = 0; i < fine.length; i += 2) { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], ang = Math.atan2(c[1] - a[1], c[0] - a[0]) + Math.PI / 2; if (ys[i] < 3) continue; if (wet[i]) { if (i % 4 === 0) piers.push([fine[i][0], fine[i][1], ys[i], b.w, ang]); } else piers.push([fine[i][0], fine[i][1], ys[i], b.w * 0.6, ang]); }
       if (anyWet) for (let i = 0; i < fine.length; i += 3) { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1; for (const sgn of [-1, 1]) lamps.push(fine[i][0] - dz / L * b.w / 2 * sgn, ys[i] + 1.2, fine[i][1] + dx / L * b.w / 2 * sgn); }
     }
@@ -1105,6 +1105,8 @@ export class Hangang {
     const M2 = this.map, hx = (126.958 - 126.98) * 111320 * Math.cos(37.53 * Math.PI / 180) - M2.center[0], hz = -(37.5172 - 37.53) * 110574 - M2.center[1];
     this.trackPaths = (this.railPaths || []).map((rp) => { const mid = rp.fine[Math.floor(rp.fine.length / 2)]; return { ...rp, len: rp.fine.reduce((a, p, i) => a + (i ? Math.hypot(p[0] - rp.fine[i - 1][0], p[1] - rp.fine[i - 1][1]) : 0), 0), dist: Math.hypot(mid[0] - hx, mid[1] - hz) }; }).filter((rp) => rp.dist < 900 && rp.len > 300).sort((a, b) => b.len - a.len).slice(0, 2);
     this.trains = []; this.trainT = 5; this.trainSeen = new Set(); this.buses = new Map();
+    // 다른 호선 철교 (4호선 동작대교 · 2호선 당산철교 등): 그 호선 색 열차가 몇 분마다 지나간다
+    this.lineTracks = (this.railPaths || []).map((rp) => ({ ...rp, line: (/(\d)호선/.exec(rp.n) || [])[1], len: rp.fine.reduce((a, p, i) => a + (i ? Math.hypot(p[0] - rp.fine[i - 1][0], p[1] - rp.fine[i - 1][1]) : 0), 0) })).filter((rp) => rp.line && rp.line !== '1' && rp.len > 200); this.lineT = 8;
   }
   trainAt(tp, d) { const f = tp.fine; let acc = 0; for (let i = 1; i < f.length; i++) { const L = Math.hypot(f[i][0] - f[i - 1][0], f[i][1] - f[i - 1][1]); if (acc + L >= d) { const t = (d - acc) / (L || 1); return { x: lerp(f[i - 1][0], f[i][0], t), z: lerp(f[i - 1][1], f[i][1], t), y: lerp(tp.ys[i - 1], tp.ys[i], t), dx: (f[i][0] - f[i - 1][0]) / (L || 1), dz: (f[i][1] - f[i - 1][1]) / (L || 1) }; } acc += L; } const n = f.length - 1; return { x: f[n][0], z: f[n][1], y: tp.ys[n], dx: 0, dz: 1 }; }
   spawnTrain(north) {
@@ -1125,6 +1127,7 @@ export class Hangang {
   tickTransit(dt, px, pz) {
     if (!this.trains) return;
     this.trainT -= dt; if (this.trainT <= 0) { this.trainT = 20; this.pollTransit(); if (!this.liveTrains && Math.random() < 0.35) this.spawnTrain(Math.random() < 0.5); }
+    this.lineT -= dt; if (this.lineT <= 0 && this.lineTracks?.length) { this.lineT = 35 + Math.random() * 70; const tp = this.lineTracks[Math.floor(Math.random() * this.lineTracks.length)], fw = Math.random() < 0.5, g = makeTrain(tp.line); this.scene.add(g); this.trains.push({ tp, d: fw ? -200 : tp.len + 200, dir: fw ? 1 : -1, g, v: 15 }); }
     for (const t of this.trains) { t.d += t.dir * t.v * dt; t.g.children.forEach((car, i) => { const p = this.trainAt(t.tp, clamp(t.d - t.dir * i * 20, 0, t.tp.len)); car.position.set(p.x, p.y + 0.4, p.z); car.rotation.y = Math.atan2(p.dx, p.dz); car.visible = t.d - t.dir * i * 20 > 0 && t.d - t.dir * i * 20 < t.tp.len; }); }
     this.trains = this.trains.filter((t) => { const done = t.dir > 0 ? t.d > t.tp.len + 220 : t.d < -220; if (done) this.scene.remove(t.g); return !done; });
     // 실시간 버스: GPS → 지도 좌표, 받은 위치로 부드럽게
@@ -1677,8 +1680,10 @@ function stationSignTex(name, lines, ref) {
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 // 1호선 전동차 10량: 은색 몸체 · 파랑 · 빨강 띠 · 창 띠
-function makeTrain() {
-  const g = new THREE.Group(), body = new THREE.MeshLambertMaterial({ color: '#d9dde2' }), win = new THREE.MeshLambertMaterial({ color: '#2a3442', emissive: '#ffe8b0', emissiveIntensity: 0.2 }), blue = new THREE.MeshLambertMaterial({ color: '#1d4fa8' }), red = new THREE.MeshLambertMaterial({ color: '#d8352a' });
+// 호선별 바깥 열차 (1호선: 파랑 + 빨강 띠, 나머지: 그 호선 색 띠)
+const OUT_TRAIN = { 1: ['#d9dde2', '#1d4fa8', '#d8352a'], 2: ['#dfe3e6', '#00A84D', '#00A84D'], 3: ['#dfe3e6', '#EF7C1C', '#EF7C1C'], 4: ['#dfe3e6', '#00A5DE', '#00A5DE'], 5: ['#d6dade', '#996CAC', '#996CAC'], 6: ['#d6dade', '#CD7C2F', '#CD7C2F'], 7: ['#dfe3e6', '#747F00', '#747F00'], 9: ['#e3e1da', '#BDB092', '#8a6d3b'] };
+function makeTrain(line = '1') {
+  const [bc, c1, c2] = OUT_TRAIN[line] || OUT_TRAIN[1], g = new THREE.Group(), body = new THREE.MeshLambertMaterial({ color: bc }), win = new THREE.MeshLambertMaterial({ color: '#2a3442', emissive: '#ffe8b0', emissiveIntensity: 0.2 }), blue = new THREE.MeshLambertMaterial({ color: c1 }), red = new THREE.MeshLambertMaterial({ color: c2 });
   for (let i = 0; i < 10; i++) { const car = new THREE.Group(); const b = new THREE.Mesh(new THREE.BoxGeometry(3.1, 3.4, 19.4), body); b.position.y = 1.9; car.add(b); const w = new THREE.Mesh(new THREE.BoxGeometry(3.12, 0.9, 17.6), win); w.position.y = 2.5; car.add(w); const s1 = new THREE.Mesh(new THREE.BoxGeometry(3.13, 0.18, 19.4), blue); s1.position.y = 1.7; car.add(s1); const s2 = new THREE.Mesh(new THREE.BoxGeometry(3.13, 0.1, 19.4), red); s2.position.y = 1.5; car.add(s2); g.add(car); }
   return g;
 }
