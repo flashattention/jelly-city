@@ -70,7 +70,12 @@ jobs:
           fetch-depth: 0 # 패치노트를 커밋 기록에서 만든다
       - name: 패치노트에 새 커밋 추가
         run: node tools/patchnotes.mjs && node tools/patchnotes.mjs --check
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-      - run: flyctl deploy --remote-only
+      # flyctl 내려받기: 받는 서버가 가끔 504 를 내서 배포가 통째로 실패하던 것 → 5번까지 다시 시도
+      - name: flyctl 설치 (다시 시도)
+        run: |
+          for i in 1 2 3 4 5; do curl -fsSL https://fly.io/install.sh | sh && break; echo "다시 시도 $i"; sleep $((i * 10)); done
+          echo "$HOME/.fly/bin" >> "$GITHUB_PATH"
+      - name: 배포 (다시 시도)
+        run: for i in 1 2 3; do flyctl deploy --remote-only && exit 0; echo "다시 시도 $i"; sleep 20; done; exit 1
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
