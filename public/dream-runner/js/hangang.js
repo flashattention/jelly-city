@@ -1111,6 +1111,7 @@ export class Hangang {
       if (M.kind === 'summit' && /봉수대/.test(name)) continue;
       if (name === '남산서울타워' && mh > 1) continue; // 타워 위쪽 조각은 따로 만든 실제 모양으로
       // 도성 문 (숭례문 · 흥인지문 · 광화문): 실제 바닥 방향대로 돌 축대 + 홍예문 + 2층 문루 + 겹처마 지붕 (따로 만든 모양), 부딪힘은 축대 높이
+      if (LM?.stadium) { const xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); this.scene.add(buildStadium(ring, LM.stadium)); this.addFoot({ ring, h: LM.stadium.h, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), name, type: 'stone', noClimb: true }); continue; }
       if (LM?.gate) { const xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); if (!(this.gateDone ||= new Set()).has(LM)) { this.gateDone.add(LM); this.scene.add(buildGate(ring, LM)); } this.addFoot({ ring, h: LM.gate.base || 7, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), name, type: 'stone' }); continue; }
       if (LM?.egg || LM?.jbug) { const xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); this.addFoot({ ring, h, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), name, type: 'glass', noClimb: true }); continue; }
       let acc = 0;
@@ -2103,6 +2104,23 @@ function batchStatic(scene, roots, out = null) {
   if (out) for (const r of roots) r.traverse((o) => { if (o.isMesh && o.parent) out.push(o); });
 }
 // 도성 문 모양: 바닥 외곽선의 긴 축 방향으로 돌 축대 · 홍예(어두운 문 굴) · 붉은 문루 2층 · 단청 띠 · 짙은 기와 겹처마
+function buildStadium(ring, S) {
+  let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length;
+  const sc = (k) => ring.map(([x, z]) => [cx + (x - cx) * k, cz + (z - cz) * k]), n = ring.length, P = [], C = [], I = [], col = new THREE.Color();
+  // 고리 두 개(바깥 a · 안 b)를 높이 ya · yb 로 잇는 띠
+  const band = (ka, ya, kb, yb, c) => { const A = sc(ka), B = sc(kb), b0 = P.length / 3; col.set(c); for (const [x, z] of A) { P.push(x, ya, z); C.push(col.r, col.g, col.b); } for (const [x, z] of B) { P.push(x, yb, z); C.push(col.r, col.g, col.b); } for (let i = 0; i < n; i++) { const j = (i + 1) % n; I.push(b0 + i, b0 + j, b0 + n + j, b0 + i, b0 + n + j, b0 + n + i); } };
+  const H = S.h;
+  band(1, 0, 1, H * 0.72, '#cfd3d8'); band(1.0, H * 0.72, 1.02, H * 0.74, '#9aa3ad');
+  band(0.97, H * 0.7, 0.62, 2, '#7f93ad'); band(0.62, 2, 0.6, 0.6, '#d8d4cc');
+  band(1.04, H, 0.74, H * 0.86, S.roof); band(1.04, H, 1.04, H * 0.92, '#c9ccd0');
+  // 가운데 잔디
+  { const F = sc(0.6), b0 = P.length / 3; col.set('#4f9a52'); for (const [x, z] of F) { P.push(x, 0.5, z); C.push(col.r, col.g, col.b); } P.push(cx, 0.5, cz); C.push(col.r, col.g, col.b); for (let i = 0; i < n; i++) I.push(b0 + n, b0 + (i + 1) % n, b0 + i); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setIndex(I); g.computeVertexNormals();
+  const grp = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  // 월드컵경기장: 지붕을 매단 돛대 16개 (방패연 · 소반 모양 지붕)
+  if (S.mast) { const mg = new THREE.CylinderGeometry(0.5, 0.8, 18, 6), mm = new THREE.MeshLambertMaterial({ color: '#e8e8e4' }); const out = sc(1.06); for (let i = 0; i < 16; i++) { const [x, z] = out[Math.floor(i * n / 16)], m = new THREE.Mesh(mg, mm); m.position.set(x, H + 7, z); grp.add(m); } }
+  return grp;
+}
 function buildGate(ring, LM) {
   const G = LM.gate; let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length;
   let xx = 0, zz = 0, xz = 0; for (const [x, z] of ring) { const dx = x - cx, dz = z - cz; xx += dx * dx; zz += dz * dz; xz += dx * dz; } const ang = 0.5 * Math.atan2(2 * xz, xx - zz), ux = Math.cos(ang), uz = Math.sin(ang);
@@ -2266,6 +2284,9 @@ export const LANDMARKS = {
   // 도성 문 (돌 축대 위 2층 문루 · 실제 높이 약 20m): 축대 색 돌 + 기와 우진각 지붕
   숭례문: GATE_SN, '숭례문(남대문)': GATE_SN, 흥인지문: { facade: 'hanok', gate: { base: 6, tiers: 2, ong: true } }, 광화문: { facade: 'hanok', gate: { base: 8, tiers: 2, arches: 3 } },
   // 서울시청 새 청사 (유리 파도) · DDP (은빛 알루미늄 패널) · 국립중앙박물관 (긴 화강석 건물)
+  // 경기장: 바깥 벽 + 비스듬한 관중석 + 흰 지붕 고리 + 가운데 잔디 (상자로 막지 않게)
+  월드컵주경기장: { facade: 'panels', stadium: { h: 32, roof: '#f4f4f0', mast: true } }, 목동주경기장: { facade: 'stone', stadium: { h: 18, roof: '#e8e4dc' } },
+  고척스카이돔: { facade: 'panels', color: '#d8dadc', height: 34, domeTop: { r: 92, h: 30, c: '#eceef0' } },
   대한문: { facade: 'hanok', gate: { base: 1.2, tiers: 1, arches: 3, wood: true } },
   // 옛 서울역 (문화역서울284): 붉은 벽돌 + 화강석 띠 + 가운데 초록 돔 · 덕수궁 석조전 (흰 돌 신고전) · 지금 서울역 (유리)
   문화역서울284: { facade: 'brick', color: '#a8573e', height: 15, domeTop: { r: 7, h: 9, c: '#4f8a76' } }, 석조전: { facade: 'stone', color: '#ece6d8', height: 17 }, '서울역(철도역)': { facade: 'glass', color: '#9fb6c8', height: 24 },
