@@ -23,9 +23,9 @@ async function send(btn, el, what, fn) {
 }
 
 export async function refreshBoard() {
-  let d; try { d = await account.api(`/api/board/list?sort=${S.sort}&page=${S.page}`); } catch { $('bd-list').innerHTML = '<div class="bd-empty">게시판을 불러오지 못했어요</div>'; return; }
+  let d; try { d = await account.api(`/api/board/list?sort=${S.sort}&page=${S.page}`); } catch { $('bd-list').innerHTML = '<div class="bd-empty">건의 게시판을 불러오지 못했어요</div>'; return; }
   S.total = d.total; S.size = d.page;
-  $('bd-list').innerHTML = d.posts.length ? d.posts.map((p) => `<button class="bd-row" data-id="${esc(p.id)}"><span class="bd-t">${esc(p.title)}${p.comments ? ` <b>[${p.comments}]</b>` : ''}</span><span class="bd-meta"><span class="bd-v">👍 ${p.up}</span><span class="bd-v">👎 ${p.down}</span><span class="bd-n">${esc(p.name)}</span><span>${ago(p.at)}</span></span></button>`).join('') : '<div class="bd-empty">아직 글이 없어요. 첫 글을 남겨 보세요!</div>';
+  $('bd-list').innerHTML = d.posts.length ? d.posts.map((p) => `<button class="bd-row" data-id="${esc(p.id)}"><span class="bd-t">${esc(p.title)}${p.comments ? ` <b>[${p.comments}]</b>` : ''}</span><span class="bd-meta"><span class="bd-v">👍 ${p.up}</span><span class="bd-v">👎 ${p.down}</span><span class="bd-n">${esc(p.name)}</span><span>${ago(p.at)}</span></span></button>`).join('') : '<div class="bd-empty">아직 건의가 없어요. 바라는 점을 남겨 주세요!</div>';
   for (const b of $('bd-list').querySelectorAll('[data-id]')) b.onclick = () => openPost(b.dataset.id);
   const pages = Math.ceil(S.total / S.size);
   $('bd-pages').classList.toggle('hidden', pages < 2);
@@ -60,7 +60,7 @@ async function openPost(id) {
 }
 function openWrite() {
   if (needLogin(null)) return;
-  const { wrap, close } = modal(`<div class="bd-body"><h3>✏️ 글쓰기</h3><input id="bd-w-t" maxlength="60" placeholder="제목" /><textarea id="bd-w-b" maxlength="2000" rows="8" placeholder="내용 (닉네임으로 올라가요 · 올리기 전에 AI 가 욕설과 부적절한 내용을 검사해요)"></textarea><div class="bd-form end"><button class="btn" id="bd-w-send">올리기</button></div><div class="bd-msg"></div></div>`);
+  const { wrap, close } = modal(`<div class="bd-body"><h3>💡 건의하기</h3><input id="bd-w-t" maxlength="60" placeholder="제목 (예: 드림러너에 ○○ 맵 추가해 주세요)" /><textarea id="bd-w-b" maxlength="2000" rows="8" placeholder="바라는 점 · 불편한 점 · 버그를 자유롭게 (닉네임으로 올라가요 · 올리기 전에 AI 가 욕설과 부적절한 내용을 검사해요)"></textarea><div class="bd-form end"><button class="btn" id="bd-w-send">올리기</button></div><div class="bd-msg"></div></div>`);
   wrap.querySelector('#bd-w-t').focus();
   wrap.querySelector('#bd-w-send').onclick = (ev) => send(ev.currentTarget, wrap, '게시글', async () => { const r = await account.api('/api/board/write', { method: 'POST', body: { title: wrap.querySelector('#bd-w-t').value, body: wrap.querySelector('#bd-w-b').value } }); close(); S.sort = 'new'; S.page = 0; syncTabs(); await refreshBoard(); openPost(r.id); });
 }
