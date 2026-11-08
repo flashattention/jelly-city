@@ -1,5 +1,5 @@
 // 서울 전체 OSM 미리 받기: 칸(2km)마다 Overpass 에 다섯 번씩 물으면 공개 서버가 느려져 칸 하나에 20분이 넘게 걸린다
-//   그래서 큰 덩어리(칸 6 × 6 = 12km)로 한 번에 받고, 칸마다 잘라서 .cache/osm/tiles/t_i_j/<파일>.json 에 미리 넣어 둔다
+//   그래서 덩어리(칸 2 × 2 = 4km, BLOCK 로 바꿈 · 12km 는 서버가 504)로 한 번에 받고, 칸마다 잘라서 .cache/osm/tiles/t_i_j/<파일>.json 에 미리 넣어 둔다
 //   (지도 도구 hangang-map.mjs tile 은 캐시 파일이 있으면 Overpass 에 묻지 않는다)
 //   받은 덩어리는 .cache/osm/seoul-blocks/ 에 기억. 이미 있는 칸 캐시 파일은 건드리지 않는다
 //   쓰는 법: node tools/seoul-osm-prefetch.mjs
@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 import { QUERIES } from './osm-queries.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..'), BLK = path.join(ROOT, '.cache/osm/seoul-blocks'), TC = path.join(ROOT, '.cache/osm/tiles');
-const LAT0 = 37.53, LON0 = 126.98, KX = 111320 * Math.cos((LAT0 * Math.PI) / 180), KZ = 110574, T = 2000, M = 150, B = 6;
+const LAT0 = 37.53, LON0 = 126.98, KX = 111320 * Math.cos((LAT0 * Math.PI) / 180), KZ = 110574, T = 2000, M = 150, B = +(process.env.BLOCK || 2);
 const lat = (z) => LAT0 - z / KZ, lon = (x) => LON0 + x / KX;
 const S = JSON.parse(fs.readFileSync(path.join(ROOT, 'public/dream-runner/hangang/seoul.json'), 'utf8')), U = S.unit || 10;
 const rings = S.gu.flatMap((g) => g.rings.map((r) => { const p = []; for (let i = 0; i < r.length; i += 2) p.push([r[i] * U, r[i + 1] * U]); return p; }));

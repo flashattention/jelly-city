@@ -1571,7 +1571,9 @@ export class Hangang {
       else if (this.y >= C.top - 0.02) { this.climb = null; this.y = C.top; this.px -= C.nx * 0.9; this.pz -= C.nz * 0.9; this.onRoof = C.f; }
       else if (this.y <= 0.01 && up < 0) this.climb = null;
     } else if (this.v > 0.02 && this.mdx != null) {
-      let nx = this.px + this.mdx * this.v * dt, nz = this.pz + this.mdz * this.v * dt;
+      // 서울 전체 지형: 오르막은 조금 느리게(가파를수록, 최대 40%), 내리막은 조금 빠르게(최대 15%). 날 때 · 지붕 위는 그대로
+      let slopeK = 1; if (this.terr && !this.flying && this.y < 0.5) { const g = (this.terrAt(this.px + this.mdx * 3, this.pz + this.mdz * 3) - this.terrAt(this.px, this.pz)) / 3; slopeK = g > 0 ? 1 - Math.min(0.4, g * 2.2) : 1 + Math.min(0.15, -g * 0.8); }
+      let nx = this.px + this.mdx * this.v * slopeK * dt, nz = this.pz + this.mdz * this.v * slopeK * dt;
       // 지도 밖 · 물속(코스 다리 제외)은 못 간다
       nx = clamp(nx, -2500, 2500); nz = clamp(nz, -2500, 2500);
       const qn = this.project(nx, nz);
