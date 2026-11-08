@@ -298,6 +298,8 @@ export class Hangang {
     const f0 = this.foot.length, d0 = this.decks.length, [i, j] = key.split('_').map(Number);
     const idle = () => new Promise((res) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(() => res(), { timeout: 60 }) : setTimeout(res, 0)));
     for (const _ of c.buildSteps(rnd(((i * 73856093) ^ (j * 19349663)) >>> 0))) await idle();
+    // 몰 문(더현대 · IFC몰)은 칸에서 만들지만 들어가기 검사는 주인이 한다
+    for (const D of c.malls || []) { D.key = key; (this.malls ||= []).push(D); }
     for (const f of c.foot) { f.key ??= key; this.addFoot(f); } c.foot = this.foot; c.footGrid = this.footGrid; for (let k = d0; k < this.decks.length; k++) this.decks[k].key = key;
     const tb1 = performance.now(); await idle(); this.maskWater(key); this.drape(c); await idle(); this.mergeChunk(c); await idle(); c.scene.userData.chunk = key; c.buildMs = [Math.round(tb1 - tb0), Math.round(performance.now() - tb1)]; // 만들기 · 지형 얹기+묶기 (ms)
     c.applySeason(); this.scene.add(c.scene); return c;
@@ -309,7 +311,7 @@ export class Hangang {
     this.foot = keep(this.foot); this.footGrid.clear(); this.foot.forEach((f, fi) => { for (let gx = Math.floor(f.x0 / 40); gx <= Math.floor(f.x1 / 40); gx++) for (let gz = Math.floor(f.z0 / 40); gz <= Math.floor(f.z1 / 40); gz++) { const k = `${gx},${gz}`; if (!this.footGrid.has(k)) this.footGrid.set(k, []); this.footGrid.get(k).push(fi); } });
     this.decks = keep(this.decks); this.deckGrid.clear(); this.decks.forEach((sg, si) => { for (let gx = Math.floor((Math.min(sg.ax, sg.cx) - sg.hw) / 40); gx <= Math.floor((Math.max(sg.ax, sg.cx) + sg.hw) / 40); gx++) for (let gz = Math.floor((Math.min(sg.az, sg.cz) - sg.hw) / 40); gz <= Math.floor((Math.max(sg.az, sg.cz) + sg.hw) / 40); gz++) { const k = `${gx},${gz}`; if (!this.deckGrid.has(k)) this.deckGrid.set(k, []); this.deckGrid.get(k).push(si); } });
     for (const [k, list] of this.circGrid) { const l2 = list.filter((q) => q.key !== key); if (l2.length) this.circGrid.set(k, l2); else this.circGrid.delete(k); }
-    this.shopFronts = keep(this.shopFronts); this.shopGrid.clear(); this.shopFronts.forEach((F, i) => { const k = `${Math.floor(F.x / 40)},${Math.floor(F.z / 40)}`; if (!this.shopGrid.has(k)) this.shopGrid.set(k, []); this.shopGrid.get(k).push(i); });
+    this.malls = keep(this.malls || []); this.shopFronts = keep(this.shopFronts); this.shopGrid.clear(); this.shopFronts.forEach((F, i) => { const k = `${Math.floor(F.x / 40)},${Math.floor(F.z / 40)}`; if (!this.shopGrid.has(k)) this.shopGrid.set(k, []); this.shopGrid.get(k).push(i); });
     this.entrances = keep(this.entrances || []); const ws = keep(this.waterSets); this.waterSets.length = 0; this.waterSets.push(...ws);
     for (const c2 of this.chunks.values()) { c2.foot = this.foot; c2.decks = this.decks; c2.shopFronts = this.shopFronts; }
     this.cityDirty = true;
