@@ -90,7 +90,13 @@ export function buildShopInterior(hg, kind, slot, makeBear) {
   foot(-W / 2 - 0.4, -D / 2 - 0.4, W / 2 + 0.4, -D / 2); foot(-W / 2 - 0.4, D / 2, W / 2 + 0.4, D / 2 + 0.4); foot(-W / 2 - 0.4, -D / 2, -W / 2, D / 2); foot(W / 2, -D / 2, W / 2 + 0.4, D / 2);
   // 문 (앞벽 가운데, z = +D/2): 유리문 + 밖이 밝게 보이는 창
   const outT = tex(128, 128, (c) => { const gr = c.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, '#cfe4f4'); gr.addColorStop(1, '#f2efe8'); c.fillStyle = gr; c.fillRect(0, 0, 128, 128); });
-  const outM = new THREE.MeshBasicMaterial({ map: outT }); for (const dx of [-4, 0, 4]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(dx ? 3 : 1.8, dx ? 1.8 : 2.4), outM); m.position.set(dx, dx ? 1.6 : 1.2, D / 2 - 0.02); m.rotation.y = Math.PI; g.add(m); }
+  const outM = new THREE.MeshBasicMaterial({ map: outT });
+  // 나가는 문 표시: 문 위 초록 '나가는 곳 EXIT' 등 + 바닥 화살표 (들어오면 바로 뒤에 보이게)
+  const exT = tex(256, 64, (c) => { c.fillStyle = '#1f8a4c'; c.fillRect(0, 0, 256, 64); c.fillStyle = '#fff'; c.font = 'bold 30px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('🚪 나가는 곳 EXIT', 128, 34, 240); });
+  const ex = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.55), new THREE.MeshBasicMaterial({ map: exT })); ex.position.set(0, 2.75, D / 2 - 0.04); ex.rotation.y = Math.PI; g.add(ex);
+  const arT = tex(64, 64, (c) => { c.fillStyle = '#29d07a'; c.beginPath(); c.moveTo(32, 6); c.lineTo(58, 34); c.lineTo(42, 34); c.lineTo(42, 58); c.lineTo(22, 58); c.lineTo(22, 34); c.lineTo(6, 34); c.fill(); });
+  const ar = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), new THREE.MeshBasicMaterial({ map: arT, transparent: true })); ar.rotation.x = -Math.PI / 2; ar.position.set(0, 0.03, D / 2 - 1.4); g.add(ar);
+  const dframe = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.6, 0.1), dark); dframe.position.set(0, 1.3, D / 2 - 0.01); g.add(dframe); for (const dx of [-4, 0, 4]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(dx ? 3 : 1.8, dx ? 1.8 : 2.4), outM); m.position.set(dx, dx ? 1.6 : 1.2, D / 2 - 0.02); m.rotation.y = Math.PI; g.add(m); }
   // 계산대 (뒤쪽) + 메뉴판 + 직원
   box(5.5, 1.05, 0.9, woodM, 0, 0.52, -D / 2 + 1.8); box(5.6, 0.06, 1.0, lam({ color: '#efe9df' }), 0, 1.07, -D / 2 + 1.8); foot(-2.8, -D / 2 + 1.3, 2.8, -D / 2 + 2.3, 1.1);
   box(0.4, 0.35, 0.3, dark, 1.6, 1.28, -D / 2 + 1.7);
@@ -112,7 +118,7 @@ export function buildShopInterior(hg, kind, slot, makeBear) {
   // 먹을 것 (주문하면 테이블 · 손에)
   return { g, O, K, kind, seats, drawMenu,
     door: { x: O.x, z: O.z + D / 2 - 0.8 }, counter: { x: O.x, z: O.z - D / 2 + 2.9 },
-    spawn: { x: O.x, z: O.z + D / 2 - 1.8, face: Math.PI },
+    spawn: { x: O.x, z: O.z + D / 2 - 2.6, face: Math.PI },
   };
 }
 // 음식 모형 (작게): 그릇 + 내용물 색 / 컵 / 봉투

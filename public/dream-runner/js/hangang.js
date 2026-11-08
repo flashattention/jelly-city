@@ -288,6 +288,15 @@ export class Hangang {
   }
   // 한강을 나갈 때: 가게 · 역 · 열차 안이면 바깥으로 되돌려 놓는다 (다음에 들어왔을 때 바깥이 숨겨져 있지 않게)
   exitInterior() { if (this.inShop) this.leaveShop(); if (this.inMall) this.leaveMall(); if (this.ride) { this.ride.C.g.visible = false; this.ride = null; } if (this.inside) this.leaveStation(this.inside.from?.ref); }
+  // 지금 있는 실내의 바닥 상자 [x0, x1, z0, z1] (곰이 서 있는 칸)
+  interiorBox() {
+    const px = this.px, pz = this.pz, box = (cx, cz, hw, hd) => [cx - hw, cx + hw, cz - hd, cz + hd], inBox = (b) => px >= b[0] - 1 && px <= b[1] + 1 && pz >= b[2] - 1 && pz <= b[3] + 1;
+    if (this.ride) { const O = this.ride.C.g.position; return box(O.x, O.z, 19.5 / 2, 1.5); }
+    if (this.inShop) { const O = this.inShop.I.O; return box(O.x, O.z, 7, 5.5); }
+    if (this.inMall) { const O = this.inMall.I.O; return box(O.x, O.z, 35, 20); }
+    if (this.inside) { const S = this.inside.S, O = S.O, list = [box(O.x, O.z, S.CW / 2, S.CD / 2), ...S.plats.map((p) => box(O.x, p.pz, p.PL / 2, 5 + 5.2))]; return list.find(inBox) || list[0]; }
+    return null;
+  }
   placeAt(x, z, face) { this.px = x; this.pz = z; this.y = 0; this.vy = 0; this.climb = null; this.face = face; this.camYaw = face; this.camInit = false; this.mdx = null; this.onRoof = null; }
   // 열차 타기: 열린 문 앞에 서면 탄다 → 열차 안에서 잠깐 달리고 → 다음 역 승강장에 내린다 (그 역이 지도 밖이면 같은 역 반대편으로)
   startRide(p, T) {
@@ -1451,7 +1460,8 @@ export class Hangang {
     if (this.inside) { this.tickInside(dt); }
     if (this.inShop) this.tickShop(dt); else if (this.inMall) this.tickMall(dt);
     this.tickEnv(dt, camera, bx, bz);
-    if (this.inside || this.inShop || this.inMall) for (const o of this.hidden || []) o.visible = false; // 날씨 · 계절이 다시 켠 바깥 것들은 다시 숨긴다
+    // 안에 있는 동안: 바깥 것은 새로 생긴 것(차 · 행인)까지 모두 숨긴다
+    if (this.inside || this.inShop || this.inMall) { const keep = this.ride?.C.g || (this.inShop ? this.inShop.I.g : this.inMall ? this.inMall.I.g : this.inside?.S.g); this.hidden ||= []; for (const o of this.scene.children) if (o !== keep && o !== this.bear?.root && o !== this.shadow && o.visible) { o.visible = false; this.hidden.push(o); } } // 날씨 · 계절이 다시 켠 바깥 것들은 다시 숨긴다
     if ((this.inside || this.inShop || this.inMall) && this.scene.fog) { this.scene.fog.density = 0.004; this.scene.fog.color.set('#d8d2c8'); } // 역 안: 안개 거의 없이
     this.tickCamera(dt, camera, bx, bz, Math.sin(this.camYaw), Math.cos(this.camYaw));
   }
@@ -1572,7 +1582,8 @@ export class Hangang {
     let cx, cy, cz, lx, ly, lz;
     if (mode === 0) { const pt = this.camPitch ?? 0.3, d = (this.ride || this.inShop || this.inDeck ? 3.2 : 4.8) * (pt < 0 ? 1 + pt * 0.6 : 1), hd = Math.cos(pt) * d; cx = bx - fx * hd; cy = Math.max(0.35, 0.55 + Math.sin(pt) * d) + y; cz = bz - fz * hd; lx = bx + fx * 1.0; ly = 0.55 + y + (pt < 0 ? -pt * 7 : 0); lz = bz + fz * 1.0;
       // 벽 타기: 벽에서 6m 떨어져 살짝 아래에서 곰과 벽을 올려다본다
-      if (this.climb) { const C = this.climb; cx = bx + C.nx * 6; cz = bz + C.nz * 6; cy = y + 0.6; lx = bx; ly = y + 1.4; lz = bz; } }
+      // 마우스로 돌릴 수 있게: 시점 방향 그대로 따라가되, 벽 안쪽으로는 못 들어가게 벽 바깥 반쪽으로만
+      if (this.climb) { const C = this.climb; let dx = -fx, dz = -fz; const dot = dx * C.nx + dz * C.nz; if (dot < 0.3) { dx += C.nx * (0.3 - dot); dz += C.nz * (0.3 - dot); const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L; } const D = 6 * Math.cos(pt), up = 0.6 + Math.sin(pt) * 6; cx = bx + dx * D; cz = bz + dz * D; cy = y + up; lx = bx; ly = y + 1.2; lz = bz; } }
     else if (mode === 1) { const p = this.at(this.s); cx = bx - p.rx * 5 + p.dx * 1.5; cy = 1.0; cz = bz - p.rz * 5 + p.dz * 1.5; lx = bx; ly = 0.6; lz = bz; }
     else { cx = bx - fx * 26; cy = 22; cz = bz - fz * 26; lx = bx + fx * 30; ly = 0; lz = bz + fz * 30; }
     if (!this.camInit) { camera.position.set(cx, cy, cz); this.camInit = true; }
@@ -1580,6 +1591,8 @@ export class Hangang {
     camera.position.z += (cz - camera.position.z) * k; camera.position.y = Math.max(0.3, camera.position.y); { const dg = this.deckAt(camera.position.x, camera.position.z, this.y + 0.5); if (dg > 0.5 && this.y >= dg - 0.3) camera.position.y = Math.max(camera.position.y, dg + 0.6); } // 다리 위에 있을 땐 카메라가 다리 밑으로 안 내려간다
     if (this.inside) camera.position.y = Math.min(camera.position.y, this.ride ? 2.2 : 4.1);
     if (this.inShop) camera.position.y = Math.min(camera.position.y, 3.1);
+    // 안에서는 카메라가 벽 밖으로 나가지 않게 (벽은 안쪽만 그려져서, 밖에 나가면 어두운 빈 곳만 보인다)
+    { const B = this.interiorBox?.(); if (B) { const [x0, x1, z0, z1] = B, m = 0.35; camera.position.x = clamp(camera.position.x, x0 + m, x1 - m); camera.position.z = clamp(camera.position.z, z0 + m, z1 - m); } }
     if (this.inDeck) { const D = this.deckInfo; camera.position.y = Math.min(Math.max(camera.position.y, D.DY + 0.6), D.DY + 3.1); const dx = camera.position.x - D.cx, dz = camera.position.z - D.cz, dd = Math.hypot(dx, dz); if (dd > D.DR - 0.6) { camera.position.x = D.cx + dx / dd * (D.DR - 0.6); camera.position.z = D.cz + dz / dd * (D.DR - 0.6); } if (dd < 4.9) { camera.position.x = D.cx + dx / (dd || 1) * 4.9; camera.position.z = D.cz + dz / (dd || 1) * 4.9; } }
     this.look ||= new THREE.Vector3(lx, ly, lz); this.look.x += (lx - this.look.x) * k; this.look.y += (ly - this.look.y) * ky; this.look.z += (lz - this.look.z) * k;
     camera.lookAt(this.look);
