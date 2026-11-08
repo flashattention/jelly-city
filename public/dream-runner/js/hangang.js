@@ -2015,6 +2015,8 @@ export class Hangang {
     if (this.chunks && this.areasKey !== this.chunks.size + ':' + [...this.chunks.keys()].join()) { this.areasKey = this.chunks.size + ':' + [...this.chunks.keys()].join(); this.areas = [...this.chunks.values()].flatMap((c) => (c.map.areas || []).map(([n, ...f]) => ({ n, ring: unpack(f, c.map.scale) }))).map((a) => ({ ...a, A: Math.abs(ringArea(a.ring)) })).sort((a, b) => a.A - b.A); }
     if (!name) { this.areas ||= (this.map.areas || []).map(([n, ...f]) => ({ n, ring: unpack(f, this.map.scale) })).map((a) => ({ ...a, A: Math.abs(ringArea(a.ring)) })).sort((a, b) => a.A - b.A); for (const a of this.areas) if (inRing(px, pz, a.ring)) { name = a.n; break; } }
     if (name && name !== this.regionName) { const last = this.regionSeen.get(name) || -1e9; if (this.time - last > 90) this.onRegion?.(name); this.regionSeen.set(name, this.time); }
+    // 서울 전체: 그 구역에서 250m 넘게 벗어나면 이름을 지운다 (예전엔 한 번 정해지면 계속 남아 '용산구 · 여의도한강공원' 처럼 보였다)
+    if (name) this.regionAt = [px, pz]; else if (this.chunks && this.regionName) { this.regionAt ||= [px, pz]; if (Math.hypot(px - this.regionAt[0], pz - this.regionAt[1]) > 250) { this.regionName = null; this.regionAt = null; } }
     this.regionName = name || this.regionName;
   }
   // 미니맵: 지도 전체를 한 번 그려 두고, 내 주변만 잘라 보여 준다 (북쪽이 위)
