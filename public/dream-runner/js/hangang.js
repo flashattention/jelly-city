@@ -114,6 +114,7 @@ function groundTex(kind) {
   else if (kind === 'city') { noise('#d8d8d8', 0.12, 500, 10); g.strokeStyle = 'rgba(0,0,0,.08)'; for (let i = 0; i <= N; i += 32) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, N); g.moveTo(0, i); g.lineTo(N, i); g.stroke(); } }
   else if (kind === 'asphalt') { noise('#4b4f56', 0.16, 5000, 2); g.fillStyle = '#e8e8e8'; g.fillRect(6, 0, 5, N); g.fillRect(N - 11, 0, 5, N); }
   else if (kind === 'track') { noise('#a06a5c', 0.14, 6000, 2); g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(5, 0, 4, N); g.fillRect(N - 9, 0, 4, N); }
+  else if (kind === 'steps') { noise('#d6cdbd', 0.08, 400, 10); for (let k = 0; k < 4; k++) { const x = (k / 4) * N; g.fillStyle = `rgba(0,0,0,${0.06 + k * 0.05})`; g.fillRect(x, 0, N / 4, N); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x, 0, 3, N); } for (let y = 0; y < N; y += 64) { g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(0, y, N, 2); } }
   else { noise('#c9c2b4', 0.18, 300, 14); g.strokeStyle = 'rgba(0,0,0,.18)'; g.lineWidth = 2; for (let y = 0; y < N; y += 32) { g.beginPath(); g.moveTo(0, y); g.lineTo(N, y); g.stroke(); for (let x = (y / 32) % 2 ? 0 : 24; x < N; x += 48) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 32); g.stroke(); } } }
   const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
@@ -226,7 +227,7 @@ export class Hangang {
   walkable(x, z, lat) {
     if (Math.abs(lat + 2) < 7.5) return true; // 코스(자전거길 · 트랙)는 물 위도 다리로 건넌다
     if (this.inWater(x, z)) return false;
-    if (Math.abs(lat) < 45) return true;
+    if (lat < 45) return true; // 강 쪽(코스 왼편)은 물 바로 앞까지 모두
     const key = `${Math.round(x / 5)},${Math.round(z / 5)}`; this.walkCache ||= new Map();
     let v = this.walkCache.get(key);
     if (v === undefined) { v = this.greenPolys.some((g) => inPoly(x, z, g)) || (this.map.areas || []).some(([n, ...f]) => /한강공원|공원|섬/.test(n) && inRing(x, z, unpack(f, this.map.scale))); this.walkCache.set(key, v); if (this.walkCache.size > 60000) this.walkCache.clear(); }
@@ -272,7 +273,7 @@ export class Hangang {
     // 땅 바탕 (도시)
     const landTex = groundTex('city'); landTex.repeat.set(26000 / 9, 26000 / 9); const land = new THREE.Mesh(new THREE.PlaneGeometry(26000, 26000), flatMat('#a3a39f', -60, { map: landTex })); land.receiveShadow = true; land.rotation.x = -Math.PI / 2; land.renderOrder = -60; land.material.depthTest = true; land.material.depthWrite = true; sc.add(land); this.landM = land.material;
     // 물: 반짝이는 물결 · 하늘 색 반사 · 밤에는 도시 불빛이 비친다
-    this.waterU = { time: { value: 0 }, sunDir: this.skyU.sunDir, sunCol: this.skyU.sunCol, hor: this.skyU.hor, top: this.skyU.top, night: this.skyU.night, rain: { value: 0 }, fogCol: { value: C('#bcdcf4') }, fogD: { value: 0.00022 }, deep: { value: C('#2f7a88') } };
+    this.waterU = { time: { value: 0 }, sunDir: this.skyU.sunDir, sunCol: this.skyU.sunCol, hor: this.skyU.hor, top: this.skyU.top, night: this.skyU.night, rain: { value: 0 }, fogCol: { value: C('#bcdcf4') }, fogD: { value: 0.00022 }, deep: { value: C('#2a6f80') } };
     const waterM = new THREE.ShaderMaterial({ uniforms: this.waterU, depthWrite: false, depthTest: false, side: THREE.DoubleSide,
       vertexShader: 'varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }',
       fragmentShader: `uniform float time, night, rain, fogD; uniform vec3 sunDir, sunCol, hor, top, fogCol, deep; varying vec3 vW;
@@ -282,7 +283,7 @@ export class Hangang {
           g += rain * vec2(cos(p.x*3.1 + t*7.0), cos(p.y*2.9 - t*6.0)) * 0.6;
           vec3 n = normalize(vec3(g.x * 0.08, 1.0, g.y * 0.08));
           vec3 v = normalize(cameraPosition - vW); float fr = pow(1.0 - max(dot(n, v), 0.0), 3.0);
-          vec3 c = mix(deep * (0.35 + 0.65 * (1.0 - night)), mix(hor, top, 0.25), clamp(0.25 + fr * 0.85, 0.0, 1.0));
+          vec3 c = mix(deep * (0.35 + 0.65 * (1.0 - night)), mix(hor, top, 0.35), clamp(0.12 + fr * 0.6, 0.0, 0.85));
           vec3 rf = reflect(-v, n); float sp = pow(max(dot(rf, sunDir), 0.0), 220.0) * step(0.0, sunDir.y); c += sunCol * sp * 3.0;
           c += sunCol * pow(max(dot(rf, sunDir), 0.0), 18.0) * 0.18 * step(0.0, sunDir.y);
           vec2 gq = floor(p * 0.9 + g * 3.0); float gl = step(0.9965, fract(sin(dot(gq + floor(t * 1.5), vec2(12.99, 78.23))) * 43758.5)); c += sunCol * gl * 1.4 * (1.0 - night) * step(0.0, sunDir.y);
@@ -311,7 +312,7 @@ export class Hangang {
     {
       const ln = (lat, w, col, o, tex) => { const P = [], I = [], U = []; ribbonInto(P, I, this.rp.map((_, i) => this.world(i * this.step, lat)), w, 0, U); const m = new THREE.Mesh(geoOf(P, I, { uv: [U, 2] }), flatMat(col, o, tex ? { map: tex } : {})); m.renderOrder = o; m.receiveShadow = true; sc.add(m); return m.material; };
       { const gm = ln(-1.2, 15, '#8db86a', -48.5, this.grassTex ||= groundTex('grass')); patchy(gm); this.stripM = gm;
-        for (const [lat, w] of [[16, 44], [-26, 34]]) { const wm = ln(lat, w, '#8db86a', -59.5, this.grassTex); patchy(wm); this.wideM = [...(this.wideM || []), wm]; } }
+        for (const [lat, w] of [[16, 44], [-26, 34], [-150, 250]]) { const wm = ln(lat, w, '#8db86a', -59.5, this.grassTex); patchy(wm); this.wideM = [...(this.wideM || []), wm]; } }
       ln(0, 4.9, '#d9d4c8', -46.4); ln(-4.3, 3.8, '#d9d4c8', -46.3);
       this.bikeM = ln(0, 4.2, '#ffffff', -46.2, groundTex('asphalt')); this.runM = ln(-4.3, 3.2, '#ffffff', -46.1, groundTex('track'));
       // 코스가 물(샛강 등)을 건너는 곳: 작은 다리 난간 + 다리 바닥 테두리
@@ -325,8 +326,15 @@ export class Hangang {
     }
     {
       const P = [], I = [], U = [];
-      for (const w of this.water) for (const ring of w) { let run = []; const flush = () => { if (run.length > 2) ribbonInto(P, I, run, 5, 0, U); run = []; }; for (const [x, z] of ring) { const near = Math.abs(x) < 3200 && Math.abs(z) < 3200 && Math.abs(Math.abs(x) - 7000) > 5 && Math.abs(Math.abs(z) - 7000) > 5; if (near) run.push([x, z]); else flush(); } flush(); }
-      const m = new THREE.Mesh(geoOf(P, I, { uv: [U, 2] }), flatMat('#ffffff', -46.8, { map: groundTex('stone') })); m.renderOrder = -46.8; sc.add(m);
+      for (const w of this.water) for (const ring of w) { let run = []; const flush = () => { if (run.length > 2) ribbonInto(P, I, run, 4, 0, U); run = []; }; for (const [x, z] of ring) { const near = Math.abs(x) < 3200 && Math.abs(z) < 3200 && Math.abs(Math.abs(x) - 7000) > 5 && Math.abs(Math.abs(z) - 7000) > 5; if (near) run.push([x, z]); else flush(); } flush(); }
+      const m = new THREE.Mesh(geoOf(P, I, { uv: [U, 2] }), flatMat('#ffffff', -46.8, { map: this.stepTex = groundTex('steps') })); m.renderOrder = -46.8; sc.add(m);
+      // 물가 잔물결: 호안 바로 바깥 물 위에 하얀 거품 띠 (천천히 밀려왔다 빠진다)
+      const Pf = [], If = [], Uf = []; for (const w of this.water) for (const ring of w) { let run = []; const flush = () => { if (run.length > 2) ribbonInto(Pf, If, run, 6, 0, Uf); run = []; }; for (const [x, z] of ring) { if (Math.abs(x) < 3200 && Math.abs(z) < 3200 && Math.abs(Math.abs(x) - 7000) > 5 && Math.abs(Math.abs(z) - 7000) > 5) run.push([x, z]); else flush(); } flush(); }
+      this.foamU = { time: this.waterU.time };
+      const fm = new THREE.ShaderMaterial({ uniforms: this.foamU, transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide,
+        vertexShader: 'varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: 'uniform float time; varying vec2 vU; void main(){ float side = abs(vU.x - 0.5) * 2.0; float wave = 0.5 + 0.5 * sin(vU.y * 2.4 + time * 1.3); float band = smoothstep(1.0, 0.55, side) * smoothstep(0.0, 0.45, side); float foam = band * (0.25 + 0.35 * wave) * (0.6 + 0.4 * sin(vU.y * 13.0 - time * 2.0)); gl_FragColor = vec4(vec3(0.97, 0.99, 1.0), foam * 0.32); }' });
+      const fmesh = new THREE.Mesh(geoOf(Pf, If, { uv: [Uf, 2] }), fm); fmesh.renderOrder = -46.85; sc.add(fmesh);
     }
     this.buildBridges(P2, inWater, r);
     this.buildBuildings(P2);
@@ -579,6 +587,12 @@ export class Hangang {
     const g = new THREE.CylinderGeometry(0.07, 0.1, 4.6, 6); g.translate(0, 2.3, 0);
     const pm = new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial({ color: '#6a717b' }), poles.length), o = new THREE.Object3D();
     poles.forEach(([x, z], i) => { o.position.set(x, 0, z); o.updateMatrix(); pm.setMatrixAt(i, o.matrix); }); this.scene.add(pm);
+    const capG = new THREE.CylinderGeometry(0.16, 0.38, 0.22, 10); capG.translate(0, 4.82, 0);
+    const lampG = new THREE.SphereGeometry(0.24, 12, 8); lampG.translate(0, 4.6, 0);
+    const caps = new THREE.InstancedMesh(capG, new THREE.MeshLambertMaterial({ color: '#4a5058' }), poles.length);
+    this.lampHeadM = new THREE.MeshLambertMaterial({ color: '#fff4dc', emissive: '#ffd08a', emissiveIntensity: 0 });
+    const heads2 = new THREE.InstancedMesh(lampG, this.lampHeadM, poles.length);
+    poles.forEach(([x, z], i) => { o.position.set(x, 0, z); o.updateMatrix(); caps.setMatrixAt(i, o.matrix); heads2.setMatrixAt(i, o.matrix); }); this.scene.add(caps, heads2);
     this.lampGlow = this.glowPoints(heads, '#ffd79a', 3.2);
     this.lampPool = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ color: '#ffcf8a', map: this.dot ||= dotTex(), transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending }));
     // 가로등 불빛 웅덩이: 가까운 몇 개만
@@ -681,8 +695,8 @@ export class Hangang {
     const gk = this.crowd(); if (this.groupT <= 0 && this.groups.length < Math.round((isPhone ? 6 : 12) * gk.groups * Math.min(1.4, gk.k + 0.2))) {
       this.groupT = 0.6 + r() * 1.2;
       // 코스 옆 공원 안쪽 (길에서 14 ~ 90m), 물 · 길 위는 피한다
-      const s = clamp(this.s + (r() - 0.3) * 260 * this.dir, 3, this.L - 3), lat = r() < 0.12 ? -(8 + r() * 3) : 14 + r() * 76, [x, z] = this.world(s, lat), d = Math.hypot(x - px, z - pz);
-      if (d > 60 && d < 240 && !this.inWater(x, z) && !this.groups.some((q) => Math.hypot(q.g.position.x - x, q.g.position.z - z) < 14)) this.spawnGroup(x, z, r);
+      const s = clamp(this.s + (r() - 0.3) * 260 * this.dir, 3, this.L - 3), lat = r() < 0.45 ? -(12 + r() * 160) : 14 + r() * 76, [x, z] = this.world(s, lat), d = Math.hypot(x - px, z - pz);
+      if (d > 60 && d < 240 && !this.inWater(x, z) && !this.inWater(x + 6, z + 6) && !this.inWater(x - 6, z - 6) && !this.groups.some((q) => Math.hypot(q.g.position.x - x, q.g.position.z - z) < 14)) this.spawnGroup(x, z, r);
     }
     for (const gd of this.groups) {
       gd.t += dt;
@@ -863,7 +877,7 @@ export class Hangang {
     const work = hr >= 17 && hr < 20 ? 1 : hr >= 20 && hr < 22 ? 0.55 : hr >= 22 || hr < 6 ? 0.08 : hr < 8 ? 0.35 : 0.3;
     for (const [t, m] of Object.entries(this.bldByType || {})) m.emissiveIntensity = lit * (t === 'apt' || t === 'brick' ? home : work) * 1.05;
     if (this.signM) this.signM.emissiveIntensity = lit * (hr >= 1 && hr < 6 ? 0.25 : 0.9); if (this.farM) this.farM.emissiveIntensity = lit * 0.6 * Math.max(0.2, (h >= 18 && h < 24 ? 1 : 0.4));
-    this.lampGlow.material.opacity = lit; this.bridgeLights.material.opacity = lit; this.carPts.material.opacity = 0.25 + lit * 0.75;
+    this.lampGlow.material.opacity = lit; if (this.lampHeadM) this.lampHeadM.emissiveIntensity = 0.2 + lit * 2.2; this.bridgeLights.material.opacity = lit; this.carPts.material.opacity = 0.25 + lit * 0.75;
     this.lampPool.material.opacity = lit * 0.32;
     let pi = 0; for (const [x, z] of this.poleXZ) { if (pi >= this.pools.length) break; if (Math.abs(x - px) < 90 && Math.abs(z - pz) < 90) { this.pools[pi].position.set(x, 0.03, z); this.pools[pi].visible = true; pi++; } } for (; pi < this.pools.length; pi++) this.pools[pi].visible = false;
     // 자동차 불빛
@@ -885,7 +899,7 @@ export class Hangang {
     const day = sunUp > 0.4 && !rainOn && !snowOn, season = this.state.season;
     const bugCol = season === 'autumn' ? '#c8502a' : ['#ffffff', '#ffd23f', '#9fd0ff', '#ff9ec0'];
     this.bugs.forEach((b, i) => {
-      const u = b.userData, on = day && season !== 'winter'; b.visible = on; if (!on) return;
+      const u = b.userData, on = day && season !== 'winter' && !this.inWater(px + u.ox, pz + u.oz); b.visible = on; if (!on) return;
       u.ph += dt * (season === 'autumn' ? 30 : 14);
       const x = px + u.ox + Math.sin(this.t * 0.3 + i) * 3, z = pz + u.oz + Math.cos(this.t * 0.27 + i * 2) * 3;
       b.position.set(x, u.h + Math.sin(this.t * 1.7 + i) * 0.25, z); b.rotation.y = this.t * 0.5 + i;
