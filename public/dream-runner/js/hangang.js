@@ -263,15 +263,17 @@ export class Hangang {
   //   칸 = 같은 Hangang 을 '칸 모드'로 지은 것. 부딪힘 · 바닥 · 가게 · 출구 목록은 주인(host)의 것을 함께 써서, 주인의 모든 검사가 그대로 서울 전체에 통한다
   async loadChunk(key) {
     const res = await fetch(new URL(`../seoul/t_${key}.json`, import.meta.url)); if (!res.ok) throw new Error('칸 없음'); const M = await res.json();
+    const tb0 = performance.now();
     const c = new Hangang(); c.host = this; c.isChunk = true; c.chunkKey = key; c.map = M; c.id = 'seoul'; c.scene = new THREE.Group(); c.state = this.state; c.opt = this.opt;
     for (const k of ['skyU', 'windU', 'waterU', 'grassTex', 'dot', 'waterSets']) c[k] = this[k];
     // 건물 목록은 칸이 만들어지는 동안 따로 (네온 · 몰 문 · LED 같은 것이 다른 칸 건물까지 또 만들지 않게), 다 만들고 합친다
     this.foot ||= []; this.footGrid ||= new Map(); c.foot = []; c.footGrid = new Map(); c.decks = this.decks ||= []; c.deckGrid = this.deckGrid ||= new Map(); c.circGrid = this.circGrid ||= new Map(); c.shopFronts = this.shopFronts ||= []; c.shopGrid = this.shopGrid ||= new Map();
     c.inWater = this.inWater; c.routeSetup();
     const f0 = this.foot.length, d0 = this.decks.length, [i, j] = key.split('_').map(Number);
-    c.buildContent(rnd(((i * 73856093) ^ (j * 19349663)) >>> 0));
+    const idle = () => new Promise((res) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(() => res(), { timeout: 60 }) : setTimeout(res, 0)));
+    for (const _ of c.buildSteps(rnd(((i * 73856093) ^ (j * 19349663)) >>> 0))) await idle();
     for (const f of c.foot) { f.key ??= key; this.addFoot(f); } c.foot = this.foot; c.footGrid = this.footGrid; for (let k = d0; k < this.decks.length; k++) this.decks[k].key = key;
-    this.maskWater(key); this.drape(c); this.mergeChunk(c); c.scene.userData.chunk = key;
+    const tb1 = performance.now(); await idle(); this.maskWater(key); this.drape(c); await idle(); this.mergeChunk(c); await idle(); c.scene.userData.chunk = key; c.buildMs = [Math.round(tb1 - tb0), Math.round(performance.now() - tb1)]; // 만들기 · 지형 얹기+묶기 (ms)
     c.applySeason(); this.scene.add(c.scene); return c;
   }
   unloadChunk(key) {
@@ -290,8 +292,9 @@ export class Hangang {
   tickWorld(px, pz) {
     if (this.map.kind !== 'world') return;
     const T = this.world0.tile, ti = Math.floor(px / T), tj = Math.floor(pz / T); this.tileNow = [ti, tj];
-    for (const key of [...this.chunks.keys()]) { const [i, j] = key.split('_').map(Number); if (Math.max(Math.abs(i - ti), Math.abs(j - tj)) > 2) this.unloadChunk(key); }
+    // 칸을 쉬어 가며 만드는 중에는 내리지 않는다 (같이 쓰는 목록을 내리기가 새로 만들어 버리면 만드는 칸이 옛 목록에 쓴다)
     if (this.chunkLoading) return;
+    for (const key of [...this.chunks.keys()]) { const [i, j] = key.split('_').map(Number); if (Math.max(Math.abs(i - ti), Math.abs(j - tj)) > 2) this.unloadChunk(key); }
     const want = []; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const key = `${ti + a}_${tj + b}`; if (this.tileHave.has(key) && !this.chunks.has(key) && !this.chunkFail?.has(key)) want.push([Math.hypot((ti + a + 0.5) * T - px, (tj + b + 0.5) * T - pz), key]); }
     if (!want.length) return; want.sort((a, b) => a[0] - b[0]); const key = want[0][1];
     this.chunkLoading = key; this.loadChunk(key).then((c) => { if (this.map.kind === 'world') { this.chunks.set(key, c); this.cityDirty = true; this.onChunk?.(key, this.chunks.size); } }).catch(() => { (this.chunkFail ||= new Set()).add(key); }).finally(() => { this.chunkLoading = null; });
@@ -617,7 +620,9 @@ export class Hangang {
     this.shadow.rotation.x = -Math.PI / 2; this.shadow.renderOrder = -40; sc.add(this.shadow);
   }
   // 지도 안의 것들 (물 · 녹지 · 길 · 다리 · 건물 · 나무 · 가게 · 간판 · 골목 · 출구): 지역 지도 하나, 또는 서울 칸 하나(isChunk)
-  buildContent(r) {
+  // 지도 내용 만들기. 서울 전체 칸은 단계마다 쉬어 가며(yield) 만들어 걷는 중에 화면이 멈추지 않게
+  buildContent(r) { for (const _ of this.buildSteps(r)); }
+  *buildSteps(r) {
     const M = this.map, S = M.scale, sc = this.scene, P2 = (a) => unpack(a, S), polys = (list) => list.map((p) => p.map(P2));
     this.water = polys(M.water); this.islands = polys(M.island);
     const bb = (list) => { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const poly of list) for (const ring of poly) for (const [x, z] of ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return [x0, x1, z0, z1]; };
@@ -628,6 +633,7 @@ export class Hangang {
     const RX = M.kind === 'tile' ? [M.terrain.x0, M.terrain.x0 + (M.terrain.nx - 1) * M.terrain.step, M.terrain.z0, M.terrain.z0 + (M.terrain.nz - 1) * M.terrain.step] : [-3200, 3200, -3200, 3200];
     const inside = (x, z) => x > RX[0] + 5 && x < RX[1] - 5 && z > RX[2] + 5 && z < RX[3] - 5 && (M.kind === 'tile' || (Math.abs(Math.abs(x) - 7000) > 5 && Math.abs(Math.abs(z) - 7000) > 5));
     const wMesh = new THREE.Mesh(fillGeo(this.water), (this.host || this).waterM); wMesh.renderOrder = -47; sc.add(wMesh); // 물은 공원 위에 (OSM 한강공원 영역이 물까지 덮고 있다)
+    yield;
     // 섬 · 녹지 (계절마다 색이 바뀐다)
     this.islandM = flatMat('#7fa860', -46.9, { map: this.grassTex ||= groundTex('grass') }); patchy(this.islandM); const isl = new THREE.Mesh(fillGeo(this.islands, 0, 7), this.islandM); isl.renderOrder = -46.9; sc.add(isl);
     const greens = { grass: [], wood: [], wild: [], pitch: [], sand: [] };
@@ -637,11 +643,13 @@ export class Hangang {
     for (const [k, col, o] of [['grass', '#8db86a', -53], ['wild', '#94a96a', -52.5], ['wood', '#5f8a4a', -52], ['pitch', '#6aa860', -51.5], ['sand', '#d9c79a', -51]]) {
       if (!greens[k].length) continue; const m = flatMat(col, o, k === 'sand' ? {} : { map: this.grassTex ||= groundTex('grass') }); if (k !== 'sand') patchy(m); this.greenM[k] = m; const me = new THREE.Mesh(fillGeo(greens[k], 0, 7), m); me.renderOrder = o; me.receiveShadow = true; sc.add(me);
     }
+    yield;
     // 길 · 철길
     { const P = [], I = []; for (const rd of M.roads) { if (rd[1]) continue; ribbonInto(P, I, P2(rd.slice(2)), rd[0], 0); } const m = new THREE.Mesh(geoOf(P, I), flatMat('#6f7173', -50)); m.renderOrder = -50; sc.add(m); this.roadM = m.material; }
     this.buildStreets(M.roads.map((rd, i) => ({ rd, name: M.roadNames?.[i] || '' })).filter((q) => !q.rd[1]).map(({ rd, name }) => ({ w: rd[0], name, pts: P2(rd.slice(2)) })).filter((r2) => r2.pts.length > 1));
     { const P = [], I = []; for (const rl of M.rails) ribbonInto(P, I, P2(rl), 4, 0); const m = new THREE.Mesh(geoOf(P, I), flatMat('#5d5650', -49.5)); m.renderOrder = -49.5; sc.add(m); }
     { const P = [], I = []; for (const pa of M.paths) { if (pa[0]) continue; ribbonInto(P, I, P2(pa.slice(2)), pa[1], 0); } const m = new THREE.Mesh(geoOf(P, I), flatMat('#c9c0ae', -49)); m.renderOrder = -49; sc.add(m); this.pathM = m.material; }
+    yield;
     // 달리는 길: 자전거길(짙은 아스팔트) + 강 쪽 산책 · 러닝 길(붉은 우레탄)
     {
       // 거리 코스(홍대 등)는 강변 러닝 길 · 잔디 띠를 깔지 않는다 (길은 실제 도로 · 보도 그대로)
@@ -671,8 +679,11 @@ export class Hangang {
         fragmentShader: 'uniform float time; varying vec2 vU; void main(){ float side = abs(vU.x - 0.5) * 2.0; float wave = 0.5 + 0.5 * sin(vU.y * 2.4 + time * 1.3); float band = smoothstep(1.0, 0.55, side) * smoothstep(0.0, 0.45, side); float foam = band * (0.25 + 0.35 * wave) * (0.6 + 0.4 * sin(vU.y * 13.0 - time * 2.0)); gl_FragColor = vec4(vec3(0.97, 0.99, 1.0), foam * 0.32); }' });
       const fmesh = new THREE.Mesh(geoOf(Pf, If, { uv: [Uf, 2] }), fm); fmesh.renderOrder = -46.85; sc.add(fmesh);
     }
+    yield;
     this.buildBridges(P2, inWater, r);
+    yield;
     this.buildBuildings(P2);
+    yield;
     if (M.kind !== 'tile') this.buildFar(P2);
     if (M.kind === 'summit') this.summit = buildSummit(this);
     // 서울 전체: 남산 칸이면 진짜 지형 위에 N서울타워 · 케이블카 · 전망대
@@ -681,20 +692,26 @@ export class Hangang {
     if (this.isChunk) { const [ti, tj] = this.chunkKey.split('_').map(Number), T0 = this.host.world0.tile, nr = this.host.nearRegion((ti + 0.5) * T0, (tj + 0.5) * T0); this.regionHere = nr && nr.d < 1400 ? nr.id : null; } else this.regionHere = this.id;
     const RH = this.regionHere;
     if (RH === 'hongdae' || this.isChunk) this.buildForestPath(r);
+    yield;
     this.buildPlants(inWater, r);
     // 큰 몰 정문: 더현대 서울 (가장 긴 벽 가운데, 바깥을 본다)
     this.malls = []; for (const [want, mallName] of [['더현대 서울', '더현대 서울'], ['IFC mall (South Gate)', 'IFC몰'], ['IFC mall (North Gate)', 'IFC몰']]) { const fs2 = (this.foot || []).filter((f) => f.name === want); const f = fs2.sort((a, b) => Math.abs(ringArea(b.ring)) - Math.abs(ringArea(a.ring)))[0]; if (f) { const ring = f.ring, sg = ringArea(ring) > 0 ? 1 : -1; let best = null; for (let k = 0; k < ring.length; k++) { const a = ring[k], c = ring[(k + 1) % ring.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]); if (!best || L > best.L) best = { L, x: (a[0] + c[0]) / 2, z: (a[1] + c[1]) / 2, nx: (sg > 0 ? c[1] - a[1] : a[1] - c[1]) / L, nz: (sg > 0 ? a[0] - c[0] : c[0] - a[0]) / L }; } const D2 = { name: mallName, x: best.x + best.nx * 0.1, z: best.z + best.nz * 0.1, nx: best.nx, nz: best.nz }; this.malls.push(D2);
       const gd = new THREE.Group(); gd.position.set(D2.x, 0, D2.z); gd.rotation.y = Math.atan2(D2.nx, D2.nz); const glass = new THREE.Mesh(new THREE.PlaneGeometry(8, 5), new THREE.MeshPhongMaterial({ color: '#cfe2ee', emissive: '#ffe8c8', emissiveIntensity: 0.25, shininess: 100 })); glass.position.set(0, 2.5, 0.12); gd.add(glass); const fr = new THREE.Mesh(new THREE.BoxGeometry(8.6, 5.4, 0.12), new THREE.MeshLambertMaterial({ color: '#d9d4cc' })); fr.position.set(0, 2.7, 0.02); gd.add(fr); const cv = document.createElement('canvas'); cv.width = 512; cv.height = 96; const c2 = cv.getContext('2d'); c2.fillStyle = '#f4f1ea'; c2.fillRect(0, 0, 512, 96); c2.fillStyle = '#2f3a2f'; c2.font = 'bold 54px serif'; c2.textAlign = 'center'; c2.textBaseline = 'middle'; c2.fillText(mallName, 256, 50); const st = new THREE.CanvasTexture(cv); st.colorSpace = THREE.SRGBColorSpace; const sg2 = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.7), new THREE.MeshLambertMaterial({ map: st, emissive: '#ffffff', emissiveMap: st, emissiveIntensity: 0.3 })); sg2.position.set(0, 6.4, 0.1); gd.add(sg2); this.scene.add(gd); } }
+    yield;
     this.buildGates();
     if (M.kind === 'street' || (this.isChunk && ['hongdae', 'itaewon', 'gangnam', 'sinchon', 'myeongdong', 'seongsu', 'jamsil'].includes(RH))) this.buildNeon(r);
+    yield;
     if (M.kind !== 'summit') this.buildAlleys(P2, r);
     if (RH === 'hongdae') this.buildMurals(r);
     if (RH === 'banpo' || this.isChunk) this.buildBanpo(P2);
     // 뚝섬 음악분수 (실제 자리, 강가 광장)
     if (this.isChunk) { const [fx, fz] = this.ll(37.5294, 127.0697), [ti, tj] = this.chunkKey.split('_').map(Number), T0 = this.host.world0.tile; if (Math.floor(fx / T0) === ti && Math.floor(fz / T0) === tj) { let p = [fx, fz]; for (let k = 0; k < 12 && this.inWater(p[0], p[1]); k++) p = [fx, fz - 10 * (k + 1)]; this.buildMusicFountain(p); } }
     if (this.id === 'ttukseom') { const m = (M.marks || []).find(([n]) => /자벌레/.test(n)); if (m) { let p = this.world(m[1] + 60, 40); for (const lat of [40, -40, 70, -70, 25, -25]) { p = this.world(m[1] + 60, lat); if (!this.inWater(p[0], p[1])) break; } this.buildMusicFountain(p); } }
+    yield;
     this.addShopFronts(buildShopFronts(this, M.shops || [], M.scale));
+    yield;
     if (M.kind !== 'summit') this.buildStreetSigns(P2, r);
+    yield;
     this.buildEntrances();
   }
 
