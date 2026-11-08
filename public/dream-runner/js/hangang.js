@@ -1397,8 +1397,9 @@ export class Hangang {
     if (ml > 1) { mx /= ml; mz /= ml; }
     // Shift(휴대폰은 💨 버튼)를 누르는 동안 가속: 지금 단계보다 확 빨라진다
     if (inp.sprint && ml > 0.05) this.boostOn = true; if (ml <= 0.05) this.boostOn = false;
-    const boost = !!this.boostOn, want = Math.min(V_MAX * (this.flying ? 1.5 : 1), (this.target * Math.min(1, ml) * (boost ? 1.8 : 1) + (boost ? 3 : 0)) * (this.flying ? 1.5 : 1));
-    this.v += (want - this.v) * Math.min(1, dt * (want > this.v ? (boost ? 4.5 : 1.8) : 4)); this.boosting = boost;
+    // 날 때: 기본 1.5배, Shift 가속이면 그 5배까지 (서울 끝에서 끝까지 날아갈 수 있게) · 가속도도 크게
+    const boost = !!this.boostOn, flyK = this.flying ? (boost ? 7.5 : 1.5) : 1, want = Math.min(V_MAX * flyK, (this.target * Math.min(1, ml) * (boost ? 1.8 : 1) + (boost ? 3 : 0)) * flyK);
+    this.v += (want - this.v) * Math.min(1, dt * (want > this.v ? (this.flying ? (boost ? 2.2 : 3) : boost ? 4.5 : 1.8) : this.flying ? 2.5 : 4)); this.boosting = boost;
     let ds = 0;
     if (ml > 0.05) { this.mdx = mx / ml; this.mdz = mz / ml; }
     const R0 = 0.28; // 곰돌이 몸 반지름
@@ -1425,7 +1426,7 @@ export class Hangang {
       // 벽을 향해 계속 걸으면 벽 타기 (젤리시티처럼)
       if (res.wall && !res.wall.f.noClimb && this.mdx * res.wall.nx + this.mdz * res.wall.nz < -0.55 && res.wall.f.h > this.y + 1.2) { this.wallPush = (this.wallPush || 0) + dt; if (this.wallPush > 0.22) { this.climb = { f: res.wall.f, nx: res.wall.nx, nz: res.wall.nz, top: res.wall.f.h }; this.wallPush = 0; this.vy = 0; this.jumps = 0; } }
       else this.wallPush = 0;
-      ds = Math.hypot(nx - this.px, nz - this.pz); this.px = nx; this.pz = nz; this.dist += ds;
+      ds = Math.hypot(nx - this.px, nz - this.pz); this.px = nx; this.pz = nz; if (!this.flying) this.dist += ds; // 달린 거리 기록 · 업적은 걷고 달린 거리만
       const q2 = this.project(nx, nz); this.s = q2.s; this.lat = q2.lat;
       const tg = this.at(this.s); this.dir = this.mdx * tg.dx + this.mdz * tg.dz >= 0 ? 1 : -1;
       this.face += (((Math.atan2(this.mdx, this.mdz) - this.face + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * Math.min(1, dt * 9);

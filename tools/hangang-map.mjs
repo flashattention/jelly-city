@@ -92,9 +92,14 @@ const COURSES = {
   },
 };
 
-const id = process.argv[2] || 'yeouido', C = COURSES[id];
+// 서울 전체 칸(타일) 모드: node tools/hangang-map.mjs tile <ix> <iz>  → public/dream-runner/seoul/t_<ix>_<iz>.json
+//   칸 = 2km × 2km (전역 좌표 x ∈ [ix·2000, +2000), z 도 같게), 좌표는 전역 기준(center [0, 0])이라 칸끼리 그대로 이어진다
+const TILE_MODE = process.argv[2] === 'tile', TILE = 2000, TI = +process.argv[3], TJ = +process.argv[4];
+if (TILE_MODE) { const x0 = TI * TILE, z0 = TJ * TILE, M = 150, lat = (z) => LAT0 - z / KZ, lon = (x) => LON0 + x / KX;
+  COURSES[`t_${TI}_${TJ}`] = { name: `서울 ${TI},${TJ}`, kind: 'tile', bbox: [lat(z0 + TILE + M), lon(x0 - M), lat(z0 - M), lon(x0 + TILE + M)], marks: [], labels: [], arches: [], far: [] }; }
+const id = TILE_MODE ? `t_${TI}_${TJ}` : process.argv[2] || 'yeouido', C = COURSES[id];
 if (!C) { console.error(`코스가 없어요: ${id} (${Object.keys(COURSES).join(', ')})`); process.exit(1); }
-const CACHE = process.argv[3] || path.join(ROOT, '.cache', 'osm', id);
+const CACHE = TILE_MODE ? path.join(ROOT, '.cache', 'osm', 'tiles', id) : process.argv[3] || path.join(ROOT, '.cache', 'osm', id);
 fs.mkdirSync(CACHE, { recursive: true });
 
 async function overpass(file, body) {
@@ -109,7 +114,7 @@ async function overpass(file, body) {
 const bJ = await overpass('buildings.json', 'way["building"]($B);relation["building"]($B);way["building:part"]($B);');
 // 멀리: 한강 물줄기 · 섬 (가양 ~ 반포) · 높은 건물 (스카이라인) — 코스에서 강을 따라 멀리 보이는 풍경
 const FAR_B = [37.470, 126.840, 37.590, 127.090];
-async function overpassFar(file, body) { const f = path.join(CACHE, file); if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf8')); const keep = C.bbox; C.bbox = FAR_B; try { return await overpass(file, body); } finally { C.bbox = keep; } }
+async function overpassFar(file, body) { if (TILE_MODE) return /water/.test(file) ? overpass(file, body) : { elements: [] }; const f = path.join(CACHE, file); if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf8')); const keep = C.bbox; C.bbox = FAR_B; try { return await overpass(file, body); } finally { C.bbox = keep; } }
 const wJ = await overpassFar('water_far.json', 'way["natural"="water"]["water"="river"]($B);relation["natural"="water"]["water"="river"]($B);way["place"~"island|islet"]($B);relation["place"~"island|islet"]($B);');
 const tJ = await overpassFar('tall_far.json', 'way["building"]["building:levels"~"^(1[8-9]|[2-9][0-9])$"]($B);way["building"]["height"~"^([5-9][0-9]|[1-5][0-9][0-9])"]($B);way["building:part"]["height"~"^([1-5][0-9][0-9])"]($B);');
 // 지하철역 · 출입구 (실제 위치)
@@ -188,17 +193,17 @@ function chain(ways) {
   }
   return best;
 }
-const [xa] = P(37.53, C.lon[0]), [xb] = P(37.53, C.lon[1]);
+const [xa] = TILE_MODE ? [0] : P(37.53, C.lon[0]), [xb] = TILE_MODE ? [0] : P(37.53, C.lon[1]);
 // preClip: 범위 안 조각만 먼저 골라 잇는다 (자전거길이 여러 갈래로 끊긴 곳)
-let route = chain(C.preClip ? pathWays.filter((w) => w.some((p) => p[0] >= xa - 150 && p[0] <= xb + 150)) : pathWays);
+let route = TILE_MODE ? [[TI * TILE, TJ * TILE + TILE / 2], [TI * TILE + TILE, TJ * TILE + TILE / 2]] : chain(C.preClip ? pathWays.filter((w) => w.some((p) => p[0] >= xa - 150 && p[0] <= xb + 150)) : pathWays);
 if (route[0][0] > route[route.length - 1][0]) route.reverse(); // 서쪽 → 동쪽
-route = route.filter((p) => p[0] >= xa && p[0] <= xb);
+if (!TILE_MODE) route = route.filter((p) => p[0] >= xa && p[0] <= xb);
 route = simplify(route, 0.6);
 const routeLen = route.reduce((a, p, i) => a + (i ? Math.sqrt(d2(p, route[i - 1])) : 0), 0);
 if (routeLen < (C.minLen || 1000)) throw new Error(`코스 길이가 이상해요 (${routeLen}m): 자전거길 이름 · 경도를 확인해 주세요`);
-const center = centroid(route).map(Math.round);
-const R = C.R || 2600, rect = [center[0] - R, center[1] - R, center[0] + R, center[1] + R];
-const near = (p, lim) => { let m = Infinity; for (let i = 1; i < route.length; i++) { const a = route[i - 1], b = route[i], dx = b[0] - a[0], dz = b[1] - a[1], t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / (dx * dx + dz * dz || 1))); m = Math.min(m, Math.hypot(a[0] + dx * t - p[0], a[1] + dz * t - p[1])); if (m < lim) return m; } return m; };
+const center = TILE_MODE ? [0, 0] : centroid(route).map(Math.round);
+const R = C.R || 2600, rect = TILE_MODE ? [TI * TILE, TJ * TILE, TI * TILE + TILE, TJ * TILE + TILE] : [center[0] - R, center[1] - R, center[0] + R, center[1] + R];
+const near = TILE_MODE ? () => 0 : (p, lim) => { let m = Infinity; for (let i = 1; i < route.length; i++) { const a = route[i - 1], b = route[i], dx = b[0] - a[0], dz = b[1] - a[1], t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / (dx * dx + dz * dz || 1))); m = Math.min(m, Math.hypot(a[0] + dx * t - p[0], a[1] + dz * t - p[1])); if (m < lim) return m; } return m; };
 
 // 좌표는 코스 중심 기준 0.1m 정수로 줄여 담는다
 const q = (p) => [Math.round((p[0] - center[0]) * 10), Math.round((p[1] - center[1]) * 10)];
@@ -208,10 +213,10 @@ const out = { id, kind: C.kind || 'river', name: C.name, sub: C.sub, origin: [LA
 // ---------- 물 · 섬 · 녹지 ----------
 const polyOut = (pp, eps = 1.5) => { const o = clipRect(simplify(pp.o, eps), rect); if (o.length < 3 || Math.abs(area(o)) < 30) return null; return [flat(o), ...pp.h.map((h) => clipRect(simplify(h, eps), rect)).filter((h) => h.length > 2 && Math.abs(area(h)) > 30).map(flat)]; };
 out.water = []; out.island = []; out.green = [];
-const R2 = 7000, rect2 = [center[0] - R2, center[1] - R2, center[0] + R2, center[1] + R2];
+const R2 = 7000, rect2 = TILE_MODE ? rect : [center[0] - R2, center[1] - R2, center[0] + R2, center[1] + R2];
 for (const e of wJ.elements) {
   const t = e.tags || {}, isl = t.place === 'island' || t.place === 'islet';
-  if (isl && t.name === '여의도') continue;
+  if (isl && t.name === '여의도' && !TILE_MODE) continue;
   for (const pp of polysOf(e)) { const o = clipRect(simplify(pp.o, isl ? 2 : 4), rect2); if (o.length < 3 || Math.abs(area(o)) < 200) continue; const holes = pp.h.map((h) => clipRect(simplify(h, 3), rect2)).filter((h) => h.length > 2 && Math.abs(area(h)) > 200).map(flat); (isl ? out.island : out.water).push([flat(o), ...holes]); }
 }
 for (const e of lJ.elements) {
@@ -369,7 +374,11 @@ out.labels = (C.labels || []).map(([n, lat, lon, h]) => [n, ...q(P(lat, lon)), h
 out.arches = (C.arches || []).map(([n, lat, lon, span]) => [n, ...q(P(lat, lon)), span]);
 out.far = C.far.map(([n, lat, lon, h, k]) => [n, ...q(P(lat, lon)), h, k]);
 
-const file = path.join(ROOT, 'public', 'dream-runner', 'hangang', `${id}.json`);
+// 지형 높이 격자: 50m 간격 (칸 2km → 41 × 41), 데시미터 정수. 칸이 아니면 코스 둘레 사각형(rect)에 같은 간격
+{ const { heightAt } = await import('./terrain.mjs'), STEP = 50, nx = Math.round((rect[2] - rect[0]) / STEP) + 1, nz = Math.round((rect[3] - rect[1]) / STEP) + 1, hs = [];
+  for (let j = 0; j < nz; j++) { const row = await Promise.all(Array.from({ length: nx }, (_, i) => { const x = rect[0] + i * STEP, z = rect[1] + j * STEP; return heightAt(path.join(ROOT, '.cache'), LAT0 - z / KZ, LON0 + x / KX); })); for (const h of row) hs.push(Math.round(h * 10)); }
+  out.terrain = { x0: rect[0], z0: rect[1], step: STEP, nx, nz, h: hs }; }
+const file = TILE_MODE ? path.join(ROOT, 'public', 'dream-runner', 'seoul', `${id}.json`) : path.join(ROOT, 'public', 'dream-runner', 'hangang', `${id}.json`);
 fs.mkdirSync(path.dirname(file), { recursive: true });
 fs.writeFileSync(file, JSON.stringify(out));
 console.log(`먼 물줄기 ${out.water.length} · 먼 높은 건물 ${out.tall.length}`);
