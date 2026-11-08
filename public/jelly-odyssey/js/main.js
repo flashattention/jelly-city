@@ -45,6 +45,9 @@ const game = window.ody = {
   cmd: 'follow', cut: null, oracleT: 0, checkpoint: null, stutter: 0, hold: null, boss: null, waves: null,
 };
 const D = () => DIFF[game.diff];
+// 게임 시간 기준으로 미루기 (탭이 느려지거나 시험 중 빨리 돌려도 같은 순서로)
+const timers = []; const later = (sec, fn) => timers.push({ at: game.t + sec, fn });
+function runTimers() { for (let i = timers.length - 1; i >= 0; i--) if (game.t >= timers[i].at) { const T = timers.splice(i, 1)[0]; T.fn(); } }
 const unbox = (b) => { const i = W.boxes.indexOf(b); if (i >= 0) W.boxes.splice(i, 1); }, rebox = (b) => { if (!W.boxes.includes(b)) W.boxes.push(b); };
 const NAMES = ['말랑 백인대장', '통통 기수', '쫀득', '몰랑', '폭신', '찰떡', '꾸덕', '말캉', '보들', '톡톡', '쭈욱'];
 
@@ -113,6 +116,7 @@ function startGame(phase = 'intro') {
   if (phase === 'intro' && !params.has('t')) { me.bear.root.visible = false; intro(); } else enterPhase(phase);
 }
 function clearWorld() {
+  timers.length = 0;
   for (const v of [...game.viruses]) removeVirus(v);
   for (const b of [game.me, ...game.allies]) if (b) scene.remove(b.bear.root);
   for (const p of game.projs) scene.remove(p.mesh); for (const p of game.pickups) scene.remove(p.mesh); for (const f of game.frags) scene.remove(f.mesh); for (const p of game.puddles) scene.remove(p.mesh);
@@ -159,7 +163,7 @@ function openGate(instant) {
   W.winch.done = true; unbox(W.gateBox);
   if (instant) { W.gate.open = 1; return; }
   sfx('horn'); toast('🚪 성문이 열린다! 곰돌 군단 본대 돌입!', 3);
-  setTimeout(() => { if (game.mode === 'play') { armyArrives(); enterPhase('assault'); } }, 1600);
+  later(1.6, () => { if (game.mode === 'play') { armyArrives(); enterPhase('assault'); } });
 }
 function armyArrives(instant) {
   for (let i = 0; i < 8; i++) { const a = addBear({ name: NAMES[i < 2 ? i : i + 3], centurion: i === 0 }, R(-4, 4), instant ? R(54, 62) : R(64, 69)); a.hp = a.max = 100; if (i < 5) torchOn(a); game.allies.push(a); }
@@ -215,13 +219,19 @@ function setupBoss() {
   });
   k.stagger = 0; k.regrow = 0; k.attack = null; k.atkCd = 3;
   $('boss').classList.remove('hidden'); $('boss').querySelector('.nm').textContent = '👑 바이러스 왕 — 연산의 왕을 빨아먹는 자';
-  sfx('enemyult'); oracle(4, 0.5);
+  sfx('enemyult');
+  // 보스 등장 컷신 (짧게)
+  const Z2 = W.gods.find((g) => g.id === 'zeuron');
+  cutBegin([
+    { d: 3.2, from: [[0, PLAT.h + 2.5, -28], [0, PLAT.h + 5, -51]], to: [[0, PLAT.h + 4, -33], [0, PLAT.h + Z2.top * 0.7, -51]], cap: '신전 가장 깊은 곳. 연산의 왕 <b>제우론</b>이 초록 케이블에 칭칭 감겨 있다.' },
+    { d: 3.6, from: [[5, PLAT.h + 2, -36], [0, PLAT.h + 3, -42]], to: [[3, PLAT.h + 1.6, -37.5], [0, PLAT.h + 3.6, -42]], title: '<b>바이러스 왕</b><small>연산의 왕을 빨아먹는 자</small>', cap: '케이블 사슬 넷을 끊어야 왕의 심장이 드러난다.', on: () => sfx('horn') },
+  ], () => { oracle(4, 0.3); lock(); });
 }
 // 엔딩
 function finish() {
   game.mode = 'ending'; freeGod('zeuron'); $('boss').classList.add('hidden');
   const mins = ((performance.now() - game.start) / 60000).toFixed(1);
-  setTimeout(() => endingCut(mins), 2200);
+  later(2.2, () => endingCut(mins));
 }
 
 // ---------- 신탁석 (체크포인트 + GPU 신의 기계 신탁) ----------
@@ -234,7 +244,7 @@ const ORACLES = [
 ];
 function oracle(i, delay = 0) {
   const O = W.oracles[Math.min(i, W.oracles.length - 1)]; if (O) O.on = true;
-  setTimeout(() => { if (game.mode !== 'play' && game.mode !== 'ending') return; const [who, line] = ORACLES[i]; $('oracle').querySelector('.who').textContent = `🗿 신탁석 · ${who}`; $('oracle').querySelector('.line').innerHTML = line; $('oracle').classList.remove('hidden'); game.oracleT = 9; sfx('spawn'); say(line.replace(/<[^>]+>/g, '').replace(/\[[^\]]+\]/g, ''), { pitch: 0.7, rate: 1.0, vol: 0.6 }); }, delay * 1000);
+  later(delay, () => { if (game.mode !== 'play' && game.mode !== 'ending') return; const [who, line] = ORACLES[i]; $('oracle').querySelector('.who').textContent = `🗿 신탁석 · ${who}`; $('oracle').querySelector('.line').innerHTML = line; $('oracle').classList.remove('hidden'); game.oracleT = 9; sfx('spawn'); say(line.replace(/<[^>]+>/g, '').replace(/\[[^\]]+\]/g, ''), { pitch: 0.7, rate: 1.0, vol: 0.6 }); });
 }
 
 // ---------- 입력 ----------
@@ -281,9 +291,9 @@ function swordSwing() {
   me.comboT = 0.75; me.atkLock = me.combo === 3 ? 0.55 : 0.32; faceAim(me); me.bear.attack('melee'); sfx('swing');
   // 몰래 처치: 잠들었거나 나를 못 본 경비를 가까이에서
   const big = me.combo === 3;
-  setTimeout(() => meleeHit(me, { reach: big ? 3.0 : 2.5, arc: big ? 1.4 : 1.1, dmg: big ? 34 : 19, kb: big ? 5 : 1.5, breakGuard: big }), 140);
+  later(0.14, () => meleeHit(me, { reach: big ? 3.0 : 2.5, arc: big ? 1.4 : 1.1, dmg: big ? 34 : 19, kb: big ? 5 : 1.5, breakGuard: big }));
 }
-function spearThrust() { const me = game.me; if (me.atkLock > 0) return; me.atkLock = 0.45; faceAim(me); me.bear.attack('melee'); sfx('swing'); setTimeout(() => meleeHit(me, { reach: 3.6, arc: 0.45, dmg: 27, kb: 3 }), 120); }
+function spearThrust() { const me = game.me; if (me.atkLock > 0) return; me.atkLock = 0.45; faceAim(me); me.bear.attack('melee'); sfx('swing'); later(0.12, () => meleeHit(me, { reach: 3.6, arc: 0.45, dmg: 27, kb: 3 })); }
 function meleeHit(b, o) {
   if (b.state !== 'ok') return; let hit = 0;
   for (const v of [...game.viruses]) {
@@ -383,7 +393,7 @@ function breakDisguise() { const me = game.me; if (me?.disg > 0) { me.disg = 0; 
 // ---------- 감염 ----------
 function infectBrazier(B) { B.state = 'inf'; B.hits = 0; B.spawnT = 4; W.fires.setGreen(B.fire, 1); W.fires.setStrength(B.fire, 1); }
 function cureBrazier(B) { B.state = 'ok'; W.fires.setGreen(B.fire, 0); sparks(B.x, B.y + 1.6, B.z, '#ffb04a', 14); }
-function alarm(v) { if (game.phase !== 'stealth' || game.alarmed) return; game.alarmed = true; toast('🚨 들켰다! 경비들이 깨어난다', 2); sfx('enemyult'); setTimeout(() => { for (const u of game.viruses) if (u.guard && Math.hypot(u.x - v.x, u.z - v.z) < 26) { u.alert = true; u.sleep = false; } for (const a of game.allies) a.stealth = false; }, 900); }
+function alarm(v) { if (game.phase !== 'stealth' || game.alarmed) return; game.alarmed = true; toast('🚨 들켰다! 경비들이 깨어난다', 2); sfx('enemyult'); later(0.9, () => { for (const u of game.viruses) if (u.guard && Math.hypot(u.x - v.x, u.z - v.z) < 26) { u.alert = true; u.sleep = false; } for (const a of game.allies) a.stealth = false; }); }
 
 // ---------- 효과 ----------
 const fx = [];
@@ -415,7 +425,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   game.t += dt;
-  if (game.mode === 'play' || game.mode === 'ending' || game.cut) { if (game.cut) runCut(dt); else if (game.mode === 'play') tick(dt); }
+  if (game.mode === 'play' || game.mode === 'ending' || game.cut) { if (game.cut) runCut(dt); else if (game.mode === 'play') tick(dt); else runTimers(); }
   W.update(dt, game.t, camera); updateFx(dt);
   for (const b of [game.me, ...game.allies]) if (b) animBear(b, dt);
   for (const v of game.viruses) { v.mesh.position.set(v.x, v.y, v.z); v.mesh.rotation.y = v.yaw; animateVirus(v, dt, game.t); }
@@ -433,6 +443,7 @@ function animBear(b, dt) {
 }
 
 function tick(dt) {
+  runTimers();
   const me = game.me; if (!me) return;
   me.atkLock = Math.max(0, (me.atkLock || 0) - dt); me.comboT -= dt; me.rollCd -= dt; me.inv -= dt; me.calm += dt;
   if (me.disg > 0) { me.disg -= dt; $('disg').classList.remove('hidden'); $('disg').querySelector('b').textContent = `${Math.ceil(me.disg)}초`; if (me.disg <= 0) breakDisguise(); } else $('disg').classList.add('hidden');
@@ -478,8 +489,7 @@ function tick(dt) {
   interact(dt);
   // --- 신탁 · 표시 ---
   if (game.oracleT > 0) { game.oracleT -= dt; if (game.oracleT <= 0) $('oracle').classList.add('hidden'); }
-  markers();
-  camTick(dt);
+  if (!params.has('auto')) { markers(); camTick(dt); }
 }
 
 function allyAI(dt) {
@@ -495,7 +505,7 @@ function allyAI(dt) {
     else if (game.cmd === 'wall') { const n = game.allies.length, off = (i - (n - 1) / 2) * 1.6; tx = me.x + Math.sin(fy) * 3.4 + Math.cos(fy) * off; tz = me.z + Math.cos(fy) * 3.4 - Math.sin(fy) * off; a.target = near(3.5); }
     else { a.target = near(game.cmd === 'charge' ? 40 : 14); const k = i + 1; tx = me.x - Math.sin(fy) * (2 + (k % 3)) + Math.cos(fy) * ((k % 2 ? 1 : -1) * (1 + k * 0.6)); tz = me.z - Math.cos(fy) * (2 + (k % 3)) - Math.sin(fy) * ((k % 2 ? 1 : -1) * (1 + k * 0.6)); }
     const t = a.target;
-    if (t) { const d = Math.hypot(t.x - a.x, t.z - a.z), reach = 1.9 + t.K.size * 0.6; if (d > reach) { tx = t.x; tz = t.z; } else { tx = a.x; tz = a.z; a.yaw += ang(Math.atan2(t.x - a.x, t.z - a.z) - a.yaw) * Math.min(1, dt * 10); if (a.cd <= 0) { a.cd = R(0.9, 1.4); a.bear.attack('melee'); setTimeout(() => meleeHit(a, { reach: 2.4, arc: 0.9, dmg: R(9, 14), kb: 1 }), 150); } } }
+    if (t) { const d = Math.hypot(t.x - a.x, t.z - a.z), reach = 1.9 + t.K.size * 0.6; if (d > reach) { tx = t.x; tz = t.z; } else { tx = a.x; tz = a.z; a.yaw += ang(Math.atan2(t.x - a.x, t.z - a.z) - a.yaw) * Math.min(1, dt * 10); if (a.cd <= 0) { a.cd = R(0.9, 1.4); a.bear.attack('melee'); later(0.15, () => meleeHit(a, { reach: 2.4, arc: 0.9, dmg: R(9, 14), kb: 1 })); } } }
     const dist = Math.hypot(tx - a.x, tz - a.z);
     a.speed = dist > 0.4 ? moveTo(a, tx, tz, dist > 8 ? speed * 1.5 : speed, dt) : 0;
     if (!t && game.cmd === 'wall') a.yaw += ang(fy - a.yaw) * Math.min(1, dt * 6);
@@ -521,7 +531,7 @@ function virusAI(dt) {
     }
     if (v.stunT > 0) { v.windup = 0; continue; }
     // 목표: 가장 가까운 곰돌이 (위장한 나는 빼고)
-    let t = null, bd = 34;
+    let t = null, bd = v.home ? 34 : 120; // 지키는 자리가 없는 바이러스(밀려오는 무리)는 멀리서도 달려든다
     for (const b of bears) { if (b.me && b.disg > 0) continue; const d = Math.hypot(b.x - v.x, b.z - v.z); if (d < bd) { bd = d; t = b; } }
     // 지키는 자리가 있으면 너무 멀리 쫓지 않는다
     if (v.home && t && Math.hypot(t.x - v.home[0], t.z - v.home[1]) > v.leash + 6) t = null;
@@ -598,7 +608,7 @@ function interact(dt) {
   const me = game.me; if (me.state !== 'ok') { $('prompt').classList.add('hidden'); return; }
   let it = null; const near = (x, z, r) => Math.hypot(me.x - x, me.z - z) < r;
   if (game.phase === 'stealth' && !W.winch.done && near(W.winch.x, W.winch.z, 2.8)) it = { label: '🚪 성문 도르래 돌리기', time: 4, fn: () => openGate() };
-  if (game.phase === 'assault' && !game.waves && !W.gods[0].freed && near(W.gods[0].x, W.gods[0].z, 6.5)) it = { label: '❄️ 포세쿨의 사슬 풀기', time: 3, fn: () => { freeGod('posecool'); setTimeout(() => enterPhase('colonnade'), 1800); } };
+  if (game.phase === 'assault' && !game.waves && !W.gods[0].freed && near(W.gods[0].x, W.gods[0].z, 6.5)) it = { label: '❄️ 포세쿨의 사슬 풀기', time: 3, fn: () => { freeGod('posecool'); later(1.8, () => enterPhase('colonnade')); } };
   if (game.phase === 'colonnade') for (const fw of W.fireWalls) if (!fw.open && near(fw.valve.x, fw.valve.z, 2.6)) it = { label: '💧 냉각 밸브 열기', time: 2.5, fn: () => openFireWall(fw), spin: fw.valve.wheel };
   const nextG = game.phase === 'altars' ? W.gods.find((g) => game.altarQ.includes(g.id) && !g.freed) : null;
   if (nextG) for (const G of [nextG]) if (near(G.x, G.z, 4.2)) { const guards = game.viruses.some((v) => v.state === 'ok' && Math.hypot(v.x - G.x, v.z - G.z) < 14); if (!guards) it = { label: `✨ ${G.name}의 랜섬 자물쇠 풀기`, time: 3, fn: () => { freeGod(G.id); if (G.id === 'mnemora') oracle(3, 1.5); if (G.id === 'hephavolt') { unbox(W.cellaDoor.box); W.cellaDoor.mesh.visible = false; toast('🚪 성소의 방화벽이 풀렸다 — 렌더의 여신이 기다린다', 3); } } }; }
@@ -721,5 +731,27 @@ if (params.has('t')) {
     if (params.has('spawn')) for (const sp of params.get('spawn').split(';')) { const [k, x, z, yaw] = sp.split(','); const v = spawnVirus(k, +x, +z, { yaw: +(yaw || 0) }); v.cd = 99; v.stunT = +(params.get('freeze') || 0); }
     if (params.has('look')) { const [y, p] = params.get('look').split(',').map(Number); look.yaw = y; look.pitch = p; }
   }, 50);
+}
+// ---------- 시험용 자동 조종 (?auto=1): 처음부터 끝까지 빨리 돌려 막이 이어지는지 · 오류가 없는지 본다 ----------
+const ROUTE = { colonnade: [[-15.7, 6], [-14.2, -9], [-15.7, -14], [-14.2, -27], [-15.7, -33], [-15.7, -46]], altars: [[-15.7, -50], [-15.7, -57.5], [15.7, -57.5], [15.7, -50], [15.7, -10], [15.7, 6], [0, 5], [0, -6], [0, -16], [0, -11]] };
+function autoStep(dt) {
+  const me = game.me; if (!me) return; me.hp = me.max; keys.clear();
+  if (me.state !== 'ok') return;
+  const foes = game.viruses.filter((v) => v.state === 'ok' && (!v.guard || v.alert || game.phase !== 'stealth'));
+  let tgt = null, bd = 200; for (const v of foes) { const d = Math.hypot(v.x - me.x, v.z - me.z); if (d < bd) { bd = d; tgt = v; } }
+  if (game.boss) { const c = game.boss.cables.find((q) => q.alive); tgt = c ? { x: c.x, z: c.z, cable: true } : game.boss; bd = Math.hypot(tgt.x - me.x, tgt.z - me.z); }
+  let goal = null;
+  if (game.phase === 'stealth') { const g = foes.find((v) => v.sleep || !v.alert); goal = g && Math.hypot(g.x - me.x, g.z - me.z) < 30 && game.autoK < 3 ? [g.x, g.z] : [W.winch.x, W.winch.z]; tgt = null; if (g && Math.hypot(g.x - me.x, g.z - me.z) < 2) { swordSwing(); game.autoK = (game.autoK || 0) + 1; } }
+  else if (game.phase === 'assault') goal = game.waves || foes.length ? null : [W.gods[0].x - 5.5, W.gods[0].z];
+  else if (ROUTE[game.phase] && !tgt) { const R0 = ROUTE[game.phase]; game.ri ||= {}; let i = game.ri[game.phase] || 0; const w = R0[Math.min(i, R0.length - 1)]; const gw = W.gods.find((g) => !g.freed && Math.hypot(g.x - w[0], g.z - w[1]) < 1); if (gw) goal = [gw.x, gw.z + 3]; else { const fw = W.gods.some((g) => g.freed && Math.hypot(g.x - w[0], g.z - w[1]) < 1); if ((fw || Math.hypot(w[0] - me.x, w[1] - me.z) < 1.2) && i < R0.length - 1) game.ri[game.phase] = ++i; goal = R0[Math.min(i, R0.length - 1)]; } if (gw && gw.freed === false && Math.hypot(gw.x - me.x, gw.z + 3 - me.z) < 1.5 && $('prompt').classList.contains('hidden') && !foes.length) game.ri[game.phase] = i; }
+  const aim = tgt && (bd < 18 || !goal) ? [tgt.x, tgt.z] : goal;
+  if (aim) { look.yaw = Math.atan2(aim[0] - me.x, aim[1] - me.z) - Math.PI; const d = Math.hypot(aim[0] - me.x, aim[1] - me.z); if (d > (tgt ? 2.0 : 0.6)) keys.add('KeyW'); }
+  if (tgt && bd < 2.8 + (tgt.K ? tgt.K.size * 0.6 : 0)) swordSwing();
+  if (!$('prompt').classList.contains('hidden')) { keys.add('KeyF'); keys.delete('KeyW'); }
+}
+if (params.has('auto')) {
+  const secs = +params.get('auto'), step = 1 / 30; let simT = 0; const log = [];
+  setTimeout(() => { try { for (let i = 0; i < secs / step; i++) { if (game.mode === 'play' && !game.cut) { autoStep(step); tick(step); } else if (game.cut) runCut(step); else runTimers(); W.update(step, (game.t += step), camera); updateFx(step); for (const v of game.viruses) { v.mesh.position.set(v.x, v.y, v.z); } simT += step; if (log[log.length - 1] !== game.phase + game.mode) log.push(game.phase + game.mode); if (game.mode === 'over') break; }
+    document.title = `AUTO ${simT.toFixed(0)}s ${log.join('>')} kills=${game.kills} lost=${game.lost} freed=${W.gods.filter((g) => g.freed).length} me=${Math.round(game.me?.x ?? 0)},${Math.round(game.me?.z ?? 0)} viruses=${game.viruses.length} obj=${$('obj').textContent}`; } catch (e) { document.title = `AUTO ERROR ${e.message} @${game.phase} ${e.stack.split('\n')[1]}`; } }, 1500);
 }
 requestAnimationFrame((n) => { last = n; frame(n); });

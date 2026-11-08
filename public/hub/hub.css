@@ -306,3 +306,13 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .card .pt { position: absolute; right: 12px; top: 12px; z-index: 4; padding: 4px 11px; border-radius: 999px; background: rgba(10, 6, 30, .55); color: #fff; font-size: 12px; backdrop-filter: blur(4px); pointer-events: none; }
 .card .new { right: auto !important; left: 14px; }
 .card.dream.wide .pt { top: 14px; right: 16px; font-size: 13px; }
+
+/* 젤리 오디세이 카드: 밤하늘 · 불타는 신전 기둥 · 초록 바이러스 · 목마 */
+.card.ody .art { background: radial-gradient(circle at 70% 85%, #ff8a3a88, transparent 45%), radial-gradient(circle at 20% 30%, #3dff7444, transparent 40%), linear-gradient(180deg, #1a1430, #3a1c22); }
+.ody .otemple { position: absolute; left: 14%; right: 14%; bottom: 18px; height: 70px; border-top: 12px solid #e8e0d0; display: flex; justify-content: space-between; padding: 0 6px; }
+.ody .otemple::before { content: ''; position: absolute; left: -10px; right: -10px; top: -34px; height: 22px; background: #e8e0d0; clip-path: polygon(0 100%, 50% 0, 100% 100%); }
+.ody .otemple i { width: 12px; height: 70px; background: linear-gradient(90deg, #cfc6b4, #f2ece0, #cfc6b4); }
+.ody .ohorse { position: absolute; left: 6%; bottom: 10px; font-size: 40px; filter: hue-rotate(80deg) drop-shadow(0 0 8px #3dff74); }
+.ody .ovirus { position: absolute; right: 9%; top: 18px; font-size: 30px; filter: hue-rotate(60deg) drop-shadow(0 0 10px #3dff74); animation: wob 2s ease-in-out infinite; }
+.ody .ofire { position: absolute; right: 24%; bottom: 14px; font-size: 26px; filter: drop-shadow(0 0 8px #ff8a3a); }
+.ody .new { position: absolute; right: 14px; bottom: 12px; padding: 4px 12px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-size: 13px; }
