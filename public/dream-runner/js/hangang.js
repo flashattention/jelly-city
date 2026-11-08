@@ -722,7 +722,8 @@ export class Hangang {
       const fm = new THREE.ShaderMaterial({ uniforms: this.foamU, transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide,
         vertexShader: 'varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
         fragmentShader: 'uniform float time; varying vec2 vU; void main(){ float side = abs(vU.x - 0.5) * 2.0; float wave = 0.5 + 0.5 * sin(vU.y * 2.4 + time * 1.3); float band = smoothstep(1.0, 0.55, side) * smoothstep(0.0, 0.45, side); float foam = band * (0.25 + 0.35 * wave) * (0.6 + 0.4 * sin(vU.y * 13.0 - time * 2.0)); gl_FragColor = vec4(vec3(0.97, 0.99, 1.0), foam * 0.32); }' });
-      const fmesh = new THREE.Mesh(geoOf(Pf, If, { uv: [Uf, 2] }), fm); fmesh.renderOrder = -46.85; sc.add(fmesh);
+      // 서울 전체 칸에서는 뺀다: 하천 양쪽 둑에 흰 띠 두 줄이 생겨 건물을 뚫고 보였다
+      if (!this.isChunk) { const fmesh = new THREE.Mesh(geoOf(Pf, If, { uv: [Uf, 2] }), fm); fmesh.renderOrder = -46.85; sc.add(fmesh); }
     }
     yield;
     this.buildBridges(P2, inWater, r);
@@ -2005,12 +2006,15 @@ export class Hangang {
   // 이름표: 건물 가까이 처음 오면 건물에 빨간 동그라미 + 선 + 이름 (5초 뒤 사라짐)
   setupLabels() {
     const M = this.map, S = M.scale, best = new Map();
+    // 서울 전체: 주인 지도에는 건물이 없다. 칸마다 만든 목록을 모은다
+    if (M.kind === 'world') { this.labels = [...this.chunks.values()].flatMap((c) => { if (!c.labels) c.setupLabels(); return c.labels; }); return; }
+    const tile = M.kind === 'tile';
     for (const b of M.buildings) {
       if (b[4] < 0) continue; const name = M.names[b[4]]; if (!name || /^\d|^[A-Z]?\d|동$|주차|창고|화장실|관리|^[가-힣]?\d/.test(name) || name.length < 2) continue;
       const ring = unpack(b.slice(7), S); let x = 0, z = 0; for (const [a, c] of ring) { x += a; z += c; } x /= ring.length; z /= ring.length;
       const famous = /국회|63|IFC|파크원|트윈|타워|센터|호텔|공원|역|교회|성당|방송|KBS|MBC|SBS|증권|금융|빌딩|아파트|레지던스|회관|우체국/.test(name);
-      if (b[0] < 30 && !famous) continue;
-      const q = this.project0(x, z); if (Math.abs(q.lat) > 650) continue;
+      if (b[0] < 30 && !famous && !(tile && /궁|문$|박물관|미술관|극장|대학|학교|시장|병원|백화점|도서관|청사|구청|시청|문화|사찰|서원/.test(name))) continue;
+      if (!tile && Math.abs(this.project0(x, z).lat) > 650) continue;
       const old = best.get(name); if (!old || old.h < b[0]) best.set(name, { name, x, z, h: b[0] });
     }
     for (const [n, x, z, h] of M.labels || []) best.set(n, { name: n, x: x * S, z: z * S, h });
@@ -2024,13 +2028,13 @@ export class Hangang {
     for (let i = 1; i < n; i++) {
       const t = i / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t, y = ay + (by - ay) * t;
       const cell = this.footGrid?.get(`${Math.floor(x / 40)},${Math.floor(z / 40)}`); if (!cell) continue;
-      for (const fi of cell) { const f = this.foot[fi]; if (own.has(fi) || f.name === l.name || f.h < y || x < f.x0 || x > f.x1 || z < f.z0 || z > f.z1) continue; if (inRing(x, z, f.ring)) return true; }
+      for (const fi of cell) { const f = this.foot[fi]; if (own.has(fi) || f.name === l.name || x < f.x0 || x > f.x1 || z < f.z0 || z > f.z1) continue; const top = f.h + (this.chunks ? f.base ?? this.terrAt(x, z, true) : 0); if (top < y) continue; if (inRing(x, z, f.ring)) return true; }
     }
     return false;
   }
   project0(x, z) { let best = Infinity, bs = 0, bl = 0; for (let i = 0; i < this.rp.length - 1; i += 2) { const a = this.rp[i], d = (a[0] - x) ** 2 + (a[1] - z) ** 2; if (d < best) { best = d; bs = i * this.step; } } const p = this.at(bs); bl = (x - p.x) * p.rx + (z - p.z) * p.rz; return { s: bs, lat: bl }; }
   tickLabels(dt, camera, px, pz) {
-    if (!this.labels) this.setupLabels();
+    { const lk = this.chunks ? [...this.chunks.keys()].join() : ''; if (!this.labels || lk !== this.labKey) { this.labKey = lk; this.setupLabels(); } }
     // 바라보는 건물에 이름표: 화면 가운데 쪽에 들어온 건물 (높을수록 멀리서도) · 시선을 돌리면 서서히 사라지고 다시 보면 또 뜬다
     this.activeLabels ||= []; this.labT = (this.labT || 0) - dt;
     for (const l of this.activeLabels) { l.t += dt; l.seen = Math.max(0, (l.seen ?? 1) - dt); }
@@ -2038,8 +2042,9 @@ export class Hangang {
     if (this.labT <= 0) {
       this.labT = 0.25; const v = this.labV ||= new THREE.Vector3(), picks = [];
       for (const l of this.labels) {
-        const d = Math.hypot(l.x - px, l.z - pz), range = Math.min(1300, 160 + l.h * 3.2); if (d > range) continue;
-        const ty = Math.min(l.h * 0.62, 90); v.set(l.x, ty, l.z).project(camera); if (v.z > 1 || Math.abs(v.x) > 0.95 || v.y < -0.85 || v.y > 0.95) continue;
+        const d = Math.hypot(l.x - px, l.z - pz), range = Math.min(1300, 160 + l.h * 3.2 + (this.flying ? Math.min(400, this.y * 1.5) : 0)); if (d > range) continue;
+        // 서울 전체는 땅 높이가 있다: 이름표 자리에 그곳 땅 높이를 더한다
+        const ty = Math.min(l.h * 0.62, 90) + (this.chunks ? this.terrAt(l.x, l.z, true) : 0); v.set(l.x, ty, l.z).project(camera); if (v.z > 1 || Math.abs(v.x) > 0.95 || v.y < -0.85 || v.y > 0.95) continue;
         if (this.occluded(camera.position, { x: l.x, y: ty, z: l.z, name: l.name })) continue;
         picks.push({ l, score: Math.abs(v.x) + d / range * 0.4 });
       }
@@ -2047,7 +2052,7 @@ export class Hangang {
       // 지금 보이는(가려지지 않은) 이름 있는 건물은 모두 (너무 많으면 가까운 8개)
       const shown = new Set(picks.slice(0, 8).map((q) => q.l.name));
       for (const a of this.activeLabels) if (!shown.has(a.name)) a.seen = Math.min(a.seen, 0.5);
-      for (const { l } of picks.slice(0, 8)) { const a = this.activeLabels.find((q) => q.name === l.name); if (a) a.seen = 1.0; else this.activeLabels.push({ ...l, t: 0, seen: 1.0, y: Math.min(l.h * 0.62, 90) }); }
+      for (const { l } of picks.slice(0, 8)) { const a = this.activeLabels.find((q) => q.name === l.name); if (a) a.seen = 1.0; else this.activeLabels.push({ ...l, t: 0, seen: 1.0, y: Math.min(l.h * 0.62, 90) + (this.chunks ? this.terrAt(l.x, l.z, true) : 0) }); }
     }
     // 구역: 이정표(다리 등) 근처 → 이름 있는 공원 · 섬 (작은 곳 먼저)
     let name = null; for (const [n, ms] of this.map.marks || []) if (Math.abs(ms - this.s) < 30) { name = n; break; }
