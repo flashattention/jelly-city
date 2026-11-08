@@ -298,6 +298,20 @@ const VI = await (async () => {
   }
   fs.writeFileSync(f, JSON.stringify(out2)); console.log(`\n건축물 정보 ${out2.length}`); return out2;
 })();
+// 브이월드 건물 중 오픈스트리트맵 건물이 덮지 않은 것을 모두 세운다 (오픈스트리트맵엔 빌라 · 단독주택 같은 낮은 집이 많이 빠져 있다: 서울 건물의 약 27%만 있었다)
+{ const og = new Map(), G = 50, put = (k, i) => { if (!og.has(k)) og.set(k, []); og.get(k).push(i); };
+  items.forEach((b, i) => { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of b.o) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } for (let gx = Math.floor(x0 / G); gx <= Math.floor(x1 / G); gx++) for (let gz = Math.floor(z0 / G); gz <= Math.floor(z1 / G); gz++) put(`${gx},${gz}`, i); });
+  const BADN = /^(주택|단독주택|다가구주택|근린생활시설|창고|.*\d+-\d+)$/; let added = 0;
+  for (const v of VW) {
+    // 브이월드 외곽선은 첫 점이 끝에 한 번 더 있다 (닫힌 고리): 빼야 단순화가 망가지지 않는다
+    const ring = v.ring.length > 3 && v.ring[0][0] === v.ring.at(-1)[0] && v.ring[0][1] === v.ring.at(-1)[1] ? v.ring.slice(0, -1) : v.ring;
+    let x = 0, z = 0; for (const p of ring) { x += p[0]; z += p[1]; } const c = [x / ring.length, z / ring.length];
+    const cand = og.get(`${Math.floor(c[0] / G)},${Math.floor(c[1] / G)}`) || [];
+    if (cand.some((i) => inPoly(c, items[i].o) || inPoly(items[i].c, v.ring))) continue; // 오픈스트리트맵 건물과 겹치면 그쪽을 쓴다
+    const t = { building: 'yes', _vw: '1' }; if (v.fl > 0) t['building:levels'] = String(v.fl); if (v.nm && !BADN.test(v.nm)) t.name = /\d+동$/.test(v.dc) ? `${v.nm} ${v.dc}` : v.nm;
+    items.push({ t, o: ring, c, part: false }); added++;
+  }
+  console.log(`브이월드로 채운 건물 ${added}`); }
 { const grid = new Map(), G = 50; VI.forEach((v, i) => { let x = 0, z = 0; for (const p of v.ring) { x += p[0]; z += p[1]; } v.c = [x / v.ring.length, z / v.ring.length]; const k = `${Math.floor(v.c[0] / G)},${Math.floor(v.c[1] / G)}`; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(i); });
   let hit = 0; for (const b of items) { const [cx, cz] = b.c; let v = null; for (let a = -1; a <= 1 && !v; a++) for (let c2 = -1; c2 <= 1 && !v; c2++) for (const i of grid.get(`${Math.floor(cx / G) + a},${Math.floor(cz / G) + c2}`) || []) if (inPoly(b.c, VI[i].ring)) { v = VI[i]; break; }
     if (!v) continue; hit++; b.info = [v.use, v.st, v.yr]; if (!b.t.height && v.h > 2 && !b.part) b.t = { ...b.t, height: String(v.h) }; }
