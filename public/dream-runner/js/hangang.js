@@ -1147,6 +1147,17 @@ export class Hangang {
     // 공원 안 (코스 주변 450m)
     for (let n = 0; n < 2600 * near; n++) { const s = r() * this.L, lat = (r() < 0.25 ? -1 : 1) * (12 + r() * 260), [x, z] = this.world(s, lat); if (okAt(x, z) && this.greenPolys.some((g) => inPoly(x, z, g))) spots.push([x, z, 0.7 + r() * 0.6]); }
     for (const [x, z] of this.extraTrees || []) spots.push([x, z, 0.85 + r() * 0.35]);
+    // 서울 전체 칸: 코스가 없으니 칸 전체에서 — 숲은 빽빽이, 공원 · 잔디는 드문드문(넓이에 맞게), 큰길(폭 10m 이상)은 양옆 가로수
+    if (this.map.kind === 'tile') {
+      const M = this.map, S = M.scale, kinds = new Map(); for (const g of M.green) kinds.set(g, g[0]);
+      const lim = Math.round((isPhone ? 2600 : 6000) * near); let n0 = spots.length;
+      for (const g of M.green) { const kind = g[0]; if (kind === 'pitch' || kind === 'sand') continue; const poly = g.slice(1).map((rg) => unpack(rg, S)); let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of poly[0] || []) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } if (!isFinite(x0)) continue;
+        const area = Math.abs(ringArea(poly[0])), per = kind === 'wood' ? 110 : kind === 'wild' ? 260 : 420, want = Math.min(900, Math.round((area / per) * near));
+        for (let t = 0, got = 0; t < want * 3 && got < want && spots.length - n0 < lim; t++) { const x = x0 + r() * (x1 - x0), z = z0 + r() * (z1 - z0); if (!inPoly(x, z, poly) || !okAt(x, z)) continue; spots.push([x, z, (kind === 'wood' ? 0.8 : 0.7) + r() * 0.6]); got++; } }
+      for (const rd of M.roads) { if (rd[1] || rd[0] < 10) continue; const pts = unpack(rd.slice(2), S), off = rd[0] / 2 + 1.6;
+        for (let k = 1; k < pts.length && spots.length - n0 < lim; k++) { const [ax, az] = pts[k - 1], [bx, bz] = pts[k], L = Math.hypot(bx - ax, bz - az); if (L < 1) continue; const ux = (bx - ax) / L, uz = (bz - az) / L;
+          for (let t = 6; t < L - 4; t += 11 / near) for (const sd of [-1, 1]) { const x = ax + ux * t - uz * off * sd, z = az + uz * t + ux * off * sd; if (okAt(x, z) && !this.water.some((w) => inPoly(x, z, w))) spots.push([x, z, 0.62 + r() * 0.2]); } } }
+    }
     this.trees = spots; for (const [x, z, k] of spots) this.addCircle(x, z, 0.34 * k, 7);
     const N = spots.length, o = new THREE.Object3D();
     // 나무 모양 셋: 둥근 활엽수(벚나무 · 느티나무), 키 큰 나무(은행 · 포플러), 소나무. 잎 덩어리 여러 개 + 아래가 어두운 그늘
