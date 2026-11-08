@@ -974,7 +974,7 @@ hg.onStation = (st) => { hgSt = st; clearInterval(hgStT); $('hg-subway').classLi
 hg.onCity = (c) => { if (c?.congest) toast(`📡 지금 실제 여의도: ${c.congest} · 약 ${Math.round((c.pplMin + c.pplMax) / 2 / 10000)}만 명 · 도로 ${c.road || '-'}${c.temp != null ? ` · ${c.temp}°C` : ''}`, 3200); };
 // 이웃 지역으로 걸어 들어가기: 지금 지역을 정리하고 그 지역 코스의 이쪽 끝에서 이어 걷는다
 async function hgGoRegion(G) {
-  hgReport(true); hg.exitInterior?.(); hg.onShop(null); hg.onStation(null); const from = hgRegion; hg.leave(); hgUse(G.id); toast(`${G.label}(으)로 걸어가요…`, 2200);
+  hgReport(true); hgSavePos(); hg.exitInterior?.(); hg.onShop(null); hg.onStation(null); const from = hgRegion; hg.leave(); hgUse(G.id); toast(`${G.label}(으)로 걸어가요…`, 2200);
   await startHangang(null); const back = (hg.gates || []).find((q) => q.id === from); if (back) hg.teleport(back.end === 0 ? 14 : hg.L - 14, 0);
 }
 hg.onRegionGate = (G) => hgGoRegion(G);
@@ -1002,13 +1002,24 @@ let hgPost = null; // 화면 보정 (블룸 · 색감) · 컴퓨터에서만
 addEventListener('resize', () => hgPost?.setSize(innerWidth, innerHeight));
 // 입장: 이어 달리기 · 서강대교에서 · 지도에서 고르기
 const HG_POS_KEY = 'dreamrunner.hangang.pos';
-function hgSavedPos() { try { return JSON.parse(store.get(HG_POS_KEY) || 'null'); } catch { return null; } }
+// 저장 위치: 지역마다 따로 + 마지막으로 있던 지역 ({ last, regions: { id: { s, lat, where } } }) · 예전 한 칸짜리 저장도 읽는다
+function hgPosAll() { try { const v = JSON.parse(store.get(HG_POS_KEY) || 'null'); if (!v) return { last: null, regions: {} }; if (v.regions) return v; const id = v.region || 'yeouido'; return { last: id, regions: { [id]: { s: v.s, lat: v.lat, where: v.where } } }; } catch { return { last: null, regions: {} }; } }
+function hgSavedPos(id = hgRegion) { return hgPosAll().regions[id] || null; }
+function hgLastPos() { const a = hgPosAll(); return a.last && a.regions[a.last] ? { region: a.last, ...a.regions[a.last] } : null; }
 // 지도 파일이 있는 지역만 보여 준다 (지도를 아직 안 만든 지역 단추가 먼저 배포돼도 깨지지 않게)
 const hgHave = {}; async function hgCheckRegions() { await Promise.all(Object.keys(HG_REGIONS).filter((id) => hgHave[id] === undefined).map(async (id) => { try { hgHave[id] = (await fetch(`hangang/${id}.json`, { method: 'HEAD' })).ok; } catch { hgHave[id] = false; } })); hgRegionUI(); }
-function hgRegionUI() { $('hg-regions').innerHTML = Object.entries(HG_REGIONS).filter(([id]) => hgHave[id] !== false).map(([id, r]) => `<button data-r="${id}" class="${id === hgRegion ? 'on' : ''}">${r.label}</button>`).join(''); $('hg-regions').querySelectorAll('button').forEach((b) => { b.onclick = () => { hgUse(b.dataset.r); hgRegionUI(); }; }); $('hg-from-start').textContent = HG_REGIONS[hgRegion].start; }
-$('hg-btn').onclick = () => { unlock(); hgRegionUI(); hgCheckRegions(); const p = hgSavedPos(); $('hg-resume').classList.toggle('hidden', !p); if (p) $('hg-resume-sub').textContent = p.where || ''; $('hg-start').classList.remove('hidden'); };
+// 지역 고르기: 지역을 누르면 위 '이어 달리기'는 그 지역에서 마지막으로 있던 곳, 맨 끝 '▶ 이어 달리기'는 서울 전체에서 마지막으로 있던 곳
+function hgResumeUI() { const p = hgSavedPos(); $('hg-resume').classList.toggle('hidden', !p); if (p) $('hg-resume-sub').textContent = p.where || ''; }
+function hgRegionUI() {
+  const last = hgLastPos();
+  $('hg-regions').innerHTML = Object.entries(HG_REGIONS).filter(([id]) => hgHave[id] !== false).map(([id, r]) => `<button data-r="${id}" class="${id === hgRegion ? 'on' : ''}">${r.label}</button>`).join('') + (last ? `<button data-last="1" class="last">▶ 이어 달리기 · 서울 전체 마지막 위치 <small>${String(last.where || '').replace(/[<>&]/g, '')}</small></button>` : '');
+  $('hg-regions').querySelectorAll('button[data-r]').forEach((b) => { b.onclick = () => { hgUse(b.dataset.r); hgRegionUI(); }; });
+  const lb = $('hg-regions').querySelector('button[data-last]'); if (lb) lb.onclick = () => { const p = hgLastPos(); if (!p) return; $('hg-start').classList.add('hidden'); hgUse(p.region); startHangang({ s: p.s, lat: p.lat }); };
+  $('hg-from-start').textContent = HG_REGIONS[hgRegion].start; hgResumeUI();
+}
+$('hg-btn').onclick = () => { unlock(); hgRegionUI(); hgCheckRegions(); $('hg-start').classList.remove('hidden'); };
 $('hg-start-x').onclick = () => $('hg-start').classList.add('hidden');
-$('hg-resume').onclick = () => { $('hg-start').classList.add('hidden'); const p = hgSavedPos(); if (p?.region) hgUse(p.region); startHangang(p ? { s: p.s, lat: p.lat } : null); };
+$('hg-resume').onclick = () => { $('hg-start').classList.add('hidden'); const p = hgSavedPos(); startHangang(p ? { s: p.s, lat: p.lat } : null); };
 $('hg-from-start').onclick = () => { $('hg-start').classList.add('hidden'); startHangang({ s: 30, lat: -4.3 }); };
 $('hg-pick').onclick = async () => { $('hg-start').classList.add('hidden'); try { await hg.load(hgRegion); } catch (e) { toast(e.message); return; } hgOpenMap(true); };
 let hgPick = null, hgMapStart = false;
@@ -1107,7 +1118,7 @@ function hgFrame(dt) {
 addEventListener('pagehide', () => { if (game.mode === 'hangang') hgReport(true); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && game.mode === 'hangang') hgReport(true); });
 // 바로 가기: /dream-runner/#hangang 으로 들어오면 한강 러닝부터
-if (location.hash === '#hangang') setTimeout(() => { if (game.mode === 'title') { const p = hgSavedPos(); startHangang(p ? { s: p.s, lat: p.lat } : null); } }, 700);
+if (location.hash === '#hangang') setTimeout(() => { if (game.mode === 'title') { const p = hgLastPos(); if (p) hgUse(p.region); startHangang(p ? { s: p.s, lat: p.lat } : null); } }, 700);
 
 // 한강: 마우스로 시점 (화면을 누르면 마우스가 잠기고, Esc 로 풀린다) · 휴대폰은 화면을 끌어서
 let hgLook = { yaw: 0, pitch: 0 }, hgDrag = null;
@@ -1139,4 +1150,4 @@ function hgLabels() {
   }
 }
 
-function hgSavePos() { if (!hg.ready || hg.px == null) return; store.set(HG_POS_KEY, JSON.stringify({ region: hgRegion, s: Math.round(hg.s), lat: Math.round(hg.lat * 10) / 10, where: `${hg.regionName || hg.map.name} 근처 · ${(hg.s / 1000).toFixed(1)}km 지점` })); }
+function hgSavePos() { if (!hg.ready || hg.px == null) return; const a = hgPosAll(); a.regions[hgRegion] = { s: Math.round(hg.s), lat: Math.round(hg.lat * 10) / 10, where: `${HG_REGIONS[hgRegion]?.label || ''} · ${hg.regionName || hg.map.name} 근처 · ${(hg.s / 1000).toFixed(1)}km 지점` }; a.last = hgRegion; store.set(HG_POS_KEY, JSON.stringify(a)); }

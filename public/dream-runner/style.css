@@ -338,3 +338,6 @@ body.touch #hg-subway { top: 200px; }
 #hg-regions { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; margin: 4px 0 8px; max-height: 38vh; overflow-y: auto; }
 #hg-regions button { padding: 8px 10px; border-radius: 999px; border: 2px solid rgba(255,255,255,.25); background: rgba(255,255,255,.08); color: inherit; font-family: 'Jua'; font-size: 15px; cursor: pointer; }
 #hg-regions button.on { border-color: #ffd98a; background: rgba(255, 217, 138, .22); }
+
+#hg-regions button.last { grid-column: 1 / -1; border-color: #8fd18a; background: rgba(143, 209, 138, .18); display: flex; flex-direction: column; align-items: center; gap: 2px; }
+#hg-regions button.last small { font-family: 'Gowun Dodum'; font-size: 11px; opacity: .8; }
