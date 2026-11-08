@@ -1143,8 +1143,9 @@ function hgFrame(dt) {
   $('hg-bar').style.width = `${Math.round(((hg.v - V_MIN) / (V_MAX - V_MIN)) * 100)}%`;
   hgRun.sendT -= 0.2; if (hgRun.sendT <= 0) { hgRun.sendT = 20; hgReport(); hgSavePos(); }
 }
-addEventListener('pagehide', () => { if (game.mode === 'hangang') hgReport(true); });
-document.addEventListener('visibilitychange', () => { if (document.hidden && game.mode === 'hangang') hgReport(true); });
+// 탭을 닫거나 숨길 때도 지금 자리를 기억한다 (20초마다만 저장해서, 그 사이에 닫으면 걸은 만큼 처음 자리로 돌아갔다)
+addEventListener('pagehide', () => { if (game.mode === 'hangang') { hgReport(true); hgSavePos(); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden && game.mode === 'hangang') { hgReport(true); hgSavePos(); } });
 // 바로 가기: /dream-runner/#hangang 으로 들어오면 한강 러닝부터
 // 젤리 서울 러너 랜딩 배경: 게임 속에서 찍은 랜드마크 장면이 한 장씩 천천히 다가오며 바뀐다 (7초마다)
 const SW_SCENES = [['63', '63빌딩', '여의도 · 해 질 녘'], ['tower', 'N서울타워', '남산 · 밤'], ['namsanview', '남산에서 본 서울', '진짜 지형 · 해 질 녘'], ['lotte', '롯데월드타워', '잠실 · 노을'], ['hongdae', '홍대 거리', '마포 · 여름밤'], ['gangnam', '강남역 거리', '강남 · 겨울밤'], ['hangang', '한강의 밤', '여의도 · 여름']];
@@ -1218,6 +1219,7 @@ function hgAcctUI() {
   el.innerHTML = `<span>💾 로그인 없이 바로 즐겨요 · 위치는 이 기기에 저장돼요${seen}</span><span class="sub">구글로 로그인하면 다른 기기에서도 이어서 걷고, 방문 기록이 계정에 남아요</span><div id="hg-g-btn"></div>`;
   if (game.status?.googleClientId) account.googleButton($('hg-g-btn'), game.status.googleClientId, async () => { renderAccount(); await hgCloudLoad(); hgCloudSave(); hgRegionUI(); hgAcctUI(); toast('☁️ 로그인했어요 · 이제 계정에 저장돼요', 2200); }, (e) => toast(e.message, 2000)).catch(() => {});
 }
-function hgSavePos() { if (!hg.ready || hg.px == null) return; const a = hgPosAll();
+function hgSavePos() { if (!hg.ready || hg.px == null) return; if (hgWorld && hg.chunks && !hg.chunks.has(`${Math.floor(hg.px / 2000)}_${Math.floor(hg.pz / 2000)}`)) return; // 서울 전체: 곰이 선 칸이 아직 안 만들어졌으면 (불러오는 중 · 처음 자리 0,0) 저장하지 않는다
+  const a = hgPosAll();
   // 서울 전체: 서울 좌표로, 가장 가까운 지역 이름 아래에
   if (hgWorld && hg.chunks) { const nr = hg.nearRegion(hg.px, hg.pz), id = nr?.id || hgRegion; a.regions[id] = { x: Math.round(hg.px), z: Math.round(hg.pz), face: Math.round(hg.face * 100) / 100, where: hg.where(), at: Date.now() }; a.last = id; a.at = Date.now(); store.set(HG_POS_KEY, JSON.stringify(a)); hgMarkVisit(); hgCloudSave(); return; } a.regions[hgRegion] = { s: Math.round(hg.s), lat: Math.round(hg.lat * 10) / 10, where: `${HG_REGIONS[hgRegion]?.label || ''} · ${hg.regionName || hg.map.name} 근처 · ${(hg.s / 1000).toFixed(1)}km 지점`, at: Date.now() }; a.at = Date.now(); setTimeout(hgCloudSave, 0); a.last = hgRegion; store.set(HG_POS_KEY, JSON.stringify(a)); }
