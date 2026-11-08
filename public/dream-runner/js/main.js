@@ -960,7 +960,13 @@ const hgInst = { yeouido: hg }; let hgRegion = 'yeouido';
 // 지역을 옮길 때 넘길 시각 · 계절 · 날씨 (한 번 산책을 시작하면 그 뒤로는 유지)
 let hgKeep = null;
 function hgKeepNow() { if (hg?.bear) hgKeep = { opt: { ...hg.opt }, state: { ...hg.state }, weatherT: hg.weatherT }; }
-function hgUse(id) { if (!HG_REGIONS[id]) id = 'yeouido'; if (!hgInst[id]) { const n = new Hangang(); for (const k of Object.keys(hg)) if (/^on[A-Z]|^api$/.test(k) && typeof hg[k] === 'function') n[k] = hg[k]; hgInst[id] = n; } hg = hgInst[id]; hgRegion = id; }
+// 서울 전체 이어 걷기: 서울 칸 지도가 다 만들어지면 켠다 (그 전엔 주소에 ?world=1 로 시험). 켜지면 지역은 '시작 장소'일 뿐, 장면은 하나
+let hgWorld = new URLSearchParams(location.search).has('world'), hgWorldIdx = null;
+async function hgCheckWorld() { try { hgWorldIdx ||= await (await fetch('seoul/index.json')).json(); if (hgWorldIdx.all?.length && hgWorldIdx.have.length >= hgWorldIdx.all.length) hgWorld = true; } catch { /* 칸 지도 없음 */ } return hgWorld; }
+const hgTileAt = (x, z) => !!hgWorldIdx?.have?.some(([i, j]) => i === Math.floor(x / (hgWorldIdx.tile || 2000)) && j === Math.floor(z / (hgWorldIdx.tile || 2000)));
+// 지역의 시작 자리(서울 좌표): 그 지역 코스 30m 지점, 코스 방향을 본다
+async function hgRegionStart(id) { const S = await hgLoadSeoul(), R = S.regions.find((q) => q.id === id) || S.regions[0]; let k = 1; while (k < R.pts.length - 1 && R.acc[k] < 30) k++; const [ax, az] = R.pts[k - 1], [bx, bz] = R.pts[k]; return { x: bx, z: bz, face: Math.atan2(bx - ax, bz - az) }; }
+function hgUse(id) { if (!HG_REGIONS[id]) id = 'yeouido'; if (hgWorld) { if (!hgInst.seoul) { const n = new Hangang(); for (const k of Object.keys(hg)) if (/^on[A-Z]|^api$/.test(k) && typeof hg[k] === 'function') n[k] = hg[k]; hgInst.seoul = n; } hg = hgInst.seoul; hgRegion = id; return; } if (!hgInst[id]) { const n = new Hangang(); for (const k of Object.keys(hg)) if (/^on[A-Z]|^api$/.test(k) && typeof hg[k] === 'function') n[k] = hg[k]; hgInst[id] = n; } hg = hgInst[id]; hgRegion = id; }
 hg.api = (path) => account.api(path);
 // 지하철 출입구 앞: 그 역 실시간 도착 (20초마다)
 const LCOL = { '1호선': '#0052A4', '2호선': '#00A84D', '5호선': '#996CAC', '6호선': '#CD7C2F', '9호선': '#BDB092', 경의중앙선: '#77C4A3', 공항철도: '#0090D2', 신림선: '#6789CA' };
@@ -1018,40 +1024,44 @@ function hgRegionUI() {
   const last = hgLastPos();
   $('hg-regions').innerHTML = Object.entries(HG_REGIONS).filter(([id]) => hgHave[id] !== false).map(([id, r]) => `<button data-r="${id}" class="${id === hgRegion ? 'on' : ''}">${r.label}</button>`).join('') + (last ? `<button data-last="1" class="last">▶ 이어 달리기 · 서울 전체 마지막 위치 <small>${String(last.where || '').replace(/[<>&]/g, '')}</small></button>` : '');
   $('hg-regions').querySelectorAll('button[data-r]').forEach((b) => { b.onclick = () => { hgUse(b.dataset.r); hgRegionUI(); }; });
-  const lb = $('hg-regions').querySelector('button[data-last]'); if (lb) lb.onclick = () => { const p = hgLastPos(); if (!p) return; $('hg-start').classList.add('hidden'); hgUse(p.region); startHangang({ s: p.s, lat: p.lat }); };
+  const lb = $('hg-regions').querySelector('button[data-last]'); if (lb) lb.onclick = () => { const p = hgLastPos(); if (!p) return; $('hg-start').classList.add('hidden'); hgUse(p.region); startHangang(p); };
   $('hg-from-start').textContent = HG_REGIONS[hgRegion].start; hgResumeUI();
 }
-$('hg-btn').onclick = () => { unlock(); hgRegionUI(); hgCheckRegions(); $('hg-start').classList.remove('hidden'); };
+$('hg-btn').onclick = () => { unlock(); hgRegionUI(); hgCheckRegions(); hgCheckWorld().then((w) => { if (w) hgUse(hgRegion); }); $('hg-start').classList.remove('hidden'); };
 $('hg-start-x').onclick = () => $('hg-start').classList.add('hidden');
-$('hg-resume').onclick = () => { $('hg-start').classList.add('hidden'); const p = hgSavedPos(); startHangang(p ? { s: p.s, lat: p.lat } : null); };
-$('hg-from-start').onclick = () => { $('hg-start').classList.add('hidden'); startHangang({ s: 30, lat: -4.3 }); };
-$('hg-pick').onclick = async () => { $('hg-start').classList.add('hidden'); try { await hg.load(hgRegion); } catch (e) { toast(e.message); return; } hgOpenMap(true); };
+$('hg-resume').onclick = () => { $('hg-start').classList.add('hidden'); const p = hgSavedPos(); startHangang(p); };
+$('hg-from-start').onclick = () => { $('hg-start').classList.add('hidden'); startHangang(hgWorld ? null : { s: 30, lat: -4.3 }); };
+$('hg-pick').onclick = async () => { $('hg-start').classList.add('hidden'); try { if (await hgCheckWorld()) hgUse(hgRegion); await hg.load(hgWorld ? 'seoul' : hgRegion); } catch (e) { toast(e.message); return; } hgOpenMap(true); };
 let hgPick = null, hgMapStart = false, hgMapMode = 'seoul', hgSeoul = null, hgMapT = null;
 // 큰 지도: 기본은 서울 전체(지역 · 구 · 준비 중인 구), '이 지역 자세히'로 지금 지역 지도
-async function hgLoadSeoul() { if (hgSeoul) return hgSeoul; const { SeoulMap } = await import('./seoul-map.js'); const d = await (await fetch('hangang/seoul.json')).json(); hgSeoul = new SeoulMap(d, Object.fromEntries(Object.entries(HG_REGIONS).map(([k, v]) => [k, v.label]))); return hgSeoul; }
-function hgMapTitle() { $('hg-map-title').innerHTML = hgMapMode === 'seoul' ? '🗺️ 서울 전체 <small>색 있는 선 = 걸을 수 있는 지역 · 회색 = 준비 중 · 가고 싶은 곳을 누르세요</small>' : `🗺️ ${hg.map?.name || ''} <small>가고 싶은 곳을 누르세요 (빨간 선이 코스)</small>`; $('hg-map-mode').textContent = hgMapMode === 'seoul' ? '🔍 이 지역 자세히' : '🗺️ 서울 전체'; $('hg-map-mode').classList.toggle('hidden', !hg.ready); }
+async function hgLoadSeoul() { if (!hgSeoul) { const { SeoulMap } = await import('./seoul-map.js'); const d = await (await fetch('hangang/seoul.json')).json(); hgSeoul = new SeoulMap(d, Object.fromEntries(Object.entries(HG_REGIONS).map(([k, v]) => [k, v.label]))); } hgSeoul.allOpen = hgWorld; return hgSeoul; }
+function hgMapTitle() { $('hg-map-title').innerHTML = hgMapMode === 'seoul' ? (hgWorld ? '🗺️ 서울 전체 <small>어디든 누르면 그곳으로 가요 · 걸어서 · 날아서도 이어져 있어요</small>' : '🗺️ 서울 전체 <small>색 있는 선 = 걸을 수 있는 지역 · 회색 = 준비 중 · 가고 싶은 곳을 누르세요</small>') : `🗺️ ${hg.map?.name || ''} <small>가고 싶은 곳을 누르세요 (빨간 선이 코스)</small>`; $('hg-map-mode').textContent = hgMapMode === 'seoul' ? '🔍 이 지역 자세히' : '🗺️ 서울 전체'; $('hg-map-mode').classList.toggle('hidden', !hg.ready || hgWorld); }
 async function hgOpenMap(start = false) { hgMapStart = start; hgPick = null; hgMapMode = 'seoul'; $('hg-go').disabled = true; $('hg-go').textContent = start ? '🏃 여기서 시작' : '📍 새 위치로 이동'; $('hg-map').classList.remove('hidden'); if (document.pointerLockElement) document.exitPointerLock?.(); try { await hgLoadSeoul(); } catch { hgMapMode = 'detail'; } hgMapTitle(); hgDrawMap(); clearInterval(hgMapT); hgMapT = setInterval(() => { if ($('hg-map').classList.contains('hidden')) { clearInterval(hgMapT); return; } if (hgMapMode === 'seoul') hgDrawMap(); }, 120); }
 function hgHere() { return hg.ready && game.mode === 'hangang' && hg.px != null ? { x: hg.map.center[0] + hg.px, z: hg.map.center[1] + hg.pz } : null; }
 function hgDrawMap() { const c = $('hg-map-c'); if (hgMapMode === 'seoul' && hgSeoul) hgSeoul.draw(c.getContext('2d'), c.width, c.height, { here: hgHere(), pick: hgPick?.seoul ? hgPick : null, t: performance.now() / 1000 }); else hg.drawBigMap(c.getContext('2d'), c.width, hgPick?.seoul ? null : hgPick); }
 $('hg-map-mode').onclick = () => { hgMapMode = hgMapMode === 'seoul' ? 'detail' : 'seoul'; hgPick = null; $('hg-go').disabled = true; hgMapTitle(); hgDrawMap(); };
 $('hg-map-c').addEventListener('pointerdown', (e) => { const r = e.currentTarget.getBoundingClientRect(), u = (e.clientX - r.left) / r.width, v = (e.clientY - r.top) / r.height;
-  if (hgMapMode === 'seoul' && hgSeoul) { const p = hgSeoul.pickAt(u, v); hgPick = { seoul: true, ...p }; $('hg-go').disabled = !p.region; $('hg-go').textContent = p.region ? `📍 ${p.name}(으)로` : `🚧 ${p.gu || '이곳'}은 준비 중이에요`; }
+  if (hgMapMode === 'seoul' && hgSeoul) { const p = hgSeoul.pickAt(u, v); hgPick = { seoul: true, ...p }; const ok = hgWorld ? hgTileAt(p.x, p.z) : !!p.region; $('hg-go').disabled = !ok; $('hg-go').textContent = !ok ? `🚧 ${p.gu || '이곳'}은 준비 중이에요` : p.region ? `📍 ${p.name}(으)로` : `📍 ${p.gu || '이곳'}(으)로`; }
   else { hgPick = hg.pickAt(u, v); $('hg-go').disabled = false; $('hg-go').textContent = hgMapStart ? '🏃 여기서 시작' : '📍 새 위치로 이동'; }
   hgDrawMap(); });
 // 다른 지역으로 옮기기 (지금 지역은 저장하고 정리)
 async function hgSwitchRegion(id, pos) { if (game.mode === 'hangang') { hgReport(true); hgSavePos(); hg.exitInterior?.(); hg.onShop(null); hg.onStation(null); hgKeepNow(); hg.leave(); } hgUse(id); await startHangang(pos); }
 $('hg-go').onclick = () => { if (!hgPick) return; $('hg-map').classList.add('hidden'); clearInterval(hgMapT);
+  if (hgPick.seoul && hgWorld) { const P = hgPick, nm = P.region ? P.name : P.gu || '이곳'; if (game.mode === 'hangang') { hg.placeAt(P.x, P.z, hg.face); toast(`📍 ${nm} · 새 위치로 왔어요`, 1600); } else { toast(`${nm}(으)로 가요…`, 2000); if (P.region) hgUse(P.region); startHangang({ x: P.x, z: P.z }); } return; }
   if (hgPick.seoul) { if (!hgPick.region) return; const pos = { s: hgPick.s, lat: 0 }; if (game.mode === 'hangang' && hgPick.region === hgRegion) { hg.teleport(pos.s, pos.lat); toast(`📍 ${hgPick.name} · 새 위치로 왔어요`, 1600); } else { toast(`${hgPick.name}(으)로 가요…`, 2000); hgSwitchRegion(hgPick.region, pos); } return; }
   if (hgMapStart || game.mode !== 'hangang') startHangang({ s: hgPick.s, lat: hgPick.lat }); else { hg.teleport(hgPick.s, hgPick.lat); toast('📍 새 위치로 왔어요', 1400); } };
 $('hg-map-x').onclick = () => $('hg-map').classList.add('hidden');
 $('hg-mini').onclick = () => { if (game.mode === 'hangang') hgOpenMap(false); };
 async function startHangang(pos = null) {
   const b = $('hg-btn'); b.disabled = true;
-  try { if (!hg.ready) toast(`${HG_REGIONS[hgRegion].label} 지도를 펼치는 중…`, 4000); await hg.load(hgRegion); }
+  await hgCheckWorld(); if (hgWorld && hg !== hgInst.seoul) hgUse(hgRegion);
+  try { if (!hg.ready) toast(hgWorld ? '🗺️ 서울을 펼치는 중…' : `${HG_REGIONS[hgRegion].label} 지도를 펼치는 중…`, 4000); await hg.load(hgWorld ? 'seoul' : hgRegion); }
   catch (e) { toast(`한강 지도를 불러오지 못했어요 · ${e.message}`, 2600); b.disabled = false; return; }
   b.disabled = false;
   hideScreens(); game.mode = 'hangang'; document.body.classList.add('hg');
-  runner.shadow.visible = false; hg.enter(runner.bear, { ...(pos ? { s: pos.s } : {}), keep: hgKeep }); if (pos) hg.teleport(pos.s, pos.lat);
+  if (!hgWorld && pos && pos.s == null) pos = null; // 서울 전체에서 저장한 자리(x, z)는 지역 지도에선 못 쓴다
+  runner.shadow.visible = false; hg.enter(runner.bear, { ...(pos?.s != null && !hgWorld ? { s: pos.s } : {}), keep: hgKeep });
+  if (hgWorld) { const p = pos?.x != null ? pos : await hgRegionStart(hgRegion); hg.placeAt(p.x, p.z, p.face ?? 0); } else if (pos) hg.teleport(pos.s, pos.lat);
   renderer.shadowMap.enabled = !isPhone; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
   if (hgPost && hgPost.scene !== hg.scene) { hgPost.dispose(); hgPost = null; } // 지역이 바뀌면 그 지역 장면으로 다시
   if (!isPhone && !hgPost) { try { const { makePost } = await import('./hangang-post.js'); hgPost = makePost(renderer, hg.scene, camera); hgPost.scene = hg.scene; } catch (e) { console.warn('화면 보정 없이', e); } }
@@ -1134,7 +1144,7 @@ function hgFrame(dt) {
 addEventListener('pagehide', () => { if (game.mode === 'hangang') hgReport(true); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && game.mode === 'hangang') hgReport(true); });
 // 바로 가기: /dream-runner/#hangang 으로 들어오면 한강 러닝부터
-if (location.hash === '#hangang') setTimeout(() => { if (game.mode === 'title') { const p = hgLastPos(); if (p) hgUse(p.region); startHangang(p ? { s: p.s, lat: p.lat } : null); } }, 700);
+if (location.hash === '#hangang') setTimeout(() => { if (game.mode === 'title') { const p = hgLastPos(); if (p) hgUse(p.region); startHangang(p); } }, 700);
 
 // 한강: 마우스로 시점 (화면을 누르면 마우스가 잠기고, Esc 로 풀린다) · 휴대폰은 화면을 끌어서
 let hgLook = { yaw: 0, pitch: 0 }, hgDrag = null;
@@ -1166,4 +1176,6 @@ function hgLabels() {
   }
 }
 
-function hgSavePos() { if (!hg.ready || hg.px == null) return; const a = hgPosAll(); a.regions[hgRegion] = { s: Math.round(hg.s), lat: Math.round(hg.lat * 10) / 10, where: `${HG_REGIONS[hgRegion]?.label || ''} · ${hg.regionName || hg.map.name} 근처 · ${(hg.s / 1000).toFixed(1)}km 지점` }; a.last = hgRegion; store.set(HG_POS_KEY, JSON.stringify(a)); }
+function hgSavePos() { if (!hg.ready || hg.px == null) return; const a = hgPosAll();
+  // 서울 전체: 서울 좌표로, 가장 가까운 지역 이름 아래에
+  if (hgWorld && hg.chunks) { const nr = hg.nearRegion(hg.px, hg.pz), id = nr?.id || hgRegion; a.regions[id] = { x: Math.round(hg.px), z: Math.round(hg.pz), face: Math.round(hg.face * 100) / 100, where: hg.where() }; a.last = id; store.set(HG_POS_KEY, JSON.stringify(a)); return; } a.regions[hgRegion] = { s: Math.round(hg.s), lat: Math.round(hg.lat * 10) / 10, where: `${HG_REGIONS[hgRegion]?.label || ''} · ${hg.regionName || hg.map.name} 근처 · ${(hg.s / 1000).toFixed(1)}km 지점` }; a.last = hgRegion; store.set(HG_POS_KEY, JSON.stringify(a)); }

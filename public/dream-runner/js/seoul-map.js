@@ -20,12 +20,12 @@ export class SeoulMap {
     this.fit(w, h);
     c.fillStyle = '#0f1726'; c.fillRect(0, 0, w, h);
     // 구: 지역이 있는 구는 밝게, 없는 구는 회색 빗금(준비 중)
-    for (const g of this.gu) { const on = g.regions.length > 0; c.beginPath(); for (const r of g.rings) r.forEach(([x, z], i) => { const [a, b] = this.T(x, z); if (i) c.lineTo(a, b); else c.moveTo(a, b); }); c.closePath();
+    for (const g of this.gu) { const on = this.allOpen || g.regions.length > 0; c.beginPath(); for (const r of g.rings) r.forEach(([x, z], i) => { const [a, b] = this.T(x, z); if (i) c.lineTo(a, b); else c.moveTo(a, b); }); c.closePath();
       c.fillStyle = on ? 'rgba(120, 200, 170, .22)' : 'rgba(90, 96, 110, .28)'; c.fill(); if (!on) { c.save(); c.clip(); c.strokeStyle = 'rgba(160,165,175,.12)'; c.lineWidth = 1; for (let s = -h; s < w + h; s += 9) { c.beginPath(); c.moveTo(s, 0); c.lineTo(s - h, h); c.stroke(); } c.restore(); }
       c.strokeStyle = on ? 'rgba(160, 230, 200, .7)' : 'rgba(150,155,170,.45)'; c.lineWidth = 1.2; c.stroke(); }
     // 구 이름
     c.textAlign = 'center'; c.textBaseline = 'middle';
-    for (const g of this.gu) { const [a, b] = this.T(...g.c), on = g.regions.length > 0; c.font = `${on ? 'bold ' : ''}${Math.max(10, w * 0.016)}px sans-serif`; c.fillStyle = on ? 'rgba(220,245,235,.85)' : 'rgba(170,175,188,.7)'; c.fillText(g.name, a, b); if (!on) { c.font = `${Math.max(8, w * 0.011)}px sans-serif`; c.fillStyle = 'rgba(170,175,188,.55)'; c.fillText('준비 중', a, b + Math.max(11, w * 0.017)); } }
+    for (const g of this.gu) { const [a, b] = this.T(...g.c), on = this.allOpen || g.regions.length > 0; c.font = `${on ? 'bold ' : ''}${Math.max(10, w * 0.016)}px sans-serif`; c.fillStyle = on ? 'rgba(220,245,235,.85)' : 'rgba(170,175,188,.7)'; c.fillText(g.name, a, b); if (!on) { c.font = `${Math.max(8, w * 0.011)}px sans-serif`; c.fillStyle = 'rgba(170,175,188,.55)'; c.fillText('준비 중', a, b + Math.max(11, w * 0.017)); } }
     // 지역 코스: 굵은 색 선 + 이름표
     for (const R of this.regions) { c.strokeStyle = R.color; c.lineWidth = Math.max(4, w * 0.007); c.lineCap = 'round'; c.lineJoin = 'round'; c.shadowColor = R.color; c.shadowBlur = 8; c.beginPath(); R.pts.forEach(([x, z], i) => { const [a, b] = this.T(x, z); if (i) c.lineTo(a, b); else c.moveTo(a, b); }); c.stroke(); c.shadowBlur = 0; }
     const placed = [];

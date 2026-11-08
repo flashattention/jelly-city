@@ -4,6 +4,7 @@
 //   쓰기: node tools/hangang-map.mjs yeouido [OSM 캐시 폴더]   (캐시가 없으면 Overpass 에서 받아 저장)
 //   지도 데이터 © OpenStreetMap contributors (ODbL) — 게임 화면에 출처를 표시한다
 import fs from 'node:fs';
+import { QUERIES } from './osm-queries.mjs';
 import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
@@ -111,15 +112,15 @@ async function overpass(file, body) {
   if (!r.ok) throw new Error(`Overpass ${r.status}`);
   const j = await r.json(); fs.writeFileSync(f, JSON.stringify(j)); return j;
 }
-const bJ = await overpass('buildings.json', 'way["building"]($B);relation["building"]($B);way["building:part"]($B);');
+const bJ = await overpass('buildings.json', QUERIES.buildings);
 // 멀리: 한강 물줄기 · 섬 (가양 ~ 반포) · 높은 건물 (스카이라인) — 코스에서 강을 따라 멀리 보이는 풍경
 const FAR_B = [37.470, 126.840, 37.590, 127.090];
 async function overpassFar(file, body) { if (TILE_MODE) return /water/.test(file) ? overpass(file, body) : { elements: [] }; const f = path.join(CACHE, file); if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf8')); const keep = C.bbox; C.bbox = FAR_B; try { return await overpass(file, body); } finally { C.bbox = keep; } }
-const wJ = await overpassFar('water_far.json', 'way["natural"="water"]["water"="river"]($B);relation["natural"="water"]["water"="river"]($B);way["place"~"island|islet"]($B);relation["place"~"island|islet"]($B);');
+const wJ = await overpassFar('water_far.json', QUERIES.water_far);
 const tJ = await overpassFar('tall_far.json', 'way["building"]["building:levels"~"^(1[8-9]|[2-9][0-9])$"]($B);way["building"]["height"~"^([5-9][0-9]|[1-5][0-9][0-9])"]($B);way["building:part"]["height"~"^([1-5][0-9][0-9])"]($B);');
 // 지하철역 · 출입구 (실제 위치)
-const sJ = await overpass('stations.json', 'node["railway"="subway_entrance"]($B);node["railway"="station"]($B);node["public_transport"="station"]($B);');
-const lJ = await overpass('land.json', 'way["natural"="water"]($B);relation["natural"="water"]($B);way["waterway"="riverbank"]($B);relation["waterway"="riverbank"]($B);way["place"~"island|islet"]($B);relation["place"~"island|islet"]($B);way["leisure"~"park|pitch|playground|garden"]($B);relation["leisure"="park"]($B);way["landuse"~"grass|recreation_ground|forest|meadow"]($B);way["natural"~"wood|scrub|grassland|wetland|sand|beach"]($B);relation["natural"~"wood|wetland|grassland"]($B);way["highway"]($B);way["railway"~"rail|subway"]($B);way["man_made"~"bridge|pier"]($B);');
+const sJ = await overpass('stations.json', QUERIES.stations);
+const lJ = await overpass('land.json', QUERIES.land);
 
 // ---------- 기하 도우미 ----------
 const geo = (g) => g.map((p) => P(p.lat, p.lon));
@@ -354,7 +355,7 @@ out.tall = [];
 
 // ---------- 지하철역 · 출입구 ----------
 // 가게 (실제 이름 · 종류): 카페 · 식당 · 분식 · 빵집 · 편의점 · 술집 → 건물 1층에 문과 간판을 달고 들어가서 주문할 수 있게
-{ const pJ = await overpass('pois.json', 'node["amenity"~"^(cafe|restaurant|fast_food|bar|pub|ice_cream|food_court)$"]["name"]($B);node["shop"~"^(convenience|bakery|pastry|supermarket|deli)$"]["name"]($B);');
+{ const pJ = await overpass('pois.json', QUERIES.pois);
   const kindOf = (t) => { const a = t.amenity, sh = t.shop, cu = String(t.cuisine || ''); if (sh === 'convenience' || sh === 'supermarket') return 'mart'; if (sh === 'bakery' || sh === 'pastry') return 'bakery'; if (a === 'cafe' || a === 'ice_cream') return 'cafe'; if (a === 'bar' || a === 'pub') return 'pub'; if (/chicken/.test(cu)) return 'chicken'; if (/pizza/.test(cu)) return 'pizza'; if (/burger/.test(cu) || a === 'fast_food') return 'burger'; if (/chinese/.test(cu)) return 'chinese'; if (/japanese|sushi|ramen/.test(cu)) return 'japanese'; return 'korean'; };
   out.shops = []; for (const e of pJ.elements) { if (e.type !== 'node') continue; const [x, z] = P(e.lat, e.lon); if (x < rect[0] || x > rect[2] || z < rect[1] || z > rect[3]) continue; const dd = near([x, z], 700); if (dd > 700) continue; out.shops.push([String(e.tags.name).slice(0, 24), kindOf(e.tags), ...q([x, z]), dd]); }
   out.shops = out.shops.sort((a, b) => a[4] - b[4]).slice(0, 1000).map((sh) => sh.slice(0, 4));

@@ -250,6 +250,8 @@ export class Hangang {
       const res = await fetch(new URL('../seoul/index.json', import.meta.url)); if (!res.ok) throw new Error('서울 지도를 불러오지 못했어요');
       this.world0 = await res.json(); this.tileHave = new Set(this.world0.have.map(([i, j]) => `${i}_${j}`));
       try { await this.loadTerrain(); } catch (e) { console.warn('지형 없이', e); this.terr = null; }
+      // 구 경계 · 지역(예전 코스) 자리: 지금 어느 구 · 어느 동네인지, 실시간 도시 정보를 어느 곳으로 물을지
+      try { const SJ = await (await fetch(new URL('../hangang/seoul.json', import.meta.url))).json(), U = SJ.unit || 10; this.guList = SJ.gu.map((g) => ({ name: g.name, rings: g.rings.map((r) => { const p = []; for (let i = 0; i < r.length; i += 2) p.push([r[i] * U, r[i + 1] * U]); return p; }) })); this.regionPts = SJ.regions.map((R) => { const pts = []; for (let k = 0; k < R.route.length; k += 2) pts.push([R.route[k], R.route[k + 1]]); return { id: R.id, name: R.name, pts }; }); } catch { this.guList = []; this.regionPts = []; }
       const E = []; this.map = { id: 'seoul', kind: 'world', name: '서울', sub: '', center: [0, 0], scale: 0.1, len: 400, route: [0, 0, 4000, 0], water: [], island: [], green: [], areas: [], roads: [], roadNames: [], alleys: [], bridges: [], rails: [], paths: [], buildings: [], binfo: [], colors: [], names: [], tall: [], stations: E, entrances: E, marks: [], labels: [], arches: [], far: [['남산서울타워', 0, 0, 236, 'tower']].slice(0, 0), shops: [] };
       this.id = id; this.build(); this.ready = true; return;
     }
@@ -292,6 +294,9 @@ export class Hangang {
     if (!want.length) return; want.sort((a, b) => a[0] - b[0]); const key = want[0][1];
     this.chunkLoading = key; this.loadChunk(key).then((c) => { if (this.map.kind === 'world') { this.chunks.set(key, c); this.cityDirty = true; this.onChunk?.(key, this.chunks.size); } }).catch(() => { (this.chunkFail ||= new Set()).add(key); }).finally(() => { this.chunkLoading = null; });
   }
+  // 서울 전체: 그 자리의 구 이름 · 가장 가까운 지역(예전 코스)
+  guAt(x, z) { for (const g of this.guList || []) if (g.rings.some((r) => inRing(x, z, r))) return g.name; return ''; }
+  nearRegion(x, z) { let best = null, bd = Infinity; for (const R of this.regionPts || []) for (const [a, b] of R.pts) { const d = (a - x) ** 2 + (b - z) ** 2; if (d < bd) { bd = d; best = R; } } return best ? { id: best.id, name: best.name, d: Math.sqrt(bd) } : null; }
   // ---------- 지형 (서울 전체 높이 격자, 50m) ----------
   async loadTerrain() {
     const [jr, br] = await Promise.all([fetch(new URL('../seoul/terrain.json', import.meta.url)), fetch(new URL('../seoul/terrain.bin.gz', import.meta.url))]);
@@ -1262,6 +1267,7 @@ export class Hangang {
   }
   removeGroup(gd) { this.scene.remove(gd.g); gd.g.traverse((o) => { if (o.isMesh) o.geometry?.dispose?.(); }); }
   tickGroups(dt, px, pz) {
+    if (this.chunks) return;
     const r = this.r; this.groupT -= dt;
     const gk = this.crowd(); if (this.groupT <= 0 && this.groups.length < Math.round((isPhone ? 6 : 12) * gk.groups * Math.min(1.4, gk.k + 0.2))) {
       this.groupT = 0.6 + r() * 1.2;
@@ -1453,7 +1459,8 @@ export class Hangang {
       if (this.trainSeen.size > 400) this.trainSeen.clear();
     } catch { this.liveTrains = false; }
     try { const j = await this.api('/api/seoul/bus/pos'); this.busData = j.buses || []; } catch { /* 버스 정보 없음 */ }
-    if (!this.cityAt || Date.now() - this.cityAt > 300000) { this.cityAt = Date.now(); try { this.city = await this.api('/api/seoul/city?area=' + encodeURIComponent(this.id === 'hongdae' ? '홍대 관광특구' : this.id === 'namsan' ? '남산공원' : this.id === 'itaewon' ? '이태원 관광특구' : this.id === 'banpo' ? '반포한강공원' : this.id === 'ttukseom' ? '뚝섬한강공원' : ({ seongsu: '성수카페거리', gangnam: '강남역', jamsil: '잠실 관광특구', myeongdong: '명동 관광특구', insadong: '인사동', bukchon: '북촌한옥마을', sinchon: '신촌·이대역' }[this.id] || '여의도'))); this.onCity?.(this.city); } catch { /* 도시 정보 없음 */ } }
+    if (this.chunks && this.cityRid && this.nearRegion(this.px, this.pz)?.id !== this.cityRid) this.cityAt = 0; // 서울 전체: 다른 동네로 걸어가면 그곳 정보로
+    if (!this.cityAt || Date.now() - this.cityAt > 300000) { this.cityAt = Date.now(); try { const rid = this.chunks ? this.nearRegion(this.px, this.pz)?.id || 'yeouido' : this.id; this.cityRid = rid; this.city = await this.api('/api/seoul/city?area=' + encodeURIComponent(rid === 'hongdae' ? '홍대 관광특구' : rid === 'namsan' ? '남산공원' : rid === 'itaewon' ? '이태원 관광특구' : rid === 'banpo' ? '반포한강공원' : rid === 'ttukseom' ? '뚝섬한강공원' : ({ seongsu: '성수카페거리', gangnam: '강남역', jamsil: '잠실 관광특구', myeongdong: '명동 관광특구', insadong: '인사동', bukchon: '북촌한옥마을', sinchon: '신촌·이대역' }[rid] || '여의도'))); this.onCity?.(this.city); } catch { /* 도시 정보 없음 */ } }
   }
   tickTransit(dt, px, pz) {
     if (!this.trains) return;
@@ -1648,6 +1655,7 @@ export class Hangang {
     return { k, w, gw, groups: rain ? 0.25 : snow ? 0.4 : season === 'winter' ? 0.5 : night ? 0.45 : 1 };
   }
   tickPeople(dt, px, pz) {
+    if (this.chunks) return; // 서울 전체: 코스(러닝 길)가 없어 코스 따라 달리는 사람은 없다 (골목 · 거리 행인은 tickCity)
     const r = this.r, cw = this.crowd(), maxP = Math.round((isPhone ? 8 : 14) * Math.min(1.5, cw.k));
     // 주변에 사람이 너무 적으면 앞쪽(보이지 않는 곳)에 새로 놓는다
     this.peopleT -= dt;
@@ -1815,17 +1823,25 @@ export class Hangang {
     }
     // 구역: 이정표(다리 등) 근처 → 이름 있는 공원 · 섬 (작은 곳 먼저)
     let name = null; for (const [n, ms] of this.map.marks || []) if (Math.abs(ms - this.s) < 30) { name = n; break; }
+    if (this.chunks && this.areasKey !== this.chunks.size + ':' + [...this.chunks.keys()].join()) { this.areasKey = this.chunks.size + ':' + [...this.chunks.keys()].join(); this.areas = [...this.chunks.values()].flatMap((c) => (c.map.areas || []).map(([n, ...f]) => ({ n, ring: unpack(f, c.map.scale) }))).map((a) => ({ ...a, A: Math.abs(ringArea(a.ring)) })).sort((a, b) => a.A - b.A); }
     if (!name) { this.areas ||= (this.map.areas || []).map(([n, ...f]) => ({ n, ring: unpack(f, this.map.scale) })).map((a) => ({ ...a, A: Math.abs(ringArea(a.ring)) })).sort((a, b) => a.A - b.A); for (const a of this.areas) if (inRing(px, pz, a.ring)) { name = a.n; break; } }
     if (name && name !== this.regionName) { const last = this.regionSeen.get(name) || -1e9; if (this.time - last > 90) this.onRegion?.(name); this.regionSeen.set(name, this.time); }
     this.regionName = name || this.regionName;
   }
   // 미니맵: 지도 전체를 한 번 그려 두고, 내 주변만 잘라 보여 준다 (북쪽이 위)
   minimapImage() {
-    if (this.mini) return this.mini;
-    const N = 1024, R = 2600, k = N / (2 * R), cv = document.createElement('canvas'); cv.width = cv.height = N; const g = cv.getContext('2d'), S = this.map.scale;
-    const T = (x, z) => [(x + R) * k, (z + R) * k], fillP = (poly, col) => { g.fillStyle = col; g.beginPath(); for (const ring of poly) { ring.forEach(([x, z], i) => { const [a, b] = T(x, z); if (i) g.lineTo(a, b); else g.moveTo(a, b); }); g.closePath(); } g.fill('evenodd'); };
+    // 서울 전체: 지금 칸 둘레(불러온 칸들)를 그린다. 칸이 바뀌면 다시
+    const W = this.chunks, wkey = W ? `${this.tileNow}|${[...W.keys()].sort().join()}` : '';
+    if (this.mini && (!W || this.miniKey === wkey)) return this.mini;
+    const T0 = this.world0?.tile || 2000, ox = W && this.tileNow ? (this.tileNow[0] + 0.5) * T0 : 0, oz = W && this.tileNow ? (this.tileNow[1] + 0.5) * T0 : 0, R = W ? T0 * 1.5 : 2600;
+    this.miniKey = wkey; this.miniO = [ox, oz, R];
+    const N = W ? 1536 : 1024, k = N / (2 * R), cv = document.createElement('canvas'); cv.width = cv.height = N; const g = cv.getContext('2d'), S = this.map.scale;
+    const T = (x, z) => [(x - ox + R) * k, (z - oz + R) * k], fillP = (poly, col) => { g.fillStyle = col; g.beginPath(); for (const ring of poly) { ring.forEach(([x, z], i) => { const [a, b] = T(x, z); if (i) g.lineTo(a, b); else g.moveTo(a, b); }); g.closePath(); } g.fill('evenodd'); };
     const line = (pts, col, w) => { g.strokeStyle = col; g.lineWidth = w; g.lineJoin = 'round'; g.beginPath(); pts.forEach(([x, z], i) => { const [a, b] = T(x, z); if (i) g.lineTo(a, b); else g.moveTo(a, b); }); g.stroke(); };
     g.fillStyle = '#e9e5dc'; g.fillRect(0, 0, N, N);
+    if (W) { for (const c of W.values()) { const M = c.map, S2 = M.scale; for (const gr of M.green) fillP(gr.slice(1).map((r) => unpack(r, S2)), '#bfdba4'); for (const w of c.water || []) fillP(w, '#8fc4ea'); for (const w of c.islands || []) fillP(w, '#a9cf8c'); }
+      for (const c of W.values()) { const M = c.map, S2 = M.scale; for (const rd of M.roads) line(unpack(rd.slice(2), S2), '#ffffff', Math.max(1, rd[0] * k)); for (const b of M.bridges) line(unpack(b.p, S2), '#8c8c8c', Math.max(1.5, b.w * k)); for (const b of M.buildings) fillP([unpack(b.slice(7), S2)], b[0] > 60 ? '#a9a39a' : '#cfc8bd'); }
+      return (this.mini = cv); }
     for (const gr of this.map.green) fillP(gr.slice(1).map((r) => unpack(r, S)), '#bfdba4');
     for (const w of this.water) fillP(w, '#8fc4ea'); for (const w of this.islands) fillP(w, '#a9cf8c');
     for (const rd of this.map.roads) line(unpack(rd.slice(2), S), '#ffffff', Math.max(1, rd[0] * k));
@@ -1835,7 +1851,7 @@ export class Hangang {
     return (this.mini = cv);
   }
   drawMinimap(ctx, size, span = 700) {
-    const img = this.minimapImage(), N = img.width, R = 2600, k = N / (2 * R), cx = (this.px + R) * k, cz = (this.pz + R) * k, w = span * k;
+    const img = this.minimapImage(), N = img.width, [ox, oz, R] = this.miniO || [0, 0, 2600], k = N / (2 * R), cx = (this.px - ox + R) * k, cz = (this.pz - oz + R) * k, w = span * k;
     ctx.clearRect(0, 0, size, size); ctx.save(); ctx.beginPath(); ctx.arc(size / 2, size / 2, size / 2, 0, 7); ctx.clip();
     ctx.drawImage(img, cx - w / 2, cz - w / 2, w, w, 0, 0, size, size);
     const m = size / span, c = size / 2;
@@ -1880,6 +1896,7 @@ export class Hangang {
     if (this.inShop) return `${SHOP_KIND[this.inShop.F.kind].emoji} ${this.inShop.F.name}`;
     if (this.inMall) return `🛍️ ${this.inMall.D.name}`;
     if (this.inDeck) return '🗼 N서울타워 전망대 · 140m';
+    if (this.chunks) { const gu = this.guAt(this.px, this.pz); return [gu, this.regionName].filter(Boolean).join(' · ') || '서울'; }
     const marks = this.map.marks || [], s = this.s, d = this.dir;
     const next = d > 0 ? marks.find(([, ms]) => ms > s + 5) : [...marks].reverse().find(([, ms]) => ms < s - 5);
     return next ? `${next[0]}까지 ${Math.round(Math.abs(next[1] - s))}m` : d > 0 ? `반환점까지 ${Math.round(this.L - s)}m` : `반환점까지 ${Math.round(s)}m`;
