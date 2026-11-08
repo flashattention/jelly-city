@@ -80,8 +80,9 @@ function facadeTex(type, lit, seed) {
   if (!lit && type === 'brick') for (let y = 0; y < 256; y += 4) for (let x = (y / 4) % 2 ? 0 : 4; x < 256; x += 8) { g.fillStyle = `rgba(0,0,0,${0.04 + r() * 0.06})`; g.fillRect(x, y, 7, 3); }
   if (!lit && type === 'stone') for (let y = 0; y < 256; y += 16) { g.fillStyle = 'rgba(0,0,0,.05)'; g.fillRect(0, y, 256, 1); }
   for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) {
-    const x = i * C, y = j * C, on = r() < (type === 'apt' ? 0.45 : 0.32), warm = r() < 0.75;
-    const lc = warm ? `hsl(${34 + r() * 14},${80 + r() * 15}%,${60 + r() * 20}%)` : `hsl(205,35%,${72 + r() * 15}%)`;
+    // 집(아파트 · 주택)은 따뜻한 노란 불빛 (가끔 TV 파란빛), 회사(유리 · 석재)는 하얀 형광등빛
+    const home = type === 'apt' || type === 'brick', x = i * C, y = j * C, on = r() < (type === 'apt' ? 0.55 : type === 'brick' ? 0.35 : 0.5), tv = home && r() < 0.12;
+    const lc = home ? (tv ? `hsl(215,60%,${62 + r() * 12}%)` : `hsl(${30 + r() * 12},${85 + r() * 10}%,${55 + r() * 15}%)`) : `hsl(${195 + r() * 20},${18 + r() * 15}%,${80 + r() * 12}%)`;
     if (type === 'apt') {
       // 넓은 거실 창 + 발코니 난간 띠 (가끔 에어컨 · 화분)
       if (lit) { if (on) { g.fillStyle = lc; g.fillRect(x + 3, y + 6, 26, 17); } continue; }
@@ -147,6 +148,20 @@ function bladeTex() {
   for (let i = 0; i < 22; i++) { const x = 10 + r() * 108, h = 40 + r() * 54, lean = (r() - 0.5) * 22, w = 3 + r() * 4; const v = 170 + r() * 85; g.fillStyle = `rgb(${v * 0.85},${v},${v * 0.7})`; g.beginPath(); g.moveTo(x - w, 96); g.quadraticCurveTo(x + lean * 0.4, 96 - h * 0.6, x + lean, 96 - h); g.quadraticCurveTo(x + lean * 0.4 + w * 0.3, 96 - h * 0.55, x + w, 96); g.closePath(); g.fill(); }
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
+// 잎 · 꽃 카드 그림: blossom = 다섯 꽃잎 벚꽃 여러 송이, 아니면 작은 잎 무더기. 가장자리는 들쭉날쭉 (회색조라 계절 색이 곱해진다)
+function foliageTex(blossom) {
+  const N = 256, cv = document.createElement('canvas'); cv.width = cv.height = N; const g = cv.getContext('2d'), r = rnd(blossom ? 41 : 43);
+  g.clearRect(0, 0, N, N);
+  const inBlob = (x, y) => { const dx = x - 128, dy = y - 128, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx); return d < 104 + Math.sin(a * 7) * 10 + Math.sin(a * 13) * 6; };
+  for (let i = 0; i < (blossom ? 260 : 520); i++) {
+    const x = 18 + r() * 220, y = 18 + r() * 220; if (!inBlob(x, y)) continue;
+    const d = Math.hypot(x - 128, y - 128) / 110, v = Math.round(255 - d * 70 - r() * 40);
+    if (blossom) { const rad = 7 + r() * 7, rot = r() * 6.28; g.fillStyle = `rgb(${v},${Math.round(v * (0.82 + r() * 0.1))},${Math.round(v * (0.88 + r() * 0.08))})`; for (let k = 0; k < 5; k++) { const a = rot + (k / 5) * Math.PI * 2; g.beginPath(); g.ellipse(x + Math.cos(a) * rad * 0.55, y + Math.sin(a) * rad * 0.55, rad * 0.55, rad * 0.38, a, 0, 7); g.fill(); } g.fillStyle = `rgba(${Math.round(v * 0.75)},${Math.round(v * 0.45)},${Math.round(v * 0.55)},.9)`; g.beginPath(); g.arc(x, y, rad * 0.2, 0, 7); g.fill(); }
+    else { const L = 9 + r() * 9, a = r() * 6.28; g.fillStyle = `rgb(${v},${v},${v})`; g.beginPath(); g.ellipse(x, y, L, L * 0.45, a, 0, 7); g.fill(); g.strokeStyle = `rgba(0,0,0,.12)`; g.beginPath(); g.moveTo(x - Math.cos(a) * L * 0.8, y - Math.sin(a) * L * 0.8); g.lineTo(x + Math.cos(a) * L * 0.8, y + Math.sin(a) * L * 0.8); g.stroke(); }
+  }
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+}
+function petalTex() { const cv = document.createElement('canvas'); cv.width = cv.height = 32; const g = cv.getContext('2d'); g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(16, 16, 12, 7, 0.6, 0, 7); g.fill(); return new THREE.CanvasTexture(cv); }
 function cloudTex() {
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const g = cv.getContext('2d'), r = rnd(7);
   for (let i = 0; i < 26; i++) { const x = 40 + r() * 176, y = 50 + r() * 40, rad = 18 + r() * 34, gr = g.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, rad, 0, 7); g.fill(); }
@@ -414,7 +429,7 @@ export class Hangang {
       const m = shiny ? new THREE.MeshPhongMaterial({ vertexColors: true, map: this.winTex[t], emissive: '#ffffff', emissiveMap: this.litTex[t], emissiveIntensity: 0, shininess: t === 'gold' ? 90 : 70, specular: t === 'gold' ? '#ffe2a0' : '#9fb4c8' })
         : new THREE.MeshLambertMaterial({ vertexColors: true, map: this.winTex[t], emissive: '#ffffff', emissiveMap: this.litTex[t], emissiveIntensity: 0 });
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(st.P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(st.N, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(st.U, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(st.Cl, 3)); g.setIndex(st.I);
-      const mesh = new THREE.Mesh(g, m); mesh.castShadow = false; mesh.receiveShadow = true; this.scene.add(mesh); this.bldM.push(m);
+      const mesh = new THREE.Mesh(g, m); mesh.castShadow = false; mesh.receiveShadow = true; this.scene.add(mesh); this.bldM.push(m); (this.bldByType ||= {})[t] = m;
     }
     const mk = (S, m) => { if (!S.P.length) return null; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(S.P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(S.N, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(S.Cl, 3)); g.setIndex(S.I); const me = new THREE.Mesh(g, m); this.scene.add(me); return me; };
     mk(extras, new THREE.MeshLambertMaterial({ vertexColors: true }));
@@ -461,21 +476,46 @@ export class Hangang {
     const N = spots.length, o = new THREE.Object3D();
     // 나무 모양 셋: 둥근 활엽수(벚나무 · 느티나무), 키 큰 나무(은행 · 포플러), 소나무. 잎 덩어리 여러 개 + 아래가 어두운 그늘
     const lumps = (defs) => { const gs = defs.map(([x, y, z, rr, sy = 1]) => { const g = new THREE.IcosahedronGeometry(rr, 1); g.scale(1, sy, 1); g.translate(x, y, z); return g; }); const m = mergeGeos(gs); const p = m.attributes.position, cl = []; let y0 = Infinity, y1 = -Infinity; for (let k = 0; k < p.count; k++) { y0 = Math.min(y0, p.getY(k)); y1 = Math.max(y1, p.getY(k)); } for (let k = 0; k < p.count; k++) { const t = (p.getY(k) - y0) / (y1 - y0 || 1), v = 0.62 + t * 0.42; cl.push(v, v, v); } m.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3)); return m; };
+    // 잎 카드 수관: 잎 · 꽃 그림을 그린 판 수십 장을 덩어리 둘레에 붙이고, 법선을 덩어리 바깥쪽으로 → 솜털 같은 부드러운 빛
+    const cardCrown = (blobs, nCards, size) => {
+      const P = [], N = [], U = [], Cl = [], I = []; const rr = rnd(77 + nCards);
+      for (let k = 0; k < nCards; k++) {
+        const [bx, by, bz, br] = blobs[Math.floor(rr() * blobs.length)];
+        const th = rr() * Math.PI * 2, ph = Math.acos(1 - rr() * 1.85), d = br * (0.55 + rr() * 0.5);
+        const nx = Math.sin(ph) * Math.cos(th), ny = Math.cos(ph), nz = Math.sin(ph) * Math.sin(th);
+        const cx = bx + nx * d, cy = by + ny * d * 0.85, cz = bz + nz * d, sz = size * (0.75 + rr() * 0.6);
+        // 카드 방향: 아무렇게나 (사방에서 볼 때 덩어리처럼)
+        const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rr() * 6.28, rr() * 6.28, rr() * 6.28)), ax = new THREE.Vector3(1, 0, 0).applyQuaternion(q), ay = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+        const base = P.length / 3, shade = 0.62 + (ny * 0.5 + 0.5) * 0.45 + (d / br - 0.55) * 0.25;
+        for (const [u, v] of [[0, 0], [1, 0], [1, 1], [0, 1]]) { const ox = (u - 0.5) * sz, oy = (v - 0.5) * sz; P.push(cx + ax.x * ox + ay.x * oy, cy + ax.y * ox + ay.y * oy, cz + ax.z * ox + ay.z * oy); N.push(nx, ny * 0.9 + 0.1, nz); U.push(u, v); Cl.push(shade, shade, shade); }
+        I.push(base, base + 1, base + 2, base, base + 2, base + 3);
+      }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(Cl, 3)); g.setIndex(I); return g;
+    };
+    // 줄기: 살짝 휘고 아래가 넓게 퍼진 몸통 + 위로 갈라지는 가지
+    const trunkGeo = (h, r0, bend, branches) => {
+      const parts = [];
+      const body = new THREE.CylinderGeometry(r0 * 0.55, r0, h, 9, 10); body.translate(0, h / 2, 0);
+      const p = body.attributes.position; for (let k = 0; k < p.count; k++) { const y = p.getY(k), t = y / h, flare = 1 + Math.max(0, 0.18 - t) * 3.2; p.setX(k, p.getX(k) * flare + Math.sin(t * 2.4) * bend); p.setZ(k, p.getZ(k) * flare + Math.sin(t * 1.7 + 1) * bend * 0.5); }
+      body.computeVertexNormals(); parts.push(body);
+      for (const [ang, tilt, len, at] of branches) { const b = new THREE.CylinderGeometry(r0 * 0.18, r0 * 0.38, len, 6, 3); b.translate(0, len / 2, 0); b.rotateZ(tilt); b.rotateY(ang); b.translate(Math.sin(at * 2.4) * bend, h * at, Math.sin(at * 1.7 + 1) * bend * 0.5); parts.push(b); }
+      const m = mergeGeos(parts), pp = m.attributes.position, cl = []; for (let k = 0; k < pp.count; k++) { const v = 0.7 + Math.min(1, pp.getY(k) / h) * 0.35; cl.push(v, v * 0.92, v * 0.86); } m.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3)); return m;
+    };
     const SHAPES = [
-      { crown: lumps([[0, 4.2, 0, 1.9], [1.3, 3.7, 0.4, 1.3], [-1.2, 3.8, -0.5, 1.35], [0.3, 3.6, -1.3, 1.2], [-0.4, 3.5, 1.3, 1.2], [0.2, 5.2, 0.2, 1.2]]), trunk: [0.18, 0.3, 3.4] },
-      { crown: lumps([[0, 4.6, 0, 1.25, 1.7], [0.6, 5.6, 0.3, 0.95, 1.5], [-0.5, 3.9, -0.3, 1.0, 1.4]]), trunk: [0.14, 0.24, 3.6] },
-      { crown: (() => { const gs = [[3.0, 2.0, 2.0], [4.3, 1.6, 1.7], [5.4, 1.15, 1.4], [6.3, 0.7, 1.1]].map(([y, rr, hh]) => { const g = new THREE.ConeGeometry(rr, hh, 7); g.translate(0, y, 0); return g; }); const m = mergeGeos(gs), p = m.attributes.position, cl = []; for (let k = 0; k < p.count; k++) { const v = 0.7 + (p.getY(k) - 2) / 6 * 0.35; cl.push(v, v, v); } m.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3)); return m; })(), trunk: [0.13, 0.22, 3.0], pine: true },
+      { crown: cardCrown([[0, 4.3, 0, 2.1], [1.6, 3.8, 0.5, 1.5], [-1.5, 3.9, -0.6, 1.55], [0.4, 3.7, -1.6, 1.4], [-0.5, 3.6, 1.6, 1.4], [0.2, 5.3, 0.2, 1.4]], isPhone ? 70 : 120, 1.9), trunk: trunkGeo(3.6, 0.32, 0.25, [[0.3, 0.75, 1.9, 0.62], [2.4, 0.8, 1.7, 0.7], [4.4, 0.7, 1.8, 0.66]]), cherry: true },
+      { crown: cardCrown([[0, 4.8, 0, 1.4], [0.5, 6.0, 0.3, 1.1], [-0.5, 4.0, -0.3, 1.15], [0.2, 6.9, 0, 0.8]], isPhone ? 50 : 85, 1.5), trunk: trunkGeo(4.0, 0.24, 0.12, [[1, 0.5, 1.4, 0.7], [3.5, 0.55, 1.3, 0.78]]) },
+      { crown: (() => { const gs = [[3.0, 2.0, 2.0], [4.3, 1.6, 1.7], [5.4, 1.15, 1.4], [6.3, 0.7, 1.1]].map(([y, rr2, hh]) => { const g = new THREE.ConeGeometry(rr2, hh, 9, 2); g.translate(0, y, 0); const p = g.attributes.position; for (let k = 0; k < p.count; k++) { const a = Math.atan2(p.getZ(k), p.getX(k)); const w = 1 + Math.sin(a * 9) * 0.08; p.setX(k, p.getX(k) * w); p.setZ(k, p.getZ(k) * w); } g.computeVertexNormals(); return g; }); const m = mergeGeos(gs), p = m.attributes.position, cl = []; for (let k = 0; k < p.count; k++) { const v = 0.62 + (p.getY(k) - 2) / 6 * 0.42; cl.push(v, v, v); } m.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3)); return m; })(), trunk: trunkGeo(3.0, 0.2, 0.05, []), pine: true },
     ];
     const kindOf = spots.map(() => { const x = r(); return x < 0.62 ? 0 : x < 0.84 ? 1 : 2; });
     this.treeKinds = kindOf; this.crownSets = []; this.twigSets = [];
     const twigs = []; for (let k = 0; k < 7; k++) { const g = new THREE.CylinderGeometry(0.035, 0.08, 2.3, 4); g.translate(0, 1.15, 0); g.rotateZ(0.5 + (k % 3) * 0.22); g.rotateY((k / 7) * Math.PI * 2); g.translate(0, 3.0, 0); twigs.push(g); }
     for (let k = 0; k < 4; k++) { const g = new THREE.CylinderGeometry(0.02, 0.04, 1.2, 3); g.translate(0, 0.6, 0); g.rotateZ(-0.7); g.rotateY(k * 1.7); g.translate(0.6, 4.2, 0); twigs.push(g); }
-    const twigG = mergeGeos(twigs), barkM = new THREE.MeshLambertMaterial({ color: '#5e4a3c' });
+    const twigG = mergeGeos(twigs), barkM = new THREE.MeshLambertMaterial({ color: '#7a5240', vertexColors: true }), twigM = new THREE.MeshLambertMaterial({ color: '#6a4838' });
     SHAPES.forEach((sh, t) => {
       const idx = spots.map((_, i) => i).filter((i) => kindOf[i] === t), n = idx.length; if (!n) { this.crownSets.push(null); return; }
-      const tg = new THREE.CylinderGeometry(sh.trunk[0], sh.trunk[1], sh.trunk[2], 7); tg.translate(0, sh.trunk[2] / 2, 0);
-      const cm = new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true }); windify(cm, this.windU, 0.06, true);
-      const crowns = new THREE.InstancedMesh(sh.crown, cm, n), trunks = new THREE.InstancedMesh(tg, barkM, n), tw = sh.pine ? null : new THREE.InstancedMesh(twigG, barkM, n);
+      const tg = sh.trunk;
+      const cm = sh.pine ? new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true }) : new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true, map: this.leafTex ||= foliageTex(false), alphaTest: 0.42, side: THREE.DoubleSide }); windify(cm, this.windU, 0.05, true); if (!sh.pine) this.cardMats = [...(this.cardMats || []), cm];
+      const crowns = new THREE.InstancedMesh(sh.crown, cm, n), trunks = new THREE.InstancedMesh(tg, barkM, n), tw = sh.pine ? null : new THREE.InstancedMesh(twigG, twigM, n);
       idx.forEach((si, q) => { const [x, z, k] = spots[si]; o.position.set(x, 0, z); o.rotation.set(0, r() * 6.28, 0); o.scale.set(k * (0.85 + r() * 0.3), k * (0.85 + r() * 0.35), k * (0.85 + r() * 0.3)); o.updateMatrix(); crowns.setMatrixAt(q, o.matrix); trunks.setMatrixAt(q, o.matrix); tw?.setMatrixAt(q, o.matrix); });
       for (const m of [crowns, trunks, tw]) if (m) { m.castShadow = true; m.receiveShadow = false; this.scene.add(m); }
       this.crownSets.push({ crowns, idx, pine: !!sh.pine }); if (tw) this.twigSets.push(tw);
@@ -529,6 +569,8 @@ export class Hangang {
     // 나비 · 잠자리 (낮) · 반딧불 (여름밤): 내 주변을 맴돈다
     this.bugs = []; const wingG = new THREE.CircleGeometry(0.055, 8); wingG.scale(1.3, 1, 1); wingG.translate(0.07, 0, 0);
     for (let i = 0; i < 14; i++) { const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({ color: '#ffffff', side: THREE.DoubleSide, transparent: true }); const a = new THREE.Mesh(wingG, m), b = new THREE.Mesh(wingG, m); b.rotation.y = Math.PI; g.add(a, b); g.userData = { a, b, m, ph: r() * 6, ox: (r() - 0.5) * 14, oz: (r() - 0.5) * 14, h: 0.5 + r() * 1.2 }; this.scene.add(g); this.bugs.push(g); }
+    const PN = isPhone ? 140 : 320, pp = new Float32Array(PN * 3); this.petals = []; for (let i = 0; i < PN; i++) this.petals.push({ ox: (r() - 0.5) * 40, oz: (r() - 0.5) * 40, y: r() * 8, ph: r() * 6, v: 0.5 + r() * 0.6 });
+    const pg2 = new THREE.BufferGeometry(); pg2.setAttribute('position', new THREE.BufferAttribute(pp, 3)); this.petalPts = new THREE.Points(pg2, new THREE.PointsMaterial({ color: '#ffd1e3', size: 0.13, map: petalTex(), transparent: true, depthWrite: false, alphaTest: 0.2 })); this.petalPts.frustumCulled = false; this.scene.add(this.petalPts);
     const FN = 90, fp = new Float32Array(FN * 3); this.ff = []; for (let i = 0; i < FN; i++) this.ff.push({ ox: (r() - 0.5) * 50, oz: (r() - 0.5) * 50, h: 0.3 + r() * 2, ph: r() * 6 });
     const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.BufferAttribute(fp, 3)); this.fireflies = new THREE.Points(fg, new THREE.PointsMaterial({ color: '#d9ff7a', size: 0.35, map: this.dot ||= dotTex(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 })); this.fireflies.frustumCulled = false; this.scene.add(this.fireflies);
   }
@@ -649,6 +691,7 @@ export class Hangang {
       crowns.instanceColor.needsUpdate = true; crowns.visible = pine || s !== 'winter';
     }
     for (const tw of this.twigSets) tw.visible = s === 'winter';
+    this.blossomTex ||= foliageTex(true); for (const m of this.cardMats || []) { m.map = s === 'spring' ? this.blossomTex : this.leafTex; m.needsUpdate = true; }
     const grass = { spring: '#94c470', summer: '#7fb05a', autumn: '#a7a85c', winter: '#b3b89a' }[s];
     this.greenM.grass?.color.set(grass); for (const m of this.wideM || []) m.color.set(grass); this.stripM?.color.set(grass); this.greenM.wild?.color.set(grass).offsetHSL(0, -0.05, -0.03); this.greenM.wood?.color.set({ spring: '#6f9a52', summer: '#4f7f40', autumn: '#a8763a', winter: '#8a8270' }[s]); this.islandM.color.set(grass).offsetHSL(0, 0, -0.06);
     const tc = new THREE.Color(); for (let i = 0; i < this.tufts.count; i++) { tc.setHSL(s === 'autumn' ? 0.12 + r() * 0.05 : s === 'winter' ? 0.14 : s === 'summer' ? 0.26 + r() * 0.05 : 0.23 + r() * 0.06, s === 'winter' ? 0.18 : 0.55, s === 'winter' ? 0.62 : 0.4 + r() * 0.14); this.tufts.setColorAt(i, tc); } this.tufts.instanceColor.needsUpdate = true;
@@ -777,7 +820,11 @@ export class Hangang {
     this.mtM.color.copy(sk.hor).lerp(sk.top, 0.25).multiplyScalar(0.82);
     // 밤: 창문 · 가로등 · 다리 불빛 · 자동차
     const lit = smooth(0.15, 0.8, night);
-    for (const m of this.bldM) m.emissiveIntensity = lit * 0.95; if (this.signM) this.signM.emissiveIntensity = lit * 0.9; if (this.farM) this.farM.emissiveIntensity = lit * 0.9;
+    // 시간대별 켜진 정도: 집은 저녁 7 ~ 11시가 가장 밝고 새벽엔 거의 꺼짐, 회사는 퇴근 무렵 밝다가 밤이 깊으면 거의 꺼짐
+    const hr = h, home = hr >= 17 && hr < 19 ? 0.6 : hr >= 19 && hr < 23 ? 1 : hr >= 23 || hr < 1 ? 0.55 : hr < 5 ? 0.12 : hr < 7 ? 0.3 : 0.2;
+    const work = hr >= 17 && hr < 20 ? 1 : hr >= 20 && hr < 22 ? 0.55 : hr >= 22 || hr < 6 ? 0.08 : hr < 8 ? 0.35 : 0.3;
+    for (const [t, m] of Object.entries(this.bldByType || {})) m.emissiveIntensity = lit * (t === 'apt' || t === 'brick' ? home : work) * 1.05;
+    if (this.signM) this.signM.emissiveIntensity = lit * (hr >= 1 && hr < 6 ? 0.25 : 0.9); if (this.farM) this.farM.emissiveIntensity = lit * 0.6 * Math.max(0.2, (h >= 18 && h < 24 ? 1 : 0.4));
     this.lampGlow.material.opacity = lit; this.bridgeLights.material.opacity = lit; this.carPts.material.opacity = 0.25 + lit * 0.75;
     this.lampPool.material.opacity = lit * 0.32;
     let pi = 0; for (const [x, z] of this.poleXZ) { if (pi >= this.pools.length) break; if (Math.abs(x - px) < 90 && Math.abs(z - pz) < 90) { this.pools[pi].position.set(x, 0.03, z); this.pools[pi].visible = true; pi++; } } for (; pi < this.pools.length; pi++) this.pools[pi].visible = false;
@@ -809,6 +856,8 @@ export class Hangang {
       if (season === 'autumn') { u.a.scale.set(1.8, 0.35, 1); u.b.scale.set(1.8, 0.35, 1); } else { u.a.scale.set(1, 1, 1); u.b.scale.set(1, 1, 1); }
       
     });
+    const petalOn = season === 'spring' && !rainOn && !snowOn; this.petalPts.visible = petalOn;
+    if (petalOn) { const a = this.petalPts.geometry.attributes.position; this.petals.forEach((q, i) => { q.y -= q.v * dt; if (q.y < 0) { q.y = 6 + Math.random() * 3; q.ox = (Math.random() - 0.5) * 40; q.oz = (Math.random() - 0.5) * 40; } q.ox += Math.sin(this.t * 0.8 + q.ph) * dt * 0.6 + dt * 0.4; a.setXYZ(i, px + q.ox, q.y, pz + q.oz + Math.cos(this.t * 0.6 + q.ph) * 0.5); }); a.needsUpdate = true; }
     const ffOn = season === 'summer' && night > 0.7 && !rainOn; this.fireflies.material.opacity = lerp(this.fireflies.material.opacity, ffOn ? 1 : 0, Math.min(1, dt));
     if (this.fireflies.material.opacity > 0.01) { const a = this.fireflies.geometry.attributes.position; this.ff.forEach((f, i) => a.setXYZ(i, px + f.ox + Math.sin(this.t * 0.4 + f.ph) * 2, f.h + Math.sin(this.t * 1.3 + f.ph) * 0.4, pz + f.oz + Math.cos(this.t * 0.35 + f.ph) * 2)); a.needsUpdate = true; this.fireflies.material.size = 0.25 + Math.abs(Math.sin(this.t * 2)) * 0.2; }
     this.light = { night, sunUp, hour: h };
