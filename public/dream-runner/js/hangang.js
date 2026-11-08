@@ -678,7 +678,7 @@ export class Hangang {
       // 달걀 모양 건물 (전경련 컨퍼런스센터): 상자 벽 대신 은색 타원 지붕만 (덧붙이는 곳에서 만든다), 부딪힘은 외곽선대로
       if (M.kind === 'summit' && /봉수대/.test(name)) continue;
       if (name === '남산서울타워' && mh > 1) continue; // 타워 위쪽 조각은 따로 만든 실제 모양으로
-      if (LM?.egg) { const xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); this.addFoot({ ring, h, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), name, type: 'glass', noClimb: true }); continue; }
+      if (LM?.egg || LM?.jbug) { const xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); this.addFoot({ ring, h, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), name, type: 'glass', noClimb: true }); continue; }
       let acc = 0;
       for (let i = 0; i < ring.length; i++) {
         const a = bot[i], c2 = bot[(i + 1) % ring.length], ta = top[i], tc = top[(i + 1) % ring.length], dx = c2[0] - a[0], dz = c2[1] - a[1], L = Math.hypot(dx, dz); if (L < 0.05) continue;
@@ -1342,7 +1342,7 @@ export class Hangang {
     const work = hr >= 17 && hr < 20 ? 1 : hr >= 20 && hr < 22 ? 0.55 : hr >= 22 || hr < 6 ? 0.08 : hr < 8 ? 0.35 : 0.3;
     for (const [t, m] of Object.entries(this.bldByType || {})) m.emissiveIntensity = lit * (t === 'apt' || t === 'brick' ? home : work) * 0.5;
     if (this.signM) this.signM.emissiveIntensity = lit * (hr >= 1 && hr < 6 ? 0.15 : 0.45);
-    if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; if (this.summit) tickSummit(this, dt, lit); for (const m of this.neonMs || []) m.emissiveIntensity = 0.2 + lit * 1.2; if (this.id === 'banpo') this.tickBanpo(dt, lit); for (const m of this.shopSignMs || []) m.emissiveIntensity = 0.25 + lit * 0.85; for (const m of this.shopWinM || []) m.emissiveIntensity = 0.1 + lit * 0.42; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.35 * Math.max(0.2, (h >= 18 && h < 24 ? 1 : 0.4));
+    if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; if (this.summit) tickSummit(this, dt, lit); for (const m of this.neonMs || []) m.emissiveIntensity = 0.2 + lit * 1.2; if (this.jbugM) this.jbugM.emissiveIntensity = 0.15 + lit * 0.7; if (this.id === 'banpo') this.tickBanpo(dt, lit); for (const m of this.shopSignMs || []) m.emissiveIntensity = 0.25 + lit * 0.85; for (const m of this.shopWinM || []) m.emissiveIntensity = 0.1 + lit * 0.42; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.35 * Math.max(0.2, (h >= 18 && h < 24 ? 1 : 0.4));
     this.lampGlow.material.opacity = lit; if (this.lampHeadM) this.lampHeadM.emissiveIntensity = 0.2 + lit * 2.2; this.bridgeLights.material.opacity = lit; this.carPts.material.opacity = 0.25 + lit * 0.75;
     this.lampPool.material.opacity = lit * 0.32;
     let pi = 0; for (const [x, z] of this.poleXZ) { if (pi >= this.pools.length) break; if (Math.abs(x - px) < 90 && Math.abs(z - pz) < 90) { this.pools[pi].position.set(x, 0.03, z); this.pools[pi].visible = true; pi++; } } for (; pi < this.pools.length; pi++) this.pools[pi].visible = false;
@@ -1611,6 +1611,8 @@ export const LANDMARKS = {
   'KBS 본관': { facade: 'stone', color: '#bfae92' },
   //   전경련 컨퍼런스센터: 은색 금속 달걀 / 성모병원: 크림색 석조 · 민트 지붕 / 메리어트파크센터: 흰 석조 세로 프레임 / 오투타워 · 신한금융투자: 짙은 유리
   '전경련회관 컨퍼런스센터': { facade: 'glass', color: '#cfd6dc', egg: true },
+  //   뚝섬 자벌레: 기둥 위에 길게 뜬 은색 튜브(마디 고리 · 옆 유리 띠 · 밤엔 아래 LED)
+  자벌레: { facade: 'glass', color: '#d5dbe0', jbug: true },
   '카톨릭대학교 여의도성모병원': { facade: 'stone', color: '#ece6da', roof: '#6db894' },
   여의도메리어트파크센터: { facade: 'stone', color: '#f0ece4', crown: { rise: 6, dir: [1, 0] } },
   오투타워: { facade: 'glass', color: '#8fa6b8' },
@@ -1693,6 +1695,7 @@ function buildLandmarkExtras(hg, { name, ring, h, L }) {
   const parts = [{ ring, h }, ...(hg.lmParts?.[name] || [])];
   if (L.rimLight) { const m = new THREE.LineBasicMaterial({ color: '#fff4e0', transparent: true, opacity: 0.3 }); for (const q of parts) { const pts = [...q.ring, q.ring[0]].map(([x, z]) => new THREE.Vector3(x, q.h + 0.2, z)); hg.scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), m)); } (hg.lmLights ||= []).push(m); }
   if (L.crown) buildCrown(hg, ring, h, L);
+  if (L.jbug) buildJBug(hg, ring);
   if (L.egg) { // 은색 타원 지붕: 외곽선의 긴 축 · 짧은 축에 맞춘 반타원체
     const xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); let xx = 0, zz = 0, xz = 0; for (const [x, z] of ring) { const dx = x - cx, dz = z - cz; xx += dx * dx; zz += dz * dz; xz += dx * dz; } const ang = 0.5 * Math.atan2(2 * xz, xx - zz), ux = Math.cos(ang), uz = Math.sin(ang); let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity; for (const [x, z] of ring) { const a = (x - cx) * ux + (z - cz) * uz, b = -(x - cx) * uz + (z - cz) * ux; a0 = Math.min(a0, a); a1 = Math.max(a1, a); b0 = Math.min(b0, b); b1 = Math.max(b1, b); } void xs; void zs;
     const e = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshPhongMaterial({ color: '#cdd4da', shininess: 70, specular: '#8a96a2', emissive: '#bcd2ff', emissiveIntensity: 0 })); e.scale.set((a1 - a0) / 2, Math.max(h, 12), (b1 - b0) / 2); e.rotation.y = -ang; e.position.set(cx + ux * (a0 + a1) / 2 - uz * (b0 + b1) / 2, 0, cz + uz * (a0 + a1) / 2 + ux * (b0 + b1) / 2); hg.scene.add(e); (hg.lmCrowns ||= []).push(e.material);
@@ -1748,6 +1751,26 @@ function skyGlass(m, skyU, gold) {
       #include <opaque_fragment>`);
   };
   m.customProgramCacheKey = () => (gold ? 'skyglass-gold' : 'skyglass');
+}
+// 뚝섬 자벌레: 외곽선의 긴 축을 따라 칸마다 가운데 · 폭을 재서 그 선을 따라 납작한 튜브
+function buildJBug(hg, ring) {
+  let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length;
+  let xx = 0, zz = 0, xz = 0; for (const [x, z] of ring) { const dx = x - cx, dz = z - cz; xx += dx * dx; zz += dz * dz; xz += dx * dz; } const ang = 0.5 * Math.atan2(2 * xz, xx - zz), ux = Math.cos(ang), uz = Math.sin(ang);
+  const pr = ring.map(([x, z]) => ({ a: (x - cx) * ux + (z - cz) * uz, b: -(x - cx) * uz + (z - cz) * ux })), a0 = Math.min(...pr.map((p) => p.a)), a1 = Math.max(...pr.map((p) => p.a)), NB = 14, bins = Array.from({ length: NB }, () => []);
+  for (const p of pr) bins[Math.min(NB - 1, Math.floor((p.a - a0) / (a1 - a0) * NB))].push(p.b);
+  const mids = bins.map((b, i) => ({ a: a0 + (i + 0.5) / NB * (a1 - a0), b: b.length ? (Math.min(...b) + Math.max(...b)) / 2 : null, w: b.length ? Math.max(...b) - Math.min(...b) : null })).filter((m) => m.b != null);
+  const W = Math.min(14, Math.max(8, mids.reduce((s2, m) => s2 + m.w, 0) / mids.length * 0.8)), Y = 9;
+  const pts = mids.map((m) => new THREE.Vector3(cx + ux * m.a - uz * m.b, Y, cz + uz * m.a + ux * m.b)); if (pts.length < 2) return;
+  const curve = new THREE.CatmullRomCurve3(pts), tube = new THREE.TubeGeometry(curve, 90, 1, 20, false); tube.scale(1, 1, 1);
+  // 납작하게: 단면을 가로 W, 세로 W * 0.62 로 (TubeGeometry 의 반지름 1 을 곡선 법선 방향별로 늘린다)
+  const pos = tube.attributes.position, n = 20, seg = 90; for (let i = 0; i <= seg; i++) { const c = curve.getPointAt(i / seg); for (let j = 0; j <= n; j++) { const k = i * (n + 1) + j, x = pos.getX(k) - c.x, y = pos.getY(k) - c.y, z = pos.getZ(k) - c.z; pos.setXYZ(k, c.x + x * W / 2, c.y + y * W * 0.31, c.z + z * W / 2); } } tube.computeVertexNormals();
+  const skin = new THREE.MeshPhongMaterial({ color: '#d5dbe0', shininess: 90, specular: '#9aa8b4' }); hg.scene.add(new THREE.Mesh(tube, skin));
+  // 마디 고리 · 옆 유리 띠 · 기둥 · 아래 LED
+  const ribM = new THREE.MeshLambertMaterial({ color: '#aab4be' }), glassM = new THREE.MeshLambertMaterial({ color: '#2f3a46', emissive: '#ffe6c0', emissiveIntensity: 0.15 }), L = curve.getLength();
+  for (let d = 2; d < L - 1; d += 4) { const t = d / L, p = curve.getPointAt(t), tg = curve.getTangentAt(t), rib = new THREE.Mesh(new THREE.TorusGeometry(1, 0.035, 6, 28), ribM); rib.scale.set(W / 2 + 0.05, W * 0.31 + 0.05, 1); rib.position.copy(p); rib.lookAt(p.clone().add(tg)); hg.scene.add(rib); }
+  const band = new THREE.TubeGeometry(curve, 90, 1, 20, false), bp = band.attributes.position; for (let i = 0; i <= seg; i++) { const c = curve.getPointAt(i / seg); for (let j = 0; j <= n; j++) { const k = i * (n + 1) + j; bp.setXYZ(k, c.x + (bp.getX(k) - c.x) * (W / 2 + 0.06), c.y + (bp.getY(k) - c.y) * 0.9, c.z + (bp.getZ(k) - c.z) * (W / 2 + 0.06)); } } band.computeVertexNormals(); const bm = new THREE.Mesh(band, glassM); hg.scene.add(bm); hg.jbugM = glassM;
+  const pg = new THREE.CylinderGeometry(0.45, 0.6, Y - W * 0.31, 10); pg.translate(0, (Y - W * 0.31) / 2, 0); for (let d = 8; d < L - 4; d += 18) { const p = curve.getPointAt(d / L), col = new THREE.Mesh(pg, new THREE.MeshLambertMaterial({ color: '#c9c2b6' })); col.position.set(p.x, 0, p.z); hg.scene.add(col); hg.addCircle(p.x, p.z, 0.6, Y); }
+  const led = new THREE.LineBasicMaterial({ color: '#7fd6ff', transparent: true, opacity: 0.2 }); hg.scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(120).map((p) => p.clone().setY(Y - W * 0.31 - 0.1))), led)); (hg.lmLights ||= []).push(led);
 }
 // 비스듬한 유리 왕관: 지붕 둘레를 dir 방향으로 갈수록 rise 만큼 높게 올리고, 그 위를 기울어진 유리 지붕으로 덮는다 (밤엔 모서리 불빛)
 function buildCrown(hg, ring, h, L) {
