@@ -74,11 +74,11 @@
           <tr><th>서울 열린데이터광장</th><td><b>지하철 실시간 열차 위치정보</b><code>realtimePosition</code></td><td>실제 열차가 한강 철교 양끝 역에 있을 때, 게임 속 다리 위로 그 호선 색 열차가 건너가요</td></tr>
           <tr><th>서울 열린데이터광장</th><td><b>서울시 실시간 도시데이터</b><code>citydata</code></td><td>혼잡도 → 거리의 곰 수, 도로 소통 → 차 수, 하늘 · 강수 → 게임 날씨, 기온 → 안내</td></tr>
           <tr><th>서울특별시 · 공공데이터포털</th><td><b>버스위치정보조회</b><code>getBusPosByRtid</code></td><td>실제 버스가 있는 자리에 그 노선 번호를 단 버스 (간선 파랑 · 지선 초록)</td></tr>
-          <tr><th>국토교통부 브이월드</th><td><b>건물 공간정보</b><code>LT_C_SPBD</code></td><td>서울 모든 건물의 바닥 모양 · 층수 · 이름 → 건물 덩어리와 높이</td></tr>
+          <tr><th>국토교통부 브이월드</th><td><b>건물 공간정보</b><code>LT_C_SPBD</code></td><td>서울 모든 건물의 바닥 모양 · 층수 · 이름 → 건물 63만 채의 덩어리와 높이 (오픈스트리트맵에 없는 빌라 · 단독주택까지)</td></tr>
           <tr><th>국토교통부 브이월드</th><td><b>건축물대장 정보</b><code>LT_C_BLDGINFO</code></td><td>주용도 · 구조 · 사용승인 연도 → 외벽 · 창 · 지붕</td></tr>
-          <tr><th>소상공인시장진흥공단</th><td><b>상가(상권)정보</b><code>storeListInRectangle</code></td><td>서울 가게 76만 곳의 이름 · 업종 · 층 · 건물 이름 → 간판 · 건물 이름표 <em>반영 중</em></td></tr>
+          <tr><th>소상공인시장진흥공단</th><td><b>상가(상권)정보</b><code>storeListInRectangle</code></td><td>서울 가게 46만 곳을 실제 건물 · 실제 층에 → 1층 가로 간판과 들어갈 수 있는 문, 위층 창문 글씨 간판, 업종마다 간판 색</td></tr>
           <tr><th>오픈스트리트맵</th><td><b>대한민국 원본 지도</b><code>Geofabrik 추출본</code></td><td>길 · 골목 · 인도 · 공원 · 숲 · 물 · 다리 · 철길 · 지하철 출구 · 카페 · 식당</td></tr>
-          <tr><th>맵젠 · AWS 공개 데이터</th><td><b>지형 고도 타일</b><code>Terrarium</code></td><td>서울 전체 50m 간격 높이 → 남산 · 인왕산 · 북악산 · 관악산이 실제 높이로</td></tr>
+          <tr><th>맵젠 · AWS 공개 데이터</th><td><b>지형 고도 타일</b><code>Terrarium</code></td><td>서울 전체 50m 간격 높이 → 땅이 실제 높낮이대로, 건물은 비탈에서도 수평 바닥으로 그 위에</td></tr>
         </table>
 
         <h3>건물 외형은 이렇게</h3>
@@ -95,7 +95,8 @@
 
     <section class="facts">
       <div><b>201</b><span>2km 칸으로 이은<br />서울 25개 구</span></div>
-      <div><b>760,664</b><span>받아 둔 실제 가게<br />(상가정보 · 반영 중)</span></div>
+      <div><b>63만</b><span>실제 바닥 모양대로<br />세운 서울 건물</span></div>
+      <div><b>46만</b><span>실제 건물 · 층에 단<br />진짜 가게 간판</span></div>
       <div><b>50m</b><span>간격의<br />실제 지형 고도</span></div>
       <div><b>0</b><span>장애물 · 탈락 ·<br />로그인 필요</span></div>
     </section>
