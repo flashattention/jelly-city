@@ -310,3 +310,13 @@ body.toss #title #play-btns:has(> .hg-go) { grid-template-columns: 1fr; }
 #hg-map-c { width: min(640px, 100%, 70vh); aspect-ratio: 1; border-radius: 16px; cursor: crosshair; background: #e9e5dc; touch-action: none; }
 .hg-map-btns { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
 #hg-mini { pointer-events: auto !important; cursor: pointer; }
+
+/* 지하철 출입구 앞: 실시간 도착 안내 (역 전광판 느낌) */
+#hg-subway { position: absolute; right: 14px; top: 64px; width: min(320px, 80vw); padding: 12px 14px; border-radius: 16px; background: rgba(12, 16, 28, .82); backdrop-filter: blur(6px); font-family: 'Gowun Dodum'; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+#hg-subway.hidden { display: none; }
+#hg-subway h4 { margin: 0 0 8px; font-family: 'Jua'; font-size: 17px; display: flex; gap: 6px; align-items: center; }
+#hg-subway .ln { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: 700; }
+#hg-subway .row { display: flex; gap: 8px; align-items: center; padding: 5px 0; border-top: 1px solid rgba(255,255,255,.08); }
+#hg-subway .row b { margin-left: auto; color: #ffd84d; font-family: 'Jua'; white-space: nowrap; }
+#hg-subway .note { opacity: .6; font-size: 11px; margin-top: 6px; }
+body.touch #hg-subway { top: 200px; }

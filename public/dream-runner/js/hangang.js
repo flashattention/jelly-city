@@ -265,6 +265,7 @@ export class Hangang {
     for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const c = this.circGrid?.get(`${gx + a},${gz + b}`); if (c) out.push(...c); }
     for (const p of this.people || []) for (const b of p.bears) { const q = b.root.position; if (Math.abs(q.x - x) < 3 && Math.abs(q.z - z) < 3) out.push({ x: q.x, z: q.z, r: 0.3 * (b.root.scale.x / BEAR), h: 1.2 }); }
     for (const gd of this.groups || []) if (gd.solid && Math.abs(gd.g.position.x - x) < 6 && Math.abs(gd.g.position.z - z) < 6) out.push({ x: gd.g.position.x, z: gd.g.position.z, r: gd.solid, h: 1.5 });
+    for (const o of this.buses?.values() || []) if (Math.abs(o.mesh.position.x - x) < 9 && Math.abs(o.mesh.position.z - z) < 9) out.push({ x: o.mesh.position.x, z: o.mesh.position.z, r: 2.6, h: 3 });
     for (const c of this.cars3 || []) if (c.mesh && Math.abs(c.mesh.position.x - x) < 8 && Math.abs(c.mesh.position.z - z) < 8) out.push({ x: c.mesh.position.x, z: c.mesh.position.z, r: c.r || 1.6, h: 2 });
     return out;
   }
@@ -378,6 +379,7 @@ export class Hangang {
     this.buildLights(r);
     this.buildSkyStuff(r);
     this.buildPeople();
+    this.buildTransit();
     // 내 곰돌이 그림자
     this.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.5, 18), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.25, depthWrite: false }));
     this.shadow.rotation.x = -Math.PI / 2; this.shadow.renderOrder = -40; sc.add(this.shadow);
@@ -423,6 +425,7 @@ export class Hangang {
     this.scene.add(cols, caps);
     // 철교: 트러스 (선)
     const tP = []; for (const { fine, ys, w } of rails) for (let i = 1; i < fine.length; i++) { const a = fine[i - 1], c = fine[i], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1, nx = -dz / L * w / 2, nz = dx / L * w / 2; for (const sgn of [-1, 1]) { const ax = a[0] + nx * sgn, az = a[1] + nz * sgn, cx = c[0] + nx * sgn, cz = c[1] + nz * sgn, y0 = ys[i - 1], y1 = ys[i]; tP.push(ax, y0, az, cx, y1 + 7, cz, ax, y0 + 7, az, cx, y1 + 7, cz, ax, y0, az, ax, y0 + 7, az); } }
+    this.railPaths = rails;
     if (tP.length) { const beams = []; for (let i = 0; i < tP.length; i += 6) beams.push([tP[i], tP[i + 1], tP[i + 2], tP[i + 3], tP[i + 4], tP[i + 5]]); const bg = new THREE.BoxGeometry(0.5, 0.5, 1); bg.translate(0, 0, 0.5); const bm = new THREE.InstancedMesh(bg, new THREE.MeshLambertMaterial({ color: '#5b6672' }), beams.length), o2 = new THREE.Object3D(), A = new THREE.Vector3(), B = new THREE.Vector3(); beams.forEach(([x1, y1, z1, x2, y2, z2], i) => { A.set(x1, y1, z1); B.set(x2, y2, z2); o2.position.copy(A); o2.lookAt(B); o2.scale.set(1, 1, A.distanceTo(B)); o2.updateMatrix(); bm.setMatrixAt(i, o2.matrix); }); this.scene.add(bm); }
     // 아치 (서강대교)
     for (const [, ax, az, span] of this.map.arches || []) {
@@ -798,7 +801,7 @@ export class Hangang {
     }
     for (const w of [...this.walkers]) { const p0 = w.bears[0].root.position; if (Math.hypot(p0.x - px, p0.z - pz) > 240) { this.removePerson(w); this.walkers.splice(this.walkers.indexOf(w), 1); } }
     // 차: 오른쪽 차로로, 출퇴근 시간엔 많고 밤엔 적게 · 앞에 곰돌이가 있으면 멈춘다
-    const rush = (h >= 7 && h < 9.5) || (h >= 17 && h < 20), maxC = Math.round((isPhone ? 10 : 34) * (rush ? 1.3 : h >= 23 || h < 6 ? 0.35 : 0.9));
+    const rush = (h >= 7 && h < 9.5) || (h >= 17 && h < 20), jam = { 원활: 1, 서행: 1.35, 정체: 1.7 }[this.city?.road] || (rush ? 1.3 : 1), maxC = Math.round((isPhone ? 10 : 34) * jam * (h >= 23 || h < 6 ? 0.35 : 0.9)); this.jamSpeed = this.city?.roadSpd ? clamp(this.city.roadSpd / 40, 0.25, 1.1) : 1;
     this.carT -= dt;
     if (this.carT <= 0 && this.cars3.length < maxC && this.driveLines.length) {
       this.carT = 0.25 + r() * 0.4; const pk = this.pickNear(this.driveGrid, this.driveLines, px, pz, 70, 320, r);
@@ -806,7 +809,7 @@ export class Hangang {
         const L = pk.L, dir = r() < 0.5 ? 1 : -1, lanes = Math.max(1, Math.floor(L.w / 7)), lane = Math.floor(r() * lanes), off = dir * (1.8 + lane * 3.3);
         const x = r(), kind = x < 0.08 && L.w >= 14 ? 'bus' : x < 0.24 ? 'taxi' : 'car';
         const mesh = makeVehicle(kind, r); this.scene.add(mesh);
-        this.cars3.push({ L, d: pk.d, dir, off, v: kind === 'bus' ? 9 : 10 + r() * 5, mesh, kind, r: kind === 'bus' ? 2.6 : 1.7 });
+        this.cars3.push({ L, d: pk.d, dir, off, v: (kind === 'bus' ? 9 : 10 + r() * 5) * (this.jamSpeed || 1), mesh, kind, r: kind === 'bus' ? 2.6 : 1.7 });
       }
     }
     const night = this.light?.night || 0;
@@ -820,6 +823,65 @@ export class Hangang {
       c.mesh.userData.lights.material.emissiveIntensity = 0.3 + night * 2.5;
     }
     for (const c of [...this.cars3]) if (Math.hypot(c.mesh.position.x - px, c.mesh.position.z - pz) > 360) { this.scene.remove(c.mesh); this.cars3.splice(this.cars3.indexOf(c), 1); }
+  }
+  // ---------- 지하철 · 버스 (실시간) ----------
+  //   출입구: 실제 위치에 유리 지붕 계단 + 호선 색 표지판 · 가까이 가면 그 역 실시간 도착 (onStation)
+  //   한강철교: 1호선 열차가 실시간 위치대로 노량진 ↔ 용산을 건넌다 (정보가 없으면 시간표처럼 몇 분마다)
+  //   버스: 실제 GPS 위치대로
+  buildTransit() {
+    const M = this.map, S = M.scale; this.stations = (M.stations || []).map(([n, x, z]) => ({ name: n, x: x * S, z: z * S, lines: STATION_LINES[n] || [] }));
+    this.entrances = [];
+    const glass = new THREE.MeshPhongMaterial({ color: '#cfe6f0', transparent: true, opacity: 0.38, shininess: 90, side: THREE.DoubleSide }), frame = new THREE.MeshLambertMaterial({ color: '#5a636e' }), pit = new THREE.MeshBasicMaterial({ color: '#2a2a30' }), stepM = new THREE.MeshLambertMaterial({ color: '#8a8a8e' });
+    for (const [x0, z0, si, ref] of M.entrances || []) {
+      const st = this.stations[si]; if (!st) continue; const x = x0 * S, z = z0 * S; if (this.inWater(x, z)) continue;
+      const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = Math.atan2(st.x - x, st.z - z);
+      const p = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 4.2), pit); p.rotation.x = -Math.PI / 2; p.position.y = 0.04; g.add(p);
+      for (let k = 0; k < 6; k++) { const s2 = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.05, 0.5), stepM); s2.position.set(0, 0.06, -1.6 + k * 0.62); g.add(s2); }
+      for (const sx of [-1.25, 1.25]) { const wall = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.0, 4.4), glass); wall.position.set(sx, 0.55, 0); g.add(wall); const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.5, 0.1), frame); post.position.set(sx, 1.25, -2.15); g.add(post); const post2 = post.clone(); post2.position.z = 2.15; g.add(post2); }
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.08, 4.6), glass); roof.position.y = 2.5; roof.rotation.x = 0.06; g.add(roof);
+      const rf = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.12, 0.12), frame); rf.position.set(0, 2.5, -2.3); g.add(rf);
+      // 표지판: 호선 색 동그라미들 + 역 이름 판
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.5), new THREE.MeshBasicMaterial({ map: stationSignTex(st.name, st.lines, ref), transparent: true, side: THREE.DoubleSide })); sign.position.set(0, 2.25, -2.32); g.add(sign);
+      this.scene.add(g); this.entrances.push({ x, z, st, ref, g }); this.addCircle(x, z, 0.4, 2.6);
+    }
+    // 한강철교 선로 두 줄: 가장 긴 철교 둘
+    // 한강철교(노량진 ↔ 용산, 북위 37.5172 · 동경 126.958) 근처 철교 중 긴 두 줄
+    const M2 = this.map, hx = (126.958 - 126.98) * 111320 * Math.cos(37.53 * Math.PI / 180) - M2.center[0], hz = -(37.5172 - 37.53) * 110574 - M2.center[1];
+    this.trackPaths = (this.railPaths || []).map((rp) => { const mid = rp.fine[Math.floor(rp.fine.length / 2)]; return { ...rp, len: rp.fine.reduce((a, p, i) => a + (i ? Math.hypot(p[0] - rp.fine[i - 1][0], p[1] - rp.fine[i - 1][1]) : 0), 0), dist: Math.hypot(mid[0] - hx, mid[1] - hz) }; }).filter((rp) => rp.dist < 900 && rp.len > 300).sort((a, b) => b.len - a.len).slice(0, 2);
+    this.trains = []; this.trainT = 5; this.trainSeen = new Set(); this.buses = new Map();
+  }
+  trainAt(tp, d) { const f = tp.fine; let acc = 0; for (let i = 1; i < f.length; i++) { const L = Math.hypot(f[i][0] - f[i - 1][0], f[i][1] - f[i - 1][1]); if (acc + L >= d) { const t = (d - acc) / (L || 1); return { x: lerp(f[i - 1][0], f[i][0], t), z: lerp(f[i - 1][1], f[i][1], t), y: lerp(tp.ys[i - 1], tp.ys[i], t), dx: (f[i][0] - f[i - 1][0]) / (L || 1), dz: (f[i][1] - f[i - 1][1]) / (L || 1) }; } acc += L; } const n = f.length - 1; return { x: f[n][0], z: f[n][1], y: tp.ys[n], dx: 0, dz: 1 }; }
+  spawnTrain(north) {
+    const tp = this.trackPaths[north ? 0 : 1] || this.trackPaths[0]; if (!tp) return;
+    const southFirst = tp.fine[0][1] > tp.fine[tp.fine.length - 1][1], forward = north ? southFirst : !southFirst;
+    const g = makeTrain(); this.scene.add(g); this.trains.push({ tp, d: forward ? -200 : tp.len + 200, dir: forward ? 1 : -1, g, v: 16 });
+  }
+  async pollTransit() {
+    if (!this.api) return;
+    try {
+      const j = await this.api('/api/seoul/subway/position?line=1호선'); this.liveTrains = true;
+      for (const t of j.trains || []) { const key = `${t.no}:${t.at}:${t.up}`; if (t.sttus !== 2 || this.trainSeen.has(key)) continue; if (t.at === '노량진' && t.up) { this.trainSeen.add(key); this.spawnTrain(true); } else if (t.at === '용산' && !t.up) { this.trainSeen.add(key); this.spawnTrain(false); } }
+      if (this.trainSeen.size > 400) this.trainSeen.clear();
+    } catch { this.liveTrains = false; }
+    try { const j = await this.api('/api/seoul/bus/pos'); this.busData = j.buses || []; } catch { /* 버스 정보 없음 */ }
+    if (!this.cityAt || Date.now() - this.cityAt > 300000) { this.cityAt = Date.now(); try { this.city = await this.api('/api/seoul/city?area=' + encodeURIComponent('여의도')); this.onCity?.(this.city); } catch { /* 도시 정보 없음 */ } }
+  }
+  tickTransit(dt, px, pz) {
+    if (!this.trains) return;
+    this.trainT -= dt; if (this.trainT <= 0) { this.trainT = 20; this.pollTransit(); if (!this.liveTrains && Math.random() < 0.35) this.spawnTrain(Math.random() < 0.5); }
+    for (const t of this.trains) { t.d += t.dir * t.v * dt; t.g.children.forEach((car, i) => { const p = this.trainAt(t.tp, clamp(t.d - t.dir * i * 20, 0, t.tp.len)); car.position.set(p.x, p.y + 0.4, p.z); car.rotation.y = Math.atan2(p.dx, p.dz); car.visible = t.d - t.dir * i * 20 > 0 && t.d - t.dir * i * 20 < t.tp.len; }); }
+    this.trains = this.trains.filter((t) => { const done = t.dir > 0 ? t.d > t.tp.len + 220 : t.d < -220; if (done) this.scene.remove(t.g); return !done; });
+    // 실시간 버스: GPS → 지도 좌표, 받은 위치로 부드럽게
+    const S = this.map, cx = S.center[0], cz = S.center[1];
+    for (const b of this.busData || []) {
+      const x = (b.lon - 126.98) * 111320 * Math.cos(37.53 * Math.PI / 180) - cx, z = -(b.lat - 37.53) * 110574 - cz; if (Math.abs(x) > 2600 || Math.abs(z) > 2600) continue;
+      let o = this.buses.get(b.id); if (!o) { const mesh = makeVehicle('bus', Math.random); this.scene.add(mesh); o = { mesh, x, z, tx: x, tz: z, r: 2.6 }; this.buses.set(b.id, o); }
+      if (Math.hypot(x - o.tx, z - o.tz) > 0.5) { o.yaw = Math.atan2(x - o.tx, z - o.tz); o.tx = x; o.tz = z; }
+    }
+    for (const o of this.buses.values()) { o.x += (o.tx - o.x) * Math.min(1, dt * 0.25); o.z += (o.tz - o.z) * Math.min(1, dt * 0.25); o.mesh.position.set(o.x, 0, o.z); if (o.yaw != null) o.mesh.rotation.y = o.yaw; }
+    // 가까운 지하철 출입구
+    let near = null; for (const e of this.entrances) { const d = Math.hypot(e.x - px, e.z - pz); if (d < 7 && (!near || d < near.d)) near = { ...e, d }; }
+    const key = near ? `${near.st.name}:${near.ref}` : null; if (key !== this.nearSt) { this.nearSt = key; this.onStation?.(near ? { name: near.st.name, ref: near.ref, lines: near.st.lines } : null); }
   }
   // ---------- 들어가기 · 나가기 ----------
   enter(bear, opt = {}) {
@@ -868,7 +930,7 @@ export class Hangang {
     // 시간 흐름 (기본: 게임 속 1시간 = 1분)
     if (this.opt.time === 'auto' || this.opt.flow > 0) st.hour = (st.hour + (dt / 60) * (this.opt.flow ?? 1)) % 24;
     // 날씨는 가끔 바뀐다
-    if (this.opt.weather === 'auto') { this.weatherT -= dt; if (this.weatherT <= 0) { this.weatherT = 240 + this.r() * 420; st.weather = this.randWeather(this.r); } }
+    if (this.opt.weather === 'auto') { if (this.city && this.city.rain !== undefined && this.city.at) { st.weather = /눈/.test(this.city.rain) ? 'snow' : this.city.rain ? 'rain' : /흐림|구름/.test(this.city.sky) ? 'cloudy' : st.weather === 'rain' || st.weather === 'snow' ? 'clear' : st.weather; } else { this.weatherT -= dt; if (this.weatherT <= 0) { this.weatherT = 240 + this.r() * 420; st.weather = this.randWeather(this.r); } } }
     // 속도 단계: Q · E · +/- 로 고른다. 움직이는 건 누르는 동안만 (W A S D · 조이스틱, 카메라가 보는 쪽 기준)
     if (inp.speedTo != null) { this.target = inp.speedTo; inp.speedTo = null; }
     this.camYaw += inp.yaw || 0; this.camPitch = clamp((this.camPitch ?? 0.32) + (inp.pitch || 0), -0.6, 1.2); if (inp.yaw || inp.pitch) this.dragT = 2.5; this.dragT = Math.max(0, this.dragT - dt);
@@ -931,7 +993,7 @@ export class Hangang {
     this.bear.climbing = !!this.climb;
     if (!this.climb) poseBear(this.bear, { ground: this.y <= this.groundAt(bx, bz, this.y) + 0.001, slide: this.slide, flip: this.flipT > 0 ? 1 - this.flipT / FLIP_T : null, vy: this.vy, alive: true }, dt);
     this.shadow.position.set(bx, this.groundAt(bx, bz, this.y) + 0.02, bz); this.shadow.scale.setScalar(BEAR * (1 - Math.min(0.5, this.y * 0.2)));
-    this.tickPeople(dt, bx, bz); this.tickGroups(dt, bx, bz); this.tickCity(dt, bx, bz); this.tickLabels(dt, camera, bx, bz);
+    this.tickPeople(dt, bx, bz); this.tickGroups(dt, bx, bz); this.tickCity(dt, bx, bz); this.tickTransit(dt, bx, bz); this.tickLabels(dt, camera, bx, bz);
     this.tickEnv(dt, camera, bx, bz);
     this.tickCamera(dt, camera, bx, bz, Math.sin(this.camYaw), Math.cos(this.camYaw));
   }
@@ -952,6 +1014,8 @@ export class Hangang {
     let gw = [3, 1.2, 1, 1, 1, 1.2];
     if (season === 'spring') { gw[0] *= 2; gw[5] *= 1.5; } if (season === 'autumn') { gw[1] *= 2; gw[3] *= 1.5; } if (season === 'summer') { gw[1] *= 1.6; gw[2] *= 1.5; }
     if (night) { gw = [0.6, gw[1] * 1.4, 0.05, 0.05, 0.5, 0.8]; } if (rain || snow) gw = [0, 0.2, 0, 0, 0.6, 1];
+    // 실제 여의도 인구 혼잡도 (서울 실시간 도시데이터): 여유 · 보통 · 약간 붐빔 · 붐빔
+    const live = { 여유: 0.85, 보통: 1.1, '약간 붐빔': 1.4, 붐빔: 1.8 }[this.city?.congest]; if (live) k *= live;
     return { k, w, gw, groups: rain ? 0.25 : snow ? 0.4 : season === 'winter' ? 0.5 : night ? 0.45 : 1 };
   }
   tickPeople(dt, px, pz) {
@@ -1251,6 +1315,23 @@ function makeVehicle(kind, r) {
   for (const sx of [-1, 1]) { const hl = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.16, 0.05), lm); hl.position.set(sx * (W / 2 - 0.35), 0.75, L / 2 + 0.01); g.add(hl); const tl = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.16, 0.05), tm); tl.position.set(sx * (W / 2 - 0.35), 0.8, -L / 2 - 0.01); g.add(tl); }
   g.userData.lights = { material: lm };
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return g;
+}
+// 역 · 호선 (서울 지하철 노선 색)
+const LINE_COLOR = { 1: '#0052A4', 2: '#00A84D', 3: '#EF7C1C', 4: '#00A5DE', 5: '#996CAC', 6: '#CD7C2F', 7: '#747F00', 8: '#E6186C', 9: '#BDB092', 경의중앙: '#77C4A3', 공항: '#0090D2', 신림: '#6789CA' };
+const STATION_LINES = { 여의나루: [5], 여의도: [5, 9], 국회의사당: [9], 샛강: [9, '신림'], 노들: [9], 노량진: [1, 9], 대방: [1, '신림'], 영등포: [1], 신길: [1, 5], 영등포시장: [5], 마포: [5], 공덕: [5, 6, '경의중앙', '공항'], 효창공원앞: [6, '경의중앙'], 대흥: [6], 광흥창: [6], 상수: [6], 합정: [2, 6] };
+function stationSignTex(name, lines, ref) {
+  const cv = document.createElement('canvas'); cv.width = 320; cv.height = 100; const g = cv.getContext('2d');
+  g.fillStyle = '#ffffff'; g.beginPath(); g.roundRect(2, 2, 316, 96, 14); g.fill();
+  lines.forEach((l, i) => { g.fillStyle = LINE_COLOR[l] || '#888'; g.beginPath(); g.arc(34 + i * 46, 50, 19, 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = `bold ${String(l).length > 1 ? 13 : 22}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(l).slice(0, 2), 34 + i * 46, 51); });
+  g.fillStyle = '#1d1d1f'; g.font = 'bold 30px sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(name, 22 + lines.length * 46, 44);
+  if (ref) { g.font = 'bold 18px sans-serif'; g.fillStyle = '#555'; g.fillText(`${ref}번 출구`, 22 + lines.length * 46, 76); }
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+// 1호선 전동차 10량: 은색 몸체 · 파랑 · 빨강 띠 · 창 띠
+function makeTrain() {
+  const g = new THREE.Group(), body = new THREE.MeshLambertMaterial({ color: '#d9dde2' }), win = new THREE.MeshLambertMaterial({ color: '#2a3442', emissive: '#ffe8b0', emissiveIntensity: 0.2 }), blue = new THREE.MeshLambertMaterial({ color: '#1d4fa8' }), red = new THREE.MeshLambertMaterial({ color: '#d8352a' });
+  for (let i = 0; i < 10; i++) { const car = new THREE.Group(); const b = new THREE.Mesh(new THREE.BoxGeometry(3.1, 3.4, 19.4), body); b.position.y = 1.9; car.add(b); const w = new THREE.Mesh(new THREE.BoxGeometry(3.12, 0.9, 17.6), win); w.position.y = 2.5; car.add(w); const s1 = new THREE.Mesh(new THREE.BoxGeometry(3.13, 0.18, 19.4), blue); s1.position.y = 1.7; car.add(s1); const s2 = new THREE.Mesh(new THREE.BoxGeometry(3.13, 0.1, 19.4), red); s2.position.y = 1.5; car.add(s2); g.add(car); }
   return g;
 }
 function shadeHex(hex, k) { const c = new THREE.Color(hex); c.multiplyScalar(k); return `#${c.getHexString()}`; }

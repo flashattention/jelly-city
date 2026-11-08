@@ -18,6 +18,7 @@ import { GOOGLE_CLIENT_ID, DEV_LOGIN, verifyGoogle, readJson } from './auth.js';
 import { DreamBoard, dreamApi } from './dream-runner/leaderboard.js';
 import { TossAccounts, tossAccountApi, cors as tossCors } from './toss.js';
 import { PlayTime, playtimeApi } from './playtime.js';
+import { seoulApi } from './seoul.js';
 import { Board, boardApi } from './board.js';
 import { DreamRooms } from './dream-runner/rooms.js';
 import { DriftRooms } from './jelly-drift/rooms.js';
@@ -185,6 +186,7 @@ async function api(req, res, url) {
   if (url.pathname.startsWith('/api/board/')) return boardApi(req, res, url, world.userOf(sid), board, json, isAdmin);
   if (url.pathname.startsWith('/api/dream/')) return dreamApi(req, res, url, world.userOf(sid), dreamBoard, json, isAdmin);
   if (url.pathname.startsWith('/api/merge/')) return mergeRecords.api(req, res, url, world.userOf(sid), json, '/api/merge');
+  if (url.pathname.startsWith('/api/seoul/') && await seoulApi(req, res, url, json)) return;
   if (url.pathname.startsWith('/api/playtime') && await playtimeApi(req, res, url, playtime, json, () => ({ ids: ['dream-runner', 'jelly-city', ...GAME_IDS], dream: [dreamBoard, dreamToss], records: { 'jelly-ten': tenRecords, 'jelly-survivor': survRecords, 'jelly-type': typeRecords, 'jelly-merge': mergeRecords, 'jelly-slide': slideRecords, 'jelly-drift': driftRecords }, cityUsers: Object.keys(world.users || {}).length }))) return;
   if (url.pathname.startsWith('/api/slide/')) return slideRecords.api(req, res, url, world.userOf(sid), json, '/api/slide');
   if (url.pathname.startsWith('/api/drift/')) return driftRecords.api(req, res, url, world.userOf(sid), json, '/api/drift');

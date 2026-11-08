@@ -953,6 +953,20 @@ setTimeout(() => { if (game.mode === 'title' && !new URLSearchParams(location.se
 // ---------- 🌉 한강 러닝 ----------
 //   장애물 · 탈락 없이 내 속도로 달리는 힐링 맵. 거리 · 순간(노을 · 비 · 눈 …)은 서버에 모여 업적이 된다
 const hg = new Hangang();
+hg.api = (path) => account.api(path);
+// 지하철 출입구 앞: 그 역 실시간 도착 (20초마다)
+const LCOL = { '1호선': '#0052A4', '2호선': '#00A84D', '5호선': '#996CAC', '6호선': '#CD7C2F', '9호선': '#BDB092', 경의중앙선: '#77C4A3', 공항철도: '#0090D2', 신림선: '#6789CA' };
+let hgSt = null, hgStT = null;
+async function hgStationRender() {
+  if (!hgSt) return; const el = $('hg-subway');
+  try {
+    const j = await account.api(`/api/seoul/subway/arrival?station=${encodeURIComponent(hgSt.name)}`);
+    const rows = (j.trains || []).slice(0, 6).map((t) => `<div class="row"><span class="ln" style="background:${LCOL[t.line] || '#888'}">${String(t.line).replace('호선', '')}</span><span>${String(t.to || '').replace(/[<>&]/g, '')}</span><b>${String(t.msg || '').replace(/[<>&]/g, '')}</b></div>`).join('') || '<div class="row">곧 들어오는 열차가 없어요</div>';
+    el.innerHTML = `<h4>🚇 ${hgSt.name}역${hgSt.ref ? ` · ${hgSt.ref}번 출구` : ''}</h4>${rows}<div class="note">실시간 · 서울 열린데이터광장</div>`;
+  } catch (e) { el.innerHTML = `<h4>🚇 ${hgSt.name}역${hgSt.ref ? ` · ${hgSt.ref}번 출구` : ''}</h4><div class="row">${/준비/.test(e.message) ? '실시간 도착 정보를 준비하고 있어요' : '도착 정보를 불러오지 못했어요'}</div>`; }
+}
+hg.onStation = (st) => { hgSt = st; clearInterval(hgStT); $('hg-subway').classList.toggle('hidden', !st); if (st) { $('hg-subway').innerHTML = `<h4>🚇 ${st.name}역</h4><div class="row">불러오는 중…</div>`; hgStationRender(); hgStT = setInterval(hgStationRender, 20000); } };
+hg.onCity = (c) => { if (c?.congest) toast(`📡 지금 실제 여의도: ${c.congest} · 약 ${Math.round((c.pplMin + c.pplMax) / 2 / 10000)}만 명 · 도로 ${c.road || '-'}${c.temp != null ? ` · ${c.temp}°C` : ''}`, 3200); };
 hg.onTurn = (txt) => toast(`🚧 ${txt}이에요 · 돌아서 달려요`, 2200);
 const HG_OPT_KEY = 'dreamrunner.hangang';
 try { Object.assign(hg.opt, JSON.parse(store.get(HG_OPT_KEY) || '{}')); } catch { /* 기본 */ }
@@ -997,7 +1011,7 @@ function hgReport(final = false) {
   account.api('/api/dream/hangang/run', { method: 'POST', body }).then((r) => { if (r?.fresh?.length) setTimeout(notifyNew, 300); }).catch(() => {});
 }
 function leaveHangang() {
-  hgReport(true); if (document.pointerLockElement) document.exitPointerLock?.(); $('hg-labels').innerHTML = '';
+  hgReport(true); if (document.pointerLockElement) document.exitPointerLock?.(); $('hg-labels').innerHTML = ''; hg.onStation(null);
   hg.leave(); document.body.classList.remove('hg'); $('t-shove').textContent = '🫸';
   $('hg-hud').classList.add('hidden'); $('hg-set').classList.add('hidden');
   camera.far = 1600; camera.fov = 62; camera.updateProjectionMatrix();

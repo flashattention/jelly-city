@@ -45,6 +45,8 @@ const FAR_B = [37.470, 126.840, 37.590, 127.090];
 async function overpassFar(file, body) { const f = path.join(CACHE, file); if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf8')); const keep = C.bbox; C.bbox = FAR_B; try { return await overpass(file, body); } finally { C.bbox = keep; } }
 const wJ = await overpassFar('water_far.json', 'way["natural"="water"]["water"="river"]($B);relation["natural"="water"]["water"="river"]($B);way["place"~"island|islet"]($B);relation["place"~"island|islet"]($B);');
 const tJ = await overpassFar('tall_far.json', 'way["building"]["building:levels"~"^(1[8-9]|[2-9][0-9])$"]($B);way["building"]["height"~"^([5-9][0-9]|[1-5][0-9][0-9])"]($B);way["building:part"]["height"~"^([1-5][0-9][0-9])"]($B);');
+// 지하철역 · 출입구 (실제 위치)
+const sJ = await overpass('stations.json', 'node["railway"="subway_entrance"]($B);node["railway"="station"]($B);node["public_transport"="station"]($B);');
 const lJ = await overpass('land.json', 'way["natural"="water"]($B);relation["natural"="water"]($B);way["waterway"="riverbank"]($B);relation["waterway"="riverbank"]($B);way["place"~"island|islet"]($B);relation["place"~"island|islet"]($B);way["leisure"~"park|pitch|playground|garden"]($B);relation["leisure"="park"]($B);way["landuse"~"grass|recreation_ground|forest|meadow"]($B);way["natural"~"wood|scrub|grassland|wetland|sand|beach"]($B);relation["natural"~"wood|wetland|grassland"]($B);way["highway"]($B);way["railway"~"rail|subway"]($B);way["man_made"~"bridge|pier"]($B);');
 
 // ---------- 기하 도우미 ----------
@@ -228,6 +230,15 @@ out.tall = [];
     const cx = c[0] + ca * (u0 + u1) / 2 - sa * (v0 + v1) / 2, cz = c[1] + sa * (u0 + u1) / 2 + ca * (v0 + v1) / 2;
     out.tall.push([...q([cx, cz]), Math.round((u1 - u0) * 10), Math.round((v1 - v0) * 10), Math.round(ang * 100), Math.round(h), t['building:material'] === 'glass' || /^#?[0-9a-f]{6}$/i.test(t['building:colour'] || '') ? 1 : t.building === 'apartments' ? 2 : 0]);
   }
+}
+
+// ---------- 지하철역 · 출입구 ----------
+out.stations = []; out.entrances = [];
+{
+  const st = sJ.elements.filter((e) => e.type === 'node' && e.tags?.name && (e.tags.railway === 'station' || e.tags.public_transport === 'station') && (e.tags.subway === 'yes' || e.tags.station === 'subway' || e.tags.train === 'yes' || /역$/.test(e.tags.name) || e.tags.railway === 'station'));
+  const seen = new Map();
+  for (const e of st) { const name = e.tags.name.replace(/역$/, '').replace(/\s*\(.*\)$/, ''); const [x, z] = P(e.lat, e.lon); if (x < rect[0] || x > rect[2] || z < rect[1] || z > rect[3]) continue; if (seen.has(name)) continue; seen.set(name, out.stations.length); out.stations.push([name, ...q([x, z]), String(e.tags.line || e.tags['subway:line'] || e.tags.ref || '').slice(0, 30)]); }
+  for (const e of sJ.elements) { if (e.type !== 'node' || e.tags?.railway !== 'subway_entrance') continue; const [x, z] = P(e.lat, e.lon); if (x < rect[0] || x > rect[2] || z < rect[1] || z > rect[3]) continue; let bi = -1, bd = 600; out.stations.forEach(([, sx, sz], i) => { const d = Math.hypot(sx * 0.1 + center[0] - x, sz * 0.1 + center[1] - z); if (d < bd) { bd = d; bi = i; } }); if (bi < 0) continue; out.entrances.push([...q([x, z]), bi, String(e.tags.ref || e.tags.name || '').replace(/[^0-9A-Za-z-]/g, '').slice(0, 4)]); }
 }
 
 // ---------- 이정표 · 먼 랜드마크 ----------
