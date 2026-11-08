@@ -7,6 +7,7 @@ import { makeBear, poseBear, FLIP_T } from './runner.js';
 import { isPhone } from '../../shared/js/perf.js';
 import { buildStation, buildCar } from './hangang-station.js';
 import { buildShopFronts, buildShopInterior, foodMesh, SHOP_MENU, SHOP_KIND } from './hangang-shop.js';
+import { buildMall } from './hangang-mall.js';
 
 export const SEASONS = { spring: '🌸 봄', summer: '🌿 여름', autumn: '🍁 가을', winter: '❄️ 겨울' };
 export const WEATHERS = { clear: '☀️ 맑음', cloudy: '☁️ 구름', rain: '🌧️ 비', snow: '🌨️ 눈' };
@@ -265,7 +266,7 @@ export class Hangang {
     this.placeAt(e.x - Math.sin(th) * 3.6, e.z - Math.cos(th) * 3.6, th + Math.PI); this.stationCool = 2; this.onInside?.(null);
   }
   // 한강을 나갈 때: 가게 · 역 · 열차 안이면 바깥으로 되돌려 놓는다 (다음에 들어왔을 때 바깥이 숨겨져 있지 않게)
-  exitInterior() { if (this.inShop) this.leaveShop(); if (this.ride) { this.ride.C.g.visible = false; this.ride = null; } if (this.inside) this.leaveStation(this.inside.from?.ref); }
+  exitInterior() { if (this.inShop) this.leaveShop(); if (this.inMall) this.leaveMall(); if (this.ride) { this.ride.C.g.visible = false; this.ride = null; } if (this.inside) this.leaveStation(this.inside.from?.ref); }
   placeAt(x, z, face) { this.px = x; this.pz = z; this.y = 0; this.vy = 0; this.climb = null; this.face = face; this.camYaw = face; this.camInit = false; this.mdx = null; this.onRoof = null; }
   // 열차 타기: 열린 문 앞에 서면 탄다 → 열차 안에서 잠깐 달리고 → 다음 역 승강장에 내린다 (그 역이 지도 밖이면 같은 역 반대편으로)
   startRide(p, T) {
@@ -297,12 +298,18 @@ export class Hangang {
   //   가게 문 앞(벽 쪽으로)으로 걸어가면 들어간다. 계산대 앞에 서면 메뉴 (onShop) → shopOrder(번호, 'here' | 'togo')
   hideOutdoor(keep) { this.hidden = []; for (const o of this.scene.children) if (o !== keep && o !== this.bear?.root && o !== this.shadow && o.visible) { this.hidden.push(o); o.visible = false; } }
   showOutdoor() { for (const o of this.hidden || []) o.visible = true; this.hidden = null; }
+  enterMall(D2) { this.mallInt ||= {}; const I = this.mallInt[D2.name] ||= buildMall(this, D2.name, Object.keys(this.mallInt).length, makeBear); this.hideOutdoor(I.g); I.g.visible = true; this.inMall = { D: D2, I }; this.placeAt(I.spawn.x, I.spawn.z, I.spawn.face); this.onShopEnter?.({ name: D2.name }); }
+  leaveMall() { const M2 = this.inMall; if (!M2) return; M2.I.g.visible = false; this.showOutdoor(); this.inMall = null; const D2 = M2.D; this.placeAt(D2.x + D2.nx * 3, D2.z + D2.nz * 3, Math.atan2(D2.nx, D2.nz)); this.shopCool = 2; }
+  tickMall(dt) { const I = this.inMall.I; I.tick(dt); if ((this.shopCool || 0) > 0) { this.shopCool -= dt; return; } if (Math.hypot(this.px - I.door.x, this.pz - I.door.z) < 1.4) return this.leaveMall(); for (const F of I.fronts) if (Math.hypot(this.px - F.x, this.pz - F.z) < 1.3) return this.enterShop(F); }
   enterShop(F) {
+    if (F.mall && this.inMall) { this.shopInt ||= {}; const kinds = Object.keys(SHOP_KIND), I = this.shopInt[F.kind] ||= buildShopInterior(this, F.kind, kinds.indexOf(F.kind), makeBear); I.drawMenu(F.name); this.inMall.I.g.visible = false; I.g.visible = true; this.inShop = { F, I, ordered: null, menuShown: false }; this.placeAt(I.spawn.x, I.spawn.z, I.spawn.face); this.onShopEnter?.({ name: F.name }); return; }
     this.shopInt ||= {}; const kinds = Object.keys(SHOP_KIND), I = this.shopInt[F.kind] ||= buildShopInterior(this, F.kind, kinds.indexOf(F.kind), makeBear);
     I.drawMenu(F.name); this.hideOutdoor(I.g); I.g.visible = true; this.inShop = { F, I, ordered: null, menuShown: false }; this.placeAt(I.spawn.x, I.spawn.z, I.spawn.face); this.onShopEnter?.({ name: F.name, kind: F.kind, label: SHOP_KIND[F.kind].label });
   }
   leaveShop() {
-    const S2 = this.inShop; if (!S2) return; S2.I.g.visible = false; if (S2.food) S2.I.g.remove(S2.food); this.showOutdoor(); this.inShop = null; this.eating = null;
+    const S2 = this.inShop; if (!S2) return; S2.I.g.visible = false; if (S2.food) S2.I.g.remove(S2.food); this.inShop = null; this.eating = null;
+    if (S2.F.mall && this.inMall) { this.inMall.I.g.visible = true; this.placeAt(S2.F.x - S2.F.nx * 2.4, S2.F.z - S2.F.nz * 2.4, Math.atan2(-S2.F.nx, -S2.F.nz)); this.shopCool = 1.5; this.onShop?.(null); return; }
+    this.showOutdoor();
     const F = S2.F; this.placeAt(F.x + F.nx * 2.2, F.z + F.nz * 2.2, Math.atan2(F.nx, F.nz)); this.shopCool = 2; this.onShop?.(null); this.onShopEnter?.(null);
   }
   shopOrder(idx, mode) {
@@ -466,6 +473,9 @@ export class Hangang {
     this.buildBuildings(P2);
     this.buildFar(P2);
     this.buildPlants(inWater, r);
+    // 큰 몰 정문: 더현대 서울 (가장 긴 벽 가운데, 바깥을 본다)
+    this.malls = []; { const fs2 = (this.foot || []).filter((f) => f.name === '더현대 서울'); const f = fs2.sort((a, b) => Math.abs(ringArea(b.ring)) - Math.abs(ringArea(a.ring)))[0]; if (f) { const ring = f.ring, sg = ringArea(ring) > 0 ? 1 : -1; let best = null; for (let k = 0; k < ring.length; k++) { const a = ring[k], c = ring[(k + 1) % ring.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]); if (!best || L > best.L) best = { L, x: (a[0] + c[0]) / 2, z: (a[1] + c[1]) / 2, nx: (sg > 0 ? c[1] - a[1] : a[1] - c[1]) / L, nz: (sg > 0 ? a[0] - c[0] : c[0] - a[0]) / L }; } const D2 = { name: f.name, x: best.x + best.nx * 0.1, z: best.z + best.nz * 0.1, nx: best.nx, nz: best.nz }; this.malls.push(D2);
+      const gd = new THREE.Group(); gd.position.set(D2.x, 0, D2.z); gd.rotation.y = Math.atan2(D2.nx, D2.nz); const glass = new THREE.Mesh(new THREE.PlaneGeometry(8, 5), new THREE.MeshPhongMaterial({ color: '#cfe2ee', emissive: '#ffe8c8', emissiveIntensity: 0.25, shininess: 100 })); glass.position.set(0, 2.5, 0.12); gd.add(glass); const fr = new THREE.Mesh(new THREE.BoxGeometry(8.6, 5.4, 0.12), new THREE.MeshLambertMaterial({ color: '#d9d4cc' })); fr.position.set(0, 2.7, 0.02); gd.add(fr); const cv = document.createElement('canvas'); cv.width = 512; cv.height = 96; const c2 = cv.getContext('2d'); c2.fillStyle = '#f4f1ea'; c2.fillRect(0, 0, 512, 96); c2.fillStyle = '#2f3a2f'; c2.font = 'bold 54px serif'; c2.textAlign = 'center'; c2.textBaseline = 'middle'; c2.fillText(f.name, 256, 50); const st = new THREE.CanvasTexture(cv); st.colorSpace = THREE.SRGBColorSpace; const sg2 = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.7), new THREE.MeshLambertMaterial({ map: st, emissive: '#ffffff', emissiveMap: st, emissiveIntensity: 0.3 })); sg2.position.set(0, 6.4, 0.1); gd.add(sg2); this.scene.add(gd); } }
     this.shopFronts = buildShopFronts(this, M.shops || [], M.scale); this.shopGrid = new Map(); this.shopFronts.forEach((F, i) => { const k = `${Math.floor(F.x / 40)},${Math.floor(F.z / 40)}`; if (!this.shopGrid.has(k)) this.shopGrid.set(k, []); this.shopGrid.get(k).push(i); });
     this.buildLights(r);
     this.buildSkyStuff(r);
@@ -1063,7 +1073,8 @@ export class Hangang {
     let near = null; for (const e of this.entrances) { const d = Math.hypot(e.x - px, e.z - pz); if (d < 7 && (!near || d < near.d)) near = { ...e, d }; }
     // 가게 문 앞에서 벽 쪽으로 다가가면 가게 안으로
     this.shopCool = Math.max(0, (this.shopCool || 0) - dt); if (this.carry) { this.carryT -= dt; if (this.carryT <= 0) { this.bear.root.remove(this.carry); this.carry = null; } }
-    if (!this.inShop && !this.inside && !this.shopCool && this.y < 0.5) for (const i of this.shopGrid?.get(`${Math.floor(px / 40)},${Math.floor(pz / 40)}`) || []) { const F = this.shopFronts[i]; if (Math.hypot(px - F.x, pz - F.z) < 0.9 && (this.mdx ?? 0) * F.nx + (this.mdz ?? 0) * F.nz < -0.3) { this.enterShop(F); return; } }
+    if (!this.inShop && !this.inside && !this.inMall && !this.shopCool && this.y < 0.5) for (const D2 of this.malls || []) if (Math.hypot(px - D2.x, pz - D2.z) < 3.2 && (this.mdx ?? 0) * D2.nx + (this.mdz ?? 0) * D2.nz < -0.3) { this.enterMall(D2); return; }
+    if (!this.inShop && !this.inside && !this.inMall && !this.shopCool && this.y < 0.5) for (const i of this.shopGrid?.get(`${Math.floor(px / 40)},${Math.floor(pz / 40)}`) || []) { const F = this.shopFronts[i]; if (Math.hypot(px - F.x, pz - F.z) < 0.9 && (this.mdx ?? 0) * F.nx + (this.mdz ?? 0) * F.nz < -0.3) { this.enterShop(F); return; } }
     // 출구 계단을 반쯤 내려가면 역 안으로
     this.stationCool = Math.max(0, (this.stationCool || 0) - dt);
     if (near && near.d < 3 && !this.inside && !this.stationCool && this.y < 0.5) { const th = near.g.rotation.y, dx = px - near.x, dz = pz - near.z, lx = dx * Math.cos(th) - dz * Math.sin(th), lz = dx * Math.sin(th) + dz * Math.cos(th); if (Math.abs(lx) < 1.1 && lz > -0.4 && lz < 2.2) { this.enterStation(near); return; } }
@@ -1183,10 +1194,10 @@ export class Hangang {
     this.tickSignals(this.time);
     this.tickPeople(dt, bx, bz); this.tickGroups(dt, bx, bz); this.tickCity(dt, bx, bz); this.tickTransit(dt, bx, bz); this.tickLabels(dt, camera, bx, bz);
     if (this.inside) { this.tickInside(dt); }
-    if (this.inShop) this.tickShop(dt);
+    if (this.inShop) this.tickShop(dt); else if (this.inMall) this.tickMall(dt);
     this.tickEnv(dt, camera, bx, bz);
-    if (this.inside || this.inShop) for (const o of this.hidden || []) o.visible = false; // 날씨 · 계절이 다시 켠 바깥 것들은 다시 숨긴다
-    if ((this.inside || this.inShop) && this.scene.fog) { this.scene.fog.density = 0.004; this.scene.fog.color.set('#d8d2c8'); } // 역 안: 안개 거의 없이
+    if (this.inside || this.inShop || this.inMall) for (const o of this.hidden || []) o.visible = false; // 날씨 · 계절이 다시 켠 바깥 것들은 다시 숨긴다
+    if ((this.inside || this.inShop || this.inMall) && this.scene.fog) { this.scene.fog.density = 0.004; this.scene.fog.color.set('#d8d2c8'); } // 역 안: 안개 거의 없이
     this.tickCamera(dt, camera, bx, bz, Math.sin(this.camYaw), Math.cos(this.camYaw));
   }
   // 사람 수 · 구성: 계절 · 날씨 · 시간에 따라 (벚꽃 철엔 연인이 가득, 비 · 추위 · 한밤엔 드문드문 러너만)
@@ -1429,6 +1440,7 @@ export class Hangang {
     if (this.ride) return `${this.ride.line}${String(this.ride.line).length === 1 ? '호선' : '선'} 열차 안 · 다음 ${this.ride.dest.name}`;
     if (this.inside) return `${this.inside.st.name}역 안`;
     if (this.inShop) return `${SHOP_KIND[this.inShop.F.kind].emoji} ${this.inShop.F.name}`;
+    if (this.inMall) return `🛍️ ${this.inMall.D.name}`;
     const marks = this.map.marks || [], s = this.s, d = this.dir;
     const next = d > 0 ? marks.find(([, ms]) => ms > s + 5) : [...marks].reverse().find(([, ms]) => ms < s - 5);
     return next ? `${next[0]}까지 ${Math.round(Math.abs(next[1] - s))}m` : d > 0 ? `반환점까지 ${Math.round(this.L - s)}m` : `반환점까지 ${Math.round(s)}m`;
