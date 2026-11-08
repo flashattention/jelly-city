@@ -303,7 +303,7 @@ const server = http.createServer((req, res) => {
     fs.readFile(path.join(PUBLIC, 'dream-runner/index.html'), 'utf8', (err, html) => {
       if (err) { res.writeHead(404); res.end('not found'); return; }
       const desc = '실제 서울을 걷고 · 달리고 · 나는 힐링 산책. 진짜 지도 · 건물 · 지형 · 실시간 날씨와 지하철';
-      html = html.replace('<head>', '<head>\n  <base href="/dream-runner/" />\n  <script>window.SEOUL_WALK = 1;</script>').replace('<title>드림 러너</title>', `<title>젤리 서울 산책</title>\n  <meta name="description" content="${desc}" />\n  <meta property="og:title" content="젤리 서울 산책" />\n  <meta property="og:description" content="${desc}" />`);
+      html = html.replace(/\s*<link rel="manifest"[^>]*>/, '').replace('<head>', '<head>\n  <base href="/dream-runner/" />\n  <script>window.SEOUL_WALK = 1;</script>').replace('<title>드림 러너</title>', `<title>젤리 서울 산책</title>\n  <meta name="description" content="${desc}" />\n  <meta property="og:title" content="젤리 서울 산책" />\n  <meta property="og:description" content="${desc}" />`);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(html);
     });
     return;

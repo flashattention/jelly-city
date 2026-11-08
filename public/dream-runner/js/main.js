@@ -200,7 +200,7 @@ function renderAccount() {
   };
   for (const c of chars) chip(c.token, c.name, c.profile?.color || '#8a5634');
   chip('default', '🐻 기본 곰돌이', '#8a5634');
-  if (chars.length < (on ? 4 : LOCAL_MAX)) { const a = document.createElement('a'); a.className = 'chip'; a.href = '/?create=1&back=/dream-runner/'; a.textContent = '＋ 새 캐릭터'; a.style.textDecoration = 'none'; box.appendChild(a); }
+  if (chars.length < (on ? 4 : LOCAL_MAX) && !window.SEOUL_WALK) { const a = document.createElement('a'); a.className = 'chip'; a.href = '/?create=1&back=/dream-runner/'; a.textContent = '＋ 새 캐릭터'; a.style.textDecoration = 'none'; box.appendChild(a); }
   const c = chars.find((x) => x.token === sel);
   $('nick-row').classList.toggle('hidden', !!c || on); // 로그인했으면 계정 닉네임을 쓴다
   if (!$('nick').value) {
@@ -1027,7 +1027,7 @@ function hgRegionUI() {
   const lb = $('hg-regions').querySelector('button[data-last]'); if (lb) lb.onclick = () => { const p = hgLastPos(); if (!p) return; $('hg-start').classList.add('hidden'); hgUse(p.region); startHangang(p); };
   $('hg-from-start').textContent = HG_REGIONS[hgRegion].start; hgResumeUI();
 }
-$('hg-btn').onclick = () => { unlock(); hgRegionUI(); hgCheckRegions(); hgCheckWorld().then((w) => { if (w) hgUse(hgRegion); }); $('hg-start').classList.remove('hidden'); };
+$('hg-btn').onclick = () => { unlock(); hgRegionUI(); hgCheckRegions(); hgAcctUI(); hgCloudLoad().then(() => { hgRegionUI(); hgAcctUI(); }); hgCheckWorld().then((w) => { if (w) hgUse(hgRegion); }); $('hg-start').classList.remove('hidden'); };
 $('hg-start-x').onclick = () => $('hg-start').classList.add('hidden');
 $('hg-resume').onclick = () => { $('hg-start').classList.add('hidden'); const p = hgSavedPos(); startHangang(p); };
 $('hg-from-start').onclick = () => { $('hg-start').classList.add('hidden'); startHangang(hgWorld ? null : { s: 30, lat: -4.3 }); };
@@ -1075,7 +1075,7 @@ function hgReport(final = false) {
   if (!hgRun.tk || hg.dist - hgRun.sent < (final ? 30 : 100)) return;
   hgRun.sent = hg.dist;
   const body = { tk: hgRun.tk, m: Math.floor(hg.dist), sec: Math.floor(hg.time), mo: Object.fromEntries(Object.entries(hg.moments).map(([k, v]) => [k, Math.floor(v)])), ...(logged() ? {} : { anon: anonId() }) };
-  account.api('/api/dream/hangang/run', { method: 'POST', body }).then((r) => { if (r?.fresh?.length) setTimeout(notifyNew, 300); }).catch(() => {});
+  account.api('/api/dream/hangang/run', { method: 'POST', body }).then((r) => { if (r?.fresh?.length && !document.body.classList.contains('solo')) setTimeout(notifyNew, 300); }).catch(() => {});
 }
 function leaveHangang() {
   hgReport(true); if (document.pointerLockElement) document.exitPointerLock?.(); $('hg-labels').innerHTML = ''; hg.onStation(null); hg.exitInterior?.(); hg.onShop(null);
@@ -1145,7 +1145,8 @@ addEventListener('pagehide', () => { if (game.mode === 'hangang') hgReport(true)
 document.addEventListener('visibilitychange', () => { if (document.hidden && game.mode === 'hangang') hgReport(true); });
 // 바로 가기: /dream-runner/#hangang 으로 들어오면 한강 러닝부터
 // 젤리 서울 산책(/seoul-walk/): 러너 타이틀 없이 바로 서울 산책 시작 화면. 닫기 = 메인으로, 산책을 마치면 다시 시작 화면
-if (window.SEOUL_WALK) { document.body.classList.add('sw'); $('hg-how').open = true; $('hg-start-x').textContent = '🏠 젤리게임즈로'; $('hg-start-x').onclick = () => { location.href = '/'; }; if (location.hash !== '#hangang') setTimeout(() => { if (game.mode === 'title') $('hg-btn').onclick(); }, 300); }
+// 따로 된 랜딩 페이지 등에서 바로 온 사람: 젤리게임즈와 상관없이 (닫기 · 메인으로 단추 없음). 젤리게임즈 메인 카드로 온 사람(?from=hub): 메인으로 돌아가는 단추
+if (window.SEOUL_WALK) { document.body.classList.add('sw'); $('hg-how').open = true; const fromHub = new URLSearchParams(location.search).get('from') === 'hub' || /^\/(\?|$)/.test((() => { try { const r = new URL(document.referrer); return r.origin === location.origin ? r.pathname + r.search : 'x'; } catch { return 'x'; } })()); if (fromHub) { $('hg-start-x').textContent = '🏠 젤리게임즈로'; $('hg-start-x').onclick = () => { location.href = '/'; }; } else { $('hg-start-x').classList.add('hidden'); document.body.classList.add('solo'); document.querySelectorAll('a[href]').forEach((a) => { if (!/^\/seoul-walk/.test(a.getAttribute('href'))) a.remove(); }); } if (location.hash !== '#hangang') setTimeout(() => { if (game.mode === 'title') $('hg-btn').onclick(); }, 300); }
 if (location.hash === '#hangang') setTimeout(() => { if (game.mode === 'title') { const p = hgLastPos(); if (p) hgUse(p.region); startHangang(p); } }, 700);
 
 // 한강: 마우스로 시점 (화면을 누르면 마우스가 잠기고, Esc 로 풀린다) · 휴대폰은 화면을 끌어서
@@ -1178,6 +1179,25 @@ function hgLabels() {
   }
 }
 
+// 로그인 없이: 위치 · 가 본 칸은 이 기기(localStorage)에. 로그인하면 계정에도 (다른 기기에서 이어서 · 방문 기록 보관), 더 새로운 쪽이 이긴다
+const HG_VISIT_KEY = 'dreamrunner.hangang.visit';
+function hgVisits() { try { return new Set(JSON.parse(store.get(HG_VISIT_KEY) || '[]')); } catch { return new Set(); } }
+function hgMarkVisit() { if (!hg.chunks || !hg.tileNow) return; const V = hgVisits(), k = hg.tileNow.join('_'); if (!V.has(k)) { V.add(k); store.set(HG_VISIT_KEY, JSON.stringify([...V])); } }
+function hgCloudMerge(r) {
+  if (!r) return; const a = hgPosAll(); let ch = false;
+  for (const [id, p] of Object.entries(r.pos?.regions || {})) if (!a.regions[id] || (a.regions[id].at || 0) < (p.at || 0)) { a.regions[id] = p; ch = true; }
+  if (r.pos?.last && (r.pos.at || 0) > (a.at || 0)) { a.last = r.pos.last; a.at = r.pos.at; ch = true; } if (ch) store.set(HG_POS_KEY, JSON.stringify(a));
+  const V = hgVisits(), n = V.size; for (const k of r.visit || []) V.add(k); if (V.size !== n) store.set(HG_VISIT_KEY, JSON.stringify([...V]));
+}
+function hgCloudSave() { if (!logged()) return; account.api('/api/dream/hangang/save', { method: 'POST', body: { pos: hgPosAll(), visit: [...hgVisits()] } }).then(hgCloudMerge).catch(() => {}); }
+async function hgCloudLoad() { if (!logged()) return; try { hgCloudMerge(await account.api('/api/dream/hangang/me')); } catch { /* 다음에 */ } }
+// 시작 화면 계정 줄: 로그인 없이 바로 · 로그인하면 계정에 저장
+function hgAcctUI() {
+  const el = $('hg-acct'); if (!el) return; const n = hgVisits().size, all = hgWorldIdx?.all?.length || 201, seen = n ? ` · 🗺️ 가 본 서울 ${n}/${all}칸` : '';
+  if (logged()) { el.innerHTML = `<span>☁️ <b>${esc(account.user.nick || account.user.name || '')}</b> 계정에 위치 · 방문 기록 저장 중${seen}</span>`; return; }
+  el.innerHTML = `<span>💾 로그인 없이 바로 즐겨요 · 위치는 이 기기에 저장돼요${seen}</span><span class="sub">구글로 로그인하면 다른 기기에서도 이어서 걷고, 방문 기록이 계정에 남아요</span><div id="hg-g-btn"></div>`;
+  if (game.status?.googleClientId) account.googleButton($('hg-g-btn'), game.status.googleClientId, async () => { renderAccount(); await hgCloudLoad(); hgCloudSave(); hgRegionUI(); hgAcctUI(); toast('☁️ 로그인했어요 · 이제 계정에 저장돼요', 2200); }, (e) => toast(e.message, 2000)).catch(() => {});
+}
 function hgSavePos() { if (!hg.ready || hg.px == null) return; const a = hgPosAll();
   // 서울 전체: 서울 좌표로, 가장 가까운 지역 이름 아래에
-  if (hgWorld && hg.chunks) { const nr = hg.nearRegion(hg.px, hg.pz), id = nr?.id || hgRegion; a.regions[id] = { x: Math.round(hg.px), z: Math.round(hg.pz), face: Math.round(hg.face * 100) / 100, where: hg.where() }; a.last = id; store.set(HG_POS_KEY, JSON.stringify(a)); return; } a.regions[hgRegion] = { s: Math.round(hg.s), lat: Math.round(hg.lat * 10) / 10, where: `${HG_REGIONS[hgRegion]?.label || ''} · ${hg.regionName || hg.map.name} 근처 · ${(hg.s / 1000).toFixed(1)}km 지점` }; a.last = hgRegion; store.set(HG_POS_KEY, JSON.stringify(a)); }
+  if (hgWorld && hg.chunks) { const nr = hg.nearRegion(hg.px, hg.pz), id = nr?.id || hgRegion; a.regions[id] = { x: Math.round(hg.px), z: Math.round(hg.pz), face: Math.round(hg.face * 100) / 100, where: hg.where(), at: Date.now() }; a.last = id; a.at = Date.now(); store.set(HG_POS_KEY, JSON.stringify(a)); hgMarkVisit(); hgCloudSave(); return; } a.regions[hgRegion] = { s: Math.round(hg.s), lat: Math.round(hg.lat * 10) / 10, where: `${HG_REGIONS[hgRegion]?.label || ''} · ${hg.regionName || hg.map.name} 근처 · ${(hg.s / 1000).toFixed(1)}km 지점`, at: Date.now() }; a.at = Date.now(); setTimeout(hgCloudSave, 0); a.last = hgRegion; store.set(HG_POS_KEY, JSON.stringify(a)); }

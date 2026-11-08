@@ -160,6 +160,21 @@ export class DreamBoard {
     const fresh = getCos()?.refresh(sub) || [];
     return { m: U.m, best: U.best, fresh };
   }
+  // 서울 산책: 로그인한 사람만 계정에 위치(지역마다) · 가 본 칸을 둔다 (로그인 없이도 기기에 저장되어 그대로 즐길 수 있다)
+  hgMe(sub) { const U = this.hg[sub] || {}; return { pos: U.pos || null, visit: U.visit || [], m: U.m || 0, best: U.best || 0 }; }
+  hgSave(sub, b) {
+    const U = (this.hg[sub] ||= { m: 0, best: 0, runs: 0, sec: 0, mo: {} }), num = (v) => (Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v * 100) / 100 : undefined);
+    if (b.pos && typeof b.pos === 'object') {
+      const P = (U.pos ||= { regions: {} });
+      for (const [id, r] of Object.entries(b.pos.regions || {}).slice(0, 40)) {
+        if (!/^[a-z]{2,12}$/.test(id) || !r || typeof r !== 'object') continue; const at = Math.min(+r.at || 0, Date.now() + 60000), old = P.regions[id]; if (old && (old.at || 0) >= at) continue;
+        P.regions[id] = { x: num(r.x), z: num(r.z), face: num(r.face), s: num(r.s), lat: num(r.lat), where: String(r.where || '').slice(0, 80), at };
+      }
+      const last = String(b.pos.last || ''), at = Math.min(+b.pos.at || 0, Date.now() + 60000); if (/^[a-z]{2,12}$/.test(last) && P.regions[last] && at >= (P.at || 0)) { P.last = last; P.at = at; }
+    }
+    if (Array.isArray(b.visit)) { const V = new Set(U.visit || []); for (const k of b.visit.slice(0, 600)) if (typeof k === 'string' && /^-?\d{1,3}_-?\d{1,3}$/.test(k)) V.add(k); U.visit = [...V].slice(0, 800); }
+    this.dirty = true; return this.hgMe(sub);
+  }
   // 오늘(한국 시간) 지표 칸: 달린 사람(subs) · 판수 · 시간 · 난이도 · 맵 · 광고 제안(adOffer) · 시청(adWatch) · 광고로 준 별 · 광고 본 사람
   day(now = Date.now()) {
     const k = dayKey(now);
@@ -285,6 +300,9 @@ export async function dreamApi(req, res, url, who, board, json, isAdmin) {
     if (!who && !ANON.test(String(b.anon || ''))) return json(res, 401, { error: 'login' });
     try { return json(res, 200, board.hgRun(who?.sub || 'anon:' + b.anon, b)); } catch (e) { return json(res, 400, { error: e.message }); }
   }
+  // 서울 산책: 계정에 저장된 위치 · 가 본 칸 (로그인한 사람만)
+  if (url.pathname === '/api/dream/hangang/me') { if (!who) return json(res, 401, { error: 'login' }); return json(res, 200, board.hgMe(who.sub)); }
+  if (url.pathname === '/api/dream/hangang/save' && req.method === 'POST') { if (!who) return json(res, 401, { error: 'login' }); const b = await readJson(req, 64 * 1024); return json(res, 200, board.hgSave(who.sub, b)); }
   // 출발표: 기다리지 않고 시작하고, 뒤에서 받아 둔다
   if (url.pathname === '/api/dream/ver') { const has = url.searchParams.get('has'); return json(res, 200, has ? { v: DREAM_VER, has: has === DREAM_VER || hasVer(has) } : { v: DREAM_VER }); }
   if (url.pathname === '/api/dream/run' && req.method === 'POST') { const b = await readJson(req); return json(res, 200, { tk: board.ticket(b), v: DREAM_VER }); }
