@@ -166,6 +166,16 @@ function canopyTex(season) {
       const gr = g.createRadialGradient(cx - rr * 0.3, cy - rr * 0.35, rr * 0.1, cx, cy, rr); gr.addColorStop(0, c); gr.addColorStop(0.62, c); gr.addColorStop(1, 'rgba(0,0,0,0.45)'); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, rr, 0, 7); g.fill(); } }
   const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.repeat.set(0.085, 0.085); CANOPY[season] = t; return t;
 }
+// 눈 쌓임: 위를 보는 면(지붕 · 옥상 설비)이 눈이 쌓인 만큼(snowK) 하얘진다. 모든 칸이 같은 값을 쓴다
+const SNOW_U = { value: 0 };
+function snowify(m) {
+  const prev = m.onBeforeCompile, pk = m.customProgramCacheKey?.bind(m);
+  m.onBeforeCompile = (sh, r) => { prev?.call(m, sh, r); sh.uniforms.uSnow = SNOW_U;
+    sh.vertexShader = 'varying float vUpY;\n' + sh.vertexShader.replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\n  vUpY = objectNormal.y;');
+    sh.fragmentShader = 'uniform float uSnow;\nvarying float vUpY;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.94, 0.97), uSnow * smoothstep(0.55, 0.85, vUpY));'); };
+  m.customProgramCacheKey = () => (pk ? pk() : '') + '|snow';
+  return m;
+}
 function groundTex(kind) {
   const N = kind === 'city' ? 128 : 256, cv = document.createElement('canvas'); cv.width = cv.height = N; const g = cv.getContext('2d'), r = rnd(kind.length * 31 + 7);
   const noise = (base, amp, n, sz) => { g.fillStyle = base; g.fillRect(0, 0, N, N); for (let i = 0; i < n; i++) { const v = (r() - 0.5) * amp; g.fillStyle = v > 0 ? `rgba(255,255,255,${v})` : `rgba(0,0,0,${-v})`; g.fillRect(r() * N, r() * N, sz * (0.5 + r()), sz * (0.5 + r())); } };
@@ -1175,13 +1185,14 @@ export class Hangang {
       const m = shiny ? new THREE.MeshPhongMaterial({ vertexColors: true, map: this.winTex[t], emissive: '#ffffff', emissiveMap: this.litTex[t], emissiveIntensity: 0, shininess: t === 'gold' ? 90 : 70, specular: t === 'gold' ? '#ffe2a0' : '#9fb4c8' })
         : new THREE.MeshLambertMaterial({ vertexColors: true, map: this.winTex[t], emissive: '#ffffff', emissiveMap: this.litTex[t], emissiveIntensity: 0 });
       if (shiny) skyGlass(m, this.skyU, t === 'gold');
+      snowify(m);
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(st.P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(st.N, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(st.U, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(st.Cl, 3)); g.setIndex(st.I); g.userData.baseY = new Float32Array(st.Y);
       const mesh = new THREE.Mesh(g, m); mesh.castShadow = false; mesh.receiveShadow = true; this.scene.add(mesh); this.bldM.push(m); (this.bldByType ||= {})[t] = m;
     }
     const mk = (S, m) => { if (!S.P.length) return null; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(S.P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(S.N, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(S.Cl, 3)); g.setIndex(S.I); if (S.Y) g.userData.baseY = new Float32Array(S.Y); const me = new THREE.Mesh(g, m); this.scene.add(me); return me; };
     // 옥상 설비 · 실외기 · 난간 띠: 서울 전체 칸에서는 500m 칸으로 나눠 900m 밖은 그리지 않는다 (칸 하나에 삼각형이 가장 많은 덩어리였다)
-    if (this.isChunk) { const em = new THREE.MeshLambertMaterial({ vertexColors: true }); for (const part of splitCells(extras, 500)) { const me = mk(part, em); if (me) { me.userData.lodV = [part.cx, part.cz, 900]; me.userData.noMerge = true; } } }
-    else mk(extras, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    if (this.isChunk) { const em = snowify(new THREE.MeshLambertMaterial({ vertexColors: true })); for (const part of splitCells(extras, 500)) { const me = mk(part, em); if (me) { me.userData.lodV = [part.cx, part.cz, 900]; me.userData.noMerge = true; } } }
+    else mk(extras, snowify(new THREE.MeshLambertMaterial({ vertexColors: true })));
     this.signM = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: '#ffffff', emissiveIntensity: 0, side: THREE.DoubleSide }); mk(signs, this.signM);
     this.crossM = new THREE.MeshLambertMaterial({ color: '#f4f1ea', emissive: '#ff3030', emissiveIntensity: 0 });
     for (const ring of crosses) { const f = this.foot?.find((q) => q.ring === ring); if (!f) continue; let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length; const big = Math.sqrt(Math.abs(ringArea(ring))) > 40, H2 = big ? 14 : 6; const pole = new THREE.Mesh(new THREE.BoxGeometry(big ? 1.2 : 0.5, H2, big ? 1.2 : 0.5), this.crossM); pole.position.set(cx, f.h + H2 / 2, cz); const bar = new THREE.Mesh(new THREE.BoxGeometry(big ? 6 : 2.6, big ? 1.2 : 0.5, big ? 1.2 : 0.5), this.crossM); bar.position.set(cx, f.h + H2 * 0.72, cz); if (f.base !== undefined) { pole.position.y += f.base; bar.position.y += f.base; pole.userData.based = bar.userData.based = true; } this.scene.add(pole, bar); }
@@ -1202,13 +1213,13 @@ export class Hangang {
         col.set(c); for (const [k, y, dk] of [[1.1, 0.25, 0.82], [0.5, H * 0.72, 1], [0.08, H, 1.08]]) for (const [x, z] of sc(k)) { P.push(x, h + y, z); C.push(col.r * dk, col.g * dk, col.b * dk); HY.push(by ?? NaN); }
         for (let i = 0; i < n; i++) { const j = (i + 1) % n; for (const [a0, b0] of [[0, n], [n, 2 * n]]) I.push(b + a0 + i, b + a0 + j, b + b0 + j, b + a0 + i, b + b0 + j, b + b0 + i); } for (let i = 1; i < n - 1; i++) I.push(b + 2 * n, b + 2 * n + i, b + 2 * n + i + 1); }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setIndex(I); g.computeVertexNormals(); g.userData.baseY = new Float32Array(HY);
-      this.scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }))); }
+      this.scene.add(new THREE.Mesh(g, snowify(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })))); }
     if (this.hanokRoofs?.length) { const P = [], I = [], HY = []; for (const { ring, h, rh, by } of this.hanokRoofs) { let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length; const out = ring.map(([x, z]) => [cx + (x - cx) * 1.22, cz + (z - cz) * 1.22]), mid = ring.map(([x, z]) => [cx + (x - cx) * 0.55, cz + (z - cz) * 0.55]), top = ring.map(([x, z]) => [cx + (x - cx) * 0.12, cz + (z - cz) * 0.12]), size = Math.sqrt(Math.abs(ringArea(ring))), H = rh || Math.min(4, size * 0.32), n = ring.length, b = P.length / 3;
         for (const [x, z] of out) P.push(x, h + 0.35, z); for (const [x, z] of mid) P.push(x, h + H * 0.62, z); for (const [x, z] of top) P.push(x, h + H, z); while (HY.length < P.length / 3) HY.push(by ?? NaN);
         for (let i = 0; i < n; i++) { const j = (i + 1) % n; for (const [a0, b0] of [[0, n], [n, 2 * n]]) I.push(b + a0 + i, b + a0 + j, b + b0 + j, b + a0 + i, b + b0 + j, b + b0 + i); } for (let i = 1; i < n - 1; i++) I.push(b + 2 * n, b + 2 * n + i, b + 2 * n + i + 1); }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(I); g.computeVertexNormals(); g.userData.baseY = new Float32Array(HY);
       const tile = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d'); c.fillStyle = '#4a4e55'; c.fillRect(0, 0, 64, 64); for (let x = 0; x < 64; x += 8) { c.fillStyle = '#5a5f66'; c.fillRect(x, 0, 4, 64); } const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; })();
-      this.scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: '#5b6068', side: THREE.DoubleSide }))); }
+      this.scene.add(new THREE.Mesh(g, snowify(new THREE.MeshLambertMaterial({ color: '#5b6068', side: THREE.DoubleSide })))); }
     if (this.helis?.length) { const t = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const c = cv.getContext('2d'); c.fillStyle = '#4f9e7c'; c.fillRect(0, 0, 128, 128); c.strokeStyle = '#f4f4ee'; c.lineWidth = 7; c.beginPath(); c.arc(64, 64, 50, 0, 7); c.stroke(); c.fillStyle = '#f4f4ee'; c.font = 'bold 64px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('H', 64, 68); c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 3; c.strokeRect(4, 4, 120, 120); const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace; return tx; })();
       const hg2 = new THREE.PlaneGeometry(1, 1); hg2.rotateX(-Math.PI / 2); const im = new THREE.InstancedMesh(hg2, new THREE.MeshLambertMaterial({ map: t }), this.helis.length), o = new THREE.Object3D(); im.userData.baseY = this.helis.map((q) => q.by ?? NaN); this.helis.forEach(([x, y, z, sz, ry], i) => { o.position.set(x, y, z); o.scale.set(sz * 2, 1, sz * 2); o.rotation.y = ry; o.updateMatrix(); im.setMatrixAt(i, o.matrix); }); this.scene.add(im); }
     const dm = new THREE.MeshPhongMaterial({ color: '#4f9e8c', shininess: 40, emissive: '#2a5a50', emissiveIntensity: 0 }); this.domeM = dm;
@@ -1931,7 +1942,7 @@ export class Hangang {
     if (rainOn) { const a = this.rain.geometry.attributes.position, arr = a.array; for (let i = 0; i < this.rainV.length; i++) { let y = arr[i * 6 + 1] - this.rainV[i] * dt; if (y < 0) y += 40; arr[i * 6 + 1] = y; arr[i * 6 + 4] = y - 0.7; } a.needsUpdate = true; this.rain.position.set(camera.position.x, camera.position.y - 14, camera.position.z); }
     if (snowOn) { const a = this.snow.geometry.attributes.position, arr = a.array; for (let i = 0; i < arr.length; i += 3) { arr[i + 1] -= dt * (0.9 + (i % 7) * 0.08); arr[i] += Math.sin(this.t * 0.7 + i) * dt * 0.3; if (arr[i + 1] < 0) arr[i + 1] += 40; } a.needsUpdate = true; this.snow.position.set(camera.position.x, camera.position.y - 14, camera.position.z); }
     // 겨울 눈 오면 땅이 하얘진다
-    const snowy = this.state.season === 'winter' && snowOn; this.snowK = lerp(this.snowK || 0, snowy ? 1 : 0, Math.min(1, dt * 0.05));
+    const snowy = this.state.season === 'winter' && snowOn; this.snowK = lerp(this.snowK || 0, snowy ? 1 : 0, Math.min(1, dt * 0.05)); SNOW_U.value = this.snowK * 0.9;
     // 잔디 색(계절 · 눈) — 서울 전체면 칸마다
     const grassC = C({ spring: '#9cbf7c', summer: '#86ab68', autumn: '#97a65e', winter: '#b3b89a' }[this.state.season]).lerp(C('#eef2f6'), this.snowK * 0.85);
     for (const o of [this, ...(this.chunks?.values() || [])]) if (o.greenM?.grass) { o.greenM.grass.color.copy(grassC); for (const m of o.wideM || []) m.color.copy(grassC); o.stripM?.color.copy(grassC); }
