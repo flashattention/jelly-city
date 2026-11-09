@@ -1104,7 +1104,7 @@ $('hg-cam').onclick = () => { hg.opt.cam = ((hg.opt.cam || 0) + 1) % 3; hgSave()
 addEventListener('keydown', (e) => {
   if (game.mode !== 'hangang') return;
   if (e.code === 'KeyV') $('hg-cam').onclick();
-  if (e.code === 'Escape') { if (!$('hg-set').classList.contains('hidden')) $('hg-set').classList.add('hidden'); else leaveHangang(); }
+  if (e.code === 'Escape' && !$('hg-set').classList.contains('hidden')) $('hg-set').classList.add('hidden'); // Esc 로는 나가지 않는다: 나가기는 오른쪽 위 ✕ 로만
   if (e.code === 'KeyE' && !e.repeat) hgStep(1);
   if (e.code === 'KeyQ' && !e.repeat) hgStep(-1);
 });
