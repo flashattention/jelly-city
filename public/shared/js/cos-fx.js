@@ -82,7 +82,7 @@ function ribbonTex(cols = RAIN7) {
 }
 // 이만큼 벌어지면 띠를 끊는다: 트랙이 1500m 마다 앞으로 옮겨질 때 · 되살아날 때 · 다른 사람 위치가 순간이동할 때 · 높은 곳에 내려앉을 때 · 공중에 오래 있을 때
 //   (끊지 않으면 마지막 자리와 새 자리가 한 띠로 이어져서 트랙 위로 앞뒤로 쭉 늘어나거나 위아래로 벽처럼 선다)
-const RIB_JUMP = 6, RIB_RISE = 1.2, RIB_GAP = 0.35;
+const RIB_JUMP = 6, RIB_RISE = 1.2, RIB_GAP = 0.35, RIB_FAR = 80;
 class Ribbon {
   constructor(root, o) {
     this.root = root; this.w = o.w || 0.9; this.life = o.life || 1.2; this.N = 48; this.pts = []; this.acc = 0; this.off = 0;
@@ -100,11 +100,21 @@ class Ribbon {
     while (this.pts.length && this.pts[0].a > this.life) this.pts.shift();
     this.off = on ? 0 : this.off + dt;
     this.acc += dt; if (on && this.acc > 0.025) {
+      const el = this.acc, L = this.pts[this.pts.length - 1], d = L ? Math.hypot(x - L.x, z - L.z) : 0;
       this.acc = 0;
-      const L = this.pts[this.pts.length - 1];
-      // 벌어졌으면 끊는다: 앞 띠 끝과 새 띠 시작에 투명한 자리를 하나씩 끼워 그 사이 조각이 안 보이게
-      if (L && !L.cut && (Math.hypot(x - L.x, z - L.z) > RIB_JUMP || Math.abs(y + 0.04 - L.y) > RIB_RISE || this.offAt > RIB_GAP)) { this.pts.push({ ...L, cut: true }, { x, y: y + 0.04, z, a: 0, cut: true }); }
-      this.pts.push({ x, y: y + 0.04, z, a: 0 }); this.offAt = 0;
+      // 아주 멀리 옮겨졌으면(트랙 이동 · 새 판) 옛 띠는 먼 곳에 남겨 두지 않고 지운다
+      if (d > RIB_FAR) this.pts.length = 0;
+      // 제자리(출발 카운트다운 · 부활 대기)에서는 점을 쌓지 않는다
+      if (!(L && this.pts.length && d < 0.03 && Math.abs(y + 0.04 - L.y) < 0.03)) {
+        // 벌어졌으면 끊는다: 앞 띠 끝과 새 띠 시작에 투명한 자리를 하나씩 끼워 그 사이 조각이 안 보이게
+        //   기준은 지금 빠르기만큼 늘린다 (초월 · 지옥에서 프레임이 조금 길어졌다고 띠가 토막 나지 않게)
+        //   공중을 지나온 직후에는 늘리지 않는다 (뛴 자리를 가로질러 이어지지 않게)
+        const lim = this.offAt > 0 ? RIB_JUMP : Math.max(RIB_JUMP, (this.vs || 0) * Math.min(el, 0.07) * 2.2);
+        if (this.pts.length && L && !L.cut && (d > lim || Math.abs(y + 0.04 - L.y) > RIB_RISE || this.offAt > RIB_GAP)) this.pts.push({ ...L, cut: true }, { x, y: y + 0.04, z, a: 0, cut: true });
+        else if (L && el > 0 && !this.offAt) this.vs = d / el;
+        this.pts.push({ x, y: y + 0.04, z, a: 0 });
+      }
+      this.offAt = 0;
       while (this.pts.length > this.N) this.pts.shift();
     }
     if (!on) this.offAt = this.off;
