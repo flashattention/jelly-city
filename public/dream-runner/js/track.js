@@ -648,7 +648,10 @@ export class Track {
     const run = this.vp(this.gs, this.gs + vv * r.range(0.8, 1.2), this.cx, 5), pv = P.J * 2.6, Tp = (2 * pv) / P.g, pad = this.vp(run.s1, run.s1 + vv * 0.35, this.cx, 5, { pad: pv });
     const x0 = this.cx; this.vx(r.pick([-1, 1]) * r.range(2, Math.min(4.5, P.side * Tp * 0.3)));
     const s0 = pad.s0 + vv * Tp * 0.72, p = this.vp(s0, pad.s1 + vv * (Tp + 0.9), this.cx, 4.5, { beacon: true });
-    this.starArc(pad.s0, s0 + 2, x0, 0, 0, this.cx); return p.s1;
+    // 별: 발사대를 밟고 날아가는 실제 궤적 위에 (별은 곰 발보다 1m 위에 있어야 몸에 닿는다)
+    const fly = vv * Tp, n = Math.max(2, Math.round(fly / 2.5));
+    for (let i = 1; i < n; i++) { const k = i / n, t = Tp * k; this.star(pad.s0 + fly * k, x0 + (this.cx - x0) * k, pv * t - (P.g / 2) * t * t + 1); }
+    return p.s1;
   }
   // 디지털 그리드: 세 줄 길. 벽이 두 줄을 막으니 열린 줄로 옮겨 탄다
   vp_lanes(r, vv, P) {
