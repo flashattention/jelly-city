@@ -864,9 +864,12 @@ function followCamera(dt) {
   // 지옥 공중: 오르는 동안만 따라가고 내려오는 동안은 그 높이에 머문다 (계단에서 꼭대기 → 발판으로 출렁이지 않게). 뛴 발판보다 아래로 떨어지면 다시 따라간다
   let yc = y;
   if (hell && !w && runner.alive) {
-    if (runner.onGround || game.camG == null) { game.camG = y; game.camR = y; }
-    else if (y < game.camG - 0.5) game.camR = y;
-    else game.camR = Math.max(game.camR, game.camG + Math.max(0, y - game.camG - 0.8));
+    // 목표 높이(camH)를 정하고, 시점은 그 높이로 부드럽게 따라간다 (착지 순간 한 번에 내려앉으면 화면이 툭 꺾인다)
+    if (game.camG == null) { game.camG = y; game.camH = y; game.camR = y; }
+    if (runner.onGround) { game.camG = y; game.camH = y; }
+    else if (y < game.camG - 0.5) game.camH = y;
+    else game.camH = Math.max(game.camH, game.camG + Math.max(0, y - game.camG - 0.8));
+    game.camR += (game.camH - game.camR) * Math.min(1, dt * 7);
     yc = game.camR;
   } else game.camG = null;
   const cx = x * 0.85, cy = Math.max(yc, fl) + up + game.camFall * 5;
