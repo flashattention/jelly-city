@@ -10,6 +10,7 @@ import { buildStation, buildCar } from './hangang-station.js';
 import { glyph, glyphTex, signMaterial } from './hangang-glyphs.js';
 import { buildShopFronts, buildShopInterior, foodMesh, SHOP_MENU, SHOP_KIND } from './hangang-shop.js';
 import { buildMall } from './hangang-mall.js';
+import { winLights, winProfile, winEra, winSeed, tickWindows, WIN_GRID } from './hangang-windows.js';
 import { buildSummit, tickSummit, deckBears } from './hangang-summit.js';
 
 export const SEASONS = { spring: '🌸 봄', summer: '🌿 여름', autumn: '🍁 가을', winter: '❄️ 겨울' };
@@ -92,26 +93,29 @@ function windowTex(glass, lit, seed) {
   const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
 }
 // 외벽 무늬 (8 × 8 칸 = 8층 × 8칸). lit: 밤에 켜진 창 (검은 바탕에 불빛)
-function facadeTex(type, lit, seed) {
+//   같은 그림은 한 번만 그려 모든 칸이 같이 쓴다 (예전엔 칸마다 다시 그리고, 켜진 창 그림은 칸을 지워도 남았다)
+const FACADE = new Map();
+function facadeTex(type, lit, seed) { const k = `${type}|${lit}|${seed}`; if (!FACADE.has(k)) FACADE.set(k, facadeTex0(type, lit, seed)); return FACADE.get(k); }
+function facadeTex0(type, lit, seed) {
   const cv = document.createElement('canvas'); cv.width = cv.height = 256; const g = cv.getContext('2d'), r = rnd(seed + type.length * 7), C = 32;
   const wall = { apt: '#f4f2ee', glass: '#d6dde4', stone: '#e6e1d8', brick: '#d7d0c8', gold: '#f0e2c0', assembly: '#f6f3ec' }[type];
   if (type === 'hanok') { // 한옥 벽: 아래 돌 기단 · 흰 회벽 · 나무 기둥 · 창살 창 (밤엔 창호지 불빛)
     g.fillStyle = lit ? '#000' : '#f2ece0'; g.fillRect(0, 0, 256, 256);
     for (let j = 0; j < 8; j++) { const y = j * 32; if (!lit) { g.fillStyle = '#8f8578'; g.fillRect(0, y + 26, 256, 6); }
       for (let i = 0; i < 8; i++) { const x = i * 32; if (!lit) { g.fillStyle = '#6b4a30'; g.fillRect(x, y, 4, 26); }
-        if (i % 2) { if (lit) { if (r() < 0.6) { g.fillStyle = 'hsl(38,80%,70%)'; g.fillRect(x + 7, y + 5, 20, 16); } } else { g.fillStyle = '#efe4c8'; g.fillRect(x + 7, y + 5, 20, 16); g.fillStyle = '#7a5a3e'; for (let k = 0; k < 4; k++) g.fillRect(x + 7 + k * 6, y + 5, 1, 16); for (let k = 0; k < 3; k++) g.fillRect(x + 7, y + 5 + k * 6, 20, 1); } } } }
+        if (i % 2) { if (lit) { g.fillStyle = '#fff'; g.fillRect(x + 7, y + 5, 20, 16); g.fillStyle = '#5a5a5a'; for (let k = 1; k < 4; k++) g.fillRect(x + 7 + k * 5, y + 5, 1, 16); for (let k = 1; k < 3; k++) g.fillRect(x + 7, y + 5 + k * 5.3, 20, 1); } else { g.fillStyle = '#efe4c8'; g.fillRect(x + 7, y + 5, 20, 16); g.fillStyle = '#7a5a3e'; for (let k = 0; k < 4; k++) g.fillRect(x + 7 + k * 6, y + 5, 1, 16); for (let k = 0; k < 3; k++) g.fillRect(x + 7, y + 5 + k * 6, 20, 1); } } } }
     const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
   if (type === 'factory') { // 벽돌 공장 · 창고: 벽돌 줄눈 + 위가 둥근 큰 철제 창(격자) · 밤엔 카페 불빛
     g.fillStyle = lit ? '#000' : '#d8cfc6'; g.fillRect(0, 0, 256, 256);
     if (!lit) for (let y = 0; y < 256; y += 6) for (let x = (y / 6) % 2 ? 0 : 6; x < 256; x += 12) { g.fillStyle = `rgba(0,0,0,${0.05 + r() * 0.08})`; g.fillRect(x, y, 11, 5); }
-    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { const x = i * 64 + 12, y = j * 64 + 10; g.beginPath(); g.moveTo(x, y + 48); g.lineTo(x, y + 14); g.arc(x + 20, y + 14, 20, Math.PI, 0); g.lineTo(x + 40, y + 48); g.closePath(); if (lit) { g.fillStyle = r() < 0.55 ? `hsl(${34 + r() * 10},85%,${60 + r() * 12}%)` : '#000'; g.fill(); } else { g.fillStyle = '#2d3238'; g.fill(); g.strokeStyle = '#4a4f55'; g.lineWidth = 2; g.stroke(); g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(x + 2, y + 16, 36, 4); g.fillStyle = '#4a4f55'; for (let k = 1; k < 3; k++) g.fillRect(x + k * 13, y + 2, 2, 46); g.fillRect(x, y + 30, 40, 2); } }
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { const x = i * 64 + 12, y = j * 64 + 10; g.beginPath(); g.moveTo(x, y + 48); g.lineTo(x, y + 14); g.arc(x + 20, y + 14, 20, Math.PI, 0); g.lineTo(x + 40, y + 48); g.closePath(); if (lit) { g.fillStyle = '#fff'; g.fill(); g.fillStyle = '#4a4a4a'; for (let k = 1; k < 3; k++) g.fillRect(x + k * 13, y + 2, 2, 46); g.fillRect(x, y + 30, 40, 2); g.fillRect(x, y + 16, 40, 1); } else { g.fillStyle = '#2d3238'; g.fill(); g.strokeStyle = '#4a4f55'; g.lineWidth = 2; g.stroke(); g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(x + 2, y + 16, 36, 4); g.fillStyle = '#4a4f55'; for (let k = 1; k < 3; k++) g.fillRect(x + k * 13, y + 2, 2, 46); g.fillRect(x, y + 30, 40, 2); } }
     const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
   if (type === 'street' || type === 'street2') { // 거리 상가: 1층(그림 맨 아래 줄)은 통유리 가게, 위층은 창틀 창(street) / 가로 띠창(street2)
     g.fillStyle = lit ? '#000' : '#ece8e2'; g.fillRect(0, 0, 256, 256);
     for (let j = 0; j < 8; j++) { const y = j * 32, ground = j === 7;
-      if (ground) { for (let i = 0; i < 4; i++) { const x = i * 64; if (lit) { const gr = g.createLinearGradient(0, y, 0, y + 32); gr.addColorStop(0, 'hsl(42,70%,70%)'); gr.addColorStop(1, 'hsl(32,60%,46%)'); g.fillStyle = gr; g.fillRect(x + 3, y + 3, 58, 28); g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(x + 31, y + 3, 2, 28); g.fillRect(x + 3, y + 3, 58, 2); g.fillStyle = 'rgba(40,28,20,.45)'; g.fillRect(x + 10, y + 20, 14, 11); g.fillRect(x + 40, y + 18, 10, 13); } else { g.fillStyle = '#3a4350'; g.fillRect(x + 3, y + 3, 58, 28); g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(x + 3, y + 3, 58, 5); g.fillStyle = '#2a2a2e'; g.fillRect(x + 31, y + 3, 2, 28); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x, y, 64, 3); } } continue; }
-      if (type === 'street2') { if (lit) { if (r() < 0.45) { g.fillStyle = `hsl(${r() < 0.7 ? 40 : 205},${r() < 0.7 ? 80 : 30}%,${66 + r() * 14}%)`; g.fillRect(4, y + 9, 248, 14); } continue; } g.fillStyle = `rgb(${70 + r() * 30},${82 + r() * 30},${96 + r() * 30})`; g.fillRect(4, y + 9, 248, 14); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(4, y + 9, 248, 3); g.fillStyle = 'rgba(0,0,0,.18)'; for (let x = 4; x < 252; x += 41) g.fillRect(x, y + 9, 2, 14); g.fillStyle = 'rgba(0,0,0,.08)'; g.fillRect(0, y + 28, 256, 2); continue; }
-      for (let i = 0; i < 8; i++) { const x = i * 32, on = r() < 0.4; if (lit) { if (on) { g.fillStyle = `hsl(${r() < 0.75 ? 36 : 205},${r() < 0.75 ? 85 : 30}%,${62 + r() * 16}%)`; g.fillRect(x + 8, y + 7, 16, 18); } continue; }
+      if (ground) { for (let i = 0; i < 4; i++) { const x = i * 64; if (lit) { const gr = g.createLinearGradient(0, y, 0, y + 32); gr.addColorStop(0, '#fff'); gr.addColorStop(1, '#a8a8a8'); g.fillStyle = gr; g.fillRect(x + 3, y + 3, 58, 28); g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(x + 31, y + 3, 2, 28); g.fillRect(x + 3, y + 3, 58, 2); g.fillStyle = 'rgba(40,28,20,.45)'; g.fillRect(x + 10, y + 20, 14, 11); g.fillRect(x + 40, y + 18, 10, 13); } else { g.fillStyle = '#3a4350'; g.fillRect(x + 3, y + 3, 58, 28); g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(x + 3, y + 3, 58, 5); g.fillStyle = '#2a2a2e'; g.fillRect(x + 31, y + 3, 2, 28); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x, y, 64, 3); } } continue; }
+      if (type === 'street2') { if (lit) { r(); r(); r(); g.fillStyle = '#fff'; g.fillRect(4, y + 9, 248, 14); g.fillStyle = '#3a3a3a'; for (let x = 4; x < 252; x += 41) g.fillRect(x, y + 9, 2, 14); g.fillRect(4, y + 9, 248, 1); continue; } g.fillStyle = `rgb(${70 + r() * 30},${82 + r() * 30},${96 + r() * 30})`; g.fillRect(4, y + 9, 248, 14); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(4, y + 9, 248, 3); g.fillStyle = 'rgba(0,0,0,.18)'; for (let x = 4; x < 252; x += 41) g.fillRect(x, y + 9, 2, 14); g.fillStyle = 'rgba(0,0,0,.08)'; g.fillRect(0, y + 28, 256, 2); continue; }
+      for (let i = 0; i < 8; i++) { const x = i * 32, on = r() < 0.4; if (lit) { if (r() < 0.12) continue; r(); r(); r(); g.fillStyle = '#fff'; g.fillRect(x + 8, y + 7, 16, 18); g.fillStyle = '#404040'; g.fillRect(x + 15, y + 7, 2, 18); r(); continue; }
         if (r() < 0.12) continue; g.fillStyle = '#f7f5f0'; g.fillRect(x + 6, y + 5, 20, 22); g.fillStyle = `rgb(${66 + r() * 28},${76 + r() * 28},${92 + r() * 28})`; g.fillRect(x + 8, y + 7, 16, 18); g.fillStyle = 'rgba(255,255,255,.3)'; g.fillRect(x + 8, y + 7, 16, 3); g.fillStyle = 'rgba(0,0,0,.15)'; g.fillRect(x + 15, y + 7, 2, 18); if (r() < 0.18) { g.fillStyle = '#d9d9d6'; g.fillRect(x + 7, y + 22, 18, 6); g.fillStyle = '#9a9a96'; g.fillRect(x + 9, y + 23, 6, 4); } } }
     const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
   if (type === 'villa') { // 2000년대 뒤 빌라 · 다세대 (드라이비트 · 화강석 · 판넬): 줄마다 같은 창 모양 (큰 창 + 난간 · 미닫이 창 + 방범창 · 작은 욕실 창 · 벽), 층 사이 띠
@@ -123,7 +127,7 @@ function facadeTex(type, lit, seed) {
       if (!lit) { g.fillStyle = 'rgba(0,0,0,.07)'; g.fillRect(0, y + 29, 256, 3); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(0, y + 28, 256, 1); }
       for (let i = 0; i < 8; i++) { const x = i * C, t = colT[i], warm = r() < 0.7;
         const R = t === 'big' ? [x + 3, y + 5, 26, 20] : t === 'bars' ? [x + 8, y + 7, 16, 14] : t === 'small' ? [x + 12, y + 7, 8, 6] : null; if (!R) continue;
-        if (lit) { if (r() < (t === 'small' ? 0.2 : 0.42)) { g.fillStyle = warm ? `hsl(${32 + r() * 10},${80 + r() * 10}%,${58 + r() * 14}%)` : `hsl(${200 + r() * 15},${25 + r() * 15}%,${76 + r() * 12}%)`; g.fillRect(...R); } continue; }
+        if (lit) { g.fillStyle = t === 'small' ? '#bbb' : '#fff'; g.fillRect(...R); g.fillStyle = '#3a3a3a'; if (t === 'big') { g.fillRect(x + 15, y + 5, 2, 20); g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(x + 3, y + 17, 26, 8); } if (t === 'bars') { g.fillStyle = 'rgba(40,40,40,.85)'; for (let k2 = 0; k2 < 5; k2++) g.fillRect(x + 9 + k2 * 3.4, y + 7, 1, 14); g.fillRect(x + 8, y + 13, 16, 1); } continue; }
         g.fillStyle = '#4a4e54'; g.fillRect(R[0] - 1, R[1] - 1, R[2] + 2, R[3] + 2);
         const k = 0.85 + r() * 0.3; g.fillStyle = `rgb(${72 * k},${86 * k},${100 * k})`; g.fillRect(...R); g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(R[0], R[1], R[2], 3);
         if (r() < 0.35) { g.fillStyle = `rgba(${230 + r() * 25},${220 + r() * 25},${200 + r() * 30},.75)`; g.fillRect(R[0] + 1, R[1] + 1, Math.floor(R[2] * (0.25 + r() * 0.3)), R[3] - 2); } // 커튼
@@ -133,11 +137,11 @@ function facadeTex(type, lit, seed) {
     const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
   if (type === 'fins') { // 연회색 세로 핀 + 그 사이 좁은 유리 띠 (파크원)
     g.fillStyle = lit ? '#000' : '#e4e4e0'; g.fillRect(0, 0, 256, 256);
-    for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { const x = i * 32, y = j * 32; if (lit) { if (r() < 0.45) { g.fillStyle = `hsl(${200 + r() * 20},20%,${78 + r() * 12}%)`; g.fillRect(x + 9, y + 2, 14, 27); } continue; } const k = 0.8 + r() * 0.2; g.fillStyle = `rgb(${120 * k},${136 * k},${150 * k})`; g.fillRect(x + 9, y + 2, 14, 27); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(x + 9, y + 2, 3, 27); g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(x + 23, y, 3, 32); }
+    for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { const x = i * 32, y = j * 32; if (lit) { g.fillStyle = '#fff'; g.fillRect(x + 9, y + 2, 14, 27); continue; } const k = 0.8 + r() * 0.2; g.fillStyle = `rgb(${120 * k},${136 * k},${150 * k})`; g.fillRect(x + 9, y + 2, 14, 27); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(x + 9, y + 2, 3, 27); g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(x + 23, y, 3, 32); }
     if (!lit) for (let j = 0; j < 8; j++) { g.fillStyle = 'rgba(0,0,0,.08)'; g.fillRect(0, j * 32 + 30, 256, 2); }
     const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
-  if (type === 'panels') { g.fillStyle = lit ? '#000' : '#cfc8c2'; g.fillRect(0, 0, 256, 256); for (let i = 0; i < 8; i++) { const x = i * 32; if (lit) { g.fillStyle = 'rgba(255,226,180,.75)'; g.fillRect(x + 14, 0, 4, 256); g.fillStyle = 'rgba(255,214,160,.18)'; g.fillRect(x + 10, 0, 12, 256); } else { g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(x + 10, 0, 12, 256); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(x + 2, 0, 2, 256); } } const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
-  if (type === 'church') { g.fillStyle = lit ? '#000' : '#f2ede4'; g.fillRect(0, 0, 256, 256); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { const x = i * 64 + 22, y = j * 64 + 8; g.fillStyle = lit ? (r() < 0.35 ? '#ffd9a0' : '#000') : '#5a6a86'; g.beginPath(); g.moveTo(x, y + 48); g.lineTo(x, y + 12); g.arc(x + 10, y + 12, 10, Math.PI, 0); g.lineTo(x + 20, y + 48); g.closePath(); g.fill(); if (!lit) { g.strokeStyle = 'rgba(255,255,255,.5)'; g.beginPath(); g.moveTo(x + 10, y + 4); g.lineTo(x + 10, y + 48); g.stroke(); } } const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
+  if (type === 'panels') { g.fillStyle = lit ? '#000' : '#cfc8c2'; g.fillRect(0, 0, 256, 256); for (let i = 0; i < 8; i++) { const x = i * 32; if (lit) { g.fillStyle = 'rgba(255,255,255,.8)'; g.fillRect(x + 14, 0, 4, 256); g.fillStyle = 'rgba(255,255,255,.2)'; g.fillRect(x + 10, 0, 12, 256); } else { g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(x + 10, 0, 12, 256); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(x + 2, 0, 2, 256); } } const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
+  if (type === 'church') { g.fillStyle = lit ? '#000' : '#f2ede4'; g.fillRect(0, 0, 256, 256); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { const x = i * 64 + 22, y = j * 64 + 8; g.fillStyle = lit ? '#fff' : '#5a6a86'; g.beginPath(); g.moveTo(x, y + 48); g.lineTo(x, y + 12); g.arc(x + 10, y + 12, 10, Math.PI, 0); g.lineTo(x + 20, y + 48); g.closePath(); g.fill(); g.strokeStyle = lit ? 'rgba(0,0,0,.6)' : 'rgba(255,255,255,.5)'; g.beginPath(); g.moveTo(x + 10, y + 4); g.lineTo(x + 10, y + 48); g.stroke(); } const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
   if (type === 'assembly') { g.fillStyle = lit ? '#000' : wall; g.fillRect(0, 0, 256, 256); if (!lit) { for (let i = 0; i < 8; i++) { const x = i * 32; g.fillStyle = 'rgba(0,0,0,.07)'; g.fillRect(x + 22, 0, 10, 256); g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(x + 4, 0, 3, 256); } for (let j = 0; j < 8; j++) { g.fillStyle = 'rgba(0,0,0,.04)'; g.fillRect(0, j * 32, 256, 1); } } const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
   g.fillStyle = lit ? '#000' : wall; g.fillRect(0, 0, 256, 256);
   if (!lit && type === 'brick') for (let y = 0; y < 256; y += 4) for (let x = (y / 4) % 2 ? 0 : 4; x < 256; x += 8) { g.fillStyle = `rgba(0,0,0,${0.04 + r() * 0.06})`; g.fillRect(x, y, 7, 3); }
@@ -148,23 +152,23 @@ function facadeTex(type, lit, seed) {
     const lc = home ? (tv ? `hsl(215,60%,${62 + r() * 12}%)` : `hsl(${30 + r() * 12},${85 + r() * 10}%,${55 + r() * 15}%)`) : `hsl(${195 + r() * 20},${18 + r() * 15}%,${80 + r() * 12}%)`;
     if (type === 'apt') {
       // 넓은 거실 창 + 발코니 난간 띠 (가끔 에어컨 · 화분)
-      if (lit) { if (on) { g.fillStyle = lc; g.fillRect(x + 3, y + 6, 26, 17); } continue; }
+      if (lit) { g.fillStyle = '#fff'; g.fillRect(x + 3, y + 6, 26, 17); g.fillStyle = '#444'; g.fillRect(x + 15, y + 6, 2, 17); g.fillRect(x + 3, y + 6, 26, 1); g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x + 3, y + 19, 26, 4); continue; }
       g.fillStyle = `rgb(${88 + r() * 30},${104 + r() * 30},${120 + r() * 30})`; g.fillRect(x + 3, y + 6, 26, 17);
       g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x + 3, y + 6, 26, 3);
       g.fillStyle = '#fbfaf7'; g.fillRect(x, y + 23, C, 6); g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(x, y + 29, C, 2);
       if (r() < 0.2) { g.fillStyle = '#e8e8e8'; g.fillRect(x + 20, y + 16, 8, 7); }
     } else if (type === 'glass' || type === 'gold') {
-      if (lit) { if (on) { g.fillStyle = lc; g.fillRect(x + 1, y + 2, 30, 26); } continue; }
+      if (lit) { g.fillStyle = '#fff'; g.fillRect(x + 1, y + 2, 30, 26); g.fillStyle = '#555'; g.fillRect(x + 15, y + 2, 2, 26); continue; }
       const k = 0.78 + r() * 0.22; g.fillStyle = type === 'gold' ? `rgb(${200 * k},${170 * k},${100 * k})` : `rgb(${150 * k},${170 * k},${192 * k})`; g.fillRect(x + 1, y + 2, 30, 26);
       const gr = g.createLinearGradient(x, y, x + C, y + C); gr.addColorStop(0, 'rgba(255,255,255,.28)'); gr.addColorStop(0.5, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(255,255,255,.12)'); g.fillStyle = gr; g.fillRect(x + 1, y + 2, 30, 26);
       g.fillStyle = type === 'gold' ? '#b08a3a' : '#7d8794'; g.fillRect(x + 15, y + 2, 2, 26); g.fillRect(x, y + 28, C, 4);
     } else if (type === 'stone') {
-      if (lit) { if (on) { g.fillStyle = lc; g.fillRect(x + 7, y + 6, 18, 20); } continue; }
+      if (lit) { g.fillStyle = '#fff'; g.fillRect(x + 7, y + 6, 18, 20); g.fillStyle = '#4a4a4a'; g.fillRect(x + 15, y + 6, 2, 20); continue; }
       g.fillStyle = `rgb(${70 + r() * 25},${82 + r() * 25},${96 + r() * 25})`; g.fillRect(x + 7, y + 6, 18, 20); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(x + 6, y + 26, 20, 2); g.fillStyle = 'rgba(255,255,255,.2)'; g.fillRect(x + 7, y + 6, 18, 3);
     } else {
-      if (lit) { if (on) { g.fillStyle = lc; g.fillRect(x + 9, y + 8, 14, 16); } continue; }
       // 벽돌 집 · 빌라: 줄마다 창 모양이 같다 (은색 알루미늄 창틀 · 방범창 · 넓은 거실 창 · 실외기 · 화분)
       const bt = type === 'brick' ? (facadeTex.bcol ||= (() => { const rl = rnd(555); return Array.from({ length: 8 }, () => { const q = rl(); return q < 0.5 ? 'bars' : q < 0.75 ? 'wide' : 'plain'; }); })())[i] : 'plain';
+      if (lit) { g.fillStyle = '#fff'; if (bt === 'wide') { g.fillRect(x + 5, y + 8, 22, 16); g.fillStyle = '#4a4a4a'; g.fillRect(x + 15, y + 8, 2, 16); } else { g.fillRect(x + 9, y + 8, 14, 16); g.fillStyle = '#4a4a4a'; g.fillRect(x + 15, y + 8, 2, 16); } if (bt === 'bars') { g.fillStyle = 'rgba(40,40,40,.85)'; for (let k2 = 0; k2 < 4; k2++) g.fillRect(x + 10 + k2 * 4, y + 8, 1, 16); g.fillRect(x + 9, y + 15, 14, 1); } continue; }
       if (bt === 'wide') { g.fillStyle = '#c9c9c4'; g.fillRect(x + 4, y + 7, 24, 18); g.fillStyle = `rgb(${60 + r() * 20},${68 + r() * 20},${78 + r() * 20})`; g.fillRect(x + 5, y + 8, 22, 16); g.fillStyle = '#c9c9c4'; g.fillRect(x + 15, y + 8, 2, 16); g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(x + 5, y + 8, 22, 3); g.fillStyle = '#efe9df'; g.fillRect(x + 3, y + 24, 26, 2); }
       else { if (type === 'brick') { g.fillStyle = '#c9c9c4'; g.fillRect(x + 8, y + 7, 16, 18); } g.fillStyle = `rgb(${60 + r() * 20},${68 + r() * 20},${78 + r() * 20})`; g.fillRect(x + 9, y + 8, 14, 16); g.fillStyle = '#efe9df'; g.fillRect(x + 8, y + 24, 16, 2); }
       if (type === 'brick' && r() < 0.3) { g.fillStyle = 'rgba(240,236,228,.7)'; g.fillRect(x + 10, y + 9, 5 + r() * 4, 14); } // 커튼
@@ -1200,7 +1204,7 @@ export class Hangang {
   //   랜드마크: 63빌딩 금빛 유리 · 파크원 빨간 철골 기둥 · LG트윈타워 청동빛 유리 · IFC 푸른 유리 · 전경련회관 짙은 유리 · 국회의사당 흰 기둥 + 초록 돔
   buildBuildings(P2) {
     const M = this.map, r = rnd(99), types = ['apt', 'glass', 'stone', 'brick', 'gold', 'assembly', 'church', 'panels', 'fins', 'street', 'street2', 'factory', 'hanok', 'villa'];
-    const sets = Object.fromEntries(types.map((t) => [t, { P: [], N: [], U: [], Cl: [], I: [] }]));
+    const sets = Object.fromEntries(types.map((t) => [t, { P: [], N: [], U: [], Cl: [], I: [], W: [] }]));
     const extras = { P: [], N: [], Cl: [], I: [] }, domes = [], signs = { P: [], N: [], Cl: [], I: [] }, crosses = [];
     const col = new THREE.Color(), roofC = new THREE.Color();
     const GLASS = ['#6f8fb2', '#5f9aa2', '#8a96a4', '#6d9a86', '#9a8a70', '#55626f', '#7aa0c8', '#8fa8b8'], STONE = ['#d8cfbf', '#c9c4bc', '#b8b2a8', '#d9c8ae', '#a99c88', '#e2ddd2'], BRICK = ['#a8573e', '#9a4a36', '#b8694a', '#8a4a3a', '#c07a55'], APT = ['#f1ede4', '#ece4d4', '#e8e8e4', '#f2e9da', '#e4dccd', '#dfe3e6'];
@@ -1216,7 +1220,7 @@ export class Hangang {
     // 서울 전체 칸: 건물마다 한 높이(바닥 둘레의 가장 낮은 땅)에 수평으로 세운다. 꼭짓점마다 땅 높이를 더하면 비탈에서 바닥 · 지붕이 기운다
     //   그 건물의 꼭짓점들에 바닥 높이(Y)를 적어 두고, drape 가 땅 높이 대신 이 값을 더한다 (NaN = 예전처럼 그 자리 땅 높이)
     const useBase = M.kind === 'tile' && !!(this.terr || this.host?.terr), groupsY = [...Object.values(sets), extras, signs]; for (const G of groupsY) G.Y = [];
-    let curY = NaN; const fillY = () => { for (const G of groupsY) { const n = G.P.length / 3; while (G.Y.length < n) G.Y.push(curY); } for (const a of this.aptMarks || []) if (a.by === undefined) a.by = curY; for (const a of this.hanokRoofs || []) if (a.by === undefined) a.by = curY; for (const a of this.helis || []) if (a.by === undefined) a.by = curY; for (const a of this.slateRoofs || []) if (a.by === undefined) a.by = curY; };
+    let curY = NaN, curW = [0, 0, 1]; const fillY = () => { for (const G of groupsY) { const n = G.P.length / 3; while (G.Y.length < n) G.Y.push(curY); if (G.W) while (G.W.length < n * 3) G.W.push(curW[0], curW[1], curW[2]); } for (const a of this.aptMarks || []) if (a.by === undefined) a.by = curY; for (const a of this.hanokRoofs || []) if (a.by === undefined) a.by = curY; for (const a of this.helis || []) if (a.by === undefined) a.by = curY; for (const a of this.slateRoofs || []) if (a.by === undefined) a.by = curY; };
     // 궁궐 안(경복궁 · 창덕궁 · 덕수궁 · 창경궁 · 경희궁 · 종묘): 건축물대장에 없는 작은 전각 · 문 · 행각은 낮은 한옥으로 (아무 벽돌 상자가 되지 않게)
     const palaces = []; { const PN = /^(경복궁|창덕궁|덕수궁|창경궁|경희궁|종묘)/; for (const b2 of M.buildings) { const nm = M.names[b2[4]] || ''; if (PN.test(nm)) palaces.push([b2[7] * M.scale, b2[8] * M.scale]); } }
     // 1층에 가게가 있는 건물 (상가주택: 필로티 대신 1층 가게)
@@ -1269,6 +1273,8 @@ export class Hangang {
       const MINT = ['#6db894', '#62ad8a', '#78c09c', '#5ea585', '#82c4a2'], rr = r();
       try { roofC.set(rci >= 0 ? M.colors[rci] : type === 'apt' ? (rr < 0.72 ? MINT[Math.floor(r() * 5)] : '#d6d3cc') : h > 14 ? (rr < 0.68 ? MINT[Math.floor(r() * 5)] : '#9c9a95') : rr < 0.4 ? MINT[Math.floor(r() * 5)] : '#a8a49d'); } catch { roofC.set('#7d7b78'); }
       if (LANDMARKS[name]?.roof) roofC.set(LANDMARKS[name].roof);
+      // 밤 창문 불빛: 이 건물의 씨앗 · 조명 종류(용도별) · 연대 (hangang-windows.js)
+      curW = [winSeed(b[7], b[8]), winProfile(type, info, kind, h), winEra(info)];
       const street = type === 'street' || type === 'street2', set = sets[type], s = ringArea(ring) > 0 ? 1 : -1, base = () => set.P.length / 3, FH = FLOOR[type] * 8 * (street ? 0.9 + r() * 0.22 : 1), BW = BAY[type] * 8 * (street ? 0.85 + r() * 0.35 : 1), uOff = street ? Math.floor(r() * 8) / 8 : 0;
       // 위로 갈수록 좁아지는 건물 (63빌딩): 꼭대기 외곽선을 긴 축 방향으로 줄인다. scale 은 위아래 모두 줄인다 (꼭대기 왕관 조각)
       // taper.H 가 있으면 높이에 비례해서 (위아래 조각 모두 같은 선 위로) 가늘어진다
@@ -1336,14 +1342,14 @@ export class Hangang {
     this.winTex = {}; this.litTex = {}; this.bldM = [];
     for (const t of types) {
       const st = sets[t]; if (!st.P.length) continue;
-      this.winTex[t] = facadeTex(t, false, 3); this.litTex[t] = facadeTex(t, true, 11);
+      this.winTex[t] = facadeTex(t, false, 3); this.litTex[t] = facadeTex(t, true, 3);
       const shiny = t === 'glass' || t === 'gold';
       if (t === 'assembly') { const m = new THREE.MeshLambertMaterial({ vertexColors: true, map: this.winTex[t], emissive: '#fff0d8', emissiveIntensity: 0 }); const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(st.P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(st.N, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(st.U, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(st.Cl, 3)); g.setIndex(st.I); g.userData.baseY = new Float32Array(st.Y); this.scene.add(new THREE.Mesh(g, m)); this.assemblyM = m; continue; }
       const m = shiny ? new THREE.MeshPhongMaterial({ vertexColors: true, map: this.winTex[t], emissive: '#ffffff', emissiveMap: this.litTex[t], emissiveIntensity: 0, shininess: t === 'gold' ? 90 : 70, specular: t === 'gold' ? '#ffe2a0' : '#9fb4c8' })
         : new THREE.MeshLambertMaterial({ vertexColors: true, map: this.winTex[t], emissive: '#ffffff', emissiveMap: this.litTex[t], emissiveIntensity: 0 });
       if (shiny) skyGlass(m, this.skyU, t === 'gold');
-      snowify(m);
-      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(st.P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(st.N, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(st.U, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(st.Cl, 3)); g.setIndex(st.I); g.userData.baseY = new Float32Array(st.Y);
+      snowify(m); winLights(m, WIN_GRID[t]);
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(st.P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(st.N, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(st.U, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(st.Cl, 3)); g.setAttribute('aWin', new THREE.Float32BufferAttribute(st.W, 3)); g.setIndex(st.I); g.userData.baseY = new Float32Array(st.Y);
       const mesh = new THREE.Mesh(g, m); mesh.castShadow = false; mesh.receiveShadow = true; this.scene.add(mesh); this.bldM.push(m); (this.bldByType ||= {})[t] = m;
     }
     const mk = (S, m) => { if (!S.P.length) return null; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(S.P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(S.N, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(S.Cl, 3)); g.setIndex(S.I); if (S.Y) g.userData.baseY = new Float32Array(S.Y); const me = new THREE.Mesh(g, m); this.scene.add(me); return me; };
@@ -1388,7 +1394,9 @@ export class Hangang {
     if (n) {
       const g = new THREE.BoxGeometry(1, 1, 1); g.translate(0, 0.5, 0);
       const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2, uv.getY(i) * 6);
-      const m = new THREE.MeshLambertMaterial({ map: this.winTex.stone || facadeTex('stone', false, 3), emissive: '#ffffff', emissiveMap: this.litTex.stone || facadeTex('stone', true, 11), emissiveIntensity: 0 });
+      const m = new THREE.MeshLambertMaterial({ map: this.winTex.stone || facadeTex('stone', false, 3), emissive: '#ffffff', emissiveMap: this.litTex.stone || facadeTex('stone', true, 3), emissiveIntensity: 0 }); winLights(m, [8, 8], true);
+      // 밤 창문: 상자마다 씨앗 · 조명 종류 (유리 = 회사, 아파트 = 집)
+      g.setAttribute('aWin', new THREE.InstancedBufferAttribute(new Float32Array(M.tall.flatMap(([x, z, , , , , k]) => [winSeed(x, z), k === 2 ? 0 : 2, 1])), 3));
       const im = new THREE.InstancedMesh(g, m, n), o = new THREE.Object3D(), c = new THREE.Color();
       M.tall.forEach(([x, z, w, d, a, h, k], i) => { o.position.set(x * S, 0, z * S); o.rotation.set(0, -a / 100, 0); o.scale.set(Math.max(8, w * S), h, Math.max(8, d * S)); o.updateMatrix(); im.setMatrixAt(i, o.matrix); c.set(k === 1 ? '#a9bccb' : k === 2 ? '#e8e2d6' : '#cfcac0').offsetHSL(0, 0, (Math.sin(i * 12.9) * 0.5) * 0.06); im.setColorAt(i, c); });
       this.scene.add(im); this.farM = m; this.farIM = im;
@@ -2093,10 +2101,10 @@ export class Hangang {
   }
   // 밤 불빛: 이 지도(또는 칸)의 재질들
   tickLit(lit, hr, home, work, dt) {
-    for (const [t, m] of Object.entries(this.bldByType || {})) m.emissiveIntensity = lit * (t.startsWith('street') || t === 'factory' ? (hr >= 2 && hr < 7 ? 0.3 : 1) : t === 'apt' || t === 'brick' ? home : work) * 0.5;
+    for (const m of Object.values(this.bldByType || {})) m.emissiveIntensity = lit * 0.85; // 창마다 켜짐 · 색은 hangang-windows.js (시간대별 비율 WIN_U)
     if (this.signM) this.signM.emissiveIntensity = lit * (hr >= 1 && hr < 6 ? 0.15 : 0.45);
     if (this.alleyLampM) { this.alleyLampM.emissiveIntensity = lit * 1.5; this.alleyGlowM.opacity = lit * 0.3; }
-    if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; if (this.summit) tickSummit(this, dt, lit); for (const m of this.neonMs || []) m.emissiveIntensity = 0.2 + lit * 1.2; if (this.jbugM) this.jbugM.emissiveIntensity = 0.15 + lit * 0.7; if (this.id === 'banpo' || this.fountain || this.sebit) this.tickBanpo(dt, lit); if (this.mfount) this.tickMusicFountain(dt, lit); for (const b of this.picnic || []) b.update(dt, 0, { noCrawl: true }); for (const m of this.shopSignMs || []) m.emissiveIntensity = 0.25 + lit * 0.85; for (const m of this.shopWinM || []) m.emissiveIntensity = 0.1 + lit * 0.42; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.35 * Math.max(0.2, (hr >= 18 && hr < 24 ? 1 : 0.4));
+    if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; if (this.summit) tickSummit(this, dt, lit); for (const m of this.neonMs || []) m.emissiveIntensity = 0.2 + lit * 1.2; if (this.jbugM) this.jbugM.emissiveIntensity = 0.15 + lit * 0.7; if (this.id === 'banpo' || this.fountain || this.sebit) this.tickBanpo(dt, lit); if (this.mfount) this.tickMusicFountain(dt, lit); for (const b of this.picnic || []) b.update(dt, 0, { noCrawl: true }); for (const m of this.shopSignMs || []) m.emissiveIntensity = 0.25 + lit * 0.85; for (const m of this.shopWinM || []) m.emissiveIntensity = 0.1 + lit * 0.42; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.6;
     if (this.bridgeLights) this.bridgeLights.material.opacity = lit;
   }
   tickEnv(dt, camera, px, pz) {
@@ -2128,7 +2136,7 @@ export class Hangang {
     // 시간대별 켜진 정도: 집은 저녁 7 ~ 11시가 가장 밝고 새벽엔 거의 꺼짐, 회사는 퇴근 무렵 밝다가 밤이 깊으면 거의 꺼짐
     const hr = h, home = hr >= 17 && hr < 19 ? 0.6 : hr >= 19 && hr < 23 ? 1 : hr >= 23 || hr < 1 ? 0.55 : hr < 5 ? 0.12 : hr < 7 ? 0.3 : 0.2;
     const work = hr >= 17 && hr < 20 ? 1 : hr >= 20 && hr < 22 ? 0.55 : hr >= 22 || hr < 6 ? 0.08 : hr < 8 ? 0.35 : 0.3;
-    this.tickLit(lit, hr, home, work, dt); for (const c of this.chunks?.values() || []) { c.time = this.time; c.tickLit(lit, hr, home, work, dt); }
+    tickWindows(hr, this.t); this.tickLit(lit, hr, home, work, dt); for (const c of this.chunks?.values() || []) { c.time = this.time; c.tickLit(lit, hr, home, work, dt); }
     this.lampGlow.material.opacity = lit; if (this.lampHeadM) this.lampHeadM.emissiveIntensity = 0.2 + lit * 2.2; this.carPts.material.opacity = 0.25 + lit * 0.75;
     this.lampPool.material.opacity = lit * 0.32;
     let pi = 0; for (const [x, z] of this.poleXZ) { if (pi >= this.pools.length) break; if (Math.abs(x - px) < 90 && Math.abs(z - pz) < 90) { this.pools[pi].position.set(x, 0.03, z); this.pools[pi].visible = true; pi++; } } for (; pi < this.pools.length; pi++) this.pools[pi].visible = false;
