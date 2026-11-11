@@ -4,8 +4,12 @@
 //   이름이 있는 실제 초고층(롯데월드타워 · IFC 등) · 낮은 동네 옆 실제 고층 아파트(성수 트리마제 등) · 초고층 단지는 건드리지 않는다
 //   건물 한 개: [높이, 아래 높이, 종류, 색, 이름 번호, …, 바닥 꼭짓점 x, z, …(7번째부터)] · 좌표 × scale = m
 const GENERIC = /^(\d+|[A-Za-z]|[가-힣]?\d+동|[A-Z]동|-)$/; // '101동' · 'A' · '109' 같은 이름은 이름 없는 것으로 본다
+// 이름이 있어도 높이 자료가 틀린 것으로 확인된 건물 (이름 → 실제에 가까운 높이 m)
+//   헌법재판소 본관: 지상 5층 석조 청사인데 자료에 193.5m 로 들어와 북촌에서 탑처럼 솟았다
+const KNOWN = { '헌법재판소 본관': 24 };
 export function fixHeights(M, log = () => {}) {
   const B = M.buildings; if (!Array.isArray(B) || !B.length) return 0;
+  let known = 0; for (const b of B) { const nm = (b[4] >= 0 && M.names?.[b[4]]) || ''; if (KNOWN[nm] && b[0] > KNOWN[nm] * 1.5) { log(`${nm} ${b[0]}m → ${KNOWN[nm]}m (확인된 자료 오류)`); b[0] = KNOWN[nm]; b[1] = 0; known++; } }
   const S = M.scale || 0.1, P = B.map((b) => { let x = 0, z = 0, n = 0; for (let k = 7; k < b.length; k += 2) { x += b[k]; z += b[k + 1]; n++; } return [(x / Math.max(1, n)) * S, (z / Math.max(1, n)) * S]; });
   let fixed = 0;
   B.forEach((b, i) => {
@@ -19,5 +23,5 @@ export function fixHeights(M, log = () => {}) {
     near.sort((a, c) => a - c); const p90 = near[Math.floor(near.length * 0.9)];
     if (h > Math.max(3 * p90, p90 + 60)) { const nh = Math.round(Math.max(p90 * 1.3, 20) * 10) / 10; log(`${nm || '이름 없음'} ${h}m → ${nh}m (주변 90% ${p90}m · 이웃 ${near.length})`); b[0] = nh; if (b[1] > nh) b[1] = 0; fixed++; }
   });
-  return fixed;
+  return fixed + known;
 }
