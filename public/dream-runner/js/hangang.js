@@ -1107,9 +1107,11 @@ export class Hangang {
     // 업종마다 간판 색 (바탕, 글씨): 실제 서울 간판에서 흔한 조합
     const ST = { cafe: [['#f4efe6', '#3b2a1e'], ['#2f5d4a', '#ffffff'], ['#1b1820', '#f2e6d0']], bakery: [['#fff3d6', '#7a3b2e'], ['#b5733d', '#ffffff']], korean: [['#7a3b2e', '#fff3d6'], ['#ffffff', '#c0392b'], ['#1f2a44', '#ffd23f'], ['#fff7c2', '#b8322a']], chicken: [['#ffd23f', '#c0392b'], ['#d8752a', '#ffffff']], pizza: [['#b8322a', '#ffffff'], ['#2f7a5a', '#ffffff']], burger: [['#c0392b', '#ffd23f']], chinese: [['#a8231d', '#ffd23f']], japanese: [['#2b2b2b', '#f4efe6'], ['#f4efe6', '#2b2b2b']], pub: [['#1b1820', '#ffb347'], ['#3b2a22', '#ffe2b0'], ['#2a2a6a', '#ff9ec0']], western: [['#f4efe6', '#2f5d4a'], ['#1b1820', '#ffffff']], mart: [['#2f7fd8', '#ffffff'], ['#ffffff', '#1f9d55'], ['#6a2bb8', '#ffffff']],
       pharm: [['#1f9d55', '#ffffff']], hair: [['#ffffff', '#b8326a'], ['#1b1820', '#ff9ec0'], ['#f2c6cf', '#5a2a3a']], clinic: [['#ffffff', '#1f4fa8'], ['#1f4fa8', '#ffffff']], academy: [['#1f4fa8', '#ffffff'], ['#ffffff', '#2f7fd8'], ['#ff8a3d', '#ffffff']], realty: [['#ffffff', '#c0392b'], ['#ffd23f', '#1b1820']], cloth: [['#1b1820', '#ffffff'], ['#ffffff', '#1b1820']], super: [['#2f7a5a', '#ffffff'], ['#c0392b', '#ffffff']], laundry: [['#3db8ff', '#ffffff']], flower: [['#ffffff', '#2f7a5a']], motel: [['#6a2bb8', '#ffd23f']], store: [['#ffffff', '#1f4fa8'], ['#ffd23f', '#1b1820'], ['#2f7a5a', '#ffffff']], repair: [['#ffffff', '#1b1820']], sport: [['#1b1820', '#3db8ff']], office: [['#ffffff', '#1f4fa8'], ['#e8e8e4', '#2b2b2b']] };
-    const list = [], up = [], doors = [];
+    const list = [], up = [], doors = [], blades = [];
+    // 세로 돌출 간판이 잘 붙는 업종 (병원 · 학원 · 술집 · 미용실 · 모텔 · 노래방처럼 위층 가게)
+    const BLADE = { clinic: 3, academy: 3, pub: 3, hair: 2, motel: 3, pharm: 2, korean: 1, cafe: 1, store: 1, office: 1, sport: 2 };
     for (const f of this.foot) {
-      const L0 = f.bi === undefined ? null : byB.get(f.bi); if (!L0 || f.h < 3 || f.type === 'glass' || f.type === 'gold') continue;
+      const L0 = f.bi === undefined ? null : byB.get(f.bi); if (!L0 || f.h < 3 || f.mh || f.type === 'glass' || f.type === 'gold') continue; // 공중에 뜬 건물 조각(아래가 비었다)엔 1층 간판 · 문을 달지 않는다
       const ring = f.ring, sg = ringArea(ring) > 0 ? 1 : -1, by = f.base === undefined ? NaN : f.base, edges = [];
       for (let k = 0; k < ring.length; k++) { const a = ring[k], c = ring[(k + 1) % ring.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]); if (L < 3) continue; const nx = (sg > 0 ? c[1] - a[1] : a[1] - c[1]) / L, nz = (sg > 0 ? a[0] - c[0] : c[0] - a[0]) / L, mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2; let tx = (c[0] - a[0]) / L, tz = (c[1] - a[1]) / L; if (tx * nz - tz * nx < 0) { tx = -tx; tz = -tz; } edges.push({ L, nx, nz, mx, mz, tx, tz, d: nearRoad(mx + nx * 2, mz + nz * 2) }); }
       if (!edges.length) continue; edges.sort((a, b) => (a.d > 10) - (b.d > 10) || b.L - a.L); const front = edges.filter((e) => e.d <= 10); if (!front.length) front.push(edges[0]);
@@ -1118,16 +1120,20 @@ export class Hangang {
       let gi = 0; for (const e of front) { const n = Math.max(1, Math.floor(e.L / 4.5)), k0 = Math.min(n, g1.length - gi); if (k0 <= 0) break; const w = e.L / k0;
         for (let q = 0; q < k0; q++, gi++) { const s2 = g1[gi], off = -e.L / 2 + w * (q + 0.5), x = e.mx + e.tx * off, z = e.mz + e.tz * off, pal = ST[s2[1]] || ST.store, st = pal[Math.floor(r() * pal.length)];
           if (this.shopFronts.some((F) => !F.real && Math.abs(F.x - x) < 3.5 && Math.abs(F.z - z) < 3.5)) continue; // 오픈스트리트맵 가게(차양 · 간판이 따로 있는 곳)와 겹치지 않게
-          list.push({ x: x + e.nx * 0.14, z: z + e.nz * 0.14, tx: e.tx, tz: e.tz, w: Math.min(w * 0.9, 9), y0: s2[3] === 0 ? 0.5 : 2.95, y1: s2[3] === 0 ? 1.15 : 3.75, n: s2[0], bg: st[0], fg: st[1], by });
+          list.push({ x: x + e.nx * 0.14, z: z + e.nz * 0.14, tx: e.tx, tz: e.tz, w: Math.min(w * 0.9, 9), y0: s2[3] === 0 ? 0.5 : 2.95, y1: s2[3] === 0 ? 1.15 : 3.75, n: s2[0], bg: st[0], fg: st[1], by, box: s2[3] === 1 });
           if (s2[3] === 1 && SHOP_KIND[s2[1]] && w > 2.4 && !this.shopFronts.some((F) => Math.abs(F.x - x) < 3 && Math.abs(F.z - z) < 3)) doors.push({ name: s2[0], kind: s2[1], x: x + e.nx * 0.05, z: z + e.nz * 0.05, nx: e.nx, nz: e.nz, by, real: 1 }); } }
       void cap;
       // 2층 위: 그 층 창문에 글씨 간판 (층 높이 3.3m)
       const perFl = {}, cntFl = {}; for (const s2 of L0) cntFl[s2[3]] = (cntFl[s2[3]] || 0) + 1; for (const s2 of L0) { if (s2[3] < 2) continue; const yc = (s2[3] - 1) * 3.3 + 1.7; if (yc > f.h - 0.8) continue; const e = front[(perFl[s2[3]] || 0) % front.length], j = Math.floor((perFl[s2[3]] || 0) / front.length); perFl[s2[3]] = (perFl[s2[3]] || 0) + 1; if (j > 1) continue; const w = Math.min(e.L * (j || front.length > 1 ? 0.42 : 0.6), 5.5), off = (cntFl[s2[3]] > front.length ? (j ? 1 : -1) : 0) * clamp(e.L * 0.25, 0, Math.max(0, e.L / 2 - w / 2 - 0.3)), pal = ST[s2[1]] || ST.office, st = pal[Math.floor(r() * pal.length)];
         up.push({ x: e.mx + e.tx * off + e.nx * 0.12, z: e.mz + e.tz * off + e.nz * 0.12, tx: e.tx, tz: e.tz, w, y0: yc - 0.45, y1: yc + 0.45, n: s2[0], bg: st[0], fg: st[1], by, fl: s2[3] }); }
+      // 세로 돌출 간판: 위층 가게가 있는 4m 넘는 건물, 길 쪽 벽 끝에 벽과 직각으로 (양면 글씨, 위층 가게 이름)
+      const upS = L0.filter((s2) => s2[3] >= 2 && [...s2[0]].filter((ch) => ch.trim()).length >= 2).sort((p, q) => (BLADE[q[1]] || 0) - (BLADE[p[1]] || 0));
+      if (upS.length && f.h > 7.5 && front[0].L > 5) { const e = front[0], s2 = upS[0], nch = [...s2[0]].filter((ch) => ch.trim()).length, side = r() < 0.5 ? 1 : -1, off = side * (e.L / 2 - 0.55), pal = ST[s2[1]] || ST.office, st = pal[Math.floor(r() * pal.length)], y0 = 4.1, y1 = Math.min(f.h - 0.5, y0 + clamp(nch * 0.82 + 0.5, 2.4, 7.5));
+        if (y1 - y0 > 1.8) blades.push({ x: e.mx + e.tx * off + e.nx * 0.95, z: e.mz + e.tz * off + e.nz * 0.95, tx: e.nx, tz: e.nz, wtx: e.tx, wtz: e.tz, w: 1.2, y0, y1, n: s2[0], bg: st[0], fg: st[1], by, vert: 1 }); }
     }
     // 한 칸 간판 7,000개까지: 1층 먼저, 낮은 층부터
     // 휴대폰: 1층 간판만 2,500개까지 (메모리 · 그리기 줄이기)
-    up.sort((a, b) => a.fl - b.fl); const all = isPhone ? list.slice(0, 2500) : [...list, ...up].slice(0, 7000);
+    up.sort((a, b) => a.fl - b.fl); const all = isPhone ? list.slice(0, 2500) : [...list, ...blades.slice(0, 1500), ...up].slice(0, 7000);
     if (doors.length) { const o = new THREE.Object3D(), fg = new THREE.BoxGeometry(1.9, 2.5, 0.1); fg.translate(0, 1.25, 0.02); const dg = new THREE.PlaneGeometry(1.6, 2.3); dg.translate(0, 1.15, 0.08); const fm = new THREE.InstancedMesh(fg, new THREE.MeshLambertMaterial({ color: '#2b2d31' }), doors.length), dm = new THREE.InstancedMesh(dg, new THREE.MeshPhongMaterial({ color: '#d8c8a8', emissive: '#ffd9a0', emissiveIntensity: 0.25, shininess: 80 }), doors.length);
       doors.forEach((D, i) => { o.position.set(D.x, 0, D.z); o.rotation.y = Math.atan2(D.nx, D.nz); o.updateMatrix(); fm.setMatrixAt(i, o.matrix); dm.setMatrixAt(i, o.matrix); D.key = this.chunkKey; const fi = this.shopFronts.push(D) - 1, k = `${Math.floor(D.x / 40)},${Math.floor(D.z / 40)}`; if (!this.shopGrid.has(k)) this.shopGrid.set(k, []); this.shopGrid.get(k).push(fi); });
       fm.userData.baseY = dm.userData.baseY = doors.map((D) => D.by); this.scene.add(fm, dm); }
@@ -1135,12 +1141,27 @@ export class Hangang {
     // 바탕 판(꼭짓점 색) 한 덩어리 + 글자 조각(글자 그림 한 장) 한 덩어리 = 칸마다 그리기 2번
     const B = { P: [], C: [], I: [], Y: [] }, T = { P: [], C: [], U: [], I: [], Y: [] }, col = new THREE.Color();
     const quad = (G, S, a0, a1, y0, y1, dz, c, uv) => { const k = G.P.length / 3, nx = -S.tz, nz = S.tx; for (const [a, y] of [[a0, y0], [a1, y0], [a1, y1], [a0, y1]]) { G.P.push(S.x + S.tx * a + nx * dz, y, S.z + S.tz * a + nz * dz); G.C.push(c.r, c.g, c.b); G.Y.push(S.by); } if (uv) G.U.push(uv.u0, uv.v0, uv.u1, uv.v0, uv.u1, uv.v1, uv.u0, uv.v1); G.I.push(k, k + 1, k + 2, k, k + 2, k + 3); };
+    // 간판 틀: 바닥 · 윗면(수평 판)과 양 끝 (상자 간판 두께)
+    const hquad = (G, S, a0, a1, y, d0, d1, c) => { const k = G.P.length / 3, nx = -S.tz, nz = S.tx; for (const [a, d] of [[a0, d0], [a1, d0], [a1, d1], [a0, d1]]) { G.P.push(S.x + S.tx * a + nx * d, y, S.z + S.tz * a + nz * d); G.C.push(c.r, c.g, c.b); G.Y.push(S.by); } G.I.push(k, k + 1, k + 2, k, k + 2, k + 3); };
+    const capq = (G, S, a, d0, d1, y0, y1, c) => quad(G, { x: S.x + S.tx * a + -S.tz * (d0 + d1) / 2, z: S.z + S.tz * a + S.tx * (d0 + d1) / 2, tx: -S.tz, tz: S.tx, by: S.by }, -(d1 - d0) / 2, (d1 - d0) / 2, y0, y1, 0, c);
+    const frameC = new THREE.Color();
     for (const S of all) {
-      const hw = S.w / 2, H = S.y1 - S.y0; col.set(S.bg); quad(B, S, -hw, hw, S.y0, S.y1, 0, col);
-      const chars = [...S.n].filter((ch) => ch.trim()), gs = chars.map((ch) => glyph(ch)); if (!chars.length) continue;
+      const hw = S.w / 2, H = S.y1 - S.y0, chars0 = [...S.n].filter((ch) => ch.trim());
+      if (S.vert) {
+        // 세로 간판: 두 면 (뒷면은 방향을 뒤집어 글씨가 거울처럼 보이지 않게) + 바깥 끝 틀
+        frameC.set(S.bg).multiplyScalar(0.55); const back = { ...S, tx: -S.tx, tz: -S.tz };
+        for (const F of [S, back]) { col.set(S.bg); quad(B, F, -hw, hw, S.y0, S.y1, 0.12, col); }
+        quad(B, { x: S.x + S.tx * hw, z: S.z + S.tz * hw, tx: S.wtx, tz: S.wtz, by: S.by }, -0.12, 0.12, S.y0, S.y1, 0, frameC); hquad(B, S, -hw, hw, S.y0, -0.12, 0.12, frameC); hquad(B, S, -hw, hw, S.y1, -0.12, 0.12, frameC);
+        const gs = chars0.map((ch) => glyph(ch)), n = gs.length; if (!n) continue; const cs = Math.min(S.w * 0.72, (H * 0.9) / n), yTop = S.y1 - (H - n * cs) / 2; col.set(S.fg);
+        for (const F of [S, back]) gs.forEach((g, k) => { if (g) quad(T, F, -cs / 2, cs / 2, yTop - cs * (k + 1), yTop - cs * k, 0.15, col, g); });
+        continue;
+      }
+      const dz0 = S.box ? 0.16 : 0; col.set(S.bg); quad(B, S, -hw, hw, S.y0, S.y1, dz0, col);
+      if (S.box) { frameC.set(S.bg).multiplyScalar(0.5); hquad(B, S, -hw, hw, S.y0, 0, dz0, frameC); hquad(B, S, -hw, hw, S.y1, 0, dz0, frameC); capq(B, S, -hw, 0, dz0, S.y0, S.y1, frameC); capq(B, S, hw, 0, dz0, S.y0, S.y1, frameC); }
+      const chars = chars0, gs = chars.map((ch) => glyph(ch)); if (!chars.length) continue;
       let cs = H * 0.78; const tw = () => gs.reduce((n, g) => n + (g ? g.w : 0.5) * cs, 0); if (tw() > S.w * 0.9) cs *= (S.w * 0.9) / tw();
       let a = -tw() / 2; const yc = (S.y0 + S.y1) / 2; col.set(S.fg);
-      for (const g of gs) { const gw = (g ? g.w : 0.5) * cs; if (g) { const pad = (cs - gw) / 2; quad(T, S, a - pad, a + gw + pad, yc - cs / 2, yc + cs / 2, 0.03, col, g); } a += gw; }
+      for (const g of gs) { const gw = (g ? g.w : 0.5) * cs; if (g) { const pad = (cs - gw) / 2; quad(T, S, a - pad, a + gw + pad, yc - cs / 2, yc + cs / 2, dz0 + 0.03, col, g); } a += gw; }
     }
     if (B.P.length) { const mk = (G, m) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(G.P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(G.C, 3)); if (G.U) g.setAttribute('uv', new THREE.Float32BufferAttribute(G.U, 2)); g.setIndex(G.I); g.computeVertexNormals(); g.userData.baseY = new Float32Array(G.Y); const me = new THREE.Mesh(g, m); this.scene.add(me); (this.shopSignMs ||= []).push(m); };
       const mB = signMaterial(false), mT = (glyphTex(), signMaterial(true)); (this.shopSignMs ||= []).push(mB, mT);
