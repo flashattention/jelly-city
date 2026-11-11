@@ -70,6 +70,7 @@ const GLSL = /* glsl */`
 uniform float uOn[12]; uniform float uWinT;
 varying vec3 vWin;
 float wh(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+vec4 wh4(vec2 p) { vec4 p4 = fract(vec4(p.xyxy) * vec4(0.1031, 0.1030, 0.0973, 0.1099)); p4 += dot(p4, p4.wzxy + 33.33); return fract((p4.xxyz + p4.yzzw) * p4.zywx); }
 // 조명 색 (선형). 주광색 6500K · 옛 형광등 · 주백색 4000K · 전구색 2700K · TV
 const vec3 W_COOL = vec3(0.62, 0.80, 1.00);
 const vec3 W_FLUO = vec3(0.70, 1.00, 0.84);
@@ -86,17 +87,17 @@ vec3 curtain(vec3 c, float hc, float hg, vec2 f, float det) {
   float gap = 0.04 + 0.32 * hg, cur = smoothstep(gap, gap + 0.05, abs(f.x - 0.5));
   return c * mix(vec3(1.0), tint * 0.45, mix(0.45, cur, det));
 }
-vec3 winLight(vec2 g, vec3 w) {
-  vec2 cell = floor(g), f = fract(g), fw = fwidth(g);
+vec3 winLight(vec2 g, vec2 fw, vec3 w) {
+  vec2 cell = floor(g), f = fract(g);
   float px = max(fw.x, fw.y), det = 1.0 - smoothstep(0.05, 0.22, px);
   float seed = w.x, era = w.z; int prof = int(w.y + 0.5);
   vec2 sd = vec2(seed * 173.0, seed * 291.0);
-  float h1 = wh(cell + sd), h2 = wh(cell + sd + 17.17), h3 = wh(cell + sd + 41.3), h4 = wh(cell + sd + 7.7), hb = fract(seed * 7.31);
+  vec4 hh = wh4(cell + sd); float h1 = hh.x, h2 = hh.y, h3 = hh.z, h4 = hh.w, hb = fract(seed * 7.31);
   vec3 c = vec3(0.0);
   if (prof <= 1) {
     // 집: 아파트는 두 칸이 한 세대 (거실 + 방), 세대마다 쓰는 조명이 다르다
     bool apt = prof == 0; vec2 unit = apt ? vec2(floor(cell.x * 0.5), cell.y) : cell; bool liv = !apt || mod(cell.x, 2.0) < 1.0;
-    float hu = wh(unit + sd + 3.1), hs = wh(unit + sd + 9.9), on = uOn[prof];
+    vec2 hq = wh4(unit + sd + 3.1).xy; float hu = hq.x, hs = hq.y, on = uOn[prof];
     vec3 hc = homeLight(hs, era); float b = 0.6 + 0.6 * h2 * h2 + 0.15 * hu;
     if (hu < on) {
       if (liv) {
@@ -168,7 +169,11 @@ export function winLights(m, grid = [8, 8], far = false) {
     prev?.call(m, sh, r); sh.uniforms.uOn = WIN_U.uOn; sh.uniforms.uWinT = WIN_U.uWinT;
     sh.vertexShader = 'attribute vec3 aWin;\nvarying vec3 vWin;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWin = aWin;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + GLSL).replace('#include <emissivemap_fragment>', `#ifdef USE_EMISSIVEMAP
-      totalEmissiveRadiance *= texture2D(emissiveMap, vEmissiveMapUv).r * winLight(vEmissiveMapUv * vec2(${grid[0].toFixed(1)}, ${grid[1].toFixed(1)}), vWin);
+      // 창이 아닌 곳(벽 · 옥상)이나 낮(빛 세기 0)엔 창 계산을 건너뛴다
+      //   (fwidth 는 갈림길 밖에서 재야 한다)
+      float wMask = texture2D(emissiveMap, vEmissiveMapUv).r; vec2 wG = vEmissiveMapUv * vec2(${grid[0].toFixed(1)}, ${grid[1].toFixed(1)}), wFw = fwidth(wG);
+      if (wMask > 0.004 && totalEmissiveRadiance.r > 0.0) totalEmissiveRadiance *= wMask * winLight(wG, wFw, vWin);
+      else totalEmissiveRadiance = vec3(0.0);
     #endif`);
   };
   m.customProgramCacheKey = () => (pk ? pk() : '') + `|win${grid[0]}x${grid[1]}${far ? 'f' : ''}`;
