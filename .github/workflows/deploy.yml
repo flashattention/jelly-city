@@ -78,8 +78,10 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
+          # 원격 빌더가 레지스트리에 못 올리는 일이 생겨서(2026-11-11, _api.internal:5000 거부) 2번째부터는 이 러너의 Docker 로 직접 빌드한다
           for i in 1 2 3; do
-            docker run --rm -e FLY_API_TOKEN -v "$PWD:/app" -w /app flyio/flyctl:latest deploy --remote-only && exit 0
-            echo "다시 시도 $i"; sleep 30
+            if [ "$i" = 1 ]; then how=--remote-only; else how=--local-only; fi
+            docker run --rm -e FLY_API_TOKEN -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/app" -w /app flyio/flyctl:latest deploy $how && exit 0
+            echo "다시 시도 $i"; sleep 20
           done
           exit 1
