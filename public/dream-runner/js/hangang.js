@@ -114,6 +114,23 @@ function facadeTex(type, lit, seed) {
       for (let i = 0; i < 8; i++) { const x = i * 32, on = r() < 0.4; if (lit) { if (on) { g.fillStyle = `hsl(${r() < 0.75 ? 36 : 205},${r() < 0.75 ? 85 : 30}%,${62 + r() * 16}%)`; g.fillRect(x + 8, y + 7, 16, 18); } continue; }
         if (r() < 0.12) continue; g.fillStyle = '#f7f5f0'; g.fillRect(x + 6, y + 5, 20, 22); g.fillStyle = `rgb(${66 + r() * 28},${76 + r() * 28},${92 + r() * 28})`; g.fillRect(x + 8, y + 7, 16, 18); g.fillStyle = 'rgba(255,255,255,.3)'; g.fillRect(x + 8, y + 7, 16, 3); g.fillStyle = 'rgba(0,0,0,.15)'; g.fillRect(x + 15, y + 7, 2, 18); if (r() < 0.18) { g.fillStyle = '#d9d9d6'; g.fillRect(x + 7, y + 22, 18, 6); g.fillStyle = '#9a9a96'; g.fillRect(x + 9, y + 23, 6, 4); } } }
     const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
+  if (type === 'villa') { // 2000년대 뒤 빌라 · 다세대 (드라이비트 · 화강석 · 판넬): 줄마다 같은 창 모양 (큰 창 + 난간 · 미닫이 창 + 방범창 · 작은 욕실 창 · 벽), 층 사이 띠
+    g.fillStyle = lit ? '#000' : '#efeeea'; g.fillRect(0, 0, 256, 256);
+    // 창 배치는 낮 · 밤 그림이 같아야 해서 따로 정한 씨앗으로 (켜짐만 r)
+    const rl = rnd(4242), colT = Array.from({ length: 8 }, () => { const q = rl(); return q < 0.34 ? 'big' : q < 0.7 ? 'bars' : q < 0.86 ? 'small' : 'wall'; });
+    for (let i = 1; i < 8; i++) if (colT[i] === 'wall' && colT[i - 1] === 'wall') colT[i] = 'bars';
+    for (let j = 0; j < 8; j++) { const y = j * C;
+      if (!lit) { g.fillStyle = 'rgba(0,0,0,.07)'; g.fillRect(0, y + 29, 256, 3); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(0, y + 28, 256, 1); }
+      for (let i = 0; i < 8; i++) { const x = i * C, t = colT[i], warm = r() < 0.7;
+        const R = t === 'big' ? [x + 3, y + 5, 26, 20] : t === 'bars' ? [x + 8, y + 7, 16, 14] : t === 'small' ? [x + 12, y + 7, 8, 6] : null; if (!R) continue;
+        if (lit) { if (r() < (t === 'small' ? 0.2 : 0.42)) { g.fillStyle = warm ? `hsl(${32 + r() * 10},${80 + r() * 10}%,${58 + r() * 14}%)` : `hsl(${200 + r() * 15},${25 + r() * 15}%,${76 + r() * 12}%)`; g.fillRect(...R); } continue; }
+        g.fillStyle = '#4a4e54'; g.fillRect(R[0] - 1, R[1] - 1, R[2] + 2, R[3] + 2);
+        const k = 0.85 + r() * 0.3; g.fillStyle = `rgb(${72 * k},${86 * k},${100 * k})`; g.fillRect(...R); g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(R[0], R[1], R[2], 3);
+        if (r() < 0.35) { g.fillStyle = `rgba(${230 + r() * 25},${220 + r() * 25},${200 + r() * 30},.75)`; g.fillRect(R[0] + 1, R[1] + 1, Math.floor(R[2] * (0.25 + r() * 0.3)), R[3] - 2); } // 커튼
+        if (t === 'big') { g.fillStyle = '#3a3d42'; g.fillRect(x + 15, y + 5, 2, 20); g.fillStyle = 'rgba(205,220,228,.55)'; g.fillRect(x + 2, y + 17, 28, 8); g.fillStyle = '#5b5f66'; g.fillRect(x + 2, y + 16, 28, 1); } // 유리 난간
+        if (t === 'bars') { g.fillStyle = 'rgba(70,72,76,.85)'; for (let k2 = 0; k2 < 5; k2++) g.fillRect(x + 9 + k2 * 3.4, y + 7, 1, 14); g.fillRect(x + 8, y + 13, 16, 1); if (r() < 0.25) { g.fillStyle = '#dedcd6'; g.fillRect(x + 10, y + 22, 12, 6); g.fillStyle = '#8f8f8b'; g.fillRect(x + 11, y + 23, 5, 4); } }
+      } }
+    const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
   if (type === 'fins') { // 연회색 세로 핀 + 그 사이 좁은 유리 띠 (파크원)
     g.fillStyle = lit ? '#000' : '#e4e4e0'; g.fillRect(0, 0, 256, 256);
     for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { const x = i * 32, y = j * 32; if (lit) { if (r() < 0.45) { g.fillStyle = `hsl(${200 + r() * 20},20%,${78 + r() * 12}%)`; g.fillRect(x + 9, y + 2, 14, 27); } continue; } const k = 0.8 + r() * 0.2; g.fillStyle = `rgb(${120 * k},${136 * k},${150 * k})`; g.fillRect(x + 9, y + 2, 14, 27); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(x + 9, y + 2, 3, 27); g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(x + 23, y, 3, 32); }
@@ -146,7 +163,14 @@ function facadeTex(type, lit, seed) {
       g.fillStyle = `rgb(${70 + r() * 25},${82 + r() * 25},${96 + r() * 25})`; g.fillRect(x + 7, y + 6, 18, 20); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(x + 6, y + 26, 20, 2); g.fillStyle = 'rgba(255,255,255,.2)'; g.fillRect(x + 7, y + 6, 18, 3);
     } else {
       if (lit) { if (on) { g.fillStyle = lc; g.fillRect(x + 9, y + 8, 14, 16); } continue; }
-      g.fillStyle = `rgb(${60 + r() * 20},${68 + r() * 20},${78 + r() * 20})`; g.fillRect(x + 9, y + 8, 14, 16); g.fillStyle = '#efe9df'; g.fillRect(x + 8, y + 24, 16, 2);
+      // 벽돌 집 · 빌라: 줄마다 창 모양이 같다 (은색 알루미늄 창틀 · 방범창 · 넓은 거실 창 · 실외기 · 화분)
+      const bt = type === 'brick' ? (facadeTex.bcol ||= (() => { const rl = rnd(555); return Array.from({ length: 8 }, () => { const q = rl(); return q < 0.5 ? 'bars' : q < 0.75 ? 'wide' : 'plain'; }); })())[i] : 'plain';
+      if (bt === 'wide') { g.fillStyle = '#c9c9c4'; g.fillRect(x + 4, y + 7, 24, 18); g.fillStyle = `rgb(${60 + r() * 20},${68 + r() * 20},${78 + r() * 20})`; g.fillRect(x + 5, y + 8, 22, 16); g.fillStyle = '#c9c9c4'; g.fillRect(x + 15, y + 8, 2, 16); g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(x + 5, y + 8, 22, 3); g.fillStyle = '#efe9df'; g.fillRect(x + 3, y + 24, 26, 2); }
+      else { if (type === 'brick') { g.fillStyle = '#c9c9c4'; g.fillRect(x + 8, y + 7, 16, 18); } g.fillStyle = `rgb(${60 + r() * 20},${68 + r() * 20},${78 + r() * 20})`; g.fillRect(x + 9, y + 8, 14, 16); g.fillStyle = '#efe9df'; g.fillRect(x + 8, y + 24, 16, 2); }
+      if (type === 'brick' && r() < 0.3) { g.fillStyle = 'rgba(240,236,228,.7)'; g.fillRect(x + 10, y + 9, 5 + r() * 4, 14); } // 커튼
+      if (bt === 'bars') { g.fillStyle = 'rgba(58,60,64,.9)'; for (let k2 = 0; k2 < 4; k2++) g.fillRect(x + 10 + k2 * 4, y + 8, 1, 16); g.fillRect(x + 9, y + 15, 14, 1); }
+      if (type === 'brick' && r() < 0.14) { g.fillStyle = '#e2e0da'; g.fillRect(x + 20, y + 20, 10, 7); g.fillStyle = '#8f8f8b'; g.fillRect(x + 21, y + 21, 5, 5); } // 실외기
+      else if (type === 'brick' && r() < 0.08) { g.fillStyle = '#4f7a3f'; g.fillRect(x + 9, y + 22, 14, 3); g.fillStyle = '#a35a3a'; g.fillRect(x + 9, y + 24, 14, 2); } // 창가 화분
     }
   }
   g.fillStyle = lit ? '#000' : wall; g.fillRect(0, 0, 3, 3);
@@ -1132,13 +1156,16 @@ export class Hangang {
   //   아파트(흰 벽 · 발코니 띠) · 유리 오피스(색 유리 · 멀리온) · 석재 오피스(창이 뚫린 돌벽) · 벽돌(학교 · 주택) · 금빛 유리(63빌딩)
   //   랜드마크: 63빌딩 금빛 유리 · 파크원 빨간 철골 기둥 · LG트윈타워 청동빛 유리 · IFC 푸른 유리 · 전경련회관 짙은 유리 · 국회의사당 흰 기둥 + 초록 돔
   buildBuildings(P2) {
-    const M = this.map, r = rnd(99), types = ['apt', 'glass', 'stone', 'brick', 'gold', 'assembly', 'church', 'panels', 'fins', 'street', 'street2', 'factory', 'hanok'];
+    const M = this.map, r = rnd(99), types = ['apt', 'glass', 'stone', 'brick', 'gold', 'assembly', 'church', 'panels', 'fins', 'street', 'street2', 'factory', 'hanok', 'villa'];
     const sets = Object.fromEntries(types.map((t) => [t, { P: [], N: [], U: [], Cl: [], I: [] }]));
     const extras = { P: [], N: [], Cl: [], I: [] }, domes = [], signs = { P: [], N: [], Cl: [], I: [] }, crosses = [];
     const col = new THREE.Color(), roofC = new THREE.Color();
     const GLASS = ['#6f8fb2', '#5f9aa2', '#8a96a4', '#6d9a86', '#9a8a70', '#55626f', '#7aa0c8', '#8fa8b8'], STONE = ['#d8cfbf', '#c9c4bc', '#b8b2a8', '#d9c8ae', '#a99c88', '#e2ddd2'], BRICK = ['#a8573e', '#9a4a36', '#b8694a', '#8a4a3a', '#c07a55'], APT = ['#f1ede4', '#ece4d4', '#e8e8e4', '#f2e9da', '#e4dccd', '#dfe3e6'];
-    const FLOOR = { apt: 2.9, glass: 3.9, stone: 3.6, brick: 3.2, gold: 3.9, assembly: 6, church: 7, panels: 8, fins: 3.9, street: 3.4, street2: 3.6, factory: 5, hanok: 3.2 }, BAY = { apt: 3.4, glass: 1.6, stone: 2.6, brick: 2.4, gold: 1.6, assembly: 3.5, church: 4.5, panels: 5, fins: 1.6, street: 2.6, street2: 3.2, factory: 4, hanok: 2.4 };
+    const FLOOR = { apt: 2.9, glass: 3.9, stone: 3.6, brick: 3.2, gold: 3.9, assembly: 6, church: 7, panels: 8, fins: 3.9, street: 3.4, street2: 3.6, factory: 5, hanok: 3.2, villa: 2.9 }, BAY = { apt: 3.4, glass: 1.6, stone: 2.6, brick: 2.4, gold: 1.6, assembly: 3.5, church: 4.5, panels: 5, fins: 1.6, street: 2.6, street2: 3.2, factory: 4, hanok: 2.4, villa: 2.9 };
     const box = (x, y, z, w, h, d, c, rotY = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.rotateY(rotY); g.translate(x, y, z); const k = extras.P.length / 3, p = g.attributes.position, n = g.attributes.normal; for (let i = 0; i < p.count; i++) { extras.P.push(p.getX(i), p.getY(i), p.getZ(i)); extras.N.push(n.getX(i), n.getY(i), n.getZ(i)); extras.Cl.push(c.r, c.g, c.b); } for (const ix of g.index.array) extras.I.push(k + ix); };
+    // 벽에 붙이는 얇은 판 (1층 필로티 · 화강석 띠 · 가게 유리 · 아파트 색 띠): extras 한 덩어리에 꼭짓점 색으로 (그리기 호출이 늘지 않는다)
+    const wq = (a, c2, nx, nz, s, o, y0, y1, cc, t0 = 0, t1 = 1) => { const dx = c2[0] - a[0], dz = c2[1] - a[1], x0 = a[0] + dx * t0 + nx * o, z0 = a[1] + dz * t0 + nz * o, x1 = a[0] + dx * t1 + nx * o, z1 = a[1] + dz * t1 + nz * o, q0 = extras.P.length / 3; extras.P.push(x0, y0, z0, x1, y0, z1, x1, y1, z1, x0, y1, z0); for (let t = 0; t < 4; t++) { extras.N.push(nx, 0, nz); extras.Cl.push(cc.r, cc.g, cc.b); } if (s < 0) extras.I.push(q0, q0 + 1, q0 + 2, q0, q0 + 2, q0 + 3); else extras.I.push(q0, q0 + 2, q0 + 1, q0, q0 + 3, q0 + 2); };
+    const C_PIL = new THREE.Color('#2a2c30'), C_BEAM = new THREE.Color('#d2cfc8'), C_SHOP = new THREE.Color('#38414c'), C_SHOPF = new THREE.Color('#2a2a2e'), GRANITE = ['#c9b9b0', '#a9a59e', '#d6d0c6', '#8f8a84', '#bfb2a6'].map((h2) => new THREE.Color(h2));
     const campus = []; for (const [nm, L] of Object.entries(LANDMARKS)) { if (!L.campus) continue; const ni2 = M.names.indexOf(nm); const b2 = M.buildings.find((q) => q[4] === ni2); if (!b2) continue; let x = 0, z = 0, n = 0; for (let k = 7; k < b2.length; k += 2) { x += b2[k] * M.scale; z += b2[k + 1] * M.scale; n++; } campus.push({ x: x / n, z: z / n, r: L.campus, L, nm, kind: b2[2] >> 1, ring: P2(b2.slice(7)), self: b2 }); }
     this.lmParts = {}; const touches = (cp, b, ring) => cp.self !== b && (ring.some(([x, z]) => inRing(x, z, cp.ring)) || cp.ring.some(([x, z]) => inRing(x, z, ring)));
     // 남산 정상 둘레(서울 전체 칸): 높이 자료가 잘못된 건물이 많아 정상 지도처럼 낮게 (타워 · 따로 만든 것 빼고)
@@ -1149,8 +1176,12 @@ export class Hangang {
     let curY = NaN; const fillY = () => { for (const G of groupsY) { const n = G.P.length / 3; while (G.Y.length < n) G.Y.push(curY); } for (const a of this.aptMarks || []) if (a.by === undefined) a.by = curY; for (const a of this.hanokRoofs || []) if (a.by === undefined) a.by = curY; for (const a of this.helis || []) if (a.by === undefined) a.by = curY; for (const a of this.slateRoofs || []) if (a.by === undefined) a.by = curY; };
     // 궁궐 안(경복궁 · 창덕궁 · 덕수궁 · 창경궁 · 경희궁 · 종묘): 건축물대장에 없는 작은 전각 · 문 · 행각은 낮은 한옥으로 (아무 벽돌 상자가 되지 않게)
     const palaces = []; { const PN = /^(경복궁|창덕궁|덕수궁|창경궁|경희궁|종묘)/; for (const b2 of M.buildings) { const nm = M.names[b2[4]] || ''; if (PN.test(nm)) palaces.push([b2[7] * M.scale, b2[8] * M.scale]); } }
+    // 1층에 가게가 있는 건물 (상가주택: 필로티 대신 1층 가게)
+    const shopG = new Set(); for (const s2 of M.shops2 || []) if (s2[3] <= 1) shopG.add(s2[2]);
     for (const [bi, b] of M.buildings.entries()) {
       fillY(); curY = NaN;
+      // 무작위는 건물마다 자기 씨앗 (외곽선 첫 점): 지도 순서 · 코드가 바뀌어도 같은 건물은 늘 같은 모습
+      const r = rnd(bSeed(b));
       const info = M.binfo?.[bi] || null;
       const [h0, mh, km, ci, ni, rci, dome] = b, kind = km >> 1, glassTag = km & 1, ring = P2(b.slice(7)); if (ring.length < 3) continue;
       // 돔 지붕 부분: 벽은 돔 아래까지, 그 위에 돔 (높이 · 색은 지도 데이터대로)
@@ -1174,7 +1205,16 @@ export class Hangang {
       else if (/^#?[0-9a-f]{6}$/i.test(cTag) || /^[a-z]+$/i.test(cTag)) { try { col.set(cTag); c = `#${col.getHexString()}`; } catch { c = null; } }
       if (useBase && !LANDMARKS[name] && M.kind !== 'summit' && !(towerC && Math.hypot(ring[0][0] - towerC[0], ring[0][1] - towerC[1]) < 200)) { let lo = Infinity; for (const [x, z] of ring) lo = Math.min(lo, this.terrAt(x, z, true)); curY = lo - 0.15; }
       // 실제 건축물 정보(용도 · 구조 · 사용승인 연도)로 외벽을 정한다 (틀 찍어내기 대신 그 건물의 실제 정보대로)
-      if (info && !c && !LANDMARKS[name] && type !== 'church' && type !== 'gold' && type !== 'assembly') { const st = styleOf(info, h, r); if (st) { type = st[0]; c = st[1]; } }
+      let ground = null;
+      if (info && !c && !LANDMARKS[name] && type !== 'church' && type !== 'gold' && type !== 'assembly') { const st = styleOf(info, h, r, shopG.has(bi)); if (st) { type = st[0]; c = st[1]; ground = st[2] || null; } }
+      // 대장 정보가 없는 이름 없는 낮은 건물 · 단독주택 (서울에선 대부분 집 · 빌라): 1990년대 주택처럼
+      if ((!info || !info[0]) && !c && !name && type !== 'church' && type !== 'apt' && (kind === 0 || kind === 4) && h < 16 && !palaceHanok) { const st = styleOf([1, 21, 0], h, r, shopG.has(bi)); type = st[0]; c = st[1]; ground = st[2] || null; }
+      // 주상복합 · 초고층 아파트 (갤러리아 포레 · 트리마제 · 타워팰리스 같은 45층 넘는 탑, 2008년 뒤 35층 넘는 탑): 발코니 띠 대신 흰 · 은회색 유리 커튼월
+      const yr = info?.[2] || 0;
+      if (type === 'apt' && !c && (h >= 150 || (h >= 110 && yr >= 2008) || (h >= 90 && /타워|팰리스|포레|트리마제|리첸시아|트럼프|아크로|써밋|레지던스|스카이/.test(name)))) { type = 'glass'; c = ['#c9d4da', '#b8c6cf', '#d5dde0', '#aebcc6', '#bfcad0'][Math.floor(r() * 5)]; }
+      // 아파트: 연대 · 브랜드마다 외벽 색과 옆벽 색 띠 (1970 ~ 80년대 크림 · 연한 색, 1990년대 흰 · 아이보리, 2000년대 뒤 회색 · 베이지 투톤 + 아래층 석재)
+      let aptAcc = null, aptEra = 0;
+      if (type === 'apt' && !c) { aptEra = yr ? (yr < 1990 ? 0 : yr < 2003 ? 1 : 2) : h > 75 ? 2 : 1; const B = aptBrand(name); c = B ? B[0] : [['#efe6d0', '#ebe3d3', '#e6e6d8', '#efe2d8', '#e9e4d6'], ['#f2f0ea', '#efe9dc', '#f1ede4', '#e9e6df'], ['#e2e2df', '#d9d4cc', '#f1f0ec', '#cfcfcb', '#e6e0d6']][aptEra][Math.floor(r() * 5) % [5, 4, 5][aptEra]]; aptAcc = B ? B[1] : [['#6f9a7a', '#5f86a8', '#b07a5a', '#8a9a6a'], ['#4f7fa8', '#3f8a6a', '#a85a4a', '#7a7f88'], ['#5d6066', '#8a7a68', '#4a5560', '#9a8a74']][aptEra][Math.floor(r() * 4)]; }
       if (palaceHanok) { type = 'hanok'; c = '#efe6d6'; }
       // 한옥 마을(북촌 · 인사동): 정보가 없는 단층 작은 집도 한옥으로
       if (!info && (this.regionHere === 'bukchon' || this.regionHere === 'insadong') && h <= 5 && Math.abs(ringArea(ring)) < 350 && !name) { type = 'hanok'; c = '#f2ece0'; }
@@ -1198,6 +1238,9 @@ export class Hangang {
       if (LM?.gate) { const xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); if (!(this.gateDone ||= new Set()).has(LM)) { this.gateDone.add(LM); this.scene.add(buildGate(ring, LM)); } this.addFoot({ ring, h: LM.gate.base || 7, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), name, type: 'stone' }); continue; }
       if (LM?.egg || LM?.jbug) { const xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); this.addFoot({ ring, h, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), name, type: 'glass', noClimb: true }); continue; }
       let acc = 0;
+      // 1층 모습 (필로티 · 화강석 띠 · 가게) 과 아파트 옆벽 띠: 건물마다 한 번 정한다
+      const gTall = r() < 0.5, gC = GRANITE[Math.floor(r() * GRANITE.length)], postC = col.clone().lerp(C_BEAM, 0.5), aptAccC = aptAcc ? new THREE.Color(aptAcc) : null, aptBaseC = aptEra === 2 ? col.clone().lerp(new THREE.Color('#a8a096'), 0.55) : null;
+      const aptShort = aptAccC && h > 14 ? new Set(ring.map((p, q) => [q, Math.hypot(ring[(q + 1) % ring.length][0] - p[0], ring[(q + 1) % ring.length][1] - p[1])]).filter((e) => e[1] > 6).sort((p, q) => p[1] - q[1]).slice(0, 2).map((e) => e[0])) : null;
       for (let i = 0; i < ring.length; i++) {
         const a = bot[i], c2 = bot[(i + 1) % ring.length], ta = top[i], tc = top[(i + 1) % ring.length], dx = c2[0] - a[0], dz = c2[1] - a[1], L = Math.hypot(dx, dz); if (L < 0.05) continue;
         const nx = (s > 0 ? dz : -dz) / L, nz = (s > 0 ? -dx : dx) / L, k = base();
@@ -1205,10 +1248,22 @@ export class Hangang {
         const lo = mh < 1 ? 0.72 : 0.92, hi = 1.06; for (let q = 0; q < 4; q++) { const k2 = q < 2 ? lo : hi; set.N.push(nx, 0, nz); set.Cl.push(col.r * k2, col.g * k2, col.b * k2); }
         const u0 = acc / BW + uOff, u1 = (acc + L) / BW + uOff, v0 = mh / FH, v1 = h / FH;
         // 거리 상가 외벽: 실외기 (층마다 가끔)
-        if (street && L > 3 && h > 7) for (let fl = 1; fl * FLOOR[type] < h - 2; fl++) if (r() < 0.22) { const t = 0.15 + r() * 0.7; box(a[0] + dx * t + nx * 0.25, fl * FLOOR[type] + 0.45, a[1] + dz * t + nz * 0.25, 0.85, 0.62, 0.38, new THREE.Color(r() < 0.8 ? '#dcdcd8' : '#a9aaa6'), -Math.atan2(dz, dx)); } acc += L;
+        if (street && L > 3 && h > 7 && h < 32) for (let fl = 1; fl * FLOOR[type] < h - 2; fl++) if (r() < 0.22) { const t = 0.15 + r() * 0.7; box(a[0] + dx * t + nx * 0.25, fl * FLOOR[type] + 0.45, a[1] + dz * t + nz * 0.25, 0.85, 0.62, 0.38, new THREE.Color(r() < 0.8 ? '#dcdcd8' : '#a9aaa6'), -Math.atan2(dz, dx)); } acc += L;
         set.U.push(u0, v0, u1, v0, u1, v1, u0, v1);
         if (s < 0) set.I.push(k, k + 1, k + 2, k, k + 2, k + 3); else set.I.push(k, k + 2, k + 1, k, k + 3, k + 2);
         if (type !== 'glass' && type !== 'gold' && h - mh > 6) { const o = 0.18, q0 = extras.P.length / 3, cc = col.clone().lerp(new THREE.Color('#ffffff'), 0.45); extras.P.push(a[0] + nx * o, h - 0.9, a[1] + nz * o, c2[0] + nx * o, h - 0.9, c2[1] + nz * o, c2[0] + nx * o, h + 0.35, c2[1] + nz * o, a[0] + nx * o, h + 0.35, a[1] + nz * o); for (let t2 = 0; t2 < 4; t2++) { extras.N.push(nx, 0, nz); extras.Cl.push(cc.r, cc.g, cc.b); } if (s < 0) extras.I.push(q0, q0 + 1, q0 + 2, q0, q0 + 2, q0 + 3); else extras.I.push(q0, q0 + 2, q0 + 1, q0, q0 + 3, q0 + 2); }
+        // 1층: 필로티 주차장(어두운 빈 칸 + 모서리 기둥 + 보) · 화강석 띠 · 상가주택 1층 가게 유리
+        if (ground && mh < 1 && L > 1.5 && (type === 'brick' || type === 'villa')) {
+          if (ground === 'pilotis') { const pw = Math.min(0.45 / L, 0.25); wq(a, c2, nx, nz, s, 0.03, 0, 2.5, C_PIL); wq(a, c2, nx, nz, s, 0.06, 0, 2.5, postC, 0, pw); wq(a, c2, nx, nz, s, 0.06, 0, 2.5, postC, 1 - pw, 1); if (L > 9) wq(a, c2, nx, nz, s, 0.06, 0, 2.5, postC, 0.5 - pw / 2, 0.5 + pw / 2); wq(a, c2, nx, nz, s, 0.06, 2.5, 2.9, C_BEAM); }
+          else if (ground === 'granite') wq(a, c2, nx, nz, s, 0.04, 0, gTall ? 2.9 : 1.1, gC);
+          else if (ground === 'shop') { wq(a, c2, nx, nz, s, 0.04, 0.12, 2.75, C_SHOP); wq(a, c2, nx, nz, s, 0.05, 2.75, 2.95, C_SHOPF); }
+        }
+        // 아파트: 2000년대 뒤 아래 두 층은 석재, 옆벽엔 단지 색 띠 (동 번호 아래), 1990년대는 지붕 둘레 색 띠
+        if (aptAccC && h > 14) {
+          if (aptBaseC) wq(a, c2, nx, nz, s, 0.04, mh, mh + Math.min(6, h * 0.12), aptBaseC);
+          if (aptShort.has(i) && L > 6) { const top2 = h - Math.min(10, h * 0.32) - 0.6, w = Math.min(2.6, L * 0.16) / L; if (top2 > mh + 6) { wq(a, c2, nx, nz, s, 0.05, mh + 3, top2, aptAccC, 0.1, 0.1 + w); if (aptEra < 2) wq(a, c2, nx, nz, s, 0.05, mh + 3, top2, aptAccC, 0.1 + w * 1.5, 0.1 + w * 2); } }
+          if (aptEra === 1) wq(a, c2, nx, nz, s, 0.2, h - 0.9, h + 0.36, aptAccC);
+        }
         // 낮은 상가: 1층 간판 띠 (밤에 빛난다)
         if ((kind === 2 || kind === 0) && h < 30 && mh < 1 && L > 4 && r() < (M.shops?.length ? 0 : 0.55)) { const sc = new THREE.Color(['#ff5a5f', '#ffd23f', '#3db8ff', '#7be07b', '#ff9ec0', '#f2e6d0', '#ff8a3d'][Math.floor(r() * 7)]), q = signs.P.length / 3, o = 0.08; signs.P.push(a[0] + nx * o, 3.1, a[1] + nz * o, c2[0] + nx * o, 3.1, c2[1] + nz * o, c2[0] + nx * o, 3.9, c2[1] + nz * o, a[0] + nx * o, 3.9, a[1] + nz * o); for (let t = 0; t < 4; t++) { signs.N.push(nx, 0, nz); signs.Cl.push(sc.r, sc.g, sc.b); } if (s < 0) signs.I.push(q, q + 1, q + 2, q, q + 2, q + 3); else signs.I.push(q, q + 2, q + 1, q, q + 3, q + 2); }
       }
@@ -2515,24 +2570,57 @@ function skyGlass(m, skyU, gold) {
   };
   m.customProgramCacheKey = () => (gold ? 'skyglass-gold' : 'skyglass');
 }
+// 건물마다 씨앗: 외곽선 첫 점 · 꼭짓점 수를 섞는다 (murmur 끝맺음)
+function bSeed(b) { let h = (Math.round(b[7]) * 73856093) ^ (Math.round(b[8]) * 19349663) ^ (b.length * 83492791); h = Math.imul(h ^ (h >>> 16), 0x85ebca6b); h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35); return (h ^ (h >>> 16)) >>> 0; }
+// 아파트 브랜드 → [외벽 색, 옆벽 띠 색] (실제 단지에서 흔한 도색)
+const APT_BRANDS = [[/래미안/, '#e4e4e2', '#4a5866'], [/자이/, '#eeeeec', '#3d3f44'], [/힐스테이트/, '#e6ddd0', '#7a5f48'], [/푸르지오/, '#efefec', '#5f8a5a'], [/편한세상/, '#f0f0ee', '#3f6fa8'], [/롯데캐슬/, '#e8dfd0', '#8a6a50'], [/아이파크/, '#ebebe8', '#6a6e74'], [/더샵/, '#e2e3e3', '#4f5a60'], [/SK|에스케이/, '#f0eeea', '#d0602a'], [/주공|LH|휴먼시아/, '#efe8d8', '#4f9a6a'], [/현대/, '#efe8d6', '#2f7a5a'], [/한신/, '#efe6d0', '#3f6fa8'], [/삼성/, '#eeeae2', '#2f5fa8'], [/우성/, '#efe9dc', '#b0453a'], [/대림/, '#efebe2', '#3f6fa8'], [/쌍용|예가/, '#ece6da', '#a8463a'], [/위브|두산/, '#ece9e4', '#5a6a8a'], [/금호|어울림/, '#eeeae2', '#c46a2a'], [/벽산/, '#efe8da', '#3f7a5a']];
+function aptBrand(name) { if (!name) return null; for (const [re, w, a] of APT_BRANDS) if (re.test(name)) return [w, a]; return null; }
 // 건축물 정보 → 외벽 [종류, 색]. use: 1 단독 · 2 공동주택 · 3 · 4 근린생활 · 6 종교 · 7 판매 · 9 의료 · 10 교육 · 14 업무 · 15 숙박, st: 11 · 12 · 13 · 19 조적(벽돌 · 블록 · 돌) · 21 · 22 철근콘크리트 · 3x 철골, yr: 사용승인 연도
-function styleOf([use, st, yr], h, r) {
+function styleOf([use, st, yr], h, r, shopG) {
   const pick2 = (a) => a[Math.floor(r() * a.length)], masonry = st >= 11 && st <= 19, steel = st >= 31 && st <= 39, era = yr ? (yr < 1990 ? 0 : yr < 2005 ? 1 : 2) : 1;
   // 한옥: 목구조(건축물대장 구조 코드 51 ~ 59 = 일반목구조 · 통나무 등) 낮은 집 (북촌 · 서촌 · 인사동) → 흰 회벽 · 나무 기둥 · 기와 지붕은 따로 얹는다
   if (st >= 51 && st <= 59 && h < 9) return ['hanok', '#f2ece0'];
   if (use === 6) return ['church', '#efe9de'];
   // 공장 · 창고 (성수 붉은 벽돌 공장 카페 등): 짙은 붉은 벽돌 + 큰 공장 창
-  if ((use === 17 || use === 18) && h > 22) return ['glass', pick2(['#9fb2c0', '#a9bccb', '#b8c6cf'])]; // 지식산업센터 (공장 용도인 높은 유리 빌딩)
+  // 지식산업센터 (공장 용도인 높은 유리 빌딩)
+  if ((use === 17 || use === 18) && h > 22) return ['glass', pick2(['#9fb2c0', '#a9bccb', '#b8c6cf', '#8d9ea9'])];
   if (use === 17 || use === 18) return ['factory', pick2(['#8a3f2e', '#9a4a36', '#7a3a2c', '#a5523e', '#6b6f73'])];
   if (use === 2 && h > 24) return null; // 아파트 단지는 아파트 모습 그대로
+  const home = use === 1 || use === 2, shop = use === 3 || use === 4 || use === 5 || use === 7;
+  // 주택 · 빌라 · 다세대: 연대마다 실제 서울 골목 모습
+  //   1990년 전: 붉은 · 밤색 벽돌집이 많고 3할쯤은 회벽에 페인트(크림 · 연두 · 하늘 · 분홍)
+  //   1990 ~ 2004: 치장벽돌 빌라(붉은 · 갈색 · 베이지) 7할, 화강석(분홍빛 · 회색) 3할, 1층은 필로티 주차장 · 화강석
+  //   2005년 뒤: 드라이비트(흰 · 회색) · 화강석 · 판넬 빌라, 고벽돌(짙은 회색 · 갈색) 3할, 대부분 필로티
+  //   3번째 값 = 1층 모습 (pilotis 필로티 · granite 화강석 띠 · shop 1층 가게)
+  if (home) {
+    const g = shopG ? 'shop' : h >= 7.5 && r() < [0.06, 0.38, 0.72][era] ? 'pilotis' : r() < [0.2, 0.55, 0.5][era] ? 'granite' : null;
+    if (era === 0) return r() < (masonry ? 0.68 : 0.5) ? ['brick', pick2(['#8a4a36', '#7a3f30', '#9a5a44', '#94503c', '#a0604a']), g] : ['brick', pick2(['#ece4d0', '#dfe6d2', '#d8e2e6', '#efdcd4', '#e8e2d6', '#cfd6c4']), g];
+    if (era === 1) return r() < 0.7 ? ['brick', pick2(['#a5523e', '#b0604a', '#9c4f3a', '#8a5a44', '#b38a6a', '#c4a484', '#7a4a3a']), g] : ['villa', pick2(['#d9c3b8', '#cfcac2', '#e0d6cc', '#c8beb6', '#e6e0d6']), g];
+    return r() < 0.3 ? ['brick', pick2(['#5d5a58', '#6e625a', '#8a6a58', '#4a4848', '#a08a76']), g] : ['villa', pick2(['#f2f1ed', '#e4e3df', '#d2d1cd', '#bdbcb8', '#e8e1d6', '#8f9196', '#f0ebe2']), g];
+  }
+  // 조적 상가 (을지로 · 종로 옛 상가): 붉은 벽돌 + 1층 가게
+  if (masonry && shop && h < 20) return ['street', pick2(['#9a4f3c', '#8a4a36', '#a8603e', '#b5654a'])];
   if (masonry) return ['brick', era === 0 ? pick2(['#8a4a36', '#7a3f30', '#9a5a44']) : era === 1 ? pick2(['#a5523e', '#b0604a', '#9c4f3a']) : pick2(['#b8735a', '#c9a27a', '#a8866a'])];
-  if (steel && h > 15) return ['glass', pick2(['#9fb6c8', '#a9bccb', '#8fa6b8'])];
-  if (use === 14) return h > 30 || yr >= 2000 ? ['glass', pick2(['#9fb2c0', '#b0c2cc', '#8d9aa6'])] : ['stone', pick2(['#d6d0c4', '#cfc8bb', '#e0dacd'])];
-  if (use === 10) return ['stone', pick2(['#efe6cf', '#e8dcc0'])];
-  if (use === 9) return ['stone', '#f2f2ee'];
-  if (use === 15) return ['street2', pick2(['#e8e4dc', '#6b4a3a', '#2f2f33', '#c8b49a'])];
-  if (use === 1 || use === 2) return era === 0 ? (r() < 0.6 ? ['brick', pick2(['#9a4f3c', '#a5523e', '#8a4a36'])] : ['stone', pick2(['#e8dfcc', '#ddd3c0'])]) : era === 1 ? ['street', pick2(['#e9dfd0', '#f0e6dc', '#dcd3c6', '#e8d8cf', '#d8cdbd'])] : ['street2', pick2(['#d9d9d6', '#f2f2f0', '#5a5d63', '#bfb7ab', '#e6e1d8'])];
-  if (use === 3 || use === 4 || use === 7 || use === 5) return era === 0 ? ['street', pick2(['#efe6d6', '#e3d6c2', '#cfc6b8', '#b5654a'])] : era === 1 ? ['street', pick2(['#d8d2c8', '#c9c2b6', '#e8e4dc', '#a29e98', '#d9cfc2'])] : ['street2', pick2(['#2f2f33', '#f4f1ea', '#8a8f96', '#c8dcef', '#e8d9b5', '#fff7e8'])];
+  // 업무 빌딩 (높은 근생 · 판매 포함): 연대마다
+  //   1990년 전: 갈색 · 회색 타일과 석재 네모 창, 화강석 띠창, 구릿빛 · 짙은 반사 유리
+  //   1990 ~ 2004: 회색 화강석 띠창, 짙은 청록 · 구릿빛 반사 유리
+  //   2005년 뒤: 은회색 · 푸른 유리 커튼월, 짙은 회색 · 흰 판넬
+  const DARK = ['#4f6a6a', '#3f5866', '#6a5a48', '#56707a', '#2f3e4a', '#5a6470'], LIGHT = ['#9fb6c8', '#b0c2cc', '#8fa6b8', '#a9b6bd', '#7f97ab', '#5d7487'], BAND = ['#a9a7a2', '#c9c6bf', '#8c8a86', '#d8d4cc', '#b8ada0', '#e2dfd8'];
+  if (steel && h > 15) return ['glass', pick2(era === 2 ? LIGHT : DARK)];
+  if (use === 14 || ((shop || use === 15) && h > 30)) {
+    const q = r();
+    if (h <= 20 && era < 2) return q < 0.5 ? ['stone', pick2(['#c9c4bc', '#a8a39a', '#d8d2c6', '#8e8a84', '#b9a68c'])] : ['street2', pick2(BAND)];
+    if (era === 0) return q < 0.4 ? ['stone', pick2(['#b9a68c', '#8e7f6e', '#a8a39a', '#c8bfae', '#7a6a5a'])] : q < 0.72 ? ['street2', pick2(BAND)] : ['glass', pick2(DARK)];
+    if (era === 1) return q < 0.42 ? ['street2', pick2(BAND)] : q < 0.8 ? ['glass', pick2(DARK)] : ['stone', pick2(['#8c8a86', '#a9a7a2', '#6e6c69', '#c9c6bf'])];
+    return q < 0.75 ? ['glass', pick2(LIGHT)] : ['stone', pick2(['#5d5f63', '#7a7c80', '#e9e8e4', '#3f4145', '#c9c8c4'])];
+  }
+  // 학교 · 대학: 크림 · 흰 도장, 1990년대 전엔 붉은 벽돌도 흔하다
+  if (use === 10) return era < 2 && r() < 0.35 ? ['brick', pick2(['#9a4f3c', '#a5523e', '#8a4a36'])] : ['stone', pick2(['#efe6cf', '#e8dcc0', '#f2efe8', '#e2e4e0'])];
+  if (use === 9) return ['stone', pick2(['#f2f2ee', '#e8eaea', '#eeeae2'])];
+  // 숙박 (모텔 · 호텔): 짙은 타일 · 석재 띠창
+  if (use === 15) return ['street2', pick2(['#e8e4dc', '#6b4a3a', '#2f2f33', '#c8b49a', '#8a6a5a'])];
+  // 근생 · 판매 (1층 가게): 1980년대 타일(베이지 · 갈색 · 흰), 1990년대 화강석 · 타일, 2005년 뒤 알루미늄 복합판넬(은 · 흰 · 짙은 회색) · 유리
+  if (shop) return era === 0 ? ['street', pick2(['#e8dcc8', '#c9b49a', '#b08e6e', '#efe9e0', '#9a6a4e', '#d6cbb8'])] : era === 1 ? ['street', pick2(['#d8d2c8', '#bdb8b0', '#e8e4dc', '#a29e98', '#c9b9a6', '#cdb8ae'])] : ['street2', pick2(['#2f2f33', '#f4f1ea', '#8a8f96', '#c8ccd0', '#5a5d63', '#e8e4dc'])];
   return null;
 }
 // 뚝섬 자벌레: 외곽선의 긴 축을 따라 칸마다 가운데 · 폭을 재서 그 선을 따라 납작한 튜브
