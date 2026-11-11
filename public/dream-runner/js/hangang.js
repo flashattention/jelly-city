@@ -342,21 +342,49 @@ export class Hangang {
     const H = await jr.json(), buf = await new Response(br.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer(), dl = new Int16Array(buf), { nx, nz } = H, h = new Float32Array(nx * nz);
     // 줄마다 앞 칸과의 차이로 저장 (첫 칸은 윗줄 첫 칸과의 차이)
     let prev = 0; for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; prev = (i ? prev : j ? h[k - nx] * 10 : 0) + dl[k]; h[k] = prev / 10; }
-    this.terr = { ...H, h };
+    this.terr = { ...H, h, h0: h.slice() };
   }
   // 그 자리 땅 높이(m, 한강 물 높이 = 0). 가게 · 역 · 몰 안에서는 0 (안쪽 장면은 멀리 따로 있다). 전망대는 제자리라 그대로
+  // raw = 'orig': 물을 파 내리기 전 원래 지형
   terrAt(x, z, raw = false) {
     const T = this.terr || this.host?.terr; if (!T) return 0;
     if (!raw && (this.inside || this.inShop || this.inMall)) return 0;
     // 격자 밖(서울 바깥 · 가게 안 장면이 있는 먼 곳)은 0
-    let fx = (x - T.x0) / T.step, fz = (z - T.z0) / T.step; if (fx < 0 || fz < 0 || fx > T.nx - 1 || fz > T.nz - 1) return 0; fx = Math.min(fx, T.nx - 1.001); fz = Math.min(fz, T.nz - 1.001); const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j, k = j * T.nx + i, h = T.h;
+    let fx = (x - T.x0) / T.step, fz = (z - T.z0) / T.step; if (fx < 0 || fz < 0 || fx > T.nx - 1 || fz > T.nz - 1) return 0; fx = Math.min(fx, T.nx - 1.001); fz = Math.min(fz, T.nz - 1.001); const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j, k = j * T.nx + i, h = raw === 'orig' ? T.h0 || T.h : T.h;
     return (h[k] * (1 - u) + h[k + 1] * u) * (1 - v) + (h[k + T.nx] * (1 - u) + h[k + T.nx + 1] * u) * v;
   }
   // 칸 안 격자점 중 물 위인 곳은 높이 0 (지형 자료는 상류 강물이 기준보다 높게 나온다)
   maskWater(key) {
     const T = this.terr; if (!T) return; const [ti, tj] = key.split('_').map(Number), S = this.world0.tile;
     const i0 = Math.max(0, Math.floor((ti * S - T.x0) / T.step)), i1 = Math.min(T.nx - 1, Math.ceil(((ti + 1) * S - T.x0) / T.step)), j0 = Math.max(0, Math.floor((tj * S - T.z0) / T.step)), j1 = Math.min(T.nz - 1, Math.ceil(((tj + 1) * S - T.z0) / T.step));
-    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (T.h[j * T.nx + i] > 0 && this.inWater(T.x0 + i * T.step, T.z0 + j * T.step)) T.h[j * T.nx + i] = 0;
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (T.h[j * T.nx + i] > 0 && this.inRiver(T.x0 + i * T.step, T.z0 + j * T.step)) T.h[j * T.nx + i] = 0;
+  }
+  // 호수 · 하천(석촌호수 · 청계천 · 중랑천 …): 물이 한강 높이(0)가 아니라 그 자리 물가 높이에 있다.
+  //   예전엔 0 으로 파 내려가서, 50m 격자 사이로 둘레 땅이 물을 덮어 호수가 잔디 · 맨땅으로 보였다.
+  //   물 안 격자점은 물 높이로, 물가 한 칸 안쪽 땅은 물보다 조금 높게 낮춘다 (호안 둑). 물 면은 이 땅 위에 얹는다
+  lowerLakes(lakes, islands) {
+    const T = this.terr; if (!T || !lakes.length) return; const st = T.step, near = st * 1.05; let mx0 = Infinity, mx1 = -Infinity, mz0 = Infinity, mz1 = -Infinity;
+    const segD = (x, z, r) => { let b = Infinity; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [ax, az] = r[j], [bx, bz] = r[i], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)), ex = ax + dx * t - x, ez = az + dz * t - z; b = Math.min(b, ex * ex + ez * ez); } return Math.sqrt(b); };
+    for (const L of lakes) {
+      const { poly, rim } = L; let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of poly[0]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+      // 그 자리 물 높이 = 150m 안 물가 높이의 아래쪽 20% (한 점의 움푹 팬 값에 끌리지 않게) - 0.6m.
+      //   둥근 호수는 물 면이 평평하게 둘레 전체로 한 높이, 길쭉한 하천은 흘러 내려가니 자리마다
+      let P = 0; for (let i = 0; i < poly[0].length; i++) { const a = poly[0][i], c = poly[0][(i + 1) % poly[0].length]; P += Math.hypot(c[0] - a[0], c[1] - a[1]); }
+      const round = (4 * Math.PI * L.area) / (P * P || 1) > 0.2, all = rim.map((r) => r[2]).sort((a, b) => a - b); let flat = Math.max(0, all[Math.floor(all.length * 0.2)] - 0.6);
+      // 칸 경계에 걸친 호수(석촌호수 동호 끝)는 먼저 불러온 옆 칸 조각과 같은 높이로 (경계에서 물 면이 층지지 않게)
+      if (round) { const recs = (this.lakeRecs ||= []), hit = recs.find((q) => q.b[0] < x1 + 3 && q.b[1] > x0 - 3 && q.b[2] < z1 + 3 && q.b[3] > z0 - 3); if (hit) flat = hit.lv; else recs.push({ b: [x0, x1, z0, z1], lv: flat }); }
+      const level = (x, z) => { if (round) return flat; const hs = []; for (const r of rim) if (Math.abs(r[0] - x) < 150 && Math.abs(r[1] - z) < 150) hs.push(r[2]); const src = hs.length >= 3 ? hs : rim.map((r) => r[2]); src.sort((a, b) => a - b); return Math.max(0, src[Math.floor(src.length * 0.2)] - 0.6); };
+      const i0 = Math.max(0, Math.floor((x0 - near - T.x0) / st)), i1 = Math.min(T.nx - 1, Math.ceil((x1 + near - T.x0) / st)), j0 = Math.max(0, Math.floor((z0 - near - T.z0) / st)), j1 = Math.min(T.nz - 1, Math.ceil((z1 + near - T.z0) / st));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const x = T.x0 + i * st, z = T.z0 + j * st, k = j * T.nx + i, wet = inPoly(x, z, poly) && !islands.some((w) => inPoly(x, z, w));
+        if (!wet && Math.min(...poly.map((r) => segD(x, z, r))) > near) continue;
+        const lv = level(x, z); T.h[k] = wet ? lv : Math.min(Math.max(T.h[k], lv + 0.4), lv + 1.2); mx0 = Math.min(mx0, x); mx1 = Math.max(mx1, x); mz0 = Math.min(mz0, z); mz1 = Math.max(mz1, z);
+      }
+    }
+    // 이미 지어 둔 옆 칸 땅이 바뀐 격자점을 쓰면 다시 얹는다 (경계에 틈이 생기지 않게)
+    const S = this.world0?.tile; if (!S || !this.chunks || mx0 > mx1) return;
+    for (const [key, c] of this.chunks) { const [ti, tj] = key.split('_').map(Number); if (ti * S > mx1 || (ti + 1) * S < mx0 || tj * S > mz1 || (tj + 1) * S < mz0) continue;
+      c.scene.traverse((o) => { if (o.material !== this.terrLandM) return; const p = o.geometry.attributes.position; for (let k = 0; k < p.count; k++) p.setY(k, this.terrAt(p.getX(k), p.getZ(k), true) - 0.05); p.needsUpdate = true; o.geometry.computeVertexNormals(); }); }
   }
   // 칸 하나를 지형 위에 얹는다: 넓은 것(땅 · 길 · 묶은 건물)은 꼭짓점마다, 작은 것(간판 · 출구)은 통째로, 나무 같은 인스턴스는 하나씩
   drape(c) { for (const _ of this.drapeGen(c)); }
@@ -367,9 +395,10 @@ export class Hangang {
     const vertices = (o) => {
       o.updateWorldMatrix(true, false); let g = o.geometry; if (done.has(g)) g = o.geometry = g.clone(); done.add(g);
       // 평평한 바닥 층은 큰 삼각형을 잘게 나눠야 언덕을 따라간다
-      if (flatLike(o) && (o.isMesh || o.isLineSegments) && !g.groups.length) g = o.geometry = subdivide(g.applyMatrix4(o.matrixWorld), o.isMesh ? 3 : 2, 24); else g.applyMatrix4(o.matrixWorld);
+      const wet = o.userData.drapeWater ? 0.1 : 0;
+      if ((flatLike(o) || wet) && (o.isMesh || o.isLineSegments) && !g.groups.length) g = o.geometry = subdivide(g.applyMatrix4(o.matrixWorld), o.isMesh ? 3 : 2, 24); else g.applyMatrix4(o.matrixWorld);
       o.position.set(0, 0, 0); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1); o.updateMatrix(); o.updateMatrixWorld(true);
-      const p = g.attributes.position, BY = g.userData.baseY?.length === p.count ? g.userData.baseY : null; for (let k = 0; k < p.count; k++) { const b = BY ? BY[k] : NaN; p.setY(k, p.getY(k) + (b === b ? b : H(p.getX(k), p.getZ(k)))); } p.needsUpdate = true; g.computeBoundingSphere(); g.computeBoundingBox();
+      const p = g.attributes.position, BY = g.userData.baseY?.length === p.count ? g.userData.baseY : null; for (let k = 0; k < p.count; k++) { const b = BY ? BY[k] : NaN; p.setY(k, p.getY(k) + wet + (b === b ? b : H(p.getX(k), p.getZ(k)))); } p.needsUpdate = true; g.computeBoundingSphere(); g.computeBoundingBox();
     };
     const lift = (o) => { const b = new THREE.Box3().setFromObject(o); if (b.isEmpty()) return; b.getCenter(v); o.position.y += H(v.x, v.z); o.updateMatrixWorld(true); };
     const inst = (o) => { o.updateWorldMatrix(true, false); m4i.copy(o.matrixWorld).invert(); const a = new THREE.Matrix4(); for (let k = 0; k < o.count; k++) { o.getMatrixAt(k, a); m4.multiplyMatrices(o.matrixWorld, a); v.setFromMatrixPosition(m4); const by = o.userData.baseY?.[k], dy = by === by && by !== undefined ? by : H(v.x, v.z); m4.elements[13] += dy; a.multiplyMatrices(m4i, m4); o.setMatrixAt(k, a); } o.instanceMatrix.needsUpdate = true; o.computeBoundingSphere?.(); };
@@ -377,7 +406,8 @@ export class Hangang {
       // based = 이미 그 건물 바닥 높이에 올려 둔 것 (묶기는 그대로)
       if (o.userData.noDrape || o.userData.based) return;
       if (o.isInstancedMesh) return inst(o);
-      if (o.material === this.waterM) return; // 물은 0 높이 그대로
+      // 한강 물은 0 높이 그대로, 호수 · 하천 물은 물가 땅(lowerLakes)에 얹는다
+      if (o.material === this.waterM) return o.userData.drapeWater ? vertices(o) : undefined;
       const b = new THREE.Box3().setFromObject(o), size = b.isEmpty() ? 0 : Math.max(b.max.x - b.min.x, b.max.z - b.min.z);
       if (size < 40 && !flatLike(o) && !o.geometry?.userData.baseY) return lift(o);
       if (o.isMesh || o.isLine || o.isPoints) return vertices(o);
@@ -601,6 +631,8 @@ export class Hangang {
     this.windU = { value: 0 };
     // 물: 서울 전체(칸) 모드에선 불러온 칸들의 물을 모두 (칸마다 넣고 뺀다), 아니면 이 지도의 물
     this.waterSets = []; this.inWater = (x, z) => { for (const W of this.waterSets) { if (x < W.b[0] || x > W.b[1] || z < W.b[2] || z > W.b[3]) continue; if (W.water.some((w) => inPoly(x, z, w)) && !W.islands.some((w) => inPoly(x, z, w))) return true; } return false; };
+    // 한강(높이 0) 물만: 지형을 0 으로 파는 곳 (호수 · 하천은 lowerLakes 가 따로)
+    this.inRiver = (x, z) => { for (const W of this.waterSets) { if (x < W.b[0] || x > W.b[1] || z < W.b[2] || z > W.b[3]) continue; if ((W.rivers || W.water).some((w) => inPoly(x, z, w)) && !W.islands.some((w) => inPoly(x, z, w))) return true; } return false; };
     // 빛
     this.hemi = new THREE.HemisphereLight('#cfe3ff', '#7a7a60', 1.1); sc.add(this.hemi);
     this.sun = new THREE.DirectionalLight('#ffffff', 1.6); sc.add(this.sun); sc.add(this.sun.target);
@@ -672,12 +704,28 @@ export class Hangang {
     this.water = polys(M.water); this.islands = polys(M.island);
     const bb = (list) => { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const poly of list) for (const ring of poly) for (const [x, z] of ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return [x0, x1, z0, z1]; };
     const WS = { water: this.water, islands: this.islands, b: bb(this.water), key: this.chunkKey }; (this.host || this).waterSets.push(WS);
+    // 서울 전체 칸: 물을 한강(넓거나 물가가 0 높이)과 호수 · 하천으로 나눈다. 호수 · 하천은 물가 높이에 물을 얹는다
+    const lakes = [], rivers = [];
+    { const HO = this.host, HT = this.isChunk && HO?.terr ? (x, z) => HO.terrAt(x, z, 'orig') : null, T0 = HO?.world0?.tile, [ti0, tj0] = (this.chunkKey || '0_0').split('_').map(Number);
+      // 칸 경계에서 잘린 변(물 한가운데)은 물가가 아니다
+      const cut = (x, z) => T0 && (Math.abs(x - ti0 * T0) < 0.6 || Math.abs(x - (ti0 + 1) * T0) < 0.6 || Math.abs(z - tj0 * T0) < 0.6 || Math.abs(z - (tj0 + 1) * T0) < 0.6);
+      for (const w of this.water) {
+        if (!HT) { rivers.push(w); continue; }
+        const o = w[0]; let A = 0; for (let i = 0, j = o.length - 1; i < o.length; j = i++) A += o[j][0] * o[i][1] - o[i][0] * o[j][1]; A = Math.abs(A / 2);
+        const rim = [], rimAll = []; for (const r of w) for (let i = 0; i < r.length; i++) { const [ax, az] = r[i], [bx, bz] = r[(i + 1) % r.length], isCut = cut(ax, az) && cut(bx, bz) && (Math.abs(ax - bx) < 0.6 || Math.abs(az - bz) < 0.6), n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 10)); for (let q = 0; q < n; q++) { const x = ax + ((bx - ax) * q) / n, z = az + ((bz - az) * q) / n, e = [x, z, HT(x, z)]; rimAll.push(e); if (!isCut) rim.push(e); } }
+        if (!rim.length) { rivers.push(w); continue; }
+        const hs = rimAll.map((r) => r[2]).sort((a, b) => a - b), p10 = hs[Math.floor(hs.length * 0.1)] ?? 0;
+        if (A >= 300000 || p10 < 0.8) rivers.push(w); else lakes.push({ poly: w, rim, area: A });
+      }
+      WS.rivers = rivers; if (lakes.length) HO.lowerLakes(lakes, this.islands); }
     const inWater = (x, z) => this.water.some((w) => inPoly(x, z, w)) && !this.islands.some((w) => inPoly(x, z, w));
     if (!this.host) this.inWater = (this.host || this).inWater;
     // 지도 사각형 (물가 계단 · 거품: 잘린 가장자리는 빼려고)
     const RX = M.kind === 'tile' ? [M.terrain.x0, M.terrain.x0 + (M.terrain.nx - 1) * M.terrain.step, M.terrain.z0, M.terrain.z0 + (M.terrain.nz - 1) * M.terrain.step] : [-3200, 3200, -3200, 3200];
     const inside = (x, z) => x > RX[0] + 5 && x < RX[1] - 5 && z > RX[2] + 5 && z < RX[3] - 5 && (M.kind === 'tile' || (Math.abs(Math.abs(x) - 7000) > 5 && Math.abs(Math.abs(z) - 7000) > 5));
-    const wMesh = new THREE.Mesh(fillGeo(this.water), (this.host || this).waterM); wMesh.renderOrder = -47; sc.add(wMesh); // 물은 공원 위에 (OSM 한강공원 영역이 물까지 덮고 있다)
+    // 물은 공원 위에 (OSM 한강공원 영역이 물까지 덮고 있다)
+    const wMesh = new THREE.Mesh(fillGeo(rivers), (this.host || this).waterM); wMesh.renderOrder = -47; sc.add(wMesh);
+    if (lakes.length) { const lm = new THREE.Mesh(fillGeo(lakes.map((L) => L.poly)), (this.host || this).waterM); lm.renderOrder = -47; lm.userData.drapeWater = true; sc.add(lm); }
     yield;
     // 섬 · 녹지 (계절마다 색이 바뀐다)
     this.islandM = flatMat('#7fa860', -46.9, { map: this.grassTex ||= groundTex('grass') }); patchy(this.islandM); const isl = new THREE.Mesh(fillGeo(this.islands, 0, 7), this.islandM); isl.renderOrder = -46.9; sc.add(isl);
