@@ -179,7 +179,7 @@ function facadeTex(type, lit, seed) {
 // 땅 무늬: 잔디(회색조라 계절 색이 곱해진다) · 도시 바닥 · 아스팔트(가장자리 흰 선) · 러닝 트랙(붉은 우레탄) · 호안 돌
 // 숲 지붕 그림 (산을 멀리서 보면 나무 꼭대기들이 빽빽이 겹친 모습): 계절마다 한 장, 이어 붙여도 이음매가 없게 가장자리를 감싼다
 //   uv 는 7m 마다 1 이라 repeat 0.16 이면 그림 한 장이 약 45m (나무 지붕 하나 5 ~ 9m)
-const CANOPY = {}, CANOPY_K = { spring: '#e8e8e8', summer: '#f4f4f4', autumn: '#cfcfcf', winter: '#dcdcdc' };
+const CANOPY = {};
 function canopyTex(season) {
   if (CANOPY[season]) return CANOPY[season];
   const P = { spring: ['#3a5230', ['#6a9450', '#7fa85a', '#5d8448', '#d8b4c0', '#93b870', '#4f7a40', '#73a052']], summer: ['#2c4428', ['#4a7a3e', '#5a8a48', '#3e6a3a', '#669a50', '#365e34', '#4f7f42', '#5f9248']], autumn: ['#2e281e', ['#9a4a2e', '#b07a3a', '#a8883e', '#7a3a28', '#3f5a36', '#8a5a32', '#6a6a38', '#c09848']], winter: ['#443f38', ['#5e5750', '#6a625a', '#766c62', '#33503a', '#385438', '#82786c', '#5a534c']] }[season] || ['#22361f', ['#355a33']];
@@ -189,6 +189,49 @@ function canopyTex(season) {
     for (const [ox, oy] of [[0, 0], [N, 0], [-N, 0], [0, N], [0, -N], [N, N], [-N, -N], [N, -N], [-N, N]]) { const cx = x + ox, cy = y + oy; if (cx < -rr || cx > N + rr || cy < -rr || cy > N + rr) continue;
       const gr = g.createRadialGradient(cx - rr * 0.3, cy - rr * 0.35, rr * 0.1, cx, cy, rr); gr.addColorStop(0, c); gr.addColorStop(0.62, c); gr.addColorStop(1, 'rgba(0,0,0,0.45)'); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, rr, 0, 7); g.fill(); } }
   const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.repeat.set(0.085, 0.085); CANOPY[season] = t; return t;
+}
+// 숲 바닥 (가까이서 본 서울숲 · 동네 산 나무 밑): 흙 · 낮은 풀 · 이끼 · 떨어진 잎. 동그라미 없이 얼룩 · 잎 조각으로, 계절마다 한 장
+//   uv 는 7m 마다 1, repeat 0.28 이면 그림 한 장이 약 25m
+const FFLOOR = {}, FFLOOR_REP = 0.28;
+function forestFloorTex(season) {
+  if (FFLOOR[season]) return FFLOOR[season];
+  const P = {
+    spring: { base: '#6d7f45', blot: ['#7d9450', '#5f7040', '#86744e', '#738a48'], soil: ['#7a6446', '#6a573e'], leaf: ['#8fae5a', '#a3bf68', '#6f5a3e', '#e6c6cf'], grass: 0.7 },
+    summer: { base: '#4f6436', blot: ['#5c7440', '#435a30', '#6b5c3e', '#587038'], soil: ['#65533a', '#574832'], leaf: ['#6a8a44', '#7d9a4c', '#6e5a3a'], grass: 0.6 },
+    autumn: { base: '#6a5532', blot: ['#7c5e34', '#5e4a2e', '#8a6a38', '#6c6034'], soil: ['#5e4a32', '#4f3f2c'], leaf: ['#b0602e', '#c98a38', '#d4a640', '#8a4428', '#a07a3a', '#6e7a3a'], grass: 0.15 },
+    winter: { base: '#6a5e4c', blot: ['#76695a', '#5c5244', '#7e7262', '#665c4a'], soil: ['#5a4e40', '#4c4236'], leaf: ['#8a7660', '#7a6a56', '#9a8670', '#5e5446'], grass: 0.05 },
+  }[season] || { base: '#4f6436', blot: ['#5c7440'], soil: ['#65533a'], leaf: ['#6a8a44'], grass: 0.5 };
+  const N = 256, cv = document.createElement('canvas'); cv.width = cv.height = N; const g = cv.getContext('2d'), r = rnd(season.length * 131 + 17);
+  const wrap = (x, y, rr, fn) => { for (const [ox, oy] of [[0, 0], [N, 0], [-N, 0], [0, N], [0, -N], [N, N], [-N, -N], [N, -N], [-N, N]]) { const cx = x + ox, cy = y + oy; if (cx < -rr || cx > N + rr || cy < -rr || cy > N + rr) continue; fn(cx, cy); } };
+  const hexA = (h, a) => { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+  g.fillStyle = P.base; g.fillRect(0, 0, N, N);
+  // 큰 얼룩: 가장자리가 흐려 사라지는 부드러운 반점 (그늘 · 풀 많은 곳 · 흙 드러난 곳)
+  for (let i = 0; i < 70; i++) { const x = r() * N, y = r() * N, rr = 18 + r() * 46, c = P.blot[Math.floor(r() * P.blot.length)], a = 0.25 + r() * 0.3;
+    wrap(x, y, rr, (cx, cy) => { const gr = g.createRadialGradient(cx, cy, 0, cx, cy, rr); gr.addColorStop(0, hexA(c, a)); gr.addColorStop(1, hexA(c, 0)); g.fillStyle = gr; g.fillRect(cx - rr, cy - rr, rr * 2, rr * 2); }); }
+  // 흙 · 이끼 작은 조각 (찌그러진 모양)
+  for (let i = 0; i < 900; i++) { const x = r() * N, y = r() * N, rr = 1.5 + r() * 4.5, c = r() < 0.6 ? P.soil[Math.floor(r() * P.soil.length)] : P.blot[Math.floor(r() * P.blot.length)], rot = r() * 3.14, sq = 0.35 + r() * 0.5;
+    wrap(x, y, rr, (cx, cy) => { g.fillStyle = hexA(c, 0.35 + r() * 0.35); g.beginPath(); g.ellipse(cx, cy, rr, rr * sq, rot, 0, 7); g.fill(); }); }
+  // 풀잎 (봄 · 여름에 많이)
+  g.lineWidth = 1; for (let i = 0; i < 2200 * P.grass; i++) { const x = r() * N, y = r() * N, v = r(); g.strokeStyle = v < 0.5 ? 'rgba(150,180,100,.45)' : 'rgba(70,95,50,.5)'; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (r() - 0.5) * 3, y - 2 - r() * 4); g.stroke(); }
+  // 떨어진 잎: 작은 타원 (가을엔 빽빽이)
+  const nLeaf = season === 'autumn' ? 4200 : season === 'winter' ? 2600 : 900;
+  for (let i = 0; i < nLeaf; i++) { const x = r() * N, y = r() * N, rr = 1.2 + r() * 1.8, c = P.leaf[Math.floor(r() * P.leaf.length)], rot = r() * 3.14;
+    wrap(x, y, rr, (cx, cy) => { g.fillStyle = hexA(c, 0.55 + r() * 0.4); g.beginPath(); g.ellipse(cx, cy, rr, rr * 0.45, rot, 0, 7); g.fill(); }); }
+  // 잔 그늘 점 (잎 사이 틈)
+  for (let i = 0; i < 1800; i++) { g.fillStyle = `rgba(20,25,10,${0.08 + r() * 0.12})`; g.fillRect(r() * N, r() * N, 1 + r() * 2, 1 + r() * 2); }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.repeat.set(FFLOOR_REP, FFLOOR_REP); FFLOOR[season] = t; return t;
+}
+// 숲 바닥 재질: 가까이는 숲 바닥, 멀리(나무를 그리지 않는 거리)는 나무 꼭대기들이 겹친 숲 지붕 그림으로 서서히 바뀐다 + 얼룩(patchy)
+function woodFloor(mat, season) {
+  const U = { uCan: { value: canopyTex(season) }, uCanK: { value: 0.085 / FFLOOR_REP } }; mat.userData.uCan = U.uCan;
+  mat.customProgramCacheKey = () => 'patchy-wood';
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, U);
+    sh.vertexShader = 'varying vec3 vWP;\n' + sh.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\n vWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'varying vec3 vWP;\nuniform sampler2D uCan;\nuniform float uCanK;\nfloat hh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\nfloat nz(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hh(i), hh(i + vec2(1, 0)), f.x), mix(hh(i + vec2(0, 1)), hh(i + vec2(1, 1)), f.x), f.y); }\n' +
+      sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n float pn = nz(vWP.xz * 0.045) * 0.6 + nz(vWP.xz * 0.16) * 0.4; diffuseColor.rgb *= 0.84 + pn * 0.3;\n float fd = smoothstep(380.0, 760.0, length(vViewPosition)); vec3 cn = texture2D(uCan, vMapUv * uCanK).rgb * 0.92; diffuseColor.rgb = mix(diffuseColor.rgb, cn, fd);');
+  };
+  return mat;
 }
 // 눈 쌓임: 위를 보는 면(지붕 · 옥상 설비)이 눈이 쌓인 만큼(snowK) 하얘진다. 모든 칸이 같은 값을 쓴다
 const SNOW_U = { value: 0 };
@@ -348,7 +391,7 @@ export class Hangang {
     if (this.inside || this.inShop || this.inMall || this.ride) return;
     const T = this.world0.tile, ti = Math.floor(px / T), tj = Math.floor(pz / T); this.tileNow = [ti, tj];
     // 먼 나무 칸은 그리지 않는다 (1.1km 넘게, 날 때는 높이만큼 더 멀리까지). 0.4초마다
-    if ((this.treeLodN = (this.treeLodN || 0) + 1) % 12 === 1) { const R = 1100 + Math.min(900, (this.y || 0) * 3); for (const c of this.chunks.values()) c.scene.traverse((o) => { const L = o.userData.lod; if (L) o.count = Math.hypot(L[0] - px, L[1] - pz) < R + 360 ? L[2] : 0; const V = o.userData.lodV; if (V) o.visible = Math.hypot(V[0] - px, V[1] - pz) < V[2] + Math.min(600, (this.y || 0) * 2); }); }
+    if ((this.treeLodN = (this.treeLodN || 0) + 1) % 12 === 1) { const R = 1100 + Math.min(900, (this.y || 0) * 3); for (const c of this.chunks.values()) c.scene.traverse((o) => { const L = o.userData.lod; if (L) o.count = Math.hypot(L[0] - px, L[1] - pz) < (L[3] ? L[3] + Math.min(900, (this.y || 0) * 3) : R + 360) ? L[2] : 0; const V = o.userData.lodV; if (V) o.visible = Math.hypot(V[0] - px, V[1] - pz) < V[2] + Math.min(600, (this.y || 0) * 2); }); }
     // 칸을 쉬어 가며 만드는 중에는 내리지 않는다 (같이 쓰는 목록을 내리기가 새로 만들어 버리면 만드는 칸이 옛 목록에 쓴다)
     if (this.chunkLoading) return;
     for (const key of [...this.chunks.keys()]) { const [i, j] = key.split('_').map(Number); if (Math.max(Math.abs(i - ti), Math.abs(j - tj)) > 2) this.unloadChunk(key); }
@@ -758,7 +801,7 @@ export class Hangang {
     this.greenPolys = [...greens.grass, ...greens.wood, ...greens.wild];
     this.greenM = {};
     for (const [k, col, o] of [['grass', '#8db86a', -53], ['wild', '#94a96a', -52.5], ['wood', '#5f8a4a', -52], ['pitch', '#6aa860', -51.5], ['sand', '#d9c79a', -51]]) {
-      if (!greens[k].length) continue; const m = flatMat(k === 'wood' ? CANOPY_K[this.state?.season || 'summer'] : col, o, k === 'sand' ? {} : { map: k === 'wood' ? canopyTex(this.state?.season || 'summer') : (this.grassTex ||= groundTex('grass')) }); if (k !== 'sand') patchy(m); this.greenM[k] = m; const me = new THREE.Mesh(fillGeo(greens[k], 0, 7), m); me.renderOrder = o; me.receiveShadow = true; sc.add(me);
+      if (!greens[k].length) continue; const ss = this.state?.season || 'summer', m = flatMat(k === 'wood' ? '#ffffff' : col, o, k === 'sand' ? {} : { map: k === 'wood' ? forestFloorTex(ss) : (this.grassTex ||= groundTex('grass')) }); if (k === 'wood') woodFloor(m, ss); else if (k !== 'sand') patchy(m); this.greenM[k] = m; const me = new THREE.Mesh(fillGeo(greens[k], 0, 7), m); me.renderOrder = o; me.receiveShadow = true; sc.add(me);
     }
     yield;
     // 길 · 철길
@@ -1399,7 +1442,16 @@ export class Hangang {
       for (const rd of M.roads) { if (rd[1] || rd[0] < 10) continue; const pts = unpack(rd.slice(2), S), off = rd[0] / 2 + 1.6;
         for (let k = 1; k < pts.length && spots.length - n0 < lim; k++) { const [ax, az] = pts[k - 1], [bx, bz] = pts[k], L = Math.hypot(bx - ax, bz - az); if (L < 1) continue; const ux = (bx - ax) / L, uz = (bz - az) / L;
           for (let t = 6; t < L - 4; t += 11 / near) for (const sd of [-1, 1]) { const x = ax + ux * t - uz * off * sd, z = az + uz * t + ux * off * sd; if (okAt(x, z) && !onRoad(x, z) && !this.water.some((w) => inPoly(x, z, w))) spots.push([x, z, 0.62 + r() * 0.2]); } } }
+      // 숲(wood) 채우기: 나무 지붕이 맞닿게 촘촘히 (약 6.5m 간격 · 흔들린 격자라 줄 맞춰 보이지 않게). 산책로 · 찻길 · 물 · 건물 자리는 비운다
+      //   칸 하나에 많아야 8000 그루(넓은 산은 그만큼 성기게), 가벼운 나무(잎 판 적게 · 줄기 단순)로 가까운 500m 칸만 그린다
+      const PG = new Map(); for (const pa of M.paths || []) { if (pa[0]) continue; const pts = unpack(pa.slice(2), S), hw = (pa[1] || 2) / 2 + 1.1; for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k]; for (let gx = Math.floor((Math.min(a[0], b[0]) - hw) / RG); gx <= Math.floor((Math.max(a[0], b[0]) + hw) / RG); gx++) for (let gz = Math.floor((Math.min(a[1], b[1]) - hw) / RG); gz <= Math.floor((Math.max(a[1], b[1]) + hw) / RG); gz++) { const kk = `${gx},${gz}`; if (!PG.has(kk)) PG.set(kk, []); PG.get(kk).push([a, b, hw]); } } }
+      const onPath = (x, z) => { for (const [a, b, hw] of PG.get(`${Math.floor(x / RG)},${Math.floor(z / RG)}`) || []) { const dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1, t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / L2, 0, 1); if (Math.hypot(a[0] + dx * t - x, a[1] + dz * t - z) < hw) return true; } return false; };
+      const woods = M.green.filter((g) => g[0] === 'wood').map((g) => g.slice(1).map((rg2) => unpack(rg2, S))); let wA = 0; for (const p of woods) wA += Math.abs(ringArea(p[0]));
+      const FB = Math.round((isPhone ? 2500 : 8000) * near), sp = Math.max(6.4, Math.sqrt(wA / Math.max(1, FB))), fill = (this.forestFill = []);
+      for (const poly of woods) { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of poly[0] || []) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+        for (let gx = x0; gx < x1 && fill.length < FB; gx += sp) for (let gz = z0; gz < z1; gz += sp) { const x = gx + r() * sp, z = gz + r() * sp; if (!inPoly(x, z, poly) || !okAt(x, z) || onRoad(x, z) || onPath(x, z)) continue; fill.push([x, z, 0.8 + r() * 0.55]); } }
     }
+    for (const [x, z, k] of this.forestFill || []) this.addCircle(x, z, 0.3 * k, 7);
     this.trees = spots; for (const [x, z, k] of spots) this.addCircle(x, z, 0.34 * k, 7);
     const N = spots.length, o = new THREE.Object3D();
     // 나무 모양 셋: 둥근 활엽수(벚나무 · 느티나무), 키 큰 나무(은행 · 포플러), 소나무. 잎 덩어리 여러 개 + 아래가 어두운 그늘
@@ -1451,6 +1503,35 @@ export class Hangang {
       for (const m of [crowns, trunks, tw]) if (m) { m.castShadow = true; m.receiveShadow = false; this.scene.add(m); if (this.isChunk) { const [gx, gz] = gk.split(',').map(Number); m.userData.lod = [(gx + 0.5) * 500, (gz + 0.5) * 500, n]; m.userData.noMerge = true; } }
       this.crownSets.push({ crowns, idx, pine: !!sh.pine }); if (tw) this.twigSets.push(tw); }
     });
+    // 숲 채우기 나무: 둥근 활엽수 · 키 큰 활엽수 · 소나무 (가벼운 모양, 500m 칸마다 · 800m 안에서만 그린다)
+    if (this.forestFill?.length) {
+      const F = this.forestFill, trunk = (h, r0) => { const g = new THREE.CylinderGeometry(r0 * 0.5, r0, h, 6, 1, true); g.translate(0, h / 2, 0); const p = g.attributes.position, cl = []; for (let k = 0; k < p.count; k++) { const v = 0.6 + (p.getY(k) / h) * 0.4; cl.push(v, v * 0.92, v * 0.86); } g.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3)); return g; };
+      const pineC = (() => { const gs = [[4.3, 2.0, 2.7], [5.7, 1.5, 2.3], [7.0, 0.9, 1.9]].map(([y, rr2, hh]) => { const g = new THREE.ConeGeometry(rr2, hh, 7, 1); g.translate(0, y, 0); return g; }); const m = mergeGeos(gs), p = m.attributes.position, cl = []; for (let k = 0; k < p.count; k++) { const v = 0.6 + ((p.getY(k) - 3) / 5) * 0.45; cl.push(v, v, v); } m.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3)); return m; })();
+      const FS = [
+        { crown: cardCrown([[0, 6.0, 0, 2.1], [1.4, 5.4, 0.5, 1.5], [-1.3, 5.5, -0.6, 1.5], [0.3, 7.1, 0.1, 1.3]], isPhone ? 36 : 64, 2.0), th: 5.6, tr: 0.19 },
+        { crown: cardCrown([[0, 6.6, 0, 1.6], [0.5, 7.8, 0.3, 1.2], [-0.4, 5.6, -0.3, 1.3]], isPhone ? 28 : 48, 1.7), th: 6.4, tr: 0.16 },
+        { crown: pineC, th: 5.0, tr: 0.15, pine: true },
+      ];
+      // 줄기는 세 모양을 한 그물로 (칸마다 그리기 한 번): 높이 1 · 굵기 1 짜리를 나무마다 늘린다. 회갈색 (느티나무 · 참나무 껍질), 소나무는 붉은 기
+      const unitTrunk = trunk(1, 1), fBark = new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true }), tcol = new THREE.Color();
+      const leafM = new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true, map: this.leafTex ||= foliageTex(false), alphaTest: 0.42, side: THREE.DoubleSide }); windify(leafM, this.windU, 0.05, true); this.cardMats = [...(this.cardMats || []), leafM];
+      const pineM = new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true });
+      const fk = F.map(() => { const x = r(); return x < 0.5 ? 0 : x < 0.75 ? 1 : 2; });
+      const cells = new Map(); F.forEach(([x, z], i) => { const k = `${Math.floor(x / 500)},${Math.floor(z / 500)}`; if (!cells.has(k)) cells.set(k, []); cells.get(k).push(i); });
+      for (const [gk, all] of cells) {
+        const [gx, gz] = gk.split(',').map(Number), lod = (m, n) => { m.receiveShadow = false; this.scene.add(m); m.userData.lod = [(gx + 0.5) * 500, (gz + 0.5) * 500, n, 800]; m.userData.noMerge = true; };
+        const trunks = new THREE.InstancedMesh(unitTrunk, fBark, all.length); let tq = 0;
+        FS.forEach((sh, t) => {
+          const idx = all.filter((i) => fk[i] === t), n = idx.length; if (!n) return;
+          const crowns = new THREE.InstancedMesh(sh.crown, sh.pine ? pineM : leafM, n), tw = sh.pine ? null : new THREE.InstancedMesh(twigG, twigM, n);
+          idx.forEach((si, q) => { const [x, z, k] = F[si], sx = k * (0.85 + r() * 0.3), sy = k * (0.85 + r() * 0.35), sz = k * (0.85 + r() * 0.3), ry = r() * 6.28; o.position.set(x, 0, z); o.rotation.set(0, ry, 0); o.scale.set(sx, sy, sz); o.updateMatrix(); crowns.setMatrixAt(q, o.matrix); tw?.setMatrixAt(q, o.matrix);
+            o.scale.set(sh.tr * sx, sh.th * sy, sh.tr * sz); o.updateMatrix(); trunks.setMatrixAt(tq, o.matrix); trunks.setColorAt(tq++, tcol.set(sh.pine ? '#8a5a44' : r() < 0.5 ? '#7a6e62' : '#6a5e52').offsetHSL(0, 0, (r() - 0.5) * 0.08)); });
+          crowns.castShadow = true; lod(crowns, n); if (tw) { lod(tw, n); this.twigSets.push(tw); }
+          this.crownSets.push({ crowns, idx, pine: !!sh.pine, forest: true });
+        });
+        trunks.count = tq; lod(trunks, tq);
+      }
+    }
     this.treeSeed = r;
     // 풀포기 · 꽃 (길 가까이)
     // 풀잎 다발: 엇갈린 판 세 장 + 풀잎 그림(투명) · 바람에 살랑
@@ -1849,15 +1930,18 @@ export class Hangang {
     const s = this.state.season, r = rnd(4242), c = new THREE.Color(), N = this.trees.length;
     const pal = { spring: ['#ffc9de', '#ffd6e6', '#ffb9d3', '#ffe3ee', '#ffc0d8'], summer: ['#3f8a3a', '#4f9a40', '#2f7a34', '#5aa548', '#3a7f40'], autumn: ['#e8742a', '#f2b233', '#c8402a', '#d9902a', '#9aa83a', '#f0c84a'], winter: ['#ffffff'] }[s];
     void N;
+    const fpal = { spring: ['#8cbf62', '#9cc96e', '#7aae55', '#a6d07a', '#86b85e', '#b4d88a'], summer: ['#3d7a34', '#4a8a3c', '#356e30', '#56913f', '#2f6a30'], autumn: ['#c8642a', '#d9962e', '#a8402a', '#b8a040', '#6a8a3a', '#8a5a2a', '#e0b040', '#9a6a30'], winter: ['#ffffff'] }[s];
     for (const set of this.crownSets) {
       if (!set) continue; const { crowns, idx, pine } = set;
-      idx.forEach((si, q) => { if (pine) c.set(['#2f5d3a', '#355f3c', '#2a5233'][si % 3]).offsetHSL(0, 0, s === 'winter' ? 0.04 : 0); else { c.set(pal[Math.floor(r() * pal.length)]); if (s === 'spring' && si % 6 === 5) c.set('#b9de8c'); } c.offsetHSL(0, 0, (r() - 0.5) * 0.06); crowns.setColorAt(q, c); });
+      // 숲 나무: 봄엔 연두 새잎(벚꽃은 드물게), 여름 짙은 초록, 가을엔 단풍 · 갈잎 · 아직 푸른 잎이 섞인다
+      const P2 = set.forest ? fpal : pal;
+      idx.forEach((si, q) => { if (pine) c.set(['#2f5d3a', '#355f3c', '#2a5233'][si % 3]).offsetHSL(0, 0, s === 'winter' ? 0.04 : 0); else { c.set(P2[Math.floor(r() * P2.length)]); if (s === 'spring' && si % 6 === 5) c.set(set.forest ? '#ffd0e0' : '#b9de8c'); } c.offsetHSL(0, 0, (r() - 0.5) * 0.06); crowns.setColorAt(q, c); });
       crowns.instanceColor.needsUpdate = true; crowns.visible = pine || s !== 'winter';
     }
     for (const tw of this.twigSets) tw.visible = s === 'winter';
     this.blossomTex ||= foliageTex(true); for (const m of this.cardMats || []) { m.map = s === 'spring' ? this.blossomTex : this.leafTex; m.needsUpdate = true; }
     const grass = { spring: '#9cbf7c', summer: '#86ab68', autumn: '#97a65e', winter: '#b3b89a' }[s];
-    this.greenM.grass?.color.set(grass); for (const m of this.wideM || []) m.color.set(grass); this.stripM?.color.set(grass); this.greenM.wild?.color.set(grass).offsetHSL(0, -0.05, -0.03); if (this.greenM.wood) { this.greenM.wood.color.set(CANOPY_K[s] || '#e0e0e0'); this.greenM.wood.map = canopyTex(s); this.greenM.wood.needsUpdate = true; } this.islandM.color.set(grass).offsetHSL(0, 0, -0.06);
+    this.greenM.grass?.color.set(grass); for (const m of this.wideM || []) m.color.set(grass); this.stripM?.color.set(grass); this.greenM.wild?.color.set(grass).offsetHSL(0, -0.05, -0.03); if (this.greenM.wood) { const wm = this.greenM.wood; wm.map = forestFloorTex(s); if (wm.userData.uCan) wm.userData.uCan.value = canopyTex(s); wm.needsUpdate = true; } this.islandM.color.set(grass).offsetHSL(0, 0, -0.06);
     const tc = new THREE.Color(); for (let i = 0; i < this.tufts.count; i++) { tc.setHSL(s === 'autumn' ? 0.12 + r() * 0.05 : s === 'winter' ? 0.14 : s === 'summer' ? 0.26 + r() * 0.05 : 0.23 + r() * 0.06, s === 'winter' ? 0.18 : 0.55, s === 'winter' ? 0.62 : 0.4 + r() * 0.14); this.tufts.setColorAt(i, tc); } if (this.tufts.instanceColor) this.tufts.instanceColor.needsUpdate = true;
     this.flowers.visible = s === 'spring' || s === 'summer';
   }
