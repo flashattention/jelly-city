@@ -13,7 +13,7 @@ const err = (t) => { $('err').textContent = t || ''; };
 const MAX_CHARS = 4;
 $('sens-open').onclick = () => openSens();
 $('pn-open').onclick = () => openPatchNotes(null);
-$('cos-open').onclick = () => openWardrobe('ach');
+$('cos-open').onclick = () => openWardrobe('look', null, { onLook: () => renderChars() });
 const q = new URLSearchParams(location.search);
 // 다른 게임에서 '새 캐릭터 만들기'로 왔으면 만든 뒤 그 게임으로 돌아간다
 const back = /^\/[a-z-]+\/$/.test(q.get('back') || '') ? q.get('back') : null;
@@ -115,7 +115,7 @@ function renderChars() {
   if (!chars.length) el.insertAdjacentHTML('afterbegin', '<p class="empty">아직 캐릭터가 없어요. 나만의 곰돌이를 만들어 보세요! 🐻</p>');
   for (const c of chars) { const img = el.querySelector(`[data-thumb="${c.token}"]`); if (img) img.src = thumbOf(c); }
   el.querySelectorAll('[data-main]').forEach((b) => { b.onclick = () => { store.set(DEFAULT_CHAR_KEY, b.dataset.main); renderChars(); }; });
-  el.querySelectorAll('[data-style]').forEach((b) => { b.onclick = () => openStudio(chars.find((c) => c.token === b.dataset.style)); });
+  el.querySelectorAll('[data-style]').forEach((b) => { b.onclick = () => openWardrobe('look', null, { char: b.dataset.style, onLook: () => renderChars() }); });
   el.querySelectorAll('[data-name]').forEach((b) => {
     b.onclick = async () => {
       const c = chars.find((x) => x.token === b.dataset.name), max = c.local ? 12 : 8;

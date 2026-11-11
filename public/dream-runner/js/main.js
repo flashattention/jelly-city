@@ -755,7 +755,8 @@ game.camLow = store.get(CAM_KEY) === 'low'; game.camK = game.camLow ? 1 : 0;
 function toggleCam() { game.camLow = !game.camLow; store.set(CAM_KEY, game.camLow ? 'low' : 'high'); $('b-cam').textContent = game.camLow ? '🎬' : '🎥'; toast(game.camLow ? '🎬 낮은 시점 (V)' : '🎥 높은 시점 (V)', 1200); }
 $('b-cam').onclick = toggleCam; $('b-cam').textContent = game.camLow ? '🎬' : '🎥';
 $('pn-btn').onclick = () => openPatchNotes();
-$('cos-btn').onclick = () => openWardrobe('shop', () => { renderAccount(); }, { game: 'dream-runner' }); // 업적 칸엔 드림 러너 업적만
+// 꾸미기 창: 모습 · 옷장 · 별 상점 · 업적 (업적 칸엔 드림 러너 업적만, 모습은 지금 고른 캐릭터)
+$('cos-btn').onclick = () => openWardrobe('shop', () => { renderAccount(); }, { game: 'dream-runner', char: store.get('jelly.char') || store.get(CHAR_KEY), onLook: () => renderAccount() });
 function frame() {
   requestAnimationFrame(frame);
   // 프레임 시간을 0.1ms 단위로 (기록과 똑같이 다시 돌릴 수 있게 · 몸으로 느낄 수 없는 차이)

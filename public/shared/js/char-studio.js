@@ -56,7 +56,8 @@ export class Creator {
     this.draft.look = { ...DEFAULT_LOOK, ...(this.draft.look || {}) };
     this.draft.starter ||= { head: null, face: null, body: null, acc: null };
     this.tab = this.edit ? 'body' : 'basic';
-    this.startPreview();
+    // 미리보기 칸이 없으면(꾸미기 창처럼 바깥에서 곰을 보여 줄 때) 그리지 않고 onDraft 로 알린다
+    if (this.els.preview) this.startPreview();
     this.renderTabs();
   }
   close() { this.pvOn = false; }
@@ -67,7 +68,7 @@ export class Creator {
     for (const [k, C] of Object.entries(COSTUME)) d.look[k] = Math.random() < 0.45 ? 1 + Math.floor(Math.random() * (C.items.length - 1)) : 0; // 옷 · 모자도 가끔
     for (const [k, p] of Object.entries(LOOK_COLORS)) d.look[k] = pick(p.options);
     if (!this.edit) for (const [slot, list] of Object.entries(BASIC_ACC)) d.starter[slot] = Math.random() < 0.7 ? pick(list)[0] : null;
-    this.renderTabs(); this.updatePreview();
+    this.renderTabs(); this.updatePreview(); this.els.onDraft?.(this.draft);
   }
   // 서버에 보낼 값
   profile() { const d = this.draft; return { name: (d.name || '').trim(), gender: d.gender, age: d.age, personality: d.personality, color: d.color, look: d.look }; }
@@ -105,7 +106,7 @@ export class Creator {
         + '<p class="hint">기본 악세서리는 젤리시티 가방에 들어 있어서 언제든 바꿔 낄 수 있어요. 더 멋진 건 시내 모자·안경·옷 가게에서!</p>';
     }
     body.innerHTML = html;
-    const re = () => { this.renderTabs(); this.updatePreview(); };
+    const re = () => { this.renderTabs(); this.updatePreview(); this.els.onDraft?.(d); };
     body.querySelectorAll('[data-look]').forEach((b) => { b.onclick = () => { d.look[b.dataset.look] = +b.dataset.v; re(); }; });
     body.querySelectorAll('[data-lookc]').forEach((b) => { b.onclick = () => { d.look[b.dataset.lookc] = b.dataset.v; re(); }; });
     body.querySelectorAll('[data-skin]').forEach((b) => { b.onclick = () => { d.color = b.dataset.skin; re(); }; });
@@ -113,8 +114,9 @@ export class Creator {
     body.querySelectorAll('[data-acc]').forEach((b) => { b.onclick = () => { d.starter[b.dataset.acc] = b.dataset.v || null; re(); }; });
     const nm = body.querySelector('#c-name'), ag = body.querySelector('#c-age'), ps = body.querySelector('#c-pers');
     if (nm) nm.oninput = (e) => { d.name = e.target.value; };
-    if (ag) ag.oninput = (e) => { d.age = +e.target.value; body.querySelector('#c-age-v').textContent = d.age; this.updatePreview(); };
+    if (ag) ag.oninput = (e) => { d.age = +e.target.value; body.querySelector('#c-age-v').textContent = d.age; this.updatePreview(); this.els.onDraft?.(d); };
     if (ps) ps.onchange = (e) => { d.personality = e.target.value; };
+    this.els.onTab?.(this.tab);
     this.zoom = this.tab === 'face' || this.tab === 'antenna' ? 1 : 0; // 얼굴 탭에서는 얼굴이 잘 보이도록 가까이
     // 보여 줄 쪽으로 한 번 돌려 준다: 얼굴 탭은 앞, 부스터 탭은 등 (자동 회전을 꺼도)
     const face = this.zoom ? 0 : this.tab === 'booster' ? Math.PI + 0.55 : null;
