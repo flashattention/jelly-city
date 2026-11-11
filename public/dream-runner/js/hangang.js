@@ -12,6 +12,7 @@ import { buildShopFronts, buildShopInterior, foodMesh, SHOP_MENU, SHOP_KIND } fr
 import { buildMall } from './hangang-mall.js';
 import { winLights, winProfile, winEra, winSeed, tickWindows, WIN_GRID } from './hangang-windows.js';
 import { buildSummit, tickSummit, deckBears } from './hangang-summit.js';
+import { buildStreetFurniture, buildLandmarkStatues } from './hangang-street.js';
 
 export const SEASONS = { spring: '🌸 봄', summer: '🌿 여름', autumn: '🍁 가을', winter: '❄️ 겨울' };
 export const WEATHERS = { clear: '☀️ 맑음', cloudy: '☁️ 구름', rain: '🌧️ 비', snow: '🌨️ 눈' };
@@ -869,6 +870,8 @@ export class Hangang {
     if (M.kind !== 'summit') this.buildAlleys(P2, r);
     if (RH === 'hongdae') this.buildMurals(r);
     if (RH === 'banpo' || this.isChunk) this.buildBanpo(P2);
+    // 광화문광장 이순신 · 세종대왕 동상, 청계광장 조형물
+    if (this.isChunk) buildLandmarkStatues(this);
     // 뚝섬 음악분수 (실제 자리, 강가 광장)
     if (this.isChunk) { const [fx, fz] = this.ll(37.5294, 127.0697), [ti, tj] = this.chunkKey.split('_').map(Number), T0 = this.host.world0.tile; if (Math.floor(fx / T0) === ti && Math.floor(fz / T0) === tj) { let p = [fx, fz]; for (let k = 0; k < 12 && this.inWater(p[0], p[1]); k++) p = [fx, fz - 10 * (k + 1)]; this.buildMusicFountain(p); } }
     if (this.id === 'ttukseom') { const m = (M.marks || []).find(([n]) => /자벌레/.test(n)); if (m) { let p = this.world(m[1] + 60, 40); for (const lat of [40, -40, 70, -70, 25, -25]) { p = this.world(m[1] + 60, lat); if (!this.inWater(p[0], p[1])) break; } this.buildMusicFountain(p); } }
@@ -899,12 +902,12 @@ export class Hangang {
     this.buildLanes(roads, cuts, zebra, off, layer);
     // 신호등: 기둥 + 팔 + 가로 신호등(빨 · 노 · 초), 기둥 아래 보행 신호. 두 방향이 번갈아 (30초)
     if (lights.length) {
-      const N = lights.length, o = new THREE.Object3D(), poleG = new THREE.CylinderGeometry(0.09, 0.11, 5.6, 8); poleG.translate(0, 2.8, 0); const armG = new THREE.BoxGeometry(0.08, 0.08, 3.4); armG.translate(0, 5.4, 1.7); const headG = new THREE.BoxGeometry(1.2, 0.36, 0.3); headG.translate(0, 5.25, 3.1); const pedG = new THREE.BoxGeometry(0.34, 0.6, 0.22); pedG.translate(0, 2.6, 0.2);
+      const N = lights.length, o = new THREE.Object3D(), poleG = new THREE.CylinderGeometry(0.09, 0.11, 5.6, 8); poleG.translate(0, 2.8, 0); const armG = new THREE.BoxGeometry(0.08, 0.08, 3.4); armG.translate(0, 5.4, 1.7); const headG = new THREE.BoxGeometry(1.55, 0.38, 0.3); headG.translate(0, 5.25, 3.1); const pedG = new THREE.BoxGeometry(0.34, 0.6, 0.22); pedG.translate(0, 2.6, 0.2);
       const mk = (g, m) => { const im = new THREE.InstancedMesh(g, m, N); lights.forEach((L, i) => { o.position.set(L.x, 0, L.z); o.rotation.y = L.face; o.updateMatrix(); im.setMatrixAt(i, o.matrix); }); sc.add(im); return im; };
       const steel = new THREE.MeshLambertMaterial({ color: '#8c949c' }), dark = new THREE.MeshLambertMaterial({ color: '#25282c' }); mk(poleG, steel); mk(armG, steel); mk(headG, dark); mk(pedG, dark);
-      // 불빛: 빨 · 노 · 초 세 개, 방향(ph) 둘로 나눠 따로 켠다
-      this.sigM = {}; const lampG = new THREE.CircleGeometry(0.12, 12);
-      for (const [key, col, dx] of [['r', '#ff3b30', -0.38], ['y', '#ffcc00', 0], ['g', '#30d158', 0.38]]) for (const ph of [0, 1]) { const list = lights.filter((L) => L.ph === ph); if (!list.length) continue; const m = new THREE.MeshBasicMaterial({ color: '#2a2a2a' }); const g = lampG.clone(); g.translate(dx, 5.25, 3.26); const im = new THREE.InstancedMesh(g, m, list.length); list.forEach((L, i) => { o.position.set(L.x, 0, L.z); o.rotation.y = L.face; o.updateMatrix(); im.setMatrixAt(i, o.matrix); }); sc.add(im); this.sigM[key + ph] = { m, col: new THREE.Color(col) }; }
+      // 불빛: 서울 가로형 4색 (빨 · 노 · 좌회전 화살표 · 초), 방향(ph) 둘로 나눠 따로 켠다. 화살표는 왼쪽을 가리키는 세모
+      this.sigM = {}; const lampG = new THREE.CircleGeometry(0.12, 12), arrowG = new THREE.CircleGeometry(0.12, 3); arrowG.rotateZ(Math.PI);
+      for (const [key, col, dx] of [['r', '#ff3b30', -0.54], ['y', '#ffcc00', -0.18], ['a', '#30d158', 0.18], ['g', '#30d158', 0.54]]) for (const ph of [0, 1]) { const list = lights.filter((L) => L.ph === ph); if (!list.length) continue; const m = new THREE.MeshBasicMaterial({ color: '#2a2a2a' }); const g = (key === 'a' ? arrowG : lampG).clone(); g.translate(dx, 5.25, 3.26); const im = new THREE.InstancedMesh(g, m, list.length); list.forEach((L, i) => { o.position.set(L.x, 0, L.z); o.rotation.y = L.face; o.updateMatrix(); im.setMatrixAt(i, o.matrix); }); sc.add(im); this.sigM[key + ph] = { m, col: new THREE.Color(col) }; }
       for (const L of lights) this.addCircle(L.x, L.z, 0.16, 5.6);
     }
     // 도로명판: 교차로 한 모퉁이 기둥에 파란 판 두 장 (두 길 이름, 한국 도로명판처럼 흰 글씨 · 화살표)
@@ -917,6 +920,8 @@ export class Hangang {
       const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); g.setIndex(I); g.computeVertexNormals(); this.scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: t, emissive: '#ffffff', emissiveMap: t, emissiveIntensity: 0.12 }))); // 앞 · 뒤 판을 따로 (양면 재질이면 뒤에서 거울 글씨가 겹쳐 보인다)
       const pg = new THREE.CylinderGeometry(0.06, 0.07, 3.5, 8); pg.translate(0, 1.75, 0); const im = new THREE.InstancedMesh(pg, new THREE.MeshLambertMaterial({ color: '#8c949c' }), poles.length), o = new THREE.Object3D(); poles.forEach(([x, z], i) => { o.position.set(x, 0, z); o.updateMatrix(); im.setMatrixAt(i, o.matrix); }); this.scene.add(im); } }
     this.streetX = xs;
+    // 가로등 · 버스정류장 · 공원 벤치 (서울 전체 칸)
+    if (this.isChunk) this.furniture = buildStreetFurniture(this, roads, xs, this.laneSide);
   }
   // 차선 · 중앙선 · 정지선 · 버스전용차로 (실제 서울 도로 표시처럼)
   //   - 같은 이름 길이 반대 방향으로 나란히 있으면(OSM 의 상 · 하행 분리 도로) 한 방향 도로: 가운데 노란 겹줄 대신 안쪽 가장자리에 노란 실선
@@ -930,7 +935,7 @@ export class Hangang {
       for (const f of [0.25, 0.5, 0.75]) { const m = Math.min(r.pts.length - 2, Math.floor((r.pts.length - 1) * f)), a = r.pts[m], b = r.pts[m + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2; let best = null;
         for (const qi of mates) { if (qi === ri) continue; const q = roads[qi]; for (let k = 1; k < q.pts.length; k++) { const c = q.pts[k - 1], e = q.pts[k], dx = e[0] - c[0], dz = e[1] - c[1], L2 = dx * dx + dz * dz || 1, t = clamp(((mx - c[0]) * dx + (mz - c[1]) * dz) / L2, 0, 1), px = c[0] + dx * t, pz = c[1] + dz * t, d = Math.hypot(px - mx, pz - mz), lim = (r.w + q.w) / 2; if (d < lim * 0.55 || d > lim + 14) continue; if ((ux * dx + uz * dz) / Math.sqrt(L2) > -0.85) continue; if (!best || d < best.d) best = { d, s: Math.sign((px - mx) * -uz + (pz - mz) * ux) }; } }
         if (best) votes += best.s; }
-      return Math.abs(votes) >= 2 ? Math.sign(votes) : 0; });
+      return Math.abs(votes) >= 2 ? Math.sign(votes) : 0; }); this.laneSide = side;
     // 선 하나를 교차로 밖 조각들로 (2m 마다 잘라 본다)
     const pieces = (pts, ri) => { const C = cuts[ri] || [], out = []; let cur = []; const bad = (x, z) => C.some(([cx, cz, rr]) => Math.abs(cx - x) < rr && Math.abs(cz - z) < rr && Math.hypot(cx - x, cz - z) < rr);
       for (let i = 0; i < pts.length; i++) { const p = pts[i]; if (i) { const q = pts[i - 1], L = Math.hypot(p[0] - q[0], p[1] - q[1]), n = Math.max(1, Math.ceil(L / 2)); for (let k = 1; k <= n; k++) { const x = q[0] + ((p[0] - q[0]) * k) / n, z = q[1] + ((p[1] - q[1]) * k) / n; if (bad(x, z)) { if (cur.length > 1) out.push(cur); cur = []; } else cur.push([x, z]); } } else if (!bad(p[0], p[1])) cur.push(p); }
@@ -1197,7 +1202,7 @@ export class Hangang {
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); g.setIndex(I); g.computeVertexNormals();
       const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; const m = new THREE.MeshLambertMaterial({ map: t, emissive: '#ffffff', emissiveMap: t, emissiveIntensity: 0.15, side: THREE.DoubleSide }); (this.shopSignMs ||= []).push(m); this.scene.add(new THREE.Mesh(g, m)); }
   }
-  tickSignals(t) { if (!this.sigM) return; const cyc = t % 60, A = cyc < 27 ? 'g' : cyc < 30 ? 'y' : 'r', B = cyc >= 30 && cyc < 57 ? 'g' : cyc >= 57 ? 'y' : 'r'; for (const [k, v] of Object.entries(this.sigM)) { const on = (k[1] === '0' ? A : B) === k[0]; v.m.color.copy(on ? v.col : new THREE.Color('#2a2a2a')); } }
+  tickSignals(t) { if (!this.sigM) return; const cyc = t % 60, A = cyc < 27 ? 'g' : cyc < 30 ? 'y' : 'r', B = cyc >= 30 && cyc < 57 ? 'g' : cyc >= 57 ? 'y' : 'r'; for (const [k, v] of Object.entries(this.sigM)) { const P = k[1] === '0' ? A : B, cy = k[1] === '0' ? cyc : (cyc + 30) % 60, on = k[0] === 'a' ? P === 'g' && cy >= 18 : P === k[0]; v.m.color.copy(on ? v.col : new THREE.Color('#2a2a2a')); } }
   // 다리: 물 위는 14m 높이로 띄우고, 교각 · 난간 · 밤 조명. 서강대교는 밤섬 위에 붉은 아치
   buildBridges(P2, inWater) {
     const deck = { P: [], I: [] }, side = { P: [], I: [] }, piers = [], lamps = [];
@@ -2171,6 +2176,8 @@ export class Hangang {
     if (this.alleyLampM) { this.alleyLampM.emissiveIntensity = lit * 1.5; this.alleyGlowM.opacity = lit * 0.3; }
     if (this.assemblyM) this.assemblyM.emissiveIntensity = lit * 0.25; if (this.crossM) this.crossM.emissiveIntensity = lit * 1.6; for (const m of this.lmCross || []) m.emissiveIntensity = 0.1 + lit * 1.4; for (const m of this.lmLights || []) m.opacity = 0.15 + lit * 0.85; for (const m of this.lmScreens || []) m.emissiveIntensity = 0.35 + lit * 0.6; for (const m of this.lmCrowns || []) m.emissiveIntensity = lit * 0.35; for (const m of this.exitSignMs || []) m.emissiveIntensity = 0.2 + lit * 0.7; if (this.summit) tickSummit(this, dt, lit); for (const m of this.neonMs || []) m.emissiveIntensity = 0.2 + lit * 1.2; if (this.jbugM) this.jbugM.emissiveIntensity = 0.15 + lit * 0.7; if (this.id === 'banpo' || this.fountain || this.sebit) this.tickBanpo(dt, lit); if (this.mfount) this.tickMusicFountain(dt, lit); for (const b of this.picnic || []) b.update(dt, 0, { noCrawl: true }); for (const m of this.shopSignMs || []) m.emissiveIntensity = 0.25 + lit * 0.85; for (const m of this.shopWinM || []) m.emissiveIntensity = 0.1 + lit * 0.42; if (this.exitLightM) { this.exitLightM.emissiveIntensity = 0.3 + lit * 1.5; this.exitGlowM.opacity = lit * 0.1; } for (const m2 of this.domeMs || []) m2.emissiveIntensity = lit * 0.6; if (this.farM) this.farM.emissiveIntensity = lit * 0.6;
     if (this.bridgeLights) this.bridgeLights.material.opacity = lit;
+    // 가로등 · 정류장 화면 · 조형물 조명 (hangang-street.js)
+    for (const f of this.litFns || []) f(lit, hr);
   }
   tickEnv(dt, camera, px, pz) {
     const st = this.state, h = st.hour, sk = skyAt(h), wt = st.weather;
