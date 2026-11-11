@@ -254,6 +254,12 @@ export class LiveTransit {
     // 서울 전체 칸의 다리는 땅 높이(원래 지형) 위에 얹혀 있다
     return best ? best.y + (hg.terr ? hg.terrAt(x, z, true) : 0) + 0.4 : ground + 6.5;
   }
+  // 철교 가운데선으로 옮긴 자리 (복선이라 선로가 다리 가운데서 2m 쯤 비켜 있어, 탄 채로는 트러스가 칸을 뚫는다)
+  bridgeCenter(x, z, dx, dz) {
+    const hg = this.hg; let best = null; const look = (rp) => { for (const tp of rp || []) for (const f of tp.fine) { const d = Math.abs(f[0] - x) + Math.abs(f[1] - z); if (d < 25 && (!best || d < best.d)) best = { d, f }; } };
+    look(hg.railPaths); if (hg.chunks) for (const c of hg.chunks.values()) look(c.railPaths); if (!best) return null;
+    const t = (x - best.f[0]) * dx + (z - best.f[1]) * dz; return [best.f[0] + dx * t, best.f[1] + dz * t];
+  }
   tick(dt, px, pz) {
     this.busT -= dt; if (this.busT <= 0) { this.busT = 20; this.pollBus(); }
     const all = performance.now() - (this.allAt || 0) < 1500; this.subT -= dt; if (this.subT <= 0) { this.subT = all ? 25 : 20; this.pollSub(all); }

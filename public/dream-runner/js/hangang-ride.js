@@ -229,7 +229,7 @@ export class LiveRide {
   follow(dt) {
     const hg = this.hg, R = this.on, L = hg.live; let x, z, yaw, y, under = false;
     if (R.kind === 'bus') { const o = R.o; x = o.x; z = o.z; yaw = o.yaw; y = hg.terr ? hg.terrAt(x, z) : 0; if (o.mesh) o.mesh.visible = false; }
-    else { const o = R.o, n = (L.sub.lines[o.line].cars || [8, 20])[0], p = L.carPose(o, Math.min(1, n - 1)); x = p.x - L.cx; z = p.z - L.cz; yaw = Math.atan2(p.dx, p.dz); under = p.k === 1; y = under ? (hg.terr ? hg.terrAt(x, z) : 0) - 30 : L.trackY(x, z, p.k) - 0.3; R.under = under; R.pose = p; }
+    else { const o = R.o, n = (L.sub.lines[o.line].cars || [8, 20])[0], p = L.carPose(o, Math.min(1, n - 1)); x = p.x - L.cx; z = p.z - L.cz; yaw = Math.atan2(p.dx, p.dz); under = p.k === 1; if (p.k === 2) { const c = L.bridgeCenter(x, z, p.dx, p.dz); if (c) { x = c[0]; z = c[1]; } } y = under ? (hg.terr ? hg.terrAt(x, z) : 0) - 30 : L.trackY(x, z, p.k) - 0.3; R.under = under; R.pose = p; }
     const g = R.I.g; g.position.set(x, y, z); g.rotation.y = yaw; R.x = x; R.z = z; R.y = y; R.yaw = yaw;
     hg.px = x; hg.pz = z; hg.y = 0;
     if (R.kind === 'train') {
@@ -303,7 +303,7 @@ export class LiveRide {
     // 버스: 정류장 14m 앞이면 10초 선다 (GPS 는 100초마다라 정차를 놓치기 쉬워서, 타고 있을 땐 정류소 목록으로)
     if (R.kind === 'bus' && R.next && R.nextD < 14 && R.heldAt !== R.next.seq) { R.heldAt = R.next.seq; R.o.hold = R.bell ? 12 : 8; }
     if (R.kind === 'bus') { const open = (R.o.cur ?? 0) < 0.3 && (R.o.stop || R.o.hold > 0); for (const p of R.I.doorP) p.position.z += ((open ? p.userData.openZ : p.userData.closedZ) - p.position.z) * Math.min(1, dt * 4); if (open && !R.wasOpen) { beep(SND.door); if (R.bell) { R.bell = false; this.led(); } } R.wasOpen = open; }
-    const night = hg.light?.night || 0, under = R.under; for (const m of R.I.mats) m.emissiveIntensity = m.userData.glow + (under ? 0.45 : night * 0.38);
+    const night = hg.light?.night || 0, under = R.under; for (const m of R.I.mats) m.emissiveIntensity = m.userData.glow + (under ? 0.4 : night * 0.26);
     // 땅 밑에선 바깥 세상을 숨긴다 (터널 벽 너머라 안 보이는데 그리기만 무겁다)
     this.hideAbove(R.kind === 'train' && R.under);
     if (this.t > 1) { this.t = 0; if (R.seat) { if (R.kind === 'bus') this.busNext(); else this.trainSay(); } this.card(); }
