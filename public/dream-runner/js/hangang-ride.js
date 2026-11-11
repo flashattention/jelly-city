@@ -181,7 +181,7 @@ export class LiveRide {
     const hg = this.hg; hg.exitInterior?.(); beep(SND.card);
     let I; if (c.kind === 'bus') { const k = `bus:${c.o.type}`; I = this.cache.get(k) || buildBus(c.o.type); this.cache.set(k, I); }
     else { const k = `car:${c.o.line}`; I = this.cache.get(k) || buildCar(c.o.line, hg.live.sub.lines[c.o.line]); this.cache.set(k, I); }
-    I.g.userData.noDrape = true; hg.scene.add(I.g); I.g.visible = true;
+    I.g.userData.noDrape = true; hg.scene.add(I.g); I.g.visible = true; hg.live.rideId = c.kind === 'train' ? c.o.id : null;
     const r = rnd(((Date.now() / 1000) | 0) * 7 + 1), taken = new Set(), n = Math.min(I.seats.length - 2, 3 + Math.floor(r() * 3));
     while (taken.size < n) taken.add(Math.floor(r() * I.seats.length));
     this.on = { kind: c.kind, o: c.o, I, taken, seat: null, yaw0: hg.camYaw, pitch0: hg.camPitch ?? 0.3, t: 0, lastSay: '', stName: c.st };
@@ -260,6 +260,11 @@ export class LiveRide {
     { const { c, t } = I.map; c.fillStyle = '#ffffff'; c.fillRect(0, 0, 2048, 64); c.fillStyle = Ln.color; c.fillRect(30, 26, 1988, 10); c.textAlign = 'center'; part.forEach((k, i) => { const x = 60 + i * (1928 / Math.max(1, part.length - 1)), here = k === o.e.b; c.fillStyle = here ? '#ff3b30' : '#ffffff'; c.strokeStyle = Ln.color; c.lineWidth = 5; c.beginPath(); c.arc(x, 31, here ? 13 : 9, 0, 7); c.fill(); c.stroke(); c.fillStyle = here ? '#d0021b' : '#222'; c.font = `${here ? 'bold ' : ''}20px sans-serif`; c.fillText(Ln.st[k]?.[0] || k, x, 60); }); t.needsUpdate = true; }
     { const { c, t } = I.scr; c.fillStyle = '#101418'; c.fillRect(0, 0, 512, 96); c.fillStyle = '#7cd3ff'; c.font = 'bold 22px sans-serif'; c.textAlign = 'center'; c.fillText(`${o.line} ${o.to || ''}행`, 256, 30); c.fillStyle = '#ffffff'; c.font = 'bold 36px sans-serif'; c.fillText(`이번 역  ${Ln.st[o.e.b]?.[0] || o.e.b}`, 256, 76); t.needsUpdate = true; }
   }
+  hideAbove(on) {
+    const hg = this.hg, keep = new Set([this.on?.I.g, this.tun?.g, this.plat?.g, hg.bear?.root, hg.shadow]);
+    if (on) { this.hid ||= []; for (const o of hg.scene.children) if (!keep.has(o) && o.visible && !o.isLight) { o.visible = false; this.hid.push(o); } }
+    else if (this.hid) { for (const o of this.hid) o.visible = true; this.hid = null; }
+  }
   canAlight() { const R = this.on; if (!R) return false; if (R.kind === 'bus') return (R.o.hold > 0 || R.o.stop) && (R.o.cur ?? 0) < 0.3 && (R.next ? R.nextD < 60 : true); return !!R.o.dwellAt && R.o.e.len - R.o.d < 40; }
   // ---------- 내리기 ----------
   alight(silent = false) {
@@ -267,6 +272,7 @@ export class LiveRide {
     let tx = R.x, tz = R.z, face = R.yaw, enter = null;
     if (R.kind === 'bus') { const rx = -Math.cos(R.yaw), rz = Math.sin(R.yaw); tx += rx * 3.6; tz += rz * 3.6; if (R.o.mesh) R.o.mesh.visible = true; }
     else { const L = hg.live, Ln = L.sub.lines[R.o.line], name = Ln.st[R.o.e.b]?.[0] || ''; const e = (hg.entrances || []).filter((q) => norm(q.st.name) === norm(name)).sort((a, b) => Math.hypot(a.x - R.x, a.z - R.z) - Math.hypot(b.x - R.x, b.z - R.z))[0]; if (e && Math.hypot(e.x - R.x, e.z - R.z) < 700) enter = e; else { const s = Ln.st[R.o.e.b]; if (s) { tx = s[1] - L.cx; tz = s[2] - L.cz; } } }
+    this.hideAbove(false); hg.live.rideId = null;
     for (const b of R.bears || []) { R.I.g.remove(b.root); }
     R.I.g.visible = false; hg.scene.remove(R.I.g); if (this.tun) { this.tun.g.visible = false; this.plat.g.visible = false; }
     this.on = null; this.el.led.classList.add('hidden'); this.el.seat.classList.add('hidden'); try { speechSynthesis?.cancel(); } catch { /* 없음 */ }
@@ -290,6 +296,8 @@ export class LiveRide {
     if (R.kind === 'bus' && R.next && R.nextD < 14 && R.heldAt !== R.next.seq) { R.heldAt = R.next.seq; R.o.hold = R.bell ? 12 : 8; }
     if (R.kind === 'bus') { const open = (R.o.cur ?? 0) < 0.3 && (R.o.stop || R.o.hold > 0); for (const p of R.I.doorP) p.position.z += ((open ? p.userData.openZ : p.userData.closedZ) - p.position.z) * Math.min(1, dt * 4); if (open && !R.wasOpen) { beep(SND.door); if (R.bell) { R.bell = false; this.led(); } } R.wasOpen = open; }
     const night = hg.light?.night || 0, under = R.under; for (const m of R.I.mats) m.emissiveIntensity = m.userData.glow + (under ? 0.5 : night * 0.55);
+    // 땅 밑에선 바깥 세상을 숨긴다 (터널 벽 너머라 안 보이는데 그리기만 무겁다)
+    this.hideAbove(R.kind === 'train' && R.under);
     if (this.t > 1) { this.t = 0; if (R.seat) { if (R.kind === 'bus') this.busNext(); else this.trainSay(); } this.card(); }
   }
   card() {

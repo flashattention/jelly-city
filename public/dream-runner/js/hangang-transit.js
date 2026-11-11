@@ -231,7 +231,8 @@ export class LiveTransit {
     const hg = this.hg, cnt = new Map(), mat = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), pos = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
     for (const im of this.lineMesh.values()) { im.body.count = 0; im.win.count = 0; }
     for (const o of this.trains.values()) {
-      if (!o.show) continue; const L = this.sub.lines[o.line], [n, clen] = L.cars || [8, 20]; let im = this.lineMesh.get(o.line);
+      // 타고 있는 열차는 바깥 껍데기를 그리지 않는다 (안에서 보면 껍데기가 창을 가린다)
+      if (!o.show || o.id === this.rideId) continue; const L = this.sub.lines[o.line], [n, clen] = L.cars || [8, 20]; let im = this.lineMesh.get(o.line);
       if (!im) { const [bg, wg] = carGeos(L.color, clen); const body = new THREE.InstancedMesh(bg, this.bodyM, 120), win = new THREE.InstancedMesh(wg, this.winM, 120); body.frustumCulled = win.frustumCulled = false; body.userData.noDrape = win.userData.noDrape = true; body.count = win.count = 0; hg.scene.add(body, win); im = { body, win }; this.lineMesh.set(o.line, im); }
       const prevE = o.prevAt ? this.edge(o.line, o.prevAt, o.e.a) : null;
       for (let c = 0; c < n; c++) {
