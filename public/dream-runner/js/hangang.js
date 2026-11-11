@@ -888,17 +888,15 @@ export class Hangang {
     const paveT = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d'); c.fillStyle = '#c4bdb2'; c.fillRect(0, 0, 64, 64); for (let y = 0; y < 64; y += 16) for (let x = (y / 16) % 2 ? 0 : 8; x < 64; x += 16) { c.fillStyle = `rgba(0,0,0,${0.04 + Math.random() * 0.05})`; c.fillRect(x, y, 15, 15); } const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; })();
     layer((P, I, U) => { for (const r of roads) ribbonInto(P, I, r.pts, r.w + 7, 0, U); }, '#ffffff', -50.6, { map: paveT });
     layer((P, I) => { for (const r of roads) ribbonInto(P, I, r.pts, r.w + 0.7, 0); }, '#d9d4cb', -50.3);
-    // 차선: 넓은 길은 가운데 노란 겹줄 + 흰 점선 (차로 3.3m 마다), 좁은 길은 가운데 흰 점선
-    const dash = (P, I, pts, d, w, on, gap) => { const q = off(pts, d); let carry = 0; for (let i = 1; i < q.length; i++) { const [ax, az] = q[i - 1], [bx, bz] = q[i], L = Math.hypot(bx - ax, bz - az); if (L < 0.01) continue; const ux = (bx - ax) / L, uz = (bz - az) / L, nx = -uz * w / 2, nz = ux * w / 2; for (let t = carry; t < L; t += on + gap) { const t1 = Math.min(L, t + on), k = P.length / 3, x0 = ax + ux * t, z0 = az + uz * t, x1 = ax + ux * t1, z1 = az + uz * t1; P.push(x0 + nx, 0, z0 + nz, x0 - nx, 0, z0 - nz, x1 + nx, 0, z1 + nz, x1 - nx, 0, z1 - nz); I.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); carry = t + on + gap - L; } } };
-    layer((P, I) => { for (const r of roads) if (r.w >= 14) for (const d of [-0.18, 0.18]) ribbonInto(P, I, off(r.pts, d), 0.15, 0); }, '#f2c230', -49.8);
-    layer((P, I) => { for (const r of roads) { if (r.w >= 14) { const n = Math.floor(r.w / 2 / 3.3); for (let k = 1; k < n; k++) for (const sd of [-1, 1]) dash(P, I, r.pts, sd * k * 3.3, 0.15, 3, 5); } else if (r.w >= 8) dash(P, I, r.pts, 0, 0.15, 3, 5); } }, '#f4f4f0', -49.8);
     // 교차로 찾기: 서로 다른 길의 선분이 만나는 곳
     const segs = [], G = 40, grid = new Map(); roads.forEach((r, ri) => { for (let i = 1; i < r.pts.length; i++) { const sg = { ri, a: r.pts[i - 1], b: r.pts[i] }, si = segs.push(sg) - 1; const x0 = Math.floor(Math.min(sg.a[0], sg.b[0]) / G), x1 = Math.floor(Math.max(sg.a[0], sg.b[0]) / G), z0 = Math.floor(Math.min(sg.a[1], sg.b[1]) / G), z1 = Math.floor(Math.max(sg.a[1], sg.b[1]) / G); for (let gx = x0; gx <= x1; gx++) for (let gz = z0; gz <= z1; gz++) { const k = `${gx},${gz}`; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(si); } } });
-    const xs = []; for (const list of grid.values()) for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) { const A = segs[list[i]], B = segs[list[j]]; if (A.ri === B.ri) continue; const d1x = A.b[0] - A.a[0], d1z = A.b[1] - A.a[1], d2x = B.b[0] - B.a[0], d2z = B.b[1] - B.a[1], den = d1x * d2z - d1z * d2x; if (Math.abs(den) < 1e-6) continue; const t = ((B.a[0] - A.a[0]) * d2z - (B.a[1] - A.a[1]) * d2x) / den, u = ((B.a[0] - A.a[0]) * d1z - (B.a[1] - A.a[1]) * d1x) / den; if (t < 0 || t > 1 || u < 0 || u > 1) continue; const L1 = Math.hypot(d1x, d1z), L2 = Math.hypot(d2x, d2z), cos = Math.abs((d1x * d2x + d1z * d2z) / (L1 * L2)); if (cos > 0.85) continue; const x = A.a[0] + d1x * t, z = A.a[1] + d1z * t; if (xs.some((q) => Math.hypot(q.x - x, q.z - z) < 18)) continue; xs.push({ x, z, A: { ux: d1x / L1, uz: d1z / L1, w: roads[A.ri].w, name: roads[A.ri].name }, B: { ux: d2x / L2, uz: d2z / L2, w: roads[B.ri].w, name: roads[B.ri].name } }); }
+    // cuts[길] = 그 길이 다른 길과 만나는 점들 (차선은 교차로 안에서 끊는다)
+    const xs = [], cuts = []; for (const list of grid.values()) for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) { const A = segs[list[i]], B = segs[list[j]]; if (A.ri === B.ri) continue; const d1x = A.b[0] - A.a[0], d1z = A.b[1] - A.a[1], d2x = B.b[0] - B.a[0], d2z = B.b[1] - B.a[1], den = d1x * d2z - d1z * d2x; if (Math.abs(den) < 1e-6) continue; const t = ((B.a[0] - A.a[0]) * d2z - (B.a[1] - A.a[1]) * d2x) / den, u = ((B.a[0] - A.a[0]) * d1z - (B.a[1] - A.a[1]) * d1x) / den; if (t < 0 || t > 1 || u < 0 || u > 1) continue; const L1 = Math.hypot(d1x, d1z), L2 = Math.hypot(d2x, d2z), cos = Math.abs((d1x * d2x + d1z * d2z) / (L1 * L2)); if (cos > 0.85) continue; const x = A.a[0] + d1x * t, z = A.a[1] + d1z * t; (cuts[A.ri] ||= []).push([x, z, roads[B.ri].w / 2 + 8]); (cuts[B.ri] ||= []).push([x, z, roads[A.ri].w / 2 + 8]); if (xs.some((q) => Math.hypot(q.x - x, q.z - z) < 18)) continue; xs.push({ x, z, A: { ux: d1x / L1, uz: d1z / L1, w: roads[A.ri].w, name: roads[A.ri].name, ri: A.ri }, B: { ux: d2x / L2, uz: d2z / L2, w: roads[B.ri].w, name: roads[B.ri].name, ri: B.ri } }); }
     // 횡단보도: 교차로마다 두 길 양쪽 (흰 막대가 길 방향으로 나란히), 그 옆 모퉁이에 신호등
     const zebra = [], lights = [];
-    for (const X of xs) for (const [R, O, ph] of [[X.A, X.B, 0], [X.B, X.A, 1]]) for (const sd of [-1, 1]) { if (R.w < 8) continue; const dist = O.w / 2 + 3.2, cx = X.x + R.ux * dist * sd, cz = X.z + R.uz * dist * sd; if (zebra.some((Z) => Math.abs(Z.x - cx) < 7 && Math.abs(Z.z - cz) < 7 && Math.abs(Z.ux * R.ux + Z.uz * R.uz) > 0.8)) continue; zebra.push({ x: cx, z: cz, ux: R.ux, uz: R.uz, w: R.w }); if (O.w >= 8) lights.push({ x: cx - R.uz * (R.w / 2 + 1.2) * sd + R.ux * 2.2 * sd, z: cz + R.ux * (R.w / 2 + 1.2) * sd + R.uz * 2.2 * sd, face: Math.atan2(-R.ux * sd, -R.uz * sd), ph }); }
+    for (const X of xs) for (const [R, O, ph] of [[X.A, X.B, 0], [X.B, X.A, 1]]) for (const sd of [-1, 1]) { if (R.w < 8) continue; const dist = O.w / 2 + 3.2, cx = X.x + R.ux * dist * sd, cz = X.z + R.uz * dist * sd; if (zebra.some((Z) => Math.abs(Z.x - cx) < 7 && Math.abs(Z.z - cz) < 7 && Math.abs(Z.ux * R.ux + Z.uz * R.uz) > 0.8)) continue; zebra.push({ x: cx, z: cz, ux: R.ux, uz: R.uz, w: R.w, ri: R.ri, sd }); if (O.w >= 8) lights.push({ x: cx - R.uz * (R.w / 2 + 1.2) * sd + R.ux * 2.2 * sd, z: cz + R.ux * (R.w / 2 + 1.2) * sd + R.uz * 2.2 * sd, face: Math.atan2(-R.ux * sd, -R.uz * sd), ph }); }
     layer((P, I) => { for (const Z of zebra) { const nx = -Z.uz, nz = Z.ux; for (let o = -Z.w / 2 + 0.5; o < Z.w / 2 - 0.3; o += 0.9) { const k = P.length / 3, cx = Z.x + nx * o, cz = Z.z + nz * o, hx = Z.ux * 2, hz = Z.uz * 2, wx = nx * 0.25, wz = nz * 0.25; P.push(cx - hx - wx, 0, cz - hz - wz, cx - hx + wx, 0, cz - hz + wz, cx + hx - wx, 0, cz + hz - wz, cx + hx + wx, 0, cz + hz + wz); I.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); } } }, '#f6f6f2', -49.7);
+    this.buildLanes(roads, cuts, zebra, off, layer);
     // 신호등: 기둥 + 팔 + 가로 신호등(빨 · 노 · 초), 기둥 아래 보행 신호. 두 방향이 번갈아 (30초)
     if (lights.length) {
       const N = lights.length, o = new THREE.Object3D(), poleG = new THREE.CylinderGeometry(0.09, 0.11, 5.6, 8); poleG.translate(0, 2.8, 0); const armG = new THREE.BoxGeometry(0.08, 0.08, 3.4); armG.translate(0, 5.4, 1.7); const headG = new THREE.BoxGeometry(1.2, 0.36, 0.3); headG.translate(0, 5.25, 3.1); const pedG = new THREE.BoxGeometry(0.34, 0.6, 0.22); pedG.translate(0, 2.6, 0.2);
@@ -919,6 +917,51 @@ export class Hangang {
       const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); g.setIndex(I); g.computeVertexNormals(); this.scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: t, emissive: '#ffffff', emissiveMap: t, emissiveIntensity: 0.12 }))); // 앞 · 뒤 판을 따로 (양면 재질이면 뒤에서 거울 글씨가 겹쳐 보인다)
       const pg = new THREE.CylinderGeometry(0.06, 0.07, 3.5, 8); pg.translate(0, 1.75, 0); const im = new THREE.InstancedMesh(pg, new THREE.MeshLambertMaterial({ color: '#8c949c' }), poles.length), o = new THREE.Object3D(); poles.forEach(([x, z], i) => { o.position.set(x, 0, z); o.updateMatrix(); im.setMatrixAt(i, o.matrix); }); this.scene.add(im); } }
     this.streetX = xs;
+  }
+  // 차선 · 중앙선 · 정지선 · 버스전용차로 (실제 서울 도로 표시처럼)
+  //   - 같은 이름 길이 반대 방향으로 나란히 있으면(OSM 의 상 · 하행 분리 도로) 한 방향 도로: 가운데 노란 겹줄 대신 안쪽 가장자리에 노란 실선
+  //   - 선은 교차로 안에서 끊고, 횡단보도 앞(들어오는 쪽 차로)에 흰 정지선 · 차로마다 직진 화살표
+  //   - 중앙버스전용차로 길(강남대로 · 송파대로 · 종로 …)은 가운데 차로를 파란 겹선으로, 가로변 버스차로(테헤란로)는 바깥 차로를 파란 점선으로
+  buildLanes(roads, cuts, zebra, off, layer) {
+    const BUS_MID = /^(강남대로|송파대로|천호대로|도봉로|미아로|동소문로|왕산로|망우로|통일로|의주로|수색로|성산로|마포대로|한강대로|경인로|시흥대로|공항대로|종로|동작대로)$/, BUS_SIDE = /^(테헤란로|남부순환로)$/;
+    // 한 방향 도로 찾기: 길 가운데 세 점에서 같은 이름 · 반대 방향 · 알맞은 거리의 짝이 보이면, 그 짝이 있는 쪽(+1 오른쪽 / -1 왼쪽)
+    const byName = new Map(); roads.forEach((r, i) => { if (r.name && r.w >= 8) { if (!byName.has(r.name)) byName.set(r.name, []); byName.get(r.name).push(i); } });
+    const side = roads.map((r, ri) => { const mates = byName.get(r.name); if (!mates || mates.length < 2 || r.pts.length < 2) return 0; let votes = 0;
+      for (const f of [0.25, 0.5, 0.75]) { const m = Math.min(r.pts.length - 2, Math.floor((r.pts.length - 1) * f)), a = r.pts[m], b = r.pts[m + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2; let best = null;
+        for (const qi of mates) { if (qi === ri) continue; const q = roads[qi]; for (let k = 1; k < q.pts.length; k++) { const c = q.pts[k - 1], e = q.pts[k], dx = e[0] - c[0], dz = e[1] - c[1], L2 = dx * dx + dz * dz || 1, t = clamp(((mx - c[0]) * dx + (mz - c[1]) * dz) / L2, 0, 1), px = c[0] + dx * t, pz = c[1] + dz * t, d = Math.hypot(px - mx, pz - mz), lim = (r.w + q.w) / 2; if (d < lim * 0.55 || d > lim + 14) continue; if ((ux * dx + uz * dz) / Math.sqrt(L2) > -0.85) continue; if (!best || d < best.d) best = { d, s: Math.sign((px - mx) * -uz + (pz - mz) * ux) }; } }
+        if (best) votes += best.s; }
+      return Math.abs(votes) >= 2 ? Math.sign(votes) : 0; });
+    // 선 하나를 교차로 밖 조각들로 (2m 마다 잘라 본다)
+    const pieces = (pts, ri) => { const C = cuts[ri] || [], out = []; let cur = []; const bad = (x, z) => C.some(([cx, cz, rr]) => Math.abs(cx - x) < rr && Math.abs(cz - z) < rr && Math.hypot(cx - x, cz - z) < rr);
+      for (let i = 0; i < pts.length; i++) { const p = pts[i]; if (i) { const q = pts[i - 1], L = Math.hypot(p[0] - q[0], p[1] - q[1]), n = Math.max(1, Math.ceil(L / 2)); for (let k = 1; k <= n; k++) { const x = q[0] + ((p[0] - q[0]) * k) / n, z = q[1] + ((p[1] - q[1]) * k) / n; if (bad(x, z)) { if (cur.length > 1) out.push(cur); cur = []; } else cur.push([x, z]); } } else if (!bad(p[0], p[1])) cur.push(p); }
+      if (cur.length > 1) out.push(cur); return out; };
+    const solid = (P, I, pts, ri, d, w) => { for (const pc of pieces(off(pts, d), ri)) ribbonInto(P, I, pc, w, 0); };
+    // 점선: 조각을 따라 잰 거리로 (on m 칠하고 gap m 비우기). 짧은 선분이 이어져도 칠한 길이가 끊기지 않게
+    const dash = (P, I, pts, ri, d, w, on, gap) => { const per = on + gap; for (const q of pieces(off(pts, d), ri)) { let s0 = 0; for (let i = 1; i < q.length; i++) { const [ax, az] = q[i - 1], [bx, bz] = q[i], L = Math.hypot(bx - ax, bz - az); if (L < 0.01) continue; const ux = (bx - ax) / L, uz = (bz - az) / L, nx = -uz * w / 2, nz = ux * w / 2, s1 = s0 + L;
+      for (let n = Math.floor(s0 / per); n * per < s1; n++) { const t0 = Math.max(s0, n * per) - s0, t1 = Math.min(s1, n * per + on) - s0; if (t1 - t0 < 0.05) continue; const k = P.length / 3, x0 = ax + ux * t0, z0 = az + uz * t0, x1 = ax + ux * t1, z1 = az + uz * t1; P.push(x0 + nx, 0, z0 + nz, x0 - nx, 0, z0 - nz, x1 + nx, 0, z1 + nz, x1 - nx, 0, z1 - nz); I.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+      s0 = s1; } } };
+    // 차로 선 자리: 양방향 = 가운데에서 ±3.3m 마다, 한 방향 = 안쪽(노란 실선)에서 바깥으로 3.3m 마다
+    const laneLines = (r, ri) => { const sd = side[ri]; if (sd) { const inner = sd * (r.w / 2 - 0.45), n = Math.max(1, Math.floor((r.w - 0.9) / 3.3)), out = []; for (let k = 1; k < n; k++) out.push({ d: inner - sd * k * 3.3, k, last: k === n - 1 }); return { inner, out }; } const n = Math.floor(r.w / 2 / 3.3), out = []; for (let k = 1; k < n; k++) for (const s2 of [-1, 1]) out.push({ d: s2 * k * 3.3, k, last: k === n - 1 }); return { inner: null, out }; };
+    // 노란 중앙선
+    layer((P, I) => { roads.forEach((r, ri) => { const L = laneLines(r, ri); if (L.inner !== null) solid(P, I, r.pts, ri, L.inner, 0.15); else if (r.w >= 14) for (const d of [-0.18, 0.18]) solid(P, I, r.pts, ri, d, 0.15); }); }, '#f2c230', -49.8);
+    // 흰 차선 (버스차로 경계는 파란 선이 대신)
+    layer((P, I) => { roads.forEach((r, ri) => { const L = laneLines(r, ri), mid = BUS_MID.test(r.name) && r.w >= 14, sideB = BUS_SIDE.test(r.name) && r.w >= 14;
+      if (r.w >= 14 || L.inner !== null) { for (const q of L.out) { if (mid && q.k === 1) continue; if (sideB && q.last) continue; dash(P, I, r.pts, ri, q.d, 0.15, 3, 5); } } else if (r.w >= 8) dash(P, I, r.pts, ri, 0, 0.15, 3, 5); }); }, '#f4f4f0', -49.8);
+    // 버스전용차로: 중앙은 파란 겹실선, 가로변은 파란 점선
+    layer((P, I) => { roads.forEach((r, ri) => { if (r.w < 14) return; const L = laneLines(r, ri);
+      if (BUS_MID.test(r.name)) for (const q of L.out) if (q.k === 1) for (const e of [-0.14, 0.14]) solid(P, I, r.pts, ri, q.d + e, 0.12);
+      if (BUS_SIDE.test(r.name)) for (const q of L.out) if (q.last) dash(P, I, r.pts, ri, q.d, 0.18, 5, 3); }); }, '#2f6fd6', -49.79);
+    // 정지선 · 직진 화살표: 횡단보도 바로 바깥, 교차로로 들어오는 쪽 차로만
+    layer((P, I) => { const quad = (cx, cz, ax, az, bx, bz) => { const k = P.length / 3; P.push(cx - ax - bx, 0, cz - az - bz, cx - ax + bx, 0, cz - az + bz, cx + ax - bx, 0, cz + az - bz, cx + ax + bx, 0, cz + az + bz); I.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); };
+      for (const Z of zebra) { const r = roads[Z.ri]; if (!r || r.w < 8) continue; const sd = side[Z.ri];
+        // 들어오는 방향 v = -Z.sd * u. 한 방향 도로는 길 방향(u)으로 들어올 때만
+        if (sd && Z.sd > 0) continue; const vx = -Z.sd * Z.ux, vz = -Z.sd * Z.uz, rx = -vz, rz = vx;
+        let a0, a1; if (sd) { a0 = -r.w / 2 + 0.3; a1 = r.w / 2 - 0.3; } else { a0 = 0.35; a1 = r.w / 2 - 0.3; }
+        // 오른쪽 벡터(rx, rz)로 잰 차로 범위. 한 방향 도로는 길 전체
+        const along = 4.6, bx0 = Z.x - vx * along, bz0 = Z.z - vz * along, mid = (a0 + a1) / 2, half = (a1 - a0) / 2;
+        quad(bx0 + rx * mid, bz0 + rz * mid, vx * 0.25, vz * 0.25, rx * half, rz * half);
+        // 화살표: 차로 가운데, 정지선 10m 뒤 (몸통 + 머리)
+        for (let o = a0 + 1.65; o < a1 - 0.6; o += 3.3) { const ax = bx0 - vx * 10 + rx * o, az = bz0 - vz * 10 + rz * o; quad(ax - vx * 1.2, az - vz * 1.2, vx * 1.5, vz * 1.5, rx * 0.09, rz * 0.09); const hx = ax + vx * 0.9, hz = az + vz * 0.9, k = P.length / 3; P.push(hx + rx * 0.45, 0, hz + rz * 0.45, hx - rx * 0.45, 0, hz - rz * 0.45, hx + vx * 1.3, 0, hz + vz * 1.3); I.push(k, k + 1, k + 2); } } }, '#f6f6f2', -49.75);
   }
   // 거리 코스(홍대): 길가 건물 벽에 세로 돌출 간판 (밤에 네온처럼 · 분홍 · 하늘 · 보라 · 노랑 · 초록), 2 ~ 4층 높이
   // 이웃 지역으로 가는 길목: 코스 양 끝에 빛나는 이정표 문 (걸어 들어가면 onRegionGate)
