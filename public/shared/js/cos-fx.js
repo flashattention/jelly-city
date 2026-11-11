@@ -75,10 +75,15 @@ const RAIN7 = ['#ff3b5c', '#ff9a2e', '#ffe14d', '#4fe08a', '#3fc8ff', '#5b6bff',
 const ribTex = {};
 function ribbonTex(cols = RAIN7) {
   const key = cols.join(); if (ribTex[key]) return ribTex[key];
-  const c = document.createElement('canvas'); c.width = 64; c.height = 4; const x = c.getContext('2d'), g = x.createLinearGradient(0, 0, 64, 0);
-  cols.forEach((col, i) => { g.addColorStop(cols.length > 1 ? 0.04 + i * (0.92 / (cols.length - 1)) : 0.5, col); });
-  x.fillStyle = g; x.fillRect(0, 0, 64, 4); const e = x.createLinearGradient(0, 0, 64, 0); e.addColorStop(0, 'rgba(0,0,0,1)'); e.addColorStop(0.08, 'rgba(0,0,0,0)'); e.addColorStop(0.92, 'rgba(0,0,0,0)'); e.addColorStop(1, 'rgba(0,0,0,1)'); x.globalCompositeOperation = 'destination-out'; x.fillStyle = e; x.fillRect(0, 0, 64, 4);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return (ribTex[key] = t);
+  // 가로로 색을 잇고, 좌우 끝은 색은 그대로 두고 부드럽게 투명해진다 (캔버스로 지우면 투명한 픽셀이 검정이 되어 가장자리가 검게 번진다)
+  const W = 64, H = 4, d = new Uint8Array(W * H * 4), C = new THREE.Color(), C2 = new THREE.Color(), ss = (v) => { v = Math.max(0, Math.min(1, v)); return v * v * (3 - 2 * v); };
+  for (let i = 0; i < W; i++) {
+    const u = (i + 0.5) / W, f = cols.length > 1 ? Math.max(0, Math.min(cols.length - 1, ((u - 0.04) / 0.92) * (cols.length - 1))) : 0, k = Math.floor(f);
+    C.set(cols[k]).lerp(C2.set(cols[Math.min(cols.length - 1, k + 1)]), f - k);
+    const a = ss(u / 0.3) * ss((1 - u) / 0.3);
+    for (let j = 0; j < H; j++) d.set([C.r * 255, C.g * 255, C.b * 255, a * 255], (j * W + i) * 4);
+  }
+  const t = new THREE.DataTexture(d, W, H, THREE.RGBAFormat); t.colorSpace = THREE.SRGBColorSpace; t.magFilter = t.minFilter = THREE.LinearFilter; t.needsUpdate = true; return (ribTex[key] = t);
 }
 // 이만큼 벌어지면 띠를 끊는다: 트랙이 1500m 마다 앞으로 옮겨질 때 · 되살아날 때 · 다른 사람 위치가 순간이동할 때 · 높은 곳에 내려앉을 때 · 공중에 오래 있을 때
 //   (끊지 않으면 마지막 자리와 새 자리가 한 띠로 이어져서 트랙 위로 앞뒤로 쭉 늘어나거나 위아래로 벽처럼 선다)
