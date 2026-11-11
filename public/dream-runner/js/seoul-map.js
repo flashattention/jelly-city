@@ -19,7 +19,7 @@ export class SeoulMap {
   pan(du, dv) { if (!this.v) return; this.cx -= (du * this.v.w) / this.v.k; this.cz -= (dv * this.v.h) / this.v.k; }
   T(x, z) { const { k, ox, oz } = this.v; return [ox + (x - this.b[0]) * k, oz + (z - this.b[2]) * k]; }
   inv(px, pz) { const { k, ox, oz } = this.v; return [(px - ox) / k + this.b[0], (pz - oz) / k + this.b[2]]; }
-  draw(c, w, h, { here = null, pick = null, t = 0 } = {}) {
+  draw(c, w, h, { here = null, pick = null, t = 0, dots = [] } = {}) {
     this.fit(w, h);
     c.fillStyle = '#0f1726'; c.fillRect(0, 0, w, h);
     // 구: 지역이 있는 구는 밝게, 없는 구는 회색 빗금(준비 중)
@@ -34,6 +34,8 @@ export class SeoulMap {
     const placed = [];
     if (!this.places?.length) for (const R of this.regions) { const m = R.pts[Math.floor(R.pts.length / 2)], [a, b0] = this.T(...m); const label0 = this.labels[R.id] || R.name; c.font = `bold ${Math.max(11, w * 0.017)}px sans-serif`; const half = (c.measureText(label0).width + 12) / 2; let b = b0 - Math.max(16, w * 0.026); for (let tr = 1; tr < 12 && placed.some((p) => Math.abs(p[0] - a) < p[2] + half && Math.abs(p[1] - b) < 24); tr++) b = b0 + (tr % 2 ? -1 : 1) * Math.ceil(tr / 2) * 26 - (tr % 2 ? Math.max(16, w * 0.026) : -10); placed.push([a, b, half]); const label = this.labels[R.id] || R.name; c.font = `bold ${Math.max(11, w * 0.017)}px sans-serif`; const tw = c.measureText(label).width + 12; c.fillStyle = 'rgba(15,23,38,.85)'; c.beginPath(); c.roundRect(a - tw / 2, b - 11, tw, 22, 8); c.fill(); c.strokeStyle = R.color; c.lineWidth = 1.5; c.stroke(); c.fillStyle = '#fff'; c.fillText(label, a, b + 1); }
     this.drawPlaces(c, w);
+    // 실시간 지하철 열차 (노선 색 점)
+    for (const d of dots) { const [a, b] = this.T(d.x, d.z); c.fillStyle = d.color; c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 1; c.beginPath(); c.arc(a, b, Math.max(2.5, w * 0.0035), 0, 7); c.fill(); c.stroke(); }
     // 내 위치 (깜빡이는 점) · 고른 곳
     if (here) { const [a, b] = this.T(here.x, here.z), r = 6 + Math.sin(t * 5) * 2; c.fillStyle = '#ffffff'; c.beginPath(); c.arc(a, b, r, 0, 7); c.fill(); c.strokeStyle = '#ff3b6b'; c.lineWidth = 3; c.stroke(); }
     if (pick) { const [a, b] = this.T(pick.x, pick.z); c.strokeStyle = pick.region ? '#ffd98a' : '#ff6b6b'; c.lineWidth = 3; c.beginPath(); c.arc(a, b, 11, 0, 7); c.stroke(); c.beginPath(); c.moveTo(a - 16, b); c.lineTo(a + 16, b); c.moveTo(a, b - 16); c.lineTo(a, b + 16); c.stroke(); }

@@ -88,7 +88,9 @@ function cellRoutes(k) {
 // ---------- 버스: 노선별 위치 ----------
 const pos = new Map(), routeInfo = new Map(), interest = new Map();
 async function fetchRoute(id) {
-  const info = routeInfo.get(id) || ['?', 3];
+  let info = routeInfo.get(id);
+  if (!info) for (const c of Object.values(st.cells)) { const r = c.routes?.find((q) => q[0] === id); if (r) { info = [r[1], r[2]]; routeInfo.set(id, info); break; } }
+  info ||= ['?', 3];
   // 지난번 자리(5m 넘게 움직였을 때)를 함께 줘서, 처음 보는 화면도 버스 방향을 안다
   const prev = new Map((pos.get(id)?.list || []).map((b) => [b.id, b]));
   const list = (await busCall('pos', 'buspos/getBusPosByRtid', `busRouteId=${id}`)).filter((b) => +b.gpsY > 30).map((b) => { const o = { id: String(b.vehId), route: info[0], type: info[1], lon: +b.gpsX, lat: +b.gpsY, t: b.dataTm, stop: b.stopFlag === '1', plate: String(b.plainNo || '').slice(-4), low: b.busType === '1' }, p = prev.get(o.id); if (p) { if (meters(p.lat, p.lon, o.lat, o.lon) > 5) { o.plat = p.lat; o.plon = p.lon; } else if (p.plat) { o.plat = p.plat; o.plon = p.plon; } } return o; });

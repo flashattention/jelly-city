@@ -14,6 +14,7 @@ import { winLights, winProfile, winEra, winSeed, tickWindows, WIN_GRID } from '.
 import { buildSummit, tickSummit, deckBears } from './hangang-summit.js';
 import { buildStreetFurniture, buildLandmarkStatues } from './hangang-street.js';
 import { setupAttractions, ATTR_SKIP } from './hangang-attractions.js';
+import { LiveTransit } from './hangang-transit.js';
 
 export const SEASONS = { spring: '🌸 봄', summer: '🌿 여름', autumn: '🍁 가을', winter: '❄️ 겨울' };
 export const WEATHERS = { clear: '☀️ 맑음', cloudy: '☁️ 구름', rain: '🌧️ 비', snow: '🌨️ 눈' };
@@ -685,7 +686,8 @@ export class Hangang {
     for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const c = this.circGrid?.get(`${gx + a},${gz + b}`); if (c) out.push(...c); }
     for (const p of this.people || []) for (const b of p.bears) { const q = b.root.position; if (Math.abs(q.x - x) < 3 && Math.abs(q.z - z) < 3) out.push({ x: q.x, z: q.z, r: 0.3 * (b.root.scale.x / BEAR), h: 1.2 }); }
     for (const gd of this.groups || []) if (gd.solid && Math.abs(gd.g.position.x - x) < 6 && Math.abs(gd.g.position.z - z) < 6) out.push({ x: gd.g.position.x, z: gd.g.position.z, r: gd.solid, h: 1.5 });
-    for (const o of this.buses?.values() || []) if (Math.abs(o.mesh.position.x - x) < 9 && Math.abs(o.mesh.position.z - z) < 9) out.push({ x: o.mesh.position.x, z: o.mesh.position.z, r: 2.6, h: 3 });
+    // 실시간 버스: 길이 11m 라 앞 · 가운데 · 뒤 세 동그라미
+    for (const o of this.live?.buses?.values() || []) if (o.mesh && Math.abs(o.x - x) < 10 && Math.abs(o.z - z) < 10) for (const k of [-3.6, 0, 3.6]) out.push({ x: o.x + Math.sin(o.yaw) * k, z: o.z + Math.cos(o.yaw) * k, r: 1.6, h: 3.2 });
     for (const c of this.cars3 || []) if (c.mesh && Math.abs(c.mesh.position.x - x) < 8 && Math.abs(c.mesh.position.z - z) < 8) out.push({ x: c.mesh.position.x, z: c.mesh.position.z, r: c.r || 1.6, h: 2 });
     return out;
   }
@@ -1922,6 +1924,8 @@ export class Hangang {
     const M2 = this.map, hx = (126.958 - 126.98) * 111320 * Math.cos(37.53 * Math.PI / 180) - M2.center[0], hz = -(37.5172 - 37.53) * 110574 - M2.center[1];
     this.trackPaths = (this.railPaths || []).map((rp) => { const mid = rp.fine[Math.floor(rp.fine.length / 2)]; return { ...rp, len: rp.fine.reduce((a, p, i) => a + (i ? Math.hypot(p[0] - rp.fine[i - 1][0], p[1] - rp.fine[i - 1][1]) : 0), 0), dist: Math.hypot(mid[0] - hx, mid[1] - hz) }; }).filter((rp) => rp.dist < 900 && rp.len > 300).sort((a, b) => b.len - a.len).slice(0, 2);
     this.trains = []; this.trainT = 5; this.trainSeen = new Set(); this.buses = new Map();
+    // 실시간 버스 · 지하철 (서울 어디든): hangang-transit.js
+    this.live?.dispose(); this.live = new LiveTransit(this);
     // 다른 호선 철교 (4호선 동작대교 · 2호선 당산철교 등): 그 호선 색 열차가 몇 분마다 지나간다
     this.lineTracks = (this.railPaths || []).map((rp) => ({ ...rp, line: (/(\d)호선/.exec(rp.n) || [])[1], len: rp.fine.reduce((a, p, i) => a + (i ? Math.hypot(p[0] - rp.fine[i - 1][0], p[1] - rp.fine[i - 1][1]) : 0), 0) })).filter((rp) => rp.line && rp.line !== '1' && rp.len > 200); this.lineT = 8;
   }
@@ -1939,30 +1943,26 @@ export class Hangang {
       if (this.lineSeen.size > 600) this.lineSeen.clear(); } catch { /* 다음에 */ } }
   }
   async pollTransit() {
-    if (!this.api) return; this.pollLineTrains();
+    if (!this.api) return;
+    // 새 실시간 열차(실제 선로 위)가 돌면 예전 철교 열차는 쉰다
+    if (!this.live?.subOK) this.pollLineTrains();
     try {
+      if (this.live?.subOK) throw new Error('새 방식');
       const j = await this.api('/api/seoul/subway/position?line=1호선'); this.liveTrains = true;
       for (const t of j.trains || []) { const key = `${t.no}:${t.at}:${t.up}`; if (t.sttus !== 2 || this.trainSeen.has(key)) continue; if (t.at === '노량진' && t.up) { this.trainSeen.add(key); this.spawnTrain(true); } else if (t.at === '용산' && !t.up) { this.trainSeen.add(key); this.spawnTrain(false); } }
       if (this.trainSeen.size > 400) this.trainSeen.clear();
-    } catch { this.liveTrains = false; }
-    try { const j = await this.api('/api/seoul/bus/pos'); this.busData = j.buses || []; } catch { /* 버스 정보 없음 */ }
+    } catch { this.liveTrains = !!this.live?.subOK; }
     if (this.chunks && this.cityRid && this.nearRegion(this.px, this.pz)?.id !== this.cityRid) this.cityAt = 0; // 서울 전체: 다른 동네로 걸어가면 그곳 정보로
     if (!this.cityAt || Date.now() - this.cityAt > 300000) { this.cityAt = Date.now(); try { const rid = this.chunks ? this.nearRegion(this.px, this.pz)?.id || 'yeouido' : this.id; this.cityRid = rid; this.city = await this.api('/api/seoul/city?area=' + encodeURIComponent(rid === 'hongdae' ? '홍대 관광특구' : rid === 'namsan' ? '남산공원' : rid === 'itaewon' ? '이태원 관광특구' : rid === 'banpo' ? '반포한강공원' : rid === 'ttukseom' ? '뚝섬한강공원' : ({ seongsu: '성수카페거리', gangnam: '강남역', jamsil: '잠실 관광특구', myeongdong: '명동 관광특구', insadong: '인사동', bukchon: '북촌한옥마을', sinchon: '신촌·이대역' }[rid] || '여의도'))); this.onCity?.(this.city); } catch { /* 도시 정보 없음 */ } }
   }
   tickTransit(dt, px, pz) {
     if (!this.trains) return;
-    this.trainT -= dt; if (this.trainT <= 0) { this.trainT = 20; this.pollTransit(); if (!this.liveTrains && Math.random() < 0.35) this.spawnTrain(Math.random() < 0.5); }
-    this.lineT -= dt; if (this.lineT <= 0 && this.lineTracks?.length && !this.liveLines?.size) { this.lineT = 35 + Math.random() * 70; const tp = this.lineTracks[Math.floor(Math.random() * this.lineTracks.length)], fw = Math.random() < 0.5, g = makeTrain(tp.line); this.scene.add(g); this.trains.push({ tp, d: fw ? -200 : tp.len + 200, dir: fw ? 1 : -1, g, v: 15 }); }
+    this.trainT -= dt; if (this.trainT <= 0) { this.trainT = 20; this.pollTransit(); if (!this.liveTrains && !this.live?.subOK && Math.random() < 0.35) this.spawnTrain(Math.random() < 0.5); }
+    this.lineT -= dt; if (this.lineT <= 0 && this.lineTracks?.length && !this.liveLines?.size && !this.live?.subOK) { this.lineT = 35 + Math.random() * 70; const tp = this.lineTracks[Math.floor(Math.random() * this.lineTracks.length)], fw = Math.random() < 0.5, g = makeTrain(tp.line); this.scene.add(g); this.trains.push({ tp, d: fw ? -200 : tp.len + 200, dir: fw ? 1 : -1, g, v: 15 }); }
     for (const t of this.trains) { t.d += t.dir * t.v * dt; t.g.children.forEach((car, i) => { const p = this.trainAt(t.tp, clamp(t.d - t.dir * i * 20, 0, t.tp.len)); car.position.set(p.x, p.y + 0.4, p.z); car.rotation.y = Math.atan2(p.dx, p.dz); car.visible = t.d - t.dir * i * 20 > 0 && t.d - t.dir * i * 20 < t.tp.len; }); }
     this.trains = this.trains.filter((t) => { const done = t.dir > 0 ? t.d > t.tp.len + 220 : t.d < -220; if (done) this.scene.remove(t.g); return !done; });
-    // 실시간 버스: GPS → 지도 좌표, 받은 위치로 부드럽게
-    const S = this.map, cx = S.center[0], cz = S.center[1];
-    for (const b of this.busData || []) {
-      const x = (b.lon - 126.98) * 111320 * Math.cos(37.53 * Math.PI / 180) - cx, z = -(b.lat - 37.53) * 110574 - cz; if (this.chunks ? Math.hypot(x - this.px, z - this.pz) > 1500 : Math.abs(x) > 2600 || Math.abs(z) > 2600) continue;
-      let o = this.buses.get(b.id); if (!o) { const mesh = makeVehicle('bus', Math.random, b.type === 4 ? '#47a83c' : '#3a63b8', b.route); this.scene.add(mesh); o = { mesh, x, z, tx: x, tz: z, r: 2.6 }; this.buses.set(b.id, o); }
-      if (Math.hypot(x - o.tx, z - o.tz) > 0.5) { o.yaw = Math.atan2(x - o.tx, z - o.tz); o.tx = x; o.tz = z; }
-    }
-    for (const o of this.buses.values()) { o.x += (o.tx - o.x) * Math.min(1, dt * 0.25); o.z += (o.tz - o.z) * Math.min(1, dt * 0.25); o.mesh.position.set(o.x, 0, o.z); if (o.yaw != null) o.mesh.rotation.y = o.yaw; }
+    // 실시간 버스 · 지하철: 실제 GPS · 실제 열차 위치 (hangang-transit.js)
+    this.live?.tick(dt, px, pz);
     // 가까운 지하철 출입구
     let near = null; for (const e of this.entrances) { const d = Math.hypot(e.x - px, e.z - pz); if (d < 7 && (!near || d < near.d)) near = { ...e, d }; }
     // 남산: 타워 아래로 다가가면 엘리베이터로 전망대(140m), 전망대 가운데 엘리베이터 앞에서 다시 아래로
@@ -2369,6 +2369,7 @@ export class Hangang {
     for (const [n, ms] of this.map.marks || []) { const p = this.at(ms), x = c + (p.x - this.px) * m, y = c + (p.z - this.pz) * m; if (x > 8 && x < size - 8 && y > 8 && y < size - 8) ctx.fillText(n, x, y - 4); }
     for (const p of this.people) { const [x0, z0] = this.world(p.s, p.lat), x = c + (x0 - this.px) * m, y = c + (z0 - this.pz) * m; ctx.fillStyle = p.kind.startsWith('runner') ? '#ffffff' : '#ffd23f'; ctx.beginPath(); ctx.arc(x, y, 2.2, 0, 7); ctx.fill(); }
     this.attr?.drawMini(ctx, size, m, c);
+    this.live?.drawMini(ctx, c, m, this.px, this.pz, size);
     // 보는 쪽 부채꼴 · 나
     ctx.translate(c, c); ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.beginPath(); ctx.moveTo(0, 0); const ya = Math.atan2(Math.cos(this.camYaw), Math.sin(this.camYaw)); ctx.arc(0, 0, size * 0.32, ya - 0.5, ya + 0.5); ctx.closePath(); ctx.fill();
     ctx.rotate(-this.face + Math.PI); ctx.fillStyle = '#ff2d55'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6.5, 7); ctx.lineTo(0, 3.5); ctx.lineTo(-6.5, 7); ctx.closePath(); ctx.fill(); ctx.stroke();

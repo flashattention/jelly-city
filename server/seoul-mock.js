@@ -17,7 +17,7 @@ const tiles = new Map();
 function tile(i, j) {
   const k = `${i}_${j}`; if (tiles.has(k)) return tiles.get(k); let routes = [];
   try { const M = JSON.parse(fs.readFileSync(path.join(SEOUL, `t_${k}.json`), 'utf8')), S = M.scale;
-    M.roads.forEach((rd, n) => { if (rd[1] || rd[0] < 14) return; const pts = []; for (let q = 2; q < rd.length; q += 2) pts.push([rd[q] * S, rd[q + 1] * S]); const cum = [0]; for (let q = 1; q < pts.length; q++) cum.push(cum[q - 1] + Math.hypot(pts[q][0] - pts[q - 1][0], pts[q][1] - pts[q - 1][1])); if (cum[cum.length - 1] > 350) routes.push({ id: `9${String(i + 50).padStart(3, '0')}${String(j + 50).padStart(3, '0')}${String(n).padStart(3, '0')}`, no: String(100 + ((Math.abs(i * 31 + j * 17 + n * 7)) % 900)), type: [3, 4, 3, 4, 6, 2, 5][n % 7], pts, cum, len: cum[cum.length - 1], name: M.roadNames?.[n] || '' }); }); } catch { routes = []; }
+    M.roads.forEach((rd, n) => { if (rd[1] || rd[0] < 14 || rd[0] >= 18) return; const pts = []; for (let q = 2; q < rd.length; q += 2) pts.push([rd[q] * S, rd[q + 1] * S]); const cum = [0]; for (let q = 1; q < pts.length; q++) cum.push(cum[q - 1] + Math.hypot(pts[q][0] - pts[q - 1][0], pts[q][1] - pts[q - 1][1])); if (cum[cum.length - 1] > 350) routes.push({ id: `9${String(i + 50).padStart(3, '0')}${String(j + 50).padStart(3, '0')}${String(n).padStart(3, '0')}`, no: String(100 + ((Math.abs(i * 31 + j * 17 + n * 7)) % 900)), type: [3, 4, 3, 4, 6, 2, 5][n % 7], pts, cum, len: cum[cum.length - 1], name: M.roadNames?.[n] || '' }); }); } catch { routes = []; }
   tiles.set(k, routes); return routes;
 }
 const routeById = (id) => { const i = +id.slice(1, 4) - 50, j = +id.slice(4, 7) - 50; return tile(i, j).find((r) => r.id === id); };
