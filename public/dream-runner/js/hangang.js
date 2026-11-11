@@ -1816,7 +1816,8 @@ export class Hangang {
       const tg = this.at(this.s); this.dir = this.mdx * tg.dx + this.mdz * tg.dz >= 0 ? 1 : -1;
       this.face += (((Math.atan2(this.mdx, this.mdz) - this.face + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * Math.min(1, dt * 9);
       // 카메라는 손으로 돌린 뒤 잠시 그대로, 그다음 천천히 등 뒤로
-      if (this.dragT <= 0 && ml > 0.05) this.camYaw += (((this.face - this.camYaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * Math.min(1, dt * 1.2);
+      //   날 때 · 마우스로 시점을 잡은 동안(포인터 잠금)은 저절로 돌지 않는다 (옆 · 뒤로 날면 몸과 카메라가 서로 따라 돌며 화면이 빙글 돌던 것)
+      if (this.dragT <= 0 && ml > 0.05 && !this.flying && !document.pointerLockElement) this.camYaw += (((this.face - this.camYaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * Math.min(1, dt * 1.2);
     } else this.wallPush = 0;
     // 점프 · 2단 · 3단 점프(공중제비) · 숙이기 · 옥상 위에 서기
     const ground = this.groundAt(this.px, this.pz, this.y);
