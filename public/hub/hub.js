@@ -33,7 +33,8 @@ fetch('/api/dream/board').then((r) => r.json()).then((d) => {
   if (t.length) $('top3').textContent = '🏆 ' + t.map((e, i) => `${['🥇', '🥈', '🥉'][i]} ${e.name} ${e.score.toLocaleString()}점`).join('  ');
 }).catch(() => {});
 
-// 게임 카드: 오른쪽 위에 출시 후 지금까지 모든 사람의 플레이 시간 (시간을 모으지 못한 게임은 플레이한 사람 수), 많이 한 게임부터 (드림 러너 큰 카드는 맨 위 그대로)
+// 게임 카드: 오른쪽 위에 출시 후 지금까지 모든 사람의 플레이 시간 · 판수 (넉넉한 게임만), 많이 한 게임부터 (드림 러너 큰 카드는 맨 위 그대로)
+const SHOW_MIN = 60, SHOW_PLAYS = 50; // 누적 배지를 보이는 기준 (분 · 판)
 fetch('/api/playtime/all').then((r) => r.json()).then((d) => {
   const games = d.games || {}, box = document.querySelector('.games'); if (!box) return;
   const fmt = (m) => (m >= 60 ? `${Math.round(m / 6) / 10}시간` : `${m}분`).replace('.0시간', '시간');
@@ -41,7 +42,8 @@ fetch('/api/playtime/all').then((r) => r.json()).then((d) => {
   for (const c of cards) {
     const id = (c.getAttribute('href') || '').split('/').filter(Boolean)[0], g = games[id] || { min: 0, players: 0 };
     c.dataset.score = g.min + (g.plays || 0) * 2 + g.players * 15;
-    const b = document.createElement('span'); b.className = 'pt'; b.textContent = g.min >= 1 ? `⏱️ 누적 ${fmt(g.min)}${g.plays ? ` · ${g.plays.toLocaleString()}판` : ''}` : g.players ? `🏆 순위표 ${g.players}명 · 플레이 집계 중` : '⏱️ 플레이 집계 중'; c.appendChild(b);
+    // 숫자가 넉넉한 게임만 배지를 붙인다 (적은 숫자는 오히려 인기 없어 보인다)
+    if (g.min >= SHOW_MIN && (g.plays || 0) >= SHOW_PLAYS) { const b = document.createElement('span'); b.className = 'pt'; b.textContent = `⏱️ 누적 ${fmt(g.min)} · ${g.plays.toLocaleString()}판`; c.appendChild(b); }
   }
   const rest = cards.filter((c) => !c.classList.contains('wide')).sort((a, b) => (+b.dataset.score - +a.dataset.score) || (order.get(a) - order.get(b)));
   for (const c of rest) box.appendChild(c);
