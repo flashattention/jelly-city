@@ -1241,6 +1241,7 @@ export class Hangang {
       let c = null;
       if (LANDMARKS[name]) { const L = LANDMARKS[name]; type = L.facade; c = L.color; (this.lmQueue ||= []).push({ name, ring, h, L }); }
       else if (/63/.test(name) || /gold/i.test(cTag)) { type = 'gold'; c = '#ffd76a'; }
+      else if (name === '부영빌딩' && h > 60) { type = 'gold'; c = '#b8875a'; } // 을지로 입구 옛 삼성화재 본사: 구릿빛 반사 유리 (같은 이름 작은 건물이 많아 높이로 가린다)
       else if (/파크원|NH금융타워/.test(name)) { type = 'fins'; c = '#e8e8e4'; }
       else if (/LG트윈|트윈타워/.test(name)) { type = 'glass'; c = '#7a6248'; }
       else if (/IFC/.test(name)) { type = 'glass'; c = '#6f95c8'; }
@@ -1253,7 +1254,7 @@ export class Hangang {
       if (useBase && !LANDMARKS[name] && M.kind !== 'summit' && !(towerC && Math.hypot(ring[0][0] - towerC[0], ring[0][1] - towerC[1]) < 200)) { let lo = Infinity; for (const [x, z] of ring) lo = Math.min(lo, this.terrAt(x, z, true)); curY = lo - 0.15; }
       // 실제 건축물 정보(용도 · 구조 · 사용승인 연도)로 외벽을 정한다 (틀 찍어내기 대신 그 건물의 실제 정보대로)
       let ground = null;
-      if (info && !c && !LANDMARKS[name] && type !== 'church' && type !== 'gold' && type !== 'assembly') { const st = styleOf(info, h, r, shopG.has(bi)); if (st) { type = st[0]; c = st[1]; ground = st[2] || null; } }
+      if (info && !c && !LANDMARKS[name] && type !== 'church' && type !== 'gold' && type !== 'assembly') { const st = styleOf(info, h, r, shopG.has(bi)); if (st && glassTag && type === 'glass' && st[0] !== 'glass') st.length = 0; if (st?.length) { type = st[0]; c = st[1]; ground = st[2] || null; } }
       // 대장 정보가 없는 이름 없는 낮은 건물 · 단독주택 (서울에선 대부분 집 · 빌라): 1990년대 주택처럼
       if ((!info || !info[0]) && !c && !name && type !== 'church' && type !== 'apt' && (kind === 0 || kind === 4) && h < 16 && !palaceHanok) { const st = styleOf([1, 21, 0], h, r, shopG.has(bi)); type = st[0]; c = st[1]; ground = st[2] || null; }
       // 주상복합 · 초고층 아파트 (갤러리아 포레 · 트리마제 · 타워팰리스 같은 45층 넘는 탑, 2008년 뒤 35층 넘는 탑): 발코니 띠 대신 흰 · 은회색 유리 커튼월
@@ -2502,9 +2503,12 @@ export const LANDMARKS = {
   '메세나폴리스 101동': { facade: 'glass', color: '#c9d8e2', crown: { rise: 8, dir: [1, 0] } },
   세아타워: { facade: 'glass', color: '#6f8494', roof: '#4a5560' },
   'CGV 아트레온(CGV Artreon)': { facade: 'glass', color: '#b9c3c8', topSign: { text: 'CGV', color: '#e8102c', bg: '#ffffff' } },
-  문헌관: { facade: 'brick', color: '#9a4a36' }, 홍문관: { facade: 'brick', color: '#a5523e' },
+  //   홍문관: 정문 위를 가로지르는 연회색 화강석 건물, 위층은 푸른 띠창 (사진 확인)
+  문헌관: { facade: 'brick', color: '#9a4a36' }, 홍문관: { facade: 'street2', color: '#d6d3cc' },
   // 이태원: 제일기획 · 용산구청
   제일기획: { facade: 'glass', color: '#5f6b74' }, 용산구청: { facade: 'stone', color: '#e8e2d6' },
+  // 강남역: 교보타워 (짙은 붉은 벽돌빛 두 탑, 가운데 세로 유리 틈)
+  교보타워: { facade: 'stone', color: '#7a4234' }, '교보생명보험(주) 서초사옥': { facade: 'stone', color: '#7a4234' },
   // 반포: 신세계백화점 강남 · JW 메리어트 · 서울성모병원 · 서울법원종합청사
   신세계백화점: { facade: 'stone', color: '#e8dcc8', topSign: { text: 'SSG', color: '#e8102c', bg: '#ffffff' } }, 'JW 메리어트 호텔 서울': { facade: 'glass', color: '#b5c2c8' },
   '가톨릭대학교 서울성모병원': { facade: 'glass', color: '#d2e2e6', roof: '#6db894' }, 서울법원종합청사: { facade: 'stone', color: '#d9d2c4' },
@@ -2518,6 +2522,10 @@ export const LANDMARKS = {
   // 명동: 명동대성당(붉은 벽돌 고딕 · 뾰족 종탑) · 신세계 본점 헤리티지(옛 석조) · 한국은행 화폐박물관(석조 · 돔) · 롯데시티호텔
   '명동대성당 본당': { facade: 'church', color: '#9a4a36', spire: { h: 45, color: '#7a3a2c' } },
   '신세계백화점 본점 더 헤리티지': { facade: 'stone', color: '#e8dcc0' }, '한국은행 화폐박물관': { facade: 'assembly', color: '#e0d2b8' },
+  //   롯데호텔 서울 본관 · 신관: 베이지 타일 · 고른 네모 창 (유리 탑이 아니다) / 부영빌딩(옛 삼성화재, 을지로 입구): 구릿빛 반사 유리
+  롯데호텔서울: { facade: 'stone', color: '#d8c8ac' }, 롯데호텔: { facade: 'stone', color: '#cdb89a' },
+  //   세종문화회관: 흰 돌 기둥 · 전통 지붕선 / 정부서울청사: 베이지 석재 네모 창 / 서울파이낸스센터: 밝은 갈색 화강석 격자 창 / 서울중앙우체국(포스트타워): 은빛 유리 두 탑
+  '세종문화회관 대극장': { facade: 'assembly', color: '#ebe5d8' }, 정부서울청사: { facade: 'stone', color: '#d8d2c4' }, 서울파이낸스센터: { facade: 'stone', color: '#cdbfa6' }, 서울중앙우체국: { facade: 'glass', color: '#b7c4cc' },
   롯데시티호텔: { facade: 'glass', color: '#a9b8c2', topSign: { text: 'LOTTE', color: '#e8102c', bg: '#ffffff' } },
   // 종로 · 북촌: 경복궁 · 건춘문 · 조계사 (한옥, 큰 기와지붕)
   // 도성 문 (돌 축대 위 2층 문루 · 실제 높이 약 20m): 축대 색 돌 + 기와 우진각 지붕
@@ -2678,7 +2686,9 @@ function styleOf([use, st, yr], h, r, shopG) {
   if ((use === 17 || use === 18) && h > 22) return ['glass', pick2(['#9fb2c0', '#a9bccb', '#b8c6cf', '#8d9ea9'])];
   if (use === 17 || use === 18) return ['factory', pick2(['#8a3f2e', '#9a4a36', '#7a3a2c', '#a5523e', '#6b6f73'])];
   if (use === 2 && h > 24) return null; // 아파트 단지는 아파트 모습 그대로
-  const home = use === 1 || use === 2, shop = use === 3 || use === 4 || use === 5 || use === 7;
+  const home = use === 1 || use === 2, shop = use === 3 || use === 4 || use === 7;
+  // 석구조 (연세대 언더우드관 같은 옛 돌 건물): 회색 · 베이지 화강석
+  if (st === 13) return ['stone', pick2(['#b8b4ac', '#a8a49c', '#c9c2b4'])];
   // 주택 · 빌라 · 다세대: 연대마다 실제 서울 골목 모습
   //   1990년 전: 붉은 · 밤색 벽돌집이 많고 3할쯤은 회벽에 페인트(크림 · 연두 · 하늘 · 분홍)
   //   1990 ~ 2004: 치장벽돌 빌라(붉은 · 갈색 · 베이지) 7할, 화강석(분홍빛 · 회색) 3할, 1층은 필로티 주차장 · 화강석
@@ -2706,6 +2716,8 @@ function styleOf([use, st, yr], h, r, shopG) {
     if (era === 1) return q < 0.42 ? ['street2', pick2(BAND)] : q < 0.8 ? ['glass', pick2(DARK)] : ['stone', pick2(['#8c8a86', '#a9a7a2', '#6e6c69', '#c9c6bf'])];
     return q < 0.75 ? ['glass', pick2(LIGHT)] : ['stone', pick2(['#5d5f63', '#7a7c80', '#e9e8e4', '#3f4145', '#c9c8c4'])];
   }
+  // 문화 · 집회 (공연장 · 전시장 · 예식장): 밝은 석재
+  if (use === 5) return ['stone', pick2(['#e8e4dc', '#d8d2c6', '#c9c4bc', '#efe9e0'])];
   // 학교 · 대학: 크림 · 흰 도장, 1990년대 전엔 붉은 벽돌도 흔하다
   if (use === 10) return era < 2 && r() < 0.35 ? ['brick', pick2(['#9a4f3c', '#a5523e', '#8a4a36'])] : ['stone', pick2(['#efe6cf', '#e8dcc0', '#f2efe8', '#e2e4e0'])];
   if (use === 9) return ['stone', pick2(['#f2f2ee', '#e8eaea', '#eeeae2'])];
