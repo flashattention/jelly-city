@@ -160,7 +160,7 @@ export class LiveTransit {
         // 타고 있는 버스는 정류장마다 잠깐 선다 (hangang-ride.js 가 hold 를 준다)
         if (o.hold > 0) { o.hold -= dt; v = 0; }
         o.cur = (o.cur ?? v) + (v - (o.cur ?? v)) * Math.min(1, dt * 1.5); o.d = clamp(o.d + o.dir * o.cur * dt, 0, o.L.len);
-        const hg = this.hg, q = hg.lineAt(o.L, o.d, 0), lane = o.L.w >= 30 ? 1.8 : Math.max(1.8, o.L.w / 2 - 1.8), fx = q.dx * o.dir, fz = q.dz * o.dir;
+        const hg = this.hg, q = hg.lineAt(o.L, o.d, 0), lane = o.L.w >= 30 ? 1.8 : Math.max(1.8, o.L.w / 2 - (o.id === this.rideId ? 3.3 : 1.8)), fx = q.dx * o.dir, fz = q.dz * o.dir;
         // 넓은 길(30m 넘게)은 가운데 버스 전용 차로, 아니면 바깥 차로
         const tx = q.x - fz * lane, tz = q.z + fx * lane; o.x += (tx - o.x) * Math.min(1, dt * 4); o.z += (tz - o.z) * Math.min(1, dt * 4);
         const want = Math.atan2(fx, fz); let dy = want - o.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); o.yaw += dy * Math.min(1, dt * 3);
