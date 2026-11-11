@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const FILE = new URL('../public/shared/patchnotes.json', import.meta.url);
-export const GAMES = { 'jelly-city': ['젤리시티'], 'dream-runner': ['드림러너', '드림 러너'], 'jelly-rumble': ['젤리대소동', '젤리 가이즈', 'jelly-guys'], 'jelly-merge': ['젤리 머지', '젤리머지'], 'jelly-arena': ['젤리 아레나', '젤리아레나'], 'jelly-hide': ['젤리 숨바꼭질', '숨바꼭질'], 'jelly-slide': ['젤리 슬라이드', '젤리슬라이드'], 'jelly-court': ['젤리궁정', '젤리뱅'], 'jelly-ding': ['젤리 땡', '젤리땡'], 'jelly-guard': ['젤리수호대', '젤리워치', 'jelly-watch'], 'jelly-tactical': ['젤리택티컬', '젤리어택', 'jelly-attack'], 'jelly-drop': ['젤리드롭', '젤리배그', 'jelly-bg'], 'jelly-drift': ['젤리드리프트', '젤리라이더', 'jelly-rider'], 'jelly-ten': ['젤리텐', '사과게임', 'jelly-apple'], 'jelly-word': ['끝말잇기'], 'jelly-draw': ['그림릴레이'], 'jelly-type': ['타자연습'], 'jelly-sketch': ['스케치퀴즈'], 'jelly-survivor': ['서바이버'] };
+export const GAMES = { 'jelly-city': ['젤리시티'], 'seoul-walk': ['젤리 서울 러너', '서울 러너', '서울 산책', '서울산책', '한강맵'], 'dream-runner': ['드림러너', '드림 러너'], 'jelly-rumble': ['젤리대소동', '젤리 가이즈', 'jelly-guys'], 'jelly-merge': ['젤리 머지', '젤리머지'], 'jelly-arena': ['젤리 아레나', '젤리아레나'], 'jelly-hide': ['젤리 숨바꼭질', '숨바꼭질'], 'jelly-slide': ['젤리 슬라이드', '젤리슬라이드'], 'jelly-court': ['젤리궁정', '젤리뱅'], 'jelly-ding': ['젤리 땡', '젤리땡'], 'jelly-guard': ['젤리수호대', '젤리워치', 'jelly-watch'], 'jelly-tactical': ['젤리택티컬', '젤리어택', 'jelly-attack'], 'jelly-drop': ['젤리드롭', '젤리배그', 'jelly-bg'], 'jelly-drift': ['젤리드리프트', '젤리라이더', 'jelly-rider'], 'jelly-ten': ['젤리텐', '사과게임', 'jelly-apple'], 'jelly-word': ['끝말잇기'], 'jelly-draw': ['그림릴레이'], 'jelly-type': ['타자연습'], 'jelly-sketch': ['스케치퀴즈'], 'jelly-survivor': ['서바이버'] };
 // 옛 이름은 새 이름으로
 const RENAME = [['젤리배그', '젤리드롭'], ['젤리워치', '젤리수호대'], ['젤리라이더', '젤리드리프트'], ['젤리어택', '젤리택티컬'], ['젤리 가이즈', '젤리대소동'], ['젤리뱅', '젤리궁정'], ['사과게임', '젤리텐'], ['젤리병단', '하늘갈고리']];
 // 다른 작품 · 실제 제품 이름: 이런 말이 든 줄은 싣지 않는다
@@ -18,13 +18,21 @@ const SKIP = new Set(['docs', 'ci', 'chore', 'style', 'test', 'build', 'refactor
 
 const clean = (s) => { for (const [a, b] of RENAME) s = s.split(a).join(b); return s.trim(); };
 const safe = (s) => !BLOCK.test(s) && !TECH.test(s);
-function gamesOf(text) { const out = Object.entries(GAMES).filter(([id, names]) => text.includes(id) || names.some((n) => text.includes(n))).map(([id]) => id); return out.length ? out : ['all']; }
+// 드림 러너로 적었지만 서울 산책 이야기인 글 (서울 산책이 드림 러너 안에 있던 때)
+const SEOUL_HINT = /서울|한강|여의도|홍대|이태원|반포|뚝섬|성수|북촌|인사동|명동|잠실|남산|강남|신촌|지하철|버스 |날기|가게|철교|열차|외벽|건물|IFC|도로명|간판/;
+function gamesOf(text, all = text) {
+  let out = Object.entries(GAMES).filter(([id, names]) => text.includes(id) || names.some((n) => text.includes(n))).map(([id]) => id);
+  // 서울 산책은 예전에 드림 러너 안에 있어서 글에 '드림 러너' 가 같이 나온다 → 서울 쪽으로만
+  if (out.includes('dream-runner') && SEOUL_HINT.test(all)) out = [...new Set(out.map((g) => (g === 'dream-runner' ? 'seoul-walk' : g)))];
+  if (out.includes('seoul-walk')) out = out.filter((g) => g !== 'dream-runner');
+  return out.length ? out : ['all'];
+}
 export function toEntry(sha, date, raw) {
   const lines = raw.split('\n').filter((l) => !/^(Co-Authored-By|Signed-off-by):/i.test(l));
   if (raw.includes('[노트없음]')) return null;
   const head = /^([a-z]+)(?:\s*·\s*[a-z]+)*(?:\(([^)]*)\))?:\s*(.*)$/.exec(lines[0] || '');
   if (head && SKIP.has(head[1])) return null;
-  const title = clean(head ? head[3] : lines[0] || ''), games = gamesOf(`${head?.[2] || ''} ${lines[0] || ''}`);
+  const title = clean(head ? head[3] : lines[0] || ''), games = gamesOf(`${head?.[2] || ''} ${lines[0] || ''}`, lines.join(' '));
   const items = lines.slice(1).filter((l) => /^\s*-\s/.test(l)).map((l) => clean(l.replace(/^\s*-\s*/, ''))).filter(safe);
   const name = GAMES[games[0]]?.[0] || '젤리 게임즈';
   return { d: date, g: games, t: head?.[1] === 'fix' ? 'fix' : /새 게임|새 영웅/.test(title) ? 'new' : 'up', c: [sha], title: safe(title) && title ? title : `${name} 업데이트`, items };
