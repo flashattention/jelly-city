@@ -1133,7 +1133,7 @@ $('hg-slow').onclick = () => hgStep(-1); $('hg-fast').onclick = () => hgStep(1);
 const CAMS = ['🎥 뒤에서', '🌊 강 쪽 옆에서', '🚁 높이서'];
 $('hg-cam').onclick = () => { hg.opt.cam = ((hg.opt.cam || 0) + 1) % 3; hgSave(); toast(CAMS[hg.opt.cam], 1200); };
 addEventListener('keydown', (e) => {
-  if (game.mode !== 'hangang') return;
+  if (game.mode !== 'hangang' || isTyping()) return;
   if (e.code === 'KeyV') $('hg-cam').onclick();
   if (e.code === 'Escape' && !$('hg-set').classList.contains('hidden')) $('hg-set').classList.add('hidden'); // Esc 로는 나가지 않는다: 나가기는 오른쪽 위 ✕ 로만
   if (e.code === 'KeyE' && !e.repeat && !hg.attr?.act()) hgStep(1); // 명소 가까이 · 체험 중이면 E = 체험하기

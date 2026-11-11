@@ -1,8 +1,11 @@
 // 남산 정상 (지도 kind 'summit'): 정상 광장은 높이 0, 서울은 발아래로 (도시 · 한강 · 먼 건물을 drop 만큼 내린다)
 //   숲으로 덮인 산비탈 · N서울타워(흰 콘크리트 기둥 · 전망대 · 빨강 · 흰 안테나 · 밤 색조명) · 사랑의 자물쇠 울타리 · 팔각정 · 봉수대 · 케이블카
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const lam = (o) => new THREE.MeshLambertMaterial(o);
+const lerpN = (a, b, t) => a + (b - a) * t;
+const smooth01 = (t) => t * t * (3 - 2 * t);
 
 // world: 서울 전체(진짜 지형) — 산 · 발아래로 내리기 · 걷는 범위는 빼고 타워 · 광장 · 자물쇠 · 케이블카 · 전망대 · 비탈 숲만 (지형 높이는 칸을 얹을 때 더해진다)
 export function buildSummit(hg, { world = false } = {}) {
@@ -46,21 +49,48 @@ export function buildSummit(hg, { world = false } = {}) {
   hg.addCircle(cx, cz, 6, 300);
   // 기단 건물 둘레 테라스 바닥 (돌)
   const plaza = new THREE.Mesh(new THREE.CircleGeometry(28, 48), lam({ color: '#cfc8bb' })); plaza.rotation.x = -Math.PI / 2; plaza.position.set(cx, 0.02, cz); sc.add(plaza);
-  // 4) 사랑의 자물쇠: 타워 둘레 울타리에 색색 자물쇠가 빼곡
-  { const N = 1800, rr = 34, lg = new THREE.BoxGeometry(0.12, 0.14, 0.05), im = new THREE.InstancedMesh(lg, lam({ color: '#ffffff' }), N), oo = new THREE.Object3D(), c3 = new THREE.Color(); for (let i = 0; i < N; i++) { const a = (i / N) * Math.PI * 2 * 0.62 + 2.2, y = 0.35 + Math.random() * 0.95, jit = (Math.random() - 0.5) * 0.06; oo.position.set(cx + Math.cos(a) * (rr + jit), y, cz + Math.sin(a) * (rr + jit)); oo.rotation.set(0, -a, (Math.random() - 0.5) * 0.6); oo.updateMatrix(); im.setMatrixAt(i, oo.matrix); im.setColorAt(i, c3.set(['#ff4d6d', '#ffd23f', '#4fc3ff', '#7be07b', '#ff9ec0', '#b57bff', '#ffffff', '#ff8a3d'][i % 8])); } sc.add(im);
-    const railM = lam({ color: '#5a5f66' }); for (const y of [0.3, 1.35]) { const rail = new THREE.Mesh(new THREE.TorusGeometry(rr, 0.04, 4, 120, Math.PI * 2 * 0.62), railM); rail.rotation.x = Math.PI / 2; rail.rotation.z = -2.2; rail.position.set(cx, y, cz); sc.add(rail); } }
+  // 4) 사랑의 자물쇠: 타워 둘레 울타리(기둥 · 난간 세 줄)에 색색 자물쇠가 난간마다 빼곡히 매달린다. 서울 전체에선 건물이 있는 자리는 건너뛴다
+  { const rr = 34, A0 = 2.2, A1 = 2.2 + Math.PI * 2 * 0.62, STEP = 1.8 / rr, pts = [], RAILS = [0.45, 0.8, 1.15];
+    for (let a = A0; a <= A1 + 1e-6; a += STEP) { const x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr; pts.push({ a, x, z, ok: !world || hg.groundAt(x, z, 9999) <= 0 }); }
+    const fp = []; const box = (w, h, d, x, y, z, ry) => { const g = new THREE.BoxGeometry(w, h, d); g.rotateY(ry); g.translate(x, y, z); fp.push(g); };
+    const segs = []; for (let k = 0; k < pts.length; k++) { const p = pts[k]; if (!p.ok) continue; box(0.08, 1.3, 0.08, p.x, 0.65, p.z, -p.a); const q = pts[k + 1]; if (q?.ok) { const L2 = Math.hypot(q.x - p.x, q.z - p.z), ry = Math.atan2(q.x - p.x, q.z - p.z) + Math.PI / 2; for (const y of RAILS) box(L2, 0.035, 0.035, (p.x + q.x) / 2, y, (p.z + q.z) / 2, ry); segs.push([p, q]); } }
+    if (fp.length) sc.add(new THREE.Mesh(mergeGeometries(fp), lam({ color: '#5a5f66' })));
+    // 자물쇠: 몸통 + 고리 (흰색 모양을 인스턴스 색으로 칠한다)
+    const body = new THREE.BoxGeometry(0.07, 0.075, 0.028); body.translate(0, -0.05, 0); const shk = new THREE.TorusGeometry(0.024, 0.006, 4, 10, Math.PI); shk.translate(0, -0.012, 0); const lg = mergeGeometries([body.toNonIndexed(), shk.toNonIndexed()]);
+    const N = Math.min(3200, segs.length * 34), im = new THREE.InstancedMesh(lg, new THREE.MeshPhongMaterial({ color: '#ffffff', shininess: 60 }), Math.max(1, N)), oo = new THREE.Object3D(), c3 = new THREE.Color(), PAL = ['#ff4d6d', '#ffd23f', '#4fc3ff', '#7be07b', '#ff9ec0', '#b57bff', '#ffffff', '#ff8a3d', '#d9dde2', '#c9a24a'];
+    let s0 = 7; const R = () => ((s0 = (s0 * 16807) % 2147483647) / 2147483647);
+    for (let i = 0; i < N; i++) { const [p, q] = segs[Math.floor(R() * segs.length)], t = R(), y = RAILS[Math.floor(R() * 3)], side = R() < 0.5 ? -0.03 : 0.03, a = p.a + (q.a - p.a) * t; oo.position.set(p.x + (q.x - p.x) * t + Math.cos(a) * side, y - R() * 0.03, p.z + (q.z - p.z) * t + Math.sin(a) * side); oo.rotation.set(0, Math.PI / 2 - a, (R() - 0.5) * 0.5); const sz = 0.8 + R() * 0.6; oo.scale.set(sz, sz, sz); oo.updateMatrix(); im.setMatrixAt(i, oo.matrix); im.setColorAt(i, c3.set(PAL[Math.floor(R() * PAL.length)])); }
+    im.count = N; sc.add(im);
+    const LF = { cx, cz, r: rr, a0: A0, a1: A1, ok: segs.map(([p, q]) => [p.a, q.a]), rails: RAILS }; hg.lockFence = LF; if (world) hg.host.lockFence = LF; }
   // 5) 팔각정 · 봉수대 (이정표 자리 옆)
   const markAt = (re, lat) => { const m = (M.marks || []).find(([nm]) => re.test(nm)); return m ? hg.world(m[1], lat) : null; };
   const pv = markAt(/팔각정/, 10); if (pv) { const g = new THREE.Group(); g.position.set(pv[0], 0, pv[1]); sc.add(g); const base = new THREE.Mesh(new THREE.CylinderGeometry(7.2, 7.6, 0.8, 8), lam({ color: '#b9b0a0' })); base.position.y = 0.4; g.add(base); for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + Math.PI / 8, col2 = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 3.6, 10), lam({ color: '#9a2a1e' })); col2.position.set(Math.cos(a) * 5.6, 2.6, Math.sin(a) * 5.6); g.add(col2); hg.addCircle(pv[0] + Math.cos(a) * 5.6, pv[1] + Math.sin(a) * 5.6, 0.3, 4.4); }
     const beam = new THREE.Mesh(new THREE.CylinderGeometry(6.0, 6.0, 0.6, 8, 1, true), lam({ color: '#2f7a6a', side: THREE.DoubleSide })); beam.position.y = 4.5; g.add(beam); const roof = new THREE.Mesh(new THREE.ConeGeometry(8.6, 3.6, 8, 1), lam({ color: '#4a4e55' })); roof.position.y = 6.5; roof.scale.y = 0.85; g.add(roof); const eave = new THREE.Mesh(new THREE.CylinderGeometry(8.9, 8.9, 0.25, 8), lam({ color: '#3a3e44' })); eave.position.y = 5.0; g.add(eave); const knob = new THREE.Mesh(new THREE.SphereGeometry(0.4, 10, 8), lam({ color: '#c9a24a' })); knob.position.y = 8.2; g.add(knob); }
   const bs = markAt(/봉수대/, 12); if (bs) for (let i = 0; i < 5; i++) { const g = new THREE.Group(); g.position.set(bs[0] + (i - 2) * 4.2, 0, bs[1]); sc.add(g); const mound = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.8, 1.4, 12), lam({ color: '#a59a88' })); mound.position.y = 0.7; g.add(mound); const chim = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 1.1, 2.2, 12), lam({ color: '#b8ad9a' })); chim.position.y = 2.5; g.add(chim); const top = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.75, 0.3, 12), dark); top.position.y = 3.7; g.add(top); hg.addCircle(g.position.x, g.position.z, 1.8, 3.8); }
-  // 6) 케이블카: 위 정류장(지도 건물) → 북쪽 아래로 줄 두 개 + 오가는 빨간 · 노란 객차
-  { const kn = M.names.indexOf('남산케이블카'); let kx = 0, kz = 0, kc = 0; for (const b of M.buildings) if (b[4] === kn) for (let k = 7; k < b.length; k += 2) { kx += b[k] * S; kz += b[k + 1] * S; kc++; }
-    if (kc) { kx /= kc; kz /= kc; const dir = new THREE.Vector3(kx - cx, 0, kz - cz).normalize(), L = 600, end = new THREE.Vector3(kx + dir.x * L, world ? 8 : -150, kz + dir.z * L), start = new THREE.Vector3(kx, 8, kz), side = new THREE.Vector3(-dir.z, 0, dir.x);
-      for (const sd of [-1.6, 1.6]) { const g = new THREE.BufferGeometry().setFromPoints([start.clone().addScaledVector(side, sd), end.clone().addScaledVector(side, sd)]); sc.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: '#2a2a2a' }))); }
-      hg.cable = { start, end, side, cabins: [0, 1].map((k) => { const cab = new THREE.Group(), body = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.2, 3.4), lam({ color: k ? '#ffd23f' : '#d8352a' })); body.position.y = -2.4; cab.add(body); const win = new THREE.Mesh(new THREE.BoxGeometry(2.64, 0.9, 3.0), lam({ color: '#2a3442', emissive: '#ffe8b0', emissiveIntensity: 0.2 })); win.position.y = -2.1; cab.add(win); const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.4, 0.12), dark); arm.position.y = -0.7; cab.add(arm); cab.userData.noDrape = true; sc.add(cab); return { cab, k }; }), t: 0 };
-      // 진짜 지형: 줄(선)은 칸을 얹을 때 양 끝 땅 높이가 더해진다. 객차가 다니는 길도 같은 높이로
-      if (world) { hg.cable.start = start.clone().setY(8 + H(start.x, start.z)); hg.cable.end = end.clone().setY(8 + H(end.x, end.z)); } } }
+  // 6) 케이블카: 위 정류장(타워에 가까운 지도 건물) ↔ 아래 정류장(회현 쪽, 서울 전체에선 실제 건물 · 없으면 600m 아래로) — 줄 두 가닥(처짐) + 서로 엇갈려 오가는 빨간 · 노란 객차 (두 대가 한 줄에 매달려 반대로 움직인다)
+  { const kn = M.names.indexOf('남산케이블카'), sts = [];
+    for (const b of M.buildings) if (b[4] === kn) { let x = 0, z = 0, n = 0; for (let k = 7; k < b.length; k += 2) { x += b[k] * S; z += b[k + 1] * S; n++; } sts.push([x / n, z / n]); }
+    sts.sort((a, b) => Math.hypot(a[0] - cx, a[1] - cz) - Math.hypot(b[0] - cx, b[1] - cz));
+    if (sts.length) { const [kx, kz] = sts[0], low = world ? sts.find((q) => Math.hypot(q[0] - kx, q[1] - kz) > 200) : null, dir = low ? new THREE.Vector3(low[0] - kx, 0, low[1] - kz).normalize() : new THREE.Vector3(kx - cx, 0, kz - cz).normalize(), L = low ? Math.hypot(low[0] - kx, low[1] - kz) : 600;
+      const start = new THREE.Vector3(kx, 8 + H(kx, kz), kz), end = new THREE.Vector3(kx + dir.x * L, world ? 8 + H(kx + dir.x * L, kz + dir.z * L) : -150, kz + dir.z * L), side = new THREE.Vector3(-dir.z, 0, dir.x), SAG = 14;
+      // 줄 높이: 양 끝을 잇는 처진 줄, 서울 전체에선 숲 위로 넉넉히 (땅 + 26m, 정류장 가까이는 낮게) — 부드럽게 다듬는다
+      const NP = 48, prof = []; for (let k = 0; k <= NP; k++) { const u = k / NP, x = lerpN(start.x, end.x, u), z = lerpN(start.z, end.z, u), chord = lerpN(start.y, end.y, u) - Math.sin(u * Math.PI) * SAG, clr = 8 + 18 * Math.min(1, Math.min(u, 1 - u) / 0.12); prof.push(world ? Math.max(chord, H(x, z) + clr) : chord); }
+      for (let pass = 0; pass < 4; pass++) for (let k = 1; k < NP; k++) prof[k] = (prof[k - 1] + prof[k] * 2 + prof[k + 1]) / 4;
+      const at = (u, sd) => { const f = Math.max(0, Math.min(NP - 1e-6, u * NP)), i = Math.floor(f); return start.clone().lerp(end, u).addScaledVector(side, sd).setY(lerpN(prof[i], prof[i + 1], f - i)); };
+      const lm = new THREE.LineBasicMaterial({ color: '#26282c' }); for (const sd of [-1.6, 1.6]) { const pts = []; for (let k = 0; k <= 40; k++) pts.push(at(k / 40, sd).setY(at(k / 40, sd).y + 0.02)); const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lm); ln.userData.noDrape = true; sc.add(ln); }
+      // 객차: 바닥 · 둥근 지붕 · 네 귀퉁이 기둥 · 큰 유리(안에 탄 곰이 보인다) · 색 띠 · 매달린 팔 · 줄을 잡는 바퀴
+      const glassM = new THREE.MeshPhongMaterial({ color: '#bfd8e6', transparent: true, opacity: 0.28, shininess: 90, depthWrite: false, side: THREE.DoubleSide });
+      hg.cable = { start, end, side, at, cabins: [0, 1].map((k) => { const cab = new THREE.Group(), col = k ? '#f2c230' : '#d8352a', paint = lam({ color: col }), steel = lam({ color: '#c9ccd0' });
+        const floor = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.35, 3.8), paint); floor.position.y = -3.4; cab.add(floor);
+        const skirt = new THREE.Mesh(new THREE.BoxGeometry(2.74, 0.3, 3.84), paint); skirt.position.y = -3.2; cab.add(skirt);
+        const roof = new THREE.Mesh(new THREE.BoxGeometry(2.86, 0.32, 3.96), paint); roof.position.y = -1.0; cab.add(roof); const roof2 = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.22, 3.2), steel); roof2.position.y = -0.74; cab.add(roof2);
+        for (const [x, z] of [[-1.3, -1.85], [1.3, -1.85], [-1.3, 1.85], [1.3, 1.85]]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.8, 0.1), steel); p.position.set(x, -2.0, z); cab.add(p); }
+        const glass = new THREE.Mesh(new THREE.BoxGeometry(2.62, 1.75, 3.74), glassM); glass.position.y = -2.0; glass.renderOrder = 2; cab.add(glass);
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.2, 0.16), dark); arm.position.y = -0.62; cab.add(arm);
+        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.24, 1.6), dark); grip.position.y = 0; cab.add(grip); for (const z of [-0.6, 0.6]) { const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.12, 12), steel); wh.rotation.z = Math.PI / 2; wh.position.set(0, 0.12, z); cab.add(wh); }
+        const lamp = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.05, 2.8), new THREE.MeshBasicMaterial({ color: '#fff1cf', transparent: true, opacity: 0.0 })); lamp.position.y = -1.18; cab.add(lamp); cab.userData.lamp = lamp;
+        cab.userData.noDrape = true; sc.add(cab); return { cab, k }; }), t: 0 };
+      if (world) hg.host.cableRef = hg.cable; } }
   // 7) 전망대 안 (실제 높이 140m): 바닥 · 천장 · 유리창 틀 · 가운데 엘리베이터 기둥 · 망원경 · 경치 보는 곰. 바깥이 진짜로 내려다보인다
   const DY = 140, DR = 12.6, deck = new THREE.Group(); deck.position.set(cx, DY, cz); sc.add(deck);
   const fl = new THREE.Mesh(new THREE.RingGeometry(4.6, DR, 48), lam({ color: '#c9b49a', side: THREE.DoubleSide })); fl.rotation.x = -Math.PI / 2; fl.position.y = 0.02; deck.add(fl);
@@ -85,5 +115,6 @@ export function tickSummit(hg, dt, lit) {
   if (hg.towerGlowM) { const h = (hg.time * 0.01) % 1; hg.towerGlowM.color.setHSL(0.62 + Math.sin(h * Math.PI * 2) * 0.12, 0.7, 0.55); hg.towerGlowM.opacity = lit * 0.45; }
   if (hg.towerWinM) hg.towerWinM.emissiveIntensity = 0.15 + lit * 0.85;
   if (hg.towerTip) hg.towerTip.visible = Math.sin(hg.time * 3) > -0.2;
-  const C = hg.cable; if (C) { C.t = (C.t + dt / 90) % 1; for (const { cab, k } of C.cabins) { const u = k ? 1 - C.t : C.t, p = C.start.clone().lerp(C.end, u).addScaledVector(C.side, k ? 1.6 : -1.6); p.y -= Math.sin(u * Math.PI) * 18; cab.position.copy(p); } }
+  // 케이블카: 90초에 한 번 오르내림. 명소 체험으로 타는 동안은 C.hold(0 = 위 정류장 ~ 1 = 아래)로 그 자리에 (정류장에선 잠깐 멈춘다)
+  const C = hg.cable; if (C) { if (C.hold != null) C.t = C.hold; else { C.ph = ((C.ph || 0) + dt / 110) % 1; const p = C.ph; C.t = p < 0.06 ? 0 : p < 0.5 ? smooth01((p - 0.06) / 0.44) : p < 0.56 ? 1 : 1 - smooth01((p - 0.56) / 0.44); } for (const { cab, k } of C.cabins) { const u = k ? 1 - C.t : C.t; cab.position.copy(C.at(u, k ? 1.6 : -1.6)); cab.userData.lamp.material.opacity = lit * 0.9; } }
 }

@@ -446,3 +446,105 @@ registerAttraction({
     };
   },
 });
+
+// ============================================================
+// 남산 케이블카: 회현 쪽 아래 정류장 ↔ 정상 아래 위 정류장 (실제 건물 자리, 줄 두 가닥에 객차 두 대가 엇갈린다)
+//   타면 문이 닫히고 → 줄을 따라 오르내리며(객차 밖에서 보는 시점, 마우스로 돌려 보기) → 반대편 정류장에 내린다
+// ============================================================
+const CABLE_LOW = [355.6, -2946.3], CABLE_TOP = [649.6, -2481.8];
+// 판 글씨 (정류장 · 선착장 · 대여소 안내판)
+export function signTex(text, sub, bg = '#1d3b2f', fg = '#fff6dc') { const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128; const c = cv.getContext('2d'); c.fillStyle = bg; c.fillRect(0, 0, 512, 128); c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 4; c.strokeRect(6, 6, 500, 116); c.fillStyle = fg; c.textAlign = 'center'; c.font = 'bold 54px "Jua", sans-serif'; c.fillText(text, 256, sub ? 66 : 82); if (sub) { c.font = '28px sans-serif'; c.globalAlpha = 0.8; c.fillText(sub, 256, 108); } const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
+// 정류장 지붕: 줄 끝을 감는 큰 바퀴 · 철골 문틀 · 지붕 · 타는 곳 바닥 · '케이블카 타는 곳' 판 (밤에 불)
+function buildCable(A) {
+  const hg = A.hg, g = new THREE.Group(); A.root.add(g); const C = hg.cableRef;
+  const ends = C ? [[C.end.x, C.end.z, C.end.y, -1], [C.start.x, C.start.z, C.start.y, 1]] : [];
+  const parts = [];
+  for (const [x, z, cy, sgn] of ends) {
+    // u = 줄이 정류장 밖으로 나가는 쪽
+    const dx = sgn > 0 ? C.end.x - C.start.x : C.start.x - C.end.x, dz = sgn > 0 ? C.end.z - C.start.z : C.start.z - C.end.z, L = Math.hypot(dx, dz), ux = dx / L, uz = dz / L, ry = Math.atan2(ux, uz), gy = A.H(x, z);
+    for (const o of [-3, 4]) { const px = x - ux * o, pz = z - uz * o; for (const sd of [-2.6, 2.6]) parts.push(part(new THREE.BoxGeometry(0.35, cy - gy + 1.5, 0.35), '#5f6670', px + uz * sd, gy + (cy - gy + 1.5) / 2, pz - ux * sd)); parts.push(part(new THREE.BoxGeometry(5.6, 0.45, 0.45), '#5f6670', px, cy + 1.3, pz, 0, ry + Math.PI / 2, 0)); }
+    parts.push(part(new THREE.BoxGeometry(7.2, 0.3, 11), '#e8e4dc', x - ux * 0.5, cy + 1.9, z - uz * 0.5, 0, ry, 0), part(new THREE.BoxGeometry(7.4, 0.5, 11.2), '#2f6b4f', x - ux * 0.5, cy + 2.2, z - uz * 0.5, 0, ry, 0));
+    parts.push(part(new THREE.CylinderGeometry(1.9, 1.9, 0.3, 28), '#3a3f47', x - ux * 4.6, cy + 0.9, z - uz * 4.6), part(new THREE.CylinderGeometry(0.3, 0.3, 1.2, 10), '#3a3f47', x - ux * 4.6, cy + 1.4, z - uz * 4.6));
+    parts.push(part(new THREE.BoxGeometry(3.2, 0.3, 8), '#b9b3a8', x + uz * 3.8, cy - 3.55, z - ux * 3.8, 0, ry, 0));
+    const sg = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 1.15), new THREE.MeshLambertMaterial({ map: signTex('케이블카 타는 곳', sgn > 0 ? '남산 정상 · N서울타워' : '회현 · 명동 방면'), emissive: '#ffffff', emissiveIntensity: 0.15, side: THREE.DoubleSide }));
+    sg.material.emissiveMap = sg.material.map; sg.position.set(x - ux * 0.5 + uz * 3.75, cy + 2.95, z - uz * 0.5 - ux * 3.75); sg.rotation.y = ry + Math.PI / 2; g.add(sg); A.addLit((lit) => { sg.material.emissiveIntensity = 0.15 + lit * 0.9; });
+  }
+  if (parts.length) g.add(new THREE.Mesh(merge(parts), vcMat()));
+  return { group: g, dispose() { g.traverse((o) => o.geometry?.dispose?.()); } };
+}
+function cableStart(A) {
+  const hg = A.hg, C = hg.cableRef; if (!C) { hg.onToast?.('케이블카를 불러오는 중이에요'); return null; }
+  const fromLow = Math.hypot(hg.px - C.end.x, hg.pz - C.end.z) < Math.hypot(hg.px - C.start.x, hg.pz - C.start.z), cab = C.cabins[0].cab, dir = new THREE.Vector3(C.start.x - C.end.x, 0, C.start.z - C.end.z).normalize();
+  const T0 = 3.5, T1 = 52, T2 = 3; let yaw0 = null;
+  return {
+    title: fromLow ? '남산 케이블카 · 올라가는 길' : '남산 케이블카 · 내려가는 길', lock: true,
+    status() { const t = this.t; if (t < T0) return '🔔 문이 닫혀요… 손잡이를 잡아요'; if (t < T0 + T1) { const k = (t - T0) / T1, p = fromLow ? k : 1 - k; return `${Math.round(p * 100)}% · 땅에서 ${Math.max(0, Math.round(cab.position.y - 3.4 - A.H(cab.position.x, cab.position.z)))}m · 마우스로 둘러보기`; } return '🔔 도착했어요! 문이 열려요'; },
+    tick() {
+      const t = this.t, k = clamp((t - T0) / T1, 0, 1), e2 = k * k * (3 - 2 * k), p = fromLow ? e2 : 1 - e2; C.hold = 1 - p;
+      const q = C.at(C.hold, -1.6); cab.position.copy(q);
+      hg.px = q.x; hg.pz = q.z; hg.y = q.y - 3.22 - hg.terrAt(q.x, q.z); hg.vy = 0; hg.v = 0; hg.flying = false; hg.face = Math.atan2(fromLow ? dir.x : -dir.x, fromLow ? dir.z : -dir.z) + Math.PI / 2;
+      if (yaw0 == null) { yaw0 = hg.face + Math.PI * 0.75; hg.camYaw = yaw0; hg.camPitch = 0.15; }
+      if (t > T0 + T1 + T2) A.finish(this);
+    },
+    floor(x, z) { return Math.hypot(x - cab.position.x, z - cab.position.z) < 3 ? cab.position.y - 3.22 - hg.terrAt(x, z) : -1; },
+    cam(camera, dt) { const c = cab.position, d = 15, pt = clamp(hg.camPitch ?? 0.15, -0.3, 1.0), yaw = hg.camYaw; const tx = c.x - Math.sin(yaw) * Math.cos(pt) * d, ty = c.y - 1.6 + Math.sin(pt) * d + 2, tz = c.z - Math.cos(yaw) * Math.cos(pt) * d, want = new THREE.Vector3(tx, Math.max(ty, A.H(tx, tz) + 6), tz); if (this.t < 0.1) camera.position.copy(want); else camera.position.lerp(want, 1 - Math.exp(-dt * 6)); camera.lookAt(c.x, c.y - 2.2, c.z); },
+    end(quit) { C.hold = null; C.ph = fromLow ? 0.5 : 0; const up = fromLow !== !!quit, ex = up ? C.start : C.end, s = up ? 1 : -1, x = ex.x + dir.x * 9 * s, z = ex.z + dir.z * 9 * s; hg.placeAt(x, z, Math.atan2(dir.x * s, dir.z * s)); },
+    where() { return '케이블카 안'; },
+  };
+}
+registerAttraction({
+  id: 'cable', name: '남산 케이블카', seal: '케이블카', icon: '🚡', x: CABLE_LOW[0], z: CABLE_LOW[1], pts: [CABLE_LOW, CABLE_TOP], r: 24, buildR: 1600,
+  go: [CABLE_LOW[0] - 14, CABLE_LOW[1] - 8, 0.6], intro: '회현 쪽 정류장 ↔ 남산 정상, 줄에 매달린 객차로 오르내려요',
+  build: buildCable, start: cableStart,
+});
+
+// ============================================================
+// 사랑의 자물쇠: N서울타워 아래 울타리에 색 · 글씨를 골라 내 자물쇠를 건다 (이 기기에 기억 · 다시 오면 그대로)
+// ============================================================
+const LOCK_KEY = 'dreamrunner.hangang.locks', LOCK_COL = ['#ff4d6d', '#ffd23f', '#4fc3ff', '#7be07b', '#ff9ec0', '#b57bff', '#ff8a3d', '#f4f1e8'];
+const locksSaved = () => { try { return JSON.parse(localStorage.getItem(LOCK_KEY) || '[]') || []; } catch { return []; } };
+function lockMesh(c, text) {
+  const g = new THREE.Group(), m = new THREE.MeshPhongMaterial({ color: c, shininess: 80, specular: '#ffffff' }), steel = new THREE.MeshPhongMaterial({ color: '#d9dde2', shininess: 120 });
+  // 하트 몸통 · 고리
+  const sh = new THREE.Shape(); sh.moveTo(0, -0.11); sh.bezierCurveTo(0.02, -0.07, 0.11, -0.04, 0.11, 0.02); sh.bezierCurveTo(0.11, 0.07, 0.06, 0.09, 0, 0.05); sh.bezierCurveTo(-0.06, 0.09, -0.11, 0.07, -0.11, 0.02); sh.bezierCurveTo(-0.11, -0.04, -0.02, -0.07, 0, -0.11);
+  const body = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.035, bevelEnabled: true, bevelSize: 0.008, bevelThickness: 0.008, bevelSegments: 2 }), m); body.position.z = -0.02; g.add(body);
+  const sk = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.009, 6, 16, Math.PI), steel); sk.position.y = 0.06; g.add(sk);
+  if (text) { const cv = document.createElement('canvas'); cv.width = 128; cv.height = 64; const x = cv.getContext('2d'); x.fillStyle = '#fff'; x.font = 'bold 30px "Jua", sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text.slice(0, 8), 64, 34); const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; const lab = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.085), new THREE.MeshBasicMaterial({ map: t, transparent: true })); lab.position.set(0, 0.0, 0.03); g.add(lab); }
+  return g;
+}
+function lockFence(hg) { return hg.lockFence || null; }
+function buildLocks(A) {
+  const hg = A.hg, g = new THREE.Group(); A.root.add(g);
+  // 울타리(남산 칸)가 아직 안 만들어졌으면 만들어진 뒤에 건다
+  const B = { group: g, shown: false, tick() { if (!this.shown && lockFence(hg)) this.show(); }, show() { const F = lockFence(hg); while (g.children.length) g.remove(g.children[0]); if (!F) return; this.shown = true; for (const L of locksSaved()) { const x = F.cx + Math.cos(L.a) * (F.r - 0.05), z = F.cz + Math.sin(L.a) * (F.r - 0.05), m = lockMesh(L.c, L.t); m.position.set(x, A.H(x, z) + L.y, z); m.rotation.y = -Math.PI / 2 - L.a; m.scale.setScalar(0.9); g.add(m); } }, dispose() { g.traverse((o) => { o.geometry?.dispose?.(); o.material?.map?.dispose?.(); }); } };
+  B.show(); return B;
+}
+function lockStart(A) {
+  const hg = A.hg, F = lockFence(hg), B = A.built.get('lock'); if (!F || !B) return null;
+  let a = Math.atan2(hg.pz - F.cz, hg.px - F.cx); if (a < F.a0) a += Math.PI * 2; a = clamp(a, F.a0 + 0.02, F.a1 - 0.02);
+  // 건물에 막힌 곳이면 가장 가까운 난간으로
+  if (F.ok?.length && !F.ok.some(([p, q]) => a >= p && a <= q)) { let best = a, bd = Infinity; for (const [p, q] of F.ok) { const m = (p + q) / 2; if (Math.abs(m - a) < bd) { bd = Math.abs(m - a); best = m; } } a = best; }
+  // 울타리 앞에 서서 바깥(서울 쪽)을 본다
+  const sx = F.cx + Math.cos(a) * (F.r - 1.1), sz = F.cz + Math.sin(a) * (F.r - 1.1); hg.placeAt(sx, sz, Math.atan2(Math.cos(a), Math.sin(a))); hg.camYaw = hg.face + 0.5; hg.camPitch = 0.12;
+  const ui = document.createElement('div'); ui.id = 'at-lock'; ui.style.cssText = 'position:absolute;left:50%;bottom:120px;transform:translateX(-50%);padding:12px 14px;border-radius:18px;background:rgba(14,20,36,.84);backdrop-filter:blur(8px);color:#fff;font-family:Jua,sans-serif;z-index:7;text-align:center;max-width:calc(100vw - 32px)';
+  ui.innerHTML = `<div style="font-size:16px;margin-bottom:8px">💝 자물쇠 색을 고르고, 새길 글씨를 적어요</div><div class="cs" style="display:flex;gap:8px;justify-content:center;margin-bottom:10px">${LOCK_COL.map((c, i) => `<button data-i="${i}" style="width:30px;height:30px;border-radius:50%;border:3px solid ${i ? 'transparent' : '#fff'};background:${c};cursor:pointer"></button>`).join('')}</div><input maxlength="8" placeholder="이름 · 날짜 (8자)" style="font:16px system-ui;padding:8px 10px;border-radius:10px;border:0;width:180px;text-align:center"> <button class="go" style="border:0;border-radius:12px;padding:9px 14px;font-family:Jua,sans-serif;font-size:15px;background:linear-gradient(180deg,#ff8fa8,#ff4d6d);color:#fff;cursor:pointer">🔒 걸기</button>`;
+  document.getElementById('hg-hud').appendChild(ui); if (document.pointerLockElement) document.exitPointerLock?.();
+  let ci = 0, hung = null; for (const b of ui.querySelectorAll('.cs button')) b.onclick = () => { ci = +b.dataset.i; for (const o of ui.querySelectorAll('.cs button')) o.style.borderColor = 'transparent'; b.style.borderColor = '#fff'; };
+  const E = {
+    title: '사랑의 자물쇠', lock: true,
+    status() { return hung != null ? '찰칵! 울타리에 자물쇠를 걸었어요 · 다시 오면 그대로 있어요' : '울타리 앞 · 색과 글씨를 골라 걸어요'; },
+    hang() { if (hung != null) return; const L = locksSaved(), y = (F.rails || [0.8])[Math.floor(Math.random() * (F.rails || [0.8]).length)] - 0.02; this.hy = y; a += (Math.random() - 0.5) * 0.012; L.push({ a, y, c: LOCK_COL[ci], t: (ui.querySelector('input')?.value || '').trim().slice(0, 8), at: Date.now() }); while (L.length > 24) L.shift(); try { localStorage.setItem(LOCK_KEY, JSON.stringify(L)); } catch { /* 무시 */ } B.show(); hung = this.t; ui.remove(); A.drum(0.5, 600, 0.08); setTimeout(() => A.drum(0.4, 900, 0.06), 120); },
+    tick() { if (hung != null && this.t - hung > 3.4) A.finish(this); },
+    cam(camera) { if (hung == null) return; const x2 = F.cx + Math.cos(a) * F.r, z2 = F.cz + Math.sin(a) * F.r, h = A.H(x2, z2), x = F.cx + Math.cos(a) * (F.r - 0.62) - Math.sin(a) * 0.42, z = F.cz + Math.sin(a) * (F.r - 0.62) + Math.cos(a) * 0.42; camera.position.set(x, h + this.hy + 0.12, z); camera.lookAt(x2, h + this.hy - 0.03, z2); },
+    end() { ui.remove(); },
+  };
+  ui.querySelector('.go').onclick = () => E.hang(); E.act = () => E.hang(); E.actLabel = () => (hung != null ? '' : '🔒 걸기');
+  setTimeout(() => ui.querySelector('input')?.focus(), 50);
+  return E;
+}
+{ const D0 = [725, -2343]; registerAttraction({
+  id: 'lock', name: '사랑의 자물쇠', seal: '자물쇠', icon: '💝', x: D0[0] + Math.cos(3.6) * 34, z: D0[1] + Math.sin(3.6) * 34, r: 9, buildR: 900, go: [D0[0] + Math.cos(3.6) * 30, D0[1] + Math.sin(3.6) * 30, Math.atan2(Math.cos(3.6), Math.sin(3.6))],
+  pts: Array.from({ length: 16 }, (_, i) => { const a = 2.2 + (i / 15) * Math.PI * 2 * 0.62; return [D0[0] + Math.cos(a) * 33, D0[1] + Math.sin(a) * 33]; }),
+  intro: 'N서울타워 아래 울타리, 색과 글씨를 골라 내 자물쇠를 걸어요', verb: '자물쇠 걸기',
+  build: buildLocks, start: lockStart,
+}); }
