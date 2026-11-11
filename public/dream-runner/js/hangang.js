@@ -657,7 +657,7 @@ export class Hangang {
   }
   groundAt(x, z, y) {
     const cell = this.footGrid?.get(`${Math.floor(x / 40)},${Math.floor(z / 40)}`); let g = Math.max(0, this.deckAt(x, z, y));
-    if (cell) for (const fi of cell) { const f = this.foot[fi]; if (x < f.x0 || x > f.x1 || z < f.z0 || z > f.z1) continue; const fh = f.base === undefined ? f.h : f.h + f.base - this.terrAt(x, z); if (fh > g && y >= fh - 0.35 && inRing(x, z, f.ring)) g = fh; }
+    if (cell) for (const fi of cell) { const f = this.foot[fi]; if (x < f.x0 || x > f.x1 || z < f.z0 || z > f.z1) continue; const fh = f.base === undefined ? f.h : f.h + f.base - this.terrAt(x, z); if (fh > g && y >= fh - 0.35 && inRing(x, z, ringAtY(f, fh))) g = fh; }
     if (this.attrFloor) { const fa = this.attrFloor(x, z, y); if (fa > g) g = fa; }
     return g;
   }
@@ -670,7 +670,7 @@ export class Hangang {
       for (const fi of cells) {
         const f = this.foot[fi]; if (f.deck || (f.deckWall && y < f.h - 5)) continue; if (f.mh && y < f.mh - 1.8) continue; if (y >= (f.base === undefined ? f.h : f.h + f.base - this.terrAt(x, z)) - 0.35 || x < f.x0 - r || x > f.x1 + r || z < f.z0 - r || z > f.z1 + r) continue;
         // 가장 가까운 벽과 그 거리
-        let best = Infinity, bx = 0, bz = 0, bnx = 0, bnz = 0; const ring = f.ring, sgn = ringArea(ring) > 0 ? 1 : -1;
+        let best = Infinity, bx = 0, bz = 0, bnx = 0, bnz = 0; const ring = ringAtY(f, y), sgn = ringArea(ring) > 0 ? 1 : -1;
         for (let k = 0; k < ring.length; k++) { const a = ring[k], c = ring[(k + 1) % ring.length], ex = c[0] - a[0], ez = c[1] - a[1], L2 = ex * ex + ez * ez || 1, t = clamp(((x - a[0]) * ex + (z - a[1]) * ez) / L2, 0, 1), px = a[0] + ex * t, pz = a[1] + ez * t, d = Math.hypot(x - px, z - pz); if (d < best) { best = d; bx = px; bz = pz; const L = Math.sqrt(L2); bnx = (sgn > 0 ? ez : -ez) / L; bnz = (sgn > 0 ? -ex : ex) / L; } }
         const inside = inRing(x, z, ring);
         if (inside || best < r) { x = bx + bnx * r * 1.001; z = bz + bnz * r * 1.001; wall = { f, nx: bnx, nz: bnz }; hit = true; }
@@ -1396,7 +1396,7 @@ export class Hangang {
       const k = base(); for (const [x, z] of top) { set.P.push(x, h, z); set.N.push(0, 1, 0); set.U.push(0.003, 0.003); set.Cl.push(roofC.r, roofC.g, roofC.b); }
       for (const t of tris) { const [A, B, Cc] = t.map((v) => ring[v]); const up = (B[1] - A[1]) * (Cc[0] - A[0]) - (B[0] - A[0]) * (Cc[1] - A[1]); if (up > 0) set.I.push(k + t[0], k + t[1], k + t[2]); else set.I.push(k + t[0], k + t[2], k + t[1]); }
       let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length;
-      { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } const fi = (this.foot ||= []).length; this.foot.push({ ring, h, x0, x1, z0, z1, name, type, bi, mh: mh > 2.5 ? mh : undefined, base: curY === curY ? curY : undefined }); this.footGrid ||= new Map(); for (let gx = Math.floor(x0 / 40); gx <= Math.floor(x1 / 40); gx++) for (let gz = Math.floor(z0 / 40); gz <= Math.floor(z1 / 40); gz++) { const k = `${gx},${gz}`; if (!this.footGrid.has(k)) this.footGrid.set(k, []); this.footGrid.get(k).push(fi); } }
+      { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } const fi = (this.foot ||= []).length; this.foot.push({ ring: LM?.scale ? top : ring, h, x0, x1, z0, z1, name, type, bi, mh: mh > 2.5 ? mh : undefined, base: curY === curY ? curY : undefined, tp: LM?.taper && top !== ring ? tp : undefined }); this.footGrid ||= new Map(); for (let gx = Math.floor(x0 / 40); gx <= Math.floor(x1 / 40); gx++) for (let gz = Math.floor(z0 / 40); gz <= Math.floor(z1 / 40); gz++) { const k = `${gx},${gz}`; if (!this.footGrid.has(k)) this.footGrid.set(k, []); this.footGrid.get(k).push(fi); } }
       // 옥상 설비 (높은 건물)
       // 아파트 옆벽: 위쪽에 단지 이름 + 큰 동 번호 (한국 아파트처럼)
       if (type === 'apt' && h > 14) { const realNo = /(\d+)동$/.exec(name || '')?.[1], key = (name || '').replace(/\s*\d+동$/, '').replace(/\s*(아파트|APT)\s*/gi, '').replace(/\(.*?\)/g, '').trim().slice(0, 6); this.aptNo ||= {}; const no = realNo ? +realNo : (this.aptNo[key || '_'] = (this.aptNo[key || '_'] || 0) + 1) + (key ? 0 : 100); const edges = ring.map((a, i) => { const b = ring[(i + 1) % ring.length]; return { a, b, L: Math.hypot(b[0] - a[0], b[1] - a[1]) }; }).filter((e) => e.L > 6).sort((p, q) => p.L - q.L).slice(0, 2); for (const e of edges) { const mx = (e.a[0] + e.b[0]) / 2, mz = (e.a[1] + e.b[1]) / 2; let nx = mx - cx, nz = mz - cz; const nl = Math.hypot(nx, nz) || 1; nx /= nl; nz /= nl; (this.aptMarks ||= []).push({ x: mx + nx * 0.1, z: mz + nz * 0.1, y: h - 0.4, w: Math.min(e.L * 0.98, 18), hh: Math.min(10, h * 0.32), ry: Math.atan2(nx, nz), text: key, no }); } }
@@ -1407,8 +1407,8 @@ export class Hangang {
       // 거리 상가 옥상: 옥탑방 · 물탱크 · 난간 (골목 감성)
       if ((type === 'street' || type === 'street2') && h > 6) { const area = Math.abs(ringArea(ring)), w = Math.min(5, Math.sqrt(area) * 0.4); if (r() < 0.45) box(cx + (r() - 0.5) * w * 0.6, h + 1.3, cz + (r() - 0.5) * w * 0.6, w, 2.6, w * 0.8, new THREE.Color(['#e8e4dc', '#d9e3ea', '#f0e2d0', '#c9d8c4'][Math.floor(r() * 4)])); if (r() < 0.4) box(cx + (r() - 0.5) * w, h + 0.8, cz + (r() - 0.5) * w, 1.4, 1.6, 1.4, new THREE.Color(r() < 0.5 ? '#3d7fbf' : '#f2f2ee')); }
       // 높은 빌딩 옥상 헬리패드 (초록 바탕 · 흰 원 · H)
-      const area0 = Math.abs(ringArea(ring)), heli = h > 45 && area0 > 520 && !LANDMARKS[name]?.crown && !/63|IFC/.test(name) && r() < 0.8; if (heli) { let xx = 0, zz = 0, xz = 0; for (const [x, z] of ring) { const dx = x - cx, dz = z - cz; xx += dx * dx; zz += dz * dz; xz += dx * dz; } const ang = 0.5 * Math.atan2(2 * xz, xx - zz); let half = Infinity; for (const [x, z] of ring) half = Math.min(half, Math.hypot(x - cx, z - cz)); (this.helis ||= []).push([cx, h + 0.12, cz, Math.min(12, Math.sqrt(area0) * 0.26, half * 0.62), -ang]); }
-      if (h > 40 && !heli && !/63|IFC|파크원|전경련/.test(name)) { const area = Math.abs(ringArea(ring)), w = Math.sqrt(area) * 0.32; box(cx, h + 1.6, cz, w, 3.2, w * 0.8, new THREE.Color('#8e8c88')); }
+      const area0 = Math.abs(ringArea(ring)), heli = h > 45 && area0 > 520 && !LANDMARKS[name]?.crown && !LM?.taper && !/63|IFC/.test(name) && r() < 0.8; if (heli) { let xx = 0, zz = 0, xz = 0; for (const [x, z] of ring) { const dx = x - cx, dz = z - cz; xx += dx * dx; zz += dz * dz; xz += dx * dz; } const ang = 0.5 * Math.atan2(2 * xz, xx - zz); let half = Infinity; for (const [x, z] of ring) half = Math.min(half, Math.hypot(x - cx, z - cz)); (this.helis ||= []).push([cx, h + 0.12, cz, Math.min(12, Math.sqrt(area0) * 0.26, half * 0.62), -ang]); }
+      if (h > 40 && !heli && !LM?.taper && !/63|IFC|파크원|전경련/.test(name)) { const area = Math.abs(ringArea(ring)), w = Math.sqrt(area) * 0.32; box(cx, h + 1.6, cz, w, 3.2, w * 0.8, new THREE.Color('#8e8c88')); }
       // 파크원: 모서리를 따라 오르는 빨간 철골 기둥과 가로대
       if (/파크원|NH금융타워/.test(name)) { const red = new THREE.Color('#d8382a'); for (let i = 0; i < ring.length; i++) { const [x, z] = ring[i], ox = x + (x - cx) * 0.04, oz = z + (z - cz) * 0.04; box(ox, (mh + h) / 2, oz, 2.2, h - mh, 2.2, red); } for (let y = mh + 60; y < h - 20; y += 96) for (let i = 0; i < ring.length; i++) { const a = ring[i], c2 = ring[(i + 1) % ring.length], L = Math.hypot(c2[0] - a[0], c2[1] - a[1]); box((a[0] + c2[0]) / 2 + ((a[0] + c2[0]) / 2 - cx) * 0.04, y, (a[1] + c2[1]) / 2 + ((a[1] + c2[1]) / 2 - cz) * 0.04, L, 1.6, 1.2, red, -Math.atan2(c2[1] - a[1], c2[0] - a[0])); } }
       if (LANDMARKS[name]?.domeTop) { const D = LANDMARKS[name].domeTop; domes.push([cx, h, cz, D.r, D.h, D.c, curY]); }
@@ -2062,6 +2062,7 @@ export class Hangang {
       // 벽 타기: 앞(W)으로 오르고 뒤(S)로 내려가고, 옆(A · D)으로 게걸음 · 점프하면 벽에서 떨어진다
       const C = this.climb, up = (inp.mz || 0), side = (inp.mx || 0);
       this.y = clamp(this.y + up * 6.8 * dt, 0, C.top);
+      if (C.f.tp) { const w = wallNear(ringAtY(C.f, this.y), this.px, this.pz); if (w) { this.px = w.x + w.nx * R0 * 1.001; this.pz = w.z + w.nz * R0 * 1.001; C.nx = w.nx; C.nz = w.nz; } }
       const tx = -C.nz, tz = C.nx; let nx = this.px + tx * side * 4.4 * dt, nz = this.pz + tz * side * 4.4 * dt;
       const ok = this.pushOut(nx, nz, this.y, R0, C.f); if (ok.f !== C.f && !ok.hit) { nx = this.px; nz = this.pz; } else { nx = ok.x; nz = ok.z; }
       this.px = nx; this.pz = nz; this.face = Math.atan2(-C.nx, -C.nz); this.v = Math.abs(up) + Math.abs(side) > 0.1 ? 2.5 : 0; this.vy = 0;
@@ -2850,6 +2851,19 @@ function buildCrown(hg, ring, h, L) {
   const lm = new THREE.LineBasicMaterial({ color: '#e8f6ff', transparent: true, opacity: 0.2 }); hg.scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([...ring, ring[0]].map(([x, z], i) => new THREE.Vector3(x, up[i % ring.length] + 0.1, z))), lm)); (hg.lmLights ||= []).push(lm);
 }
 // 외곽선을 긴 축(주축) 방향으로 long 배, 짧은 축으로 short 배 줄인다 (가운데 기준)
+// 위로 갈수록 가늘어지는 건물(롯데월드타워 · 63빌딩): 그 높이의 실제 외곽선 (부딪힘 · 벽 타기 · 지붕). 1m 단위로 기억
+function ringAtY(f, y) {
+  if (!f.tp) return f.ring;
+  const k = Math.round(Math.max(f.mh || 0, Math.min(f.h, y))); f.tpc ||= new Map(); let r = f.tpc.get(k);
+  if (!r) { r = f.tp(k); if (f.tpc.size > 64) f.tpc.clear(); f.tpc.set(k, r); }
+  return r;
+}
+// 외곽선에서 가장 가까운 벽 위의 점과 바깥 방향
+function wallNear(ring, x, z) {
+  let best = Infinity, o = null; const sgn = ringArea(ring) > 0 ? 1 : -1;
+  for (let k = 0; k < ring.length; k++) { const a = ring[k], c = ring[(k + 1) % ring.length], ex = c[0] - a[0], ez = c[1] - a[1], L2 = ex * ex + ez * ez || 1, t = clamp(((x - a[0]) * ex + (z - a[1]) * ez) / L2, 0, 1), px = a[0] + ex * t, pz = a[1] + ez * t, d = Math.hypot(x - px, z - pz); if (d < best) { best = d; const L = Math.sqrt(L2); o = { x: px, z: pz, nx: (sgn > 0 ? ez : -ez) / L, nz: (sgn > 0 ? -ex : ex) / L }; } }
+  return o;
+}
 function scaleRing(ring, long, short, C = null) {
   let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length; if (C) { cx = C[0]; cz = C[1]; }
   let xx = 0, zz = 0, xz = 0; for (const [x, z] of ring) { const dx = x - cx, dz = z - cz; xx += dx * dx; zz += dz * dz; xz += dx * dz; }
