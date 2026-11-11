@@ -63,12 +63,13 @@
 
 /* 가운데: 목표 숫자 · 종 */
 #center { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 4; }
-#target { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); z-index: 20; display: flex; align-items: baseline; gap: 6px; padding: 4px 16px; border-radius: 999px; font-family: 'Jua', sans-serif; white-space: nowrap; }
+/* 이번 판 목표 숫자: 테이블 가운데 종 바로 위 (구석에 있으면 몇 마리인지 보기 어렵다) */
+#target { position: absolute; left: 50%; bottom: calc(100% - 16px); transform: translateX(-50%); z-index: 5; box-shadow: 0 4px 14px rgba(40,10,70,.35); display: flex; align-items: baseline; gap: 6px; padding: 4px 16px; border-radius: 999px; font-family: 'Jua', sans-serif; white-space: nowrap; }
 #target small { font-size: 14px; opacity: .85; }
-#target b { font-size: 34px; color: #ffd84d; text-shadow: 0 0 14px rgba(255,216,77,.8); }
+#target b { font-size: 36px; line-height: 1; color: #ffd84d; text-shadow: 0 0 14px rgba(255,216,77,.8); }
 #target.new b { display: inline-block; animation: tnew .7s cubic-bezier(.3,1.8,.5,1); }
 @keyframes tnew { 0% { transform: scale(.3) rotate(-20deg); } }
-#bell .bell-body b { position: absolute; left: 0; right: 0; top: 30%; text-align: center; font-family: 'Jua', sans-serif; font-size: calc(var(--cw) * .32); color: #8a4b00; text-shadow: 0 1px 0 rgba(255,255,255,.6); }
+#bell .bell-body b { position: absolute; left: 0; right: 0; top: 30%; text-align: center; font-family: 'Jua', sans-serif; font-size: calc(var(--cw) * .36); color: #fff; -webkit-text-stroke: 1.5px #7a3d00; paint-order: stroke fill; text-shadow: 0 2px 0 #7a3d00, 0 0 10px rgba(255,255,255,.7); }
 #bell { position: relative; width: calc(var(--cw) * 1.05); height: calc(var(--cw) * .95); border: 0; background: none; padding: 0; touch-action: manipulation; }
 #bell .bell-body { position: absolute; left: 8%; right: 8%; top: 12%; bottom: 18%; border-radius: 50% 50% 12% 12% / 70% 70% 14% 14%; background: radial-gradient(ellipse at 35% 28%, #fffbe0 0%, #ffe066 25%, #f2b705 70%, #b77f00 100%); box-shadow: inset 0 -8px 12px rgba(120,70,0,.4), 0 8px 18px rgba(0,0,0,.35); }
 #bell .bell-top { position: absolute; left: 50%; top: 2%; width: 18%; height: 16%; transform: translateX(-50%); border-radius: 50% 50% 30% 30%; background: radial-gradient(circle at 40% 30%, #fff6c4, #e0a800); }
@@ -112,8 +113,8 @@
   .pad { flex: 1; font-size: 20px; padding: 16px 10px; }
   .pad.ring { min-width: 0; flex: 1.4; }
   #banner { min-width: 220px; top: 56px; }
-  #target { left: 12px; transform: none; padding: 2px 12px; }
-  #target small { font-size: 12px; } #target small:first-child { display: none; } #target b { font-size: 26px; }
+  #target { padding: 2px 12px; }
+  #target small { font-size: 12px; } #target small:first-child { display: none; } #target b { font-size: 30px; }
   .seat .who { flex-direction: column; gap: 2px; padding: 4px 6px; border-radius: 16px; }
   .seat .nm { max-width: 62px; font-size: 11px; }
   .seat .deck { position: absolute; right: -16px; top: -6px; width: 20px; height: 27px; margin: 0; }
