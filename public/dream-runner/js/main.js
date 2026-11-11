@@ -1136,7 +1136,8 @@ addEventListener('keydown', (e) => {
   if (game.mode !== 'hangang' || isTyping()) return;
   if (e.code === 'KeyV') $('hg-cam').onclick();
   if (e.code === 'Escape' && !$('hg-set').classList.contains('hidden')) $('hg-set').classList.add('hidden'); // Esc 로는 나가지 않는다: 나가기는 오른쪽 위 ✕ 로만
-  if (e.code === 'KeyE' && !e.repeat && !hg.attr?.act()) hgStep(1); // 명소 가까이 · 체험 중이면 E = 체험하기
+  if (e.code === 'KeyB' && !e.repeat) hg.rideL?.bell(); // 버스 하차벨
+  if (e.code === 'KeyE' && !e.repeat && !hg.rideL?.act() && !hg.attr?.act()) hgStep(1); // 명소 가까이 · 체험 중이면 E = 체험하기
   if (e.code === 'KeyQ' && !e.repeat) hgStep(-1);
 });
 // 설정: 계절 · 날씨 · 시간 · 시간 흐름 · 시점 · 소리

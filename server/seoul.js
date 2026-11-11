@@ -35,8 +35,8 @@ const LINE_RE = /^(\d호선|경의중앙선|공항철도|경춘선|수인분당�
 // ---------- 하루 예산 ----------
 const LIMIT = { pos: +process.env.SEOUL_BUS_POS_DAILY || 9000, station: +process.env.SEOUL_BUS_STATION_DAILY || 600, route: +process.env.SEOUL_BUS_ROUTE_DAILY || 1200, subway: +process.env.SEOUL_SUBWAY_DAILY || 40000 };
 const kst = () => new Date(Date.now() + 9 * 3600e3), dayKey = () => kst().toISOString().slice(0, 10);
-let st = { day: dayKey(), used: {}, hour: -1, usedH: {}, off: {}, cells: {} }; const lastErr = {};
-try { const s = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); st = { ...st, ...s, cells: s.cells || {} }; } catch { /* 처음 */ }
+let st = { day: dayKey(), used: {}, hour: -1, usedH: {}, off: {}, cells: {}, stops: {} }; const lastErr = {};
+try { const s = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); st = { ...st, ...s, cells: s.cells || {}, stops: s.stops || {} }; } catch { /* 처음 */ }
 let dirty = false; setInterval(() => { if (!dirty) return; dirty = false; try { fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true }); fs.writeFileSync(STATE_FILE, JSON.stringify(st)); } catch { /* 다음에 */ } }, 60000).unref();
 function roll() { const d = dayKey(), h = kst().getUTCHours(); if (st.day !== d) { st.day = d; st.used = {}; st.off = {}; dirty = true; } if (st.hour !== h) { st.hour = h; st.usedH = {}; } return h; }
 // 부를 수 있나: 오늘 예산 안 · 이번 시간 몫(남은 예산 ÷ 남은 시간 × 2.5) 안 · 쉬는 중이 아님
@@ -93,7 +93,7 @@ async function fetchRoute(id) {
   info ||= ['?', 3];
   // 지난번 자리(5m 넘게 움직였을 때)를 함께 줘서, 처음 보는 화면도 버스 방향을 안다
   const prev = new Map((pos.get(id)?.list || []).map((b) => [b.id, b]));
-  const list = (await busCall('pos', 'buspos/getBusPosByRtid', `busRouteId=${id}`)).filter((b) => +b.gpsY > 30).map((b) => { const o = { id: String(b.vehId), route: info[0], type: info[1], lon: +b.gpsX, lat: +b.gpsY, t: b.dataTm, stop: b.stopFlag === '1', plate: String(b.plainNo || '').slice(-4), low: b.busType === '1' }, p = prev.get(o.id); if (p) { if (meters(p.lat, p.lon, o.lat, o.lon) > 5) { o.plat = p.lat; o.plon = p.lon; } else if (p.plat) { o.plat = p.plat; o.plon = p.plon; } } return o; });
+  const list = (await busCall('pos', 'buspos/getBusPosByRtid', `busRouteId=${id}`)).filter((b) => +b.gpsY > 30).map((b) => { const o = { id: String(b.vehId), rid: id, route: info[0], type: info[1], lon: +b.gpsX, lat: +b.gpsY, t: b.dataTm, stop: b.stopFlag === '1', plate: String(b.plainNo || '').slice(-4), low: b.busType === '1' }, p = prev.get(o.id); if (p) { if (meters(p.lat, p.lon, o.lat, o.lon) > 5) { o.plat = p.lat; o.plon = p.lon; } else if (p.plat) { o.plat = p.plat; o.plon = p.plon; } } return o; });
   pos.set(id, { at: Date.now(), list });
 }
 // 사람이 있는 칸의 노선마다 무게 (칸마다 많이 지나는 노선 12개)
@@ -179,6 +179,19 @@ export async function seoulApi(req, res, url, json) {
     if (!(lat > 37.41 && lat < 37.72 && lon > 126.75 && lon < 127.2)) return json(res, 400, { error: '서울 밖이에요' }), true;
     const cid = String(url.searchParams.get('c') || '').replace(/[^\w-]/g, '').slice(0, 24) || String(req.headers['fly-client-ip'] || req.socket?.remoteAddress || 'x');
     try { return json(res, 200, await busNear(lat, lon, cid)), true; } catch (e) { return json(res, 502, { error: e.message }), true; }
+  }
+  // 노선 정류소 순서 (버스를 탔을 때 안내 방송): 7일 기억, 파일에 남긴다
+  if (url.pathname === '/api/seoul/bus/stops') {
+    if (!BUS_KEY) return json(res, 503, { error: '버스 정보 준비 중이에요' }), true;
+    const rid = String(url.searchParams.get('rid') || '').replace(/\D/g, '').slice(0, 12); if (!rid) return json(res, 400, { error: '노선이 필요해요' }), true;
+    const hit = st.stops[rid];
+    if (hit && Date.now() - hit.at < 7 * 86400e3) return json(res, 200, { rid, stops: hit.list }), true;
+    if (!canCall('route')) return json(res, 200, { rid, stops: hit?.list || [], stale: true }), true;
+    try {
+      const list = (await busCall('route', 'busRouteInfo/getStaionByRoute', `busRouteId=${rid}`)).map((q) => ({ n: String(q.stationNm || '').slice(0, 30), lat: +q.gpsY, lon: +q.gpsX, seq: +q.seq, dir: String(q.direction || '').slice(0, 20), tr: q.transYn === 'Y' })).filter((q) => q.lat > 30).sort((a, b) => a.seq - b.seq);
+      st.stops[rid] = { at: Date.now(), list }; dirty = true; const ks = Object.keys(st.stops); if (ks.length > 1500) for (const k of ks.sort((a, b) => st.stops[a].at - st.stops[b].at).slice(0, 300)) delete st.stops[k];
+      return json(res, 200, { rid, stops: list }), true;
+    } catch (e) { return json(res, 200, { rid, stops: hit?.list || [], stale: true }), true; }
   }
   if (url.pathname === '/api/seoul/bus/pos') {
     if (!BUS_KEY) return json(res, 503, { error: '버스 정보 준비 중이에요' }), true;

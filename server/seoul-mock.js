@@ -62,6 +62,7 @@ export async function mockFetch(url) {
     const q = u.searchParams;
     if (u.pathname.endsWith('getStationByPos')) return busOk(stationsNear(+q.get('tmY'), +q.get('tmX'), +q.get('radius') || 500));
     if (u.pathname.endsWith('getRouteByStation')) { const r = routeById(q.get('arsId').split('-')[0]); return busOk(r ? [{ busRouteId: r.id, busRouteNm: r.no, busRouteAbrv: r.no, busRouteType: String(r.type) }] : []); }
+    if (u.pathname.endsWith('getStaionByRoute')) { const r = routeById(q.get('busRouteId') || ''); if (!r) return busOk([]); const list = []; let n = 0; for (let d = 0; d < r.len; d += 300) { const p = along(r, d), [la, lo] = LL(p.x, p.z); list.push({ seq: String(++n), stationNm: `${r.name || '정류장'} ${n}`, gpsX: String(lo), gpsY: String(la), direction: '종점', transYn: 'N' }); } return busOk(list); }
     if (u.pathname.endsWith('getBusPosByRtid')) { const r = routeById(q.get('busRouteId') || ''); if (!r) return busOk([]); const n = Math.max(1, Math.round(r.len / 500)), list = [];
       for (let k = 0; k < n; k++) { const b = busAt(r, k, now), [la, lo] = LL(b.x + jit(k + now / 1e5), b.z + jit(k * 3 + 1 + now / 1e5)); list.push({ vehId: `${r.id}${k}`, plainNo: `서울74사${String(1000 + k * 37).slice(-4)}`, gpsX: String(lo), gpsY: String(la), stopFlag: b.stop ? '1' : '0', busType: k % 2 ? '1' : '0', dataTm: new Date(now).toISOString().replace(/\D/g, '').slice(0, 14) }); }
       return busOk(list); }

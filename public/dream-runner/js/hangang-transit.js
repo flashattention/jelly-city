@@ -30,7 +30,8 @@ function busGeo(type) {
   parts.push(boxC(W - 0.4, 0.8, 0.06, 0, 2.15, -L / 2 - 0.01, '#1a222c'));
   parts.push(boxC(W - 0.5, 0.32, 3.2, 0, 2.86, -1.2, '#d9dbde'));
   parts.push(boxC(W - 0.1, 0.12, L - 0.4, 0, 2.74, 0, '#eceef0'));
-  for (const z of [L / 2 - 1.3, -0.4]) parts.push(boxC(0.05, 2.1, 1.1, W / 2 + 0.02, 1.45, z, '#2a3440'));
+  // 문은 오른쪽(-x: 앞을 +z 로 볼 때 오른쪽)
+  for (const z of [L / 2 - 1.3, -0.4]) parts.push(boxC(0.05, 2.1, 1.1, -W / 2 - 0.02, 1.45, z, '#2a3440'));
   // 바퀴 (둥근 통)
   for (const sx of [-1, 1]) for (const z of [L / 2 - 2.2, -L / 2 + 2.4]) { const w = new THREE.CylinderGeometry(0.48, 0.48, 0.3, 12); w.rotateZ(Math.PI / 2); w.translate(sx * (W / 2 - 0.12), 0.48, z); const c = new THREE.Color('#15171a'), n = w.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) c.toArray(a, i * 3); w.setAttribute('color', new THREE.BufferAttribute(a, 3)); w.deleteAttribute('uv'); parts.push(w); }
   const g = mergeGeometries(parts.map((p) => p.toNonIndexed())); busGeoCache.set(type, g); return g;
@@ -40,7 +41,7 @@ let lampGeo = null; function busLampGeo() {
   if (lampGeo) return lampGeo; const L = 11, W = 2.5, parts = [];
   for (const sx of [-1, 1]) { parts.push(boxC(0.42, 0.18, 0.05, sx * (W / 2 - 0.35), 0.8, L / 2 + 0.03, '#fff6dc')); parts.push(boxC(0.3, 0.5, 0.05, sx * (W / 2 - 0.25), 1.0, -L / 2 - 0.03, '#ff3322')); }
   // 옆 창: 칸마다 기둥을 두고 (앞문 자리는 비움), 앞 유리는 푸르스름하게 어둡게
-  for (const sx of [-1, 1]) for (let i = 0; i < 6; i++) { const z = -L / 2 + 1.1 + i * 1.45; if (sx > 0 && (i === 3)) continue; parts.push(boxC(0.02, 0.86, 1.25, sx * (W / 2 + 0.035), 2.06, z, i % 3 === 1 ? '#ffd998' : '#ffe6b4')); }
+  for (const sx of [-1, 1]) for (let i = 0; i < 6; i++) { const z = -L / 2 + 1.1 + i * 1.45; if (sx < 0 && (i === 3)) continue; parts.push(boxC(0.02, 0.86, 1.25, sx * (W / 2 + 0.035), 2.06, z, i % 3 === 1 ? '#ffd998' : '#ffe6b4')); }
   parts.push(boxC(W - 0.3, 1.3, 0.02, 0, 1.95, L / 2 + 0.05, '#8fa6bb'));
   lampGeo = mergeGeometries(parts.map((p) => p.toNonIndexed())); return lampGeo;
 }
@@ -119,7 +120,7 @@ export class LiveTransit {
     const now = performance.now() / 1000, seen = new Set();
     for (const b of list) {
       const id = String(b.id); seen.add(id); let o = this.buses.get(id); const [x, z] = this.toLocal(b.lat, b.lon), key = `${b.lat},${b.lon}`;
-      if (!o) { o = { id, route: String(b.route || ''), type: +b.type || 3, x, z, yaw: 0, miss: 0, key: '', at: now, gap: 90 }; this.buses.set(id, o);
+      if (!o) { o = { id, rid: b.rid, route: String(b.route || ''), type: +b.type || 3, x, z, yaw: 0, miss: 0, key: '', at: now, gap: 90 }; this.buses.set(id, o);
         // 처음 볼 때 방향: 서버가 준 지난 자리에서, 없으면 길 방향 그대로
         let hx = 0, hz = 0; if (b.plat) { const [x0, z0] = this.toLocal(b.plat, b.plon); hx = x - x0; hz = z - z0; const l = Math.hypot(hx, hz) || 1; hx /= l; hz /= l; }
         const s = this.snap(x, z, hx, hz); if (s) { o.L = s.L; o.d = s.d; o.dir = hx || hz ? (s.dx * hx + s.dz * hz >= 0 ? 1 : -1) : 1; o.x = s.x; o.z = s.z; o.yaw = Math.atan2(s.dx * o.dir, s.dz * o.dir); o.tgtD = s.d; } else o.yaw = hx || hz ? Math.atan2(hx, hz) : 0;
@@ -129,7 +130,9 @@ export class LiveTransit {
       o.gap = clamp(now - o.at, 25, 150); o.at = now; o.key = key;
       const mx = x - o.x, mz = z - o.z, ml = Math.hypot(mx, mz); if (ml < 2) continue;
       const s = this.snap(x, z, mx / ml, mz / ml);
-      if (ml > 900 || !s) { if (s) { o.L = s.L; o.d = s.d; o.x = s.x; o.z = s.z; o.tgtD = s.d; } else { o.L = null; o.x = x; o.z = z; } o.yaw = Math.atan2(mx, mz); continue; }
+      // 900m 넘게 건너뛰면 그 자리로, 찻길을 못 찾으면 곧게 그 자리까지 (닿으면 다시 찻길 찾기)
+      if (ml > 900) { if (s) { o.L = s.L; o.d = s.d; o.x = s.x; o.z = s.z; o.tgtD = s.d; } else { o.L = null; o.x = x; o.z = z; } o.yaw = Math.atan2(mx, mz); continue; }
+      if (!s) { o.line = { x0: o.x, z0: o.z, s: { x, z, L: null, d: 0, dx: mx / ml, dz: mz / ml }, t: 0 }; o.v = clamp(ml / (o.gap * 0.9), 1.5, 16); continue; }
       // 다른 찻길로 붙었어도 새 자리가 지금 길에서 20m 안이면(교차로 · 갈림길) 지금 길을 따라 간다
       const pj = o.L && !sameRoad(o.L, s.L) ? projOn(o.L, s.x, s.z) : null;
       if (sameRoad(o.L, s.L) && Math.abs(s.d - o.d) > 2) { o.L = s.L; o.dir = s.d > o.d ? 1 : -1; o.tgtD = s.d; o.line = null; }
@@ -148,12 +151,14 @@ export class LiveTransit {
     for (const o of this.buses.values()) {
       if (o.line) { // 다른 길로 옮겨 가는 중: 곧게
         const s = o.line.s, L0 = Math.hypot(s.x - o.line.x0, s.z - o.line.z0) || 1; o.line.t = Math.min(1, o.line.t + (o.v * dt) / L0); const nx = o.line.x0 + (s.x - o.line.x0) * o.line.t, nz = o.line.z0 + (s.z - o.line.z0) * o.line.t; if (Math.hypot(nx - o.x, nz - o.z) > 0.01) o.yaw = Math.atan2(nx - o.x, nz - o.z); o.x = nx; o.z = nz;
-        if (o.line.t >= 1) { o.L = s.L; o.d = s.d; o.tgtD = s.d; o.dir = s.dx * Math.sin(o.yaw) + s.dz * Math.cos(o.yaw) >= 0 ? 1 : -1; o.line = null; }
+        o.cur = o.line.t < 1 ? o.v : 0; if (o.line.t >= 1) { o.L = s.L; o.d = s.d; o.tgtD = s.d; o.dir = s.dx * Math.sin(o.yaw) + s.dz * Math.cos(o.yaw) >= 0 ? 1 : -1; o.line = null; }
       } else if (!o.L) { // 찻길을 아직 못 찾았으면(칸이 덜 왔을 때) 가끔 다시
         o.retry = (o.retry || 0) - dt; if (o.retry <= 0) { o.retry = 2; const s = this.snap(o.x, o.z, Math.sin(o.yaw), Math.cos(o.yaw)); if (s) { o.L = s.L; o.d = s.d; o.tgtD = s.d; o.dir = s.dx * Math.sin(o.yaw) + s.dz * Math.cos(o.yaw) >= 0 ? 1 : -1; } }
       } else {
         // 받은 자리까지 길을 따라, 닿은 뒤엔 정차 중이 아니면 같은 방향으로 60m 까지 천천히 (새 소식이 늦을 때)
         const ahead = (o.tgtD - o.d) * o.dir; let v = 0; if (ahead > 0.3) v = o.v || 6; else if (!o.stop && ahead > -60) v = 2.2;
+        // 타고 있는 버스는 정류장마다 잠깐 선다 (hangang-ride.js 가 hold 를 준다)
+        if (o.hold > 0) { o.hold -= dt; v = 0; }
         o.cur = (o.cur ?? v) + (v - (o.cur ?? v)) * Math.min(1, dt * 1.5); o.d = clamp(o.d + o.dir * o.cur * dt, 0, o.L.len);
         const hg = this.hg, q = hg.lineAt(o.L, o.d, 0), lane = o.L.w >= 30 ? 1.8 : Math.max(1.8, o.L.w / 2 - 1.8), fx = q.dx * o.dir, fz = q.dz * o.dir;
         // 넓은 길(30m 넘게)은 가운데 버스 전용 차로, 아니면 바깥 차로
@@ -196,9 +201,9 @@ export class LiveTransit {
       if (!A || !B) { if (t.sttus === 1 && nb.next) { A = at; B = nb.next; f = 0; } else continue; }
       const e = this.edge(line, A, B); if (!e) continue;
       if (!o) { o = { id, line, e, d: e.len * f, v: 0 }; this.trains.set(id, o); }
-      if (o.lastAt !== at) o.prevAt = o.lastAt; o.lastAt = at; o.sttus = t.sttus; o.at = now; o.miss = 0; o.to = t.to; o.next = nb.next;
+      const was = o.sttus; if (o.lastAt !== at) o.prevAt = o.lastAt; o.lastAt = at; o.sttus = t.sttus; o.at = now; o.miss = 0; o.to = t.to; o.next = nb.next;
       // 같은 역 사이면 그대로 따라가고, 바로 다음 역 사이면 이어서, 아니면 그 자리로 (처음 · 건너뜀)
-      if (o.e === e) o.tgt = { e, d: e.len * f }; else if (o.e.b === A) o.tgt = { e, d: e.len * f, hop: true }; else { o.e = e; o.d = e.len * f; o.tgt = { e, d: e.len * f }; }
+      if (o.e === e) o.tgt = { e, d: e.len * f }; else if (o.e.b === A) { if (o.e.len - o.d < 40 && !o.dwellAt && (was === 0 || was === 1)) { o.d = o.e.len; o.dwellAt = now - 6; } o.tgt = { e, d: e.len * f, hop: true }; } else { o.e = e; o.d = e.len * f; o.tgt = { e, d: e.len * f }; }
     }
     for (const [id, o] of this.trains) if (o.line === line && !seen.has(id) && ++o.miss > 3) { this.trains.delete(id); }
   }
@@ -207,7 +212,10 @@ export class LiveTransit {
     for (const o of this.trains.values()) {
       const T = o.tgt; if (!T) continue; const remain = T.hop ? o.e.len - o.d + T.d : T.d - o.d;
       // 다음 소식(20초 남짓) 전에 닿게, 닿은 뒤엔 상태대로 조금 더 (출발 · 전역출발이면 다음 역 앞 92% 까지, 도착이면 정차)
-      let v; if (remain > 0.5) v = clamp(remain / 14, 3, 26); else if (o.sttus === 2 || o.sttus === 3) v = (T.e.len * 0.92 - o.d > 0 && !T.hop) ? 11 : 0; else if (o.sttus === 0) v = o.d < T.e.len - 0.5 ? 4 : 0; else { v = 0; if (now - o.at > 40 && o.next) { const ne = this.edge(o.line, T.e.b, o.next); if (ne) { o.tgt = { e: ne, d: ne.len * 0.25, hop: true }; o.sttus = 3; } } }
+      // 역에 닿으면 20초 선다 (문 열림 · 타고 내리기)
+      if (o.sttus === 1 && !T.hop && T.e === o.e && o.e.len - o.d < 1.5 && !o.dwellAt) o.dwellAt = now;
+      if (o.dwellAt && (now - o.dwellAt > 20 || o.e.len - o.d > 30)) o.dwellAt = 0;
+      let v; if (o.dwellAt) v = 0; else if (remain > 0.5) v = clamp(remain / (T.hop ? 14 : 8), remain < 25 ? 1.5 : 3, 26); else if (o.sttus === 2 || o.sttus === 3) v = (T.e.len * 0.92 - o.d > 0 && !T.hop) ? 11 : 0; else if (o.sttus === 0) v = o.d < T.e.len - 0.5 ? 4 : 0; else { v = 0; if (now - o.at > 40 && o.next) { const ne = this.edge(o.line, T.e.b, o.next); if (ne) { o.tgt = { e: ne, d: ne.len * 0.25, hop: true }; o.sttus = 3; } } }
       o.v += (v - o.v) * Math.min(1, dt * 1.2); o.d += o.v * dt;
       if (o.d >= o.e.len && T.hop) { o.d -= o.e.len; o.e = T.e; T.hop = false; }
       o.d = clamp(o.d, 0, o.e.len);
@@ -216,6 +224,8 @@ export class LiveTransit {
     }
     this.drawTrains();
   }
+  // c 번째 칸 가운데 자리 (세상 좌표 · 종류): 타고 있을 때 실내를 둘 곳
+  carPose(o, c) { const clen = (this.sub.lines[o.line].cars || [8, 20])[1]; let d = o.d - clen * (c + 0.5), e = o.e; const prevE = o.prevAt ? this.edge(o.line, o.prevAt, o.e.a) : null; if (d < 0 && prevE) { e = prevE; d += prevE.len; } return this.edgeAt(e, Math.max(0, d)); }
   // 3D 열차: 호선마다 칸 인스턴스 (몸체 · 창), 칸마다 선로를 따라 뒤로 (앞 역 사이까지)
   drawTrains() {
     const hg = this.hg, cnt = new Map(), mat = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), pos = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);

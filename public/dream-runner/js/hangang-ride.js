@@ -1,0 +1,315 @@
+// 서울 산책: 실시간 버스 · 지하철 타기 (8-20)
+//   실제(hangang-transit.js) 버스가 정류장에 서 있으면 7m 안에서, 지하철은 역 안 · 출구 앞에서 그 역에 들어오는 실제 열차가 있으면 E 로 탄다
+//   타면 좌석 고르기 → 그 자리 눈높이에서 창밖으로 지금 그 자리의 진짜 서울이 지나간다 (실내를 실제 탈 것 자리에 겹쳐 두고 바깥 껍데기는 숨김)
+//   지하 구간은 실내를 땅 밑으로 내려 터널로 감싸고, 역에 서면 승강장. 안내 방송(실제 정류소 · 역 순서) · 하차벨(B) · 내리기(E)
+//   실내 좌표: x 옆(+x = 왼쪽), y 위, z 앞(+z = 앞). 버스 문은 오른쪽(-x)
+import * as THREE from 'three';
+import { sound } from './music.js';
+
+const LAT0 = 37.53, LON0 = 126.98, KX = 111320 * Math.cos((LAT0 * Math.PI) / 180), KZ = 110574;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const norm = (s) => String(s || '').replace(/\(.*?\)/g, '').replace(/\s/g, '').replace(/역$/, '');
+const rnd = (seed) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+const BUS_COLOR = { 1: '#2a9fd8', 2: '#6fb92c', 3: '#3d5bab', 4: '#4fa83a', 5: '#f2b70a', 6: '#e0312a', 7: '#3d5bab', 8: '#e0312a', 0: '#8a8f99' };
+
+// ---------- 소리: 카드 찍는 소리 · 안내 차임 · 하차벨 (작은 웹 오디오) · 안내 목소리(브라우저 말하기) ----------
+let AC = null;
+function beep(seq) { if (sound.muted) return; try { AC ||= new (window.AudioContext || window.webkitAudioContext)(); if (AC.state !== 'running') AC.resume(); const t0 = AC.currentTime; for (const [f, t, d, type = 'sine', v = 0.12] of seq) { const o = AC.createOscillator(), g = AC.createGain(); o.type = type; o.frequency.value = f; g.gain.setValueAtTime(0, t0 + t); g.gain.linearRampToValueAtTime(v, t0 + t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + t + d); o.connect(g); g.connect(AC.destination); o.start(t0 + t); o.stop(t0 + t + d + 0.05); } } catch { /* 소리 없음 */ } }
+const SND = { card: [[1760, 0, 0.11, 'square', 0.06]], chime: [[880, 0, 0.5], [659, 0.32, 0.7]], bell: [[1318, 0, 0.35, 'triangle', 0.1], [1046, 0.18, 0.5, 'triangle', 0.1]], door: [[392, 0, 0.25, 'triangle', 0.08], [330, 0.2, 0.3, 'triangle', 0.08]] };
+function say(text) { if (sound.muted || !window.speechSynthesis) return; try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = 'ko-KR'; u.rate = 1.05; u.volume = 0.8; speechSynthesis.speak(u); } catch { /* 말하기 없음 */ } }
+
+// ---------- 화면 ----------
+const CSS = `
+#rd-card{position:absolute;left:50%;bottom:176px;transform:translateX(-50%);display:flex;gap:12px;align-items:center;padding:9px 10px 9px 14px;border-radius:18px;background:rgba(14,20,36,.8);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.18);color:#fff;font-family:'Jua',sans-serif;z-index:6;transition:opacity .2s}
+#rd-card.hidden{opacity:0;pointer-events:none}
+#rd-card .ic{font-size:28px}
+#rd-card b{font-size:16px;display:block}
+#rd-card small{display:block;font-family:system-ui,sans-serif;font-size:12px;opacity:.85;margin-top:2px}
+#rd-card button,#rd-seat button.go{border:0;border-radius:14px;padding:9px 13px;font-family:'Jua',sans-serif;font-size:15px;cursor:pointer;background:linear-gradient(180deg,#8fe08a,#4fbf5a);color:#0f3312;box-shadow:0 3px 0 #2f8a3a}
+#rd-card button kbd{font-family:inherit;background:rgba(0,0,0,.14);border-radius:6px;padding:1px 6px;margin-left:6px;font-size:13px}
+#rd-card button.bell{background:linear-gradient(180deg,#ff8a8a,#e0453a);color:#fff;box-shadow:0 3px 0 #a52a22}
+#rd-led{position:absolute;left:50%;top:62px;transform:translateX(-50%);min-width:300px;max-width:calc(100vw - 32px);padding:7px 16px;border-radius:10px;background:#0b0b0c;border:2px solid #2a2a2e;color:#ffae1a;font-family:'Jua',sans-serif;font-size:17px;text-align:center;letter-spacing:.5px;z-index:6;box-shadow:0 4px 18px rgba(0,0,0,.4)}
+#rd-led.hidden{display:none}
+#rd-led small{display:block;color:#7cd3ff;font-size:12.5px;margin-top:2px;font-family:system-ui,sans-serif}
+#rd-led .stop{color:#ff5a4a}
+#rd-seat{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:rgba(6,10,20,.5);backdrop-filter:blur(3px)}
+#rd-seat.hidden{display:none}
+#rd-seat .pg{width:min(560px,calc(100vw - 24px));border-radius:20px;padding:14px 16px;background:#f6f3ec;color:#2a2a2a;font-family:'Jua',sans-serif;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+#rd-seat h3{margin:0;font-size:20px}
+#rd-seat .sub{font-family:system-ui,sans-serif;font-size:12.5px;opacity:.7;margin:2px 0 10px}
+#rd-seat .map{position:relative;margin:0 auto;background:#d9dde2;border-radius:14px;border:3px solid #9aa1aa}
+#rd-seat .s{position:absolute;border:0;border-radius:6px;cursor:pointer;font-size:11px;color:#fff;padding:0}
+#rd-seat .s.taken{cursor:default;background:#8a8f99!important;opacity:.75}
+#rd-seat .s.taken::after{content:'🐻';font-size:13px}
+#rd-seat .s:not(.taken):hover{outline:3px solid #ffd23f}
+#rd-seat .lab{position:absolute;font-family:system-ui,sans-serif;font-size:10.5px;color:#4a4f57}
+#rd-seat .row{display:flex;gap:8px;justify-content:center;margin-top:12px}
+#rd-seat .row button{border:0;border-radius:12px;padding:8px 12px;font-family:'Jua',sans-serif;font-size:14px;cursor:pointer;background:#e4e1d8}
+`;
+function ui() {
+  if (document.getElementById('rd-card')) return; const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
+  const host = document.getElementById('hg-hud') || document.body, d = document.createElement('div');
+  d.innerHTML = `<div id="rd-card" class="hidden"><span class="ic">🚌</span><span><b></b><small></small></span><button class="b2 bell hidden">🔔 하차벨 <kbd>B</kbd></button><button class="b1"></button></div><div id="rd-led" class="hidden"></div><div id="rd-seat" class="hidden"><div class="pg"><h3></h3><div class="sub">빈 자리를 누르면 앉아요 · 🐻 = 다른 승객</div><div class="map"></div><div class="row"><button class="stand">🧍 서서 손잡이 잡기</button><button class="auto">아무 데나</button></div></div></div>`;
+  while (d.firstChild) host.appendChild(d.firstChild);
+}
+
+// ---------- 실내 만들기 ----------
+function lamb(color, glow = 0) { const m = new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: glow }); m.userData.glow = glow; return m; }
+function box(g, w, h, d, m, x, y, z) { const me = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); me.position.set(x, y, z); g.add(me); return me; }
+function canvasTex(w, h) { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return { cv, c: cv.getContext('2d'), t }; }
+// 버스: 길이 11m · 폭 2.5m, 바닥 높이 0.45m (저상)
+function buildBus(type) {
+  const g = new THREE.Group(), L = 11, W = 2.5, F = 0.45, H = 2.3, hw = W / 2 - 0.08, col = BUS_COLOR[type] || BUS_COLOR[3], mats = [];
+  const M = (c, glow = 0.12) => { const m = lamb(c, glow); mats.push(m); return m; };
+  const floorM = M('#4a4d52', 0.05), wallM = M('#e9e6df'), panelM = M(col, 0.1), ceilM = M('#f4f2ee', 0.2), seatM = M('#3c5a9a', 0.08), prioM = M('#e8a22c', 0.1), poleM = M('#f2c230', 0.15), steel = M('#c9ced4', 0.1), bellM = new THREE.MeshBasicMaterial({ color: '#ff3b30' }), lightM = new THREE.MeshBasicMaterial({ color: '#fffbea' }), darkM = M('#24272c', 0.02);
+  box(g, W - 0.16, 0.06, L - 0.3, floorM, 0, F - 0.03, 0);
+  box(g, W - 0.16, 0.04, L - 0.3, ceilM, 0, F + H, 0);
+  for (const zz of [-3, 0, 3]) box(g, 0.5, 0.03, 2.2, lightM, 0, F + H - 0.03, zz);
+  // 옆벽: 창 아래 · 위, 창 사이 기둥. 오른쪽(-x)엔 앞문(z 4 ~ 5.1) · 뒷문(z -0.6 ~ 0.6) 자리를 비운다
+  const doors = [[4.0, 5.1], [-0.6, 0.6]];
+  for (const sx of [1, -1]) {
+    const x = sx * hw, spans = sx < 0 ? [[-L / 2 + 0.2, -0.6], [0.6, 4.0]] : [[-L / 2 + 0.2, L / 2 - 0.4]];
+    for (const [z0, z1] of spans) { box(g, 0.05, 0.85, z1 - z0, wallM, x, F + 0.42, (z0 + z1) / 2); box(g, 0.06, 0.12, z1 - z0, panelM, x * 1.01, F + 0.88, (z0 + z1) / 2); box(g, 0.05, 0.45, z1 - z0, wallM, x, F + H - 0.22, (z0 + z1) / 2); for (let z = z0; z <= z1 + 0.01; z += 1.45) box(g, 0.07, H, 0.1, darkM, x, F + H / 2, Math.min(z, z1)); }
+  }
+  // 문: 접히는 문짝 (서 있을 때 열림)
+  const doorP = [];
+  for (const [z0, z1] of doors) for (const k of [0, 1]) { const w = (z1 - z0) / 2, p = box(g, 0.05, H - 0.15, w - 0.04, M('#2b3038', 0.05), -hw, F + (H - 0.15) / 2, z0 + w * (k + 0.5)); p.userData.closedZ = p.position.z; p.userData.openZ = k ? z1 - 0.12 : z0 + 0.12; doorP.push(p); }
+  // 앞: 계기판 · 운전석 · 핸들 · 요금 단말기, 위에 LED 안내판
+  box(g, W - 0.2, 0.5, 0.6, darkM, 0, F + 0.65, L / 2 - 0.45);
+  box(g, 0.5, 0.08, 0.5, M('#2c2f35'), 0.7, F + 0.42, 4.3); box(g, 0.5, 0.6, 0.08, M('#2c2f35'), 0.7, F + 0.75, 4.05);
+  { const wh = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.03, 6, 16), darkM); wh.position.set(0.7, F + 1.0, 4.75); wh.rotation.x = -0.9; g.add(wh); }
+  box(g, 0.16, 0.24, 0.1, M('#5a6068'), -0.55, F + 1.05, 4.0); box(g, 0.12, 0.08, 0.02, new THREE.MeshBasicMaterial({ color: '#47e07a' }), -0.55, F + 1.12, 3.94);
+  box(g, 0.16, 0.24, 0.1, M('#5a6068'), -0.95, F + 1.05, -0.75); box(g, 0.12, 0.08, 0.02, new THREE.MeshBasicMaterial({ color: '#47e07a' }), -0.95, F + 1.12, -0.81);
+  const led = canvasTex(512, 64); const ledM = new THREE.MeshBasicMaterial({ map: led.t, toneMapped: false }), ledP = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.19), ledM); ledP.position.set(0, F + H - 0.2, L / 2 - 0.75); ledP.rotation.y = Math.PI; g.add(ledP);
+  box(g, 1.56, 0.25, 0.06, darkM, 0, F + H - 0.2, L / 2 - 0.72);
+  // 뒤벽 (뒤 창 아래 · 위)
+  box(g, W - 0.16, 0.95, 0.05, wallM, 0, F + 0.47, -L / 2 + 0.18); box(g, W - 0.16, 0.4, 0.05, wallM, 0, F + H - 0.2, -L / 2 + 0.18);
+  // 좌석 (앞을 본다): 왼쪽 2인 줄 · 오른쪽 1인 · 맨 뒤 5인 (뒤쪽은 한 칸 높게)
+  const seats = [], seat = (x, z, prio, up = 0) => { const m = prio ? prioM : seatM; box(g, 0.44, 0.1, 0.44, m, x, F + 0.42 + up, z); box(g, 0.44, 0.55, 0.08, m, x, F + 0.72 + up, z - 0.24); seats.push({ x, y: F + 0.42 + up, z, face: 0, prio, side: x > 0 ? 'L' : 'R' }); };
+  for (let i = 0; i < 9; i++) { const z = 3.4 - i * 0.82; if (z > -0.9 && z < 0.9) continue; for (const x of [0.92, 0.46]) seat(x, z, i < 2, z < -0.9 ? 0.18 : 0); }
+  for (let i = 0; i < 6; i++) { const z = 3.0 - i * 0.82; if (z > -1.0 && z < 1.0) continue; seat(-0.92, z, false, z < -0.9 ? 0.18 : 0); }
+  for (let k = 0; k < 5; k++) seat(-0.92 + k * 0.46, -L / 2 + 0.6, false, 0.3);
+  // 기둥 · 천장 봉 · 손잡이 · 하차벨
+  const bells = [];
+  for (const [x, z] of [[-0.75, 3.9], [-0.75, 0.75], [-0.75, -0.75], [0.25, 2.2], [0.25, -1.6], [-0.4, -2.6]]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, H, 8), poleM); p.position.set(x, F + H / 2, z); g.add(p); bells.push(box(g, 0.07, 0.09, 0.05, bellM, x, F + 1.3, z + 0.04)); }
+  for (const x of [0.22, -0.42]) { box(g, 0.03, 0.03, L - 1.8, steel, x, F + H - 0.18, -0.3); for (let z = -4.4; z < 3.6; z += 0.5) { box(g, 0.02, 0.2, 0.02, M('#e8e8e8'), x, F + H - 0.3, z); const r = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 5, 12), M('#f2c230')); r.position.set(x, F + H - 0.46, z); g.add(r); } }
+  for (let z = -4.2; z < 3.6; z += 1.45) bells.push(box(g, 0.04, 0.06, 0.08, bellM, 1.12, F + 1.15, z));
+  const stand = [{ x: -0.1, y: F, z: 1.6, face: 0, stand: true }, { x: -0.1, y: F, z: -1.9, face: 0, stand: true }];
+  return { g, kind: 'bus', seats, stand, mats, doorP, led, bells, F, L };
+}
+// 지하철 한 칸: 길이 19.5m · 폭 3.1m, 바닥은 레일 위 1.1m
+function buildCar(line, L0) {
+  const g = new THREE.Group(), L = 19.5, hw = 1.45, F = 1.1, H = 2.2, col = L0.color, mats = [];
+  const M = (c, glow = 0.15) => { const m = lamb(c, glow); mats.push(m); return m; };
+  const floorM = M('#8f949b', 0.06), wallM = M('#ecebe6'), ceilM = M('#f6f5f2', 0.25), seatM = M({ '1호선': '#4a5fb5', '2호선': '#3f8f55', '3호선': '#d77a2a', '4호선': '#3a8fc4', '5호선': '#8a5fa8', '6호선': '#b0752e', '7호선': '#6b7a1a', '8호선': '#c9356f', '9호선': '#9a8a5a' }[line] || '#4f5fa8', 0.08), prioM = M('#e98a2a', 0.1), pinkM = M('#f29bb8', 0.12), steel = M('#d0d5da', 0.15), lightM = new THREE.MeshBasicMaterial({ color: '#fffdf4' }), doorM = M('#cfd3d8', 0.1), bandM = M(col, 0.15);
+  box(g, hw * 2, 0.06, L, floorM, 0, F - 0.03, 0); box(g, hw * 2, 0.04, L, ceilM, 0, F + H, 0);
+  for (const sx of [-0.55, 0.55]) box(g, 0.28, 0.03, L - 1, lightM, sx, F + H - 0.03, 0);
+  const DZ = [-7.3, -2.45, 2.45, 7.3], DW = 1.3, seats = [];
+  for (const sx of [1, -1]) {
+    const x = sx * hw;
+    // 벽 조각: 문과 문 사이 (창 아래 · 창 위 · 띠), 문 자리는 문짝 (위쪽 창은 열려 있어 밖이 보임)
+    const cuts = [-L / 2, ...DZ.flatMap((z) => [z - DW / 2, z + DW / 2]), L / 2];
+    for (let i = 0; i < cuts.length; i += 2) { const z0 = cuts[i], z1 = cuts[i + 1], zc = (z0 + z1) / 2, w = z1 - z0; box(g, 0.05, 0.85, w, wallM, x, F + 0.42, zc); box(g, 0.05, 0.45, w, wallM, x, F + H - 0.22, zc); box(g, 0.06, 0.06, w, bandM, x * 0.995, F + 0.86, zc); for (let z = z0; z < z1; z += 2.2) box(g, 0.07, 0.95, 0.12, M('#b9bec4'), x, F + 1.3, z + 0.06); }
+    for (const z of DZ) { for (const k of [-1, 1]) { box(g, 0.05, 0.9, DW / 2 - 0.02, doorM, x, F + 0.45, z + k * DW / 4); box(g, 0.05, 0.42, DW / 2 - 0.02, doorM, x, F + H - 0.21, z + k * DW / 4); box(g, 0.06, 0.95, 0.06, doorM, x, F + 1.35, z + k * (DW / 2 - 0.03)); } box(g, 0.06, 0.06, DW, bandM, x * 0.99, F + H - 0.02, z); }
+    // 긴 의자: 문 사이 7인 (한쪽 끝은 임산부석), 맨 끝 노약자석 3인 (안쪽을 본다)
+    const face = sx > 0 ? -Math.PI / 2 : Math.PI / 2, bench = (z0, z1, n, mFor) => { const sw = (z1 - z0) / n; for (let k = 0; k < n; k++) { const z = z0 + sw * (k + 0.5), m = mFor(k); box(g, 0.48, 0.1, sw - 0.03, m, x - sx * 0.3, F + 0.44, z); box(g, 0.08, 0.5, sw - 0.03, m, x - sx * 0.06, F + 0.72, z); seats.push({ x: x - sx * 0.3, y: F + 0.44, z, face, prio: m === prioM, pink: m === pinkM, side: sx > 0 ? 'L' : 'R' }); } };
+    for (let i = 0; i < 3; i++) { const z0 = DZ[i] + DW / 2 + 0.25, z1 = DZ[i + 1] - DW / 2 - 0.25; bench(z0, z1, 7, (k) => (k === 6 && i === 1 ? pinkM : seatM)); }
+    bench(-L / 2 + 0.3, DZ[0] - DW / 2 - 0.25, 3, () => prioM); bench(DZ[3] + DW / 2 + 0.25, L / 2 - 0.3, 3, () => prioM);
+    // 손잡이 봉 · 고리 · 문 옆 기둥
+    box(g, 0.03, 0.03, L - 1, steel, sx * 0.95, F + 1.95, 0); for (let z = -L / 2 + 0.6; z < L / 2 - 0.5; z += 0.45) { if (DZ.some((d) => Math.abs(d - z) < 0.75)) continue; box(g, 0.02, 0.22, 0.02, M('#f0f0f0'), sx * 0.95, F + 1.83, z); const r = new THREE.Mesh(new THREE.TorusGeometry(0.065, 0.012, 5, 12), sx > 0 ? steel : M('#f2c230')); r.position.set(sx * 0.95, F + 1.66, z); r.rotation.y = Math.PI / 2; g.add(r); }
+    for (const z of DZ) for (const k of [-1, 1]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, H, 8), steel); p.position.set(sx * 1.05, F + H / 2, z + k * (DW / 2 + 0.2)); g.add(p); }
+  }
+  // 노선도 (창 위, 양쪽) · 문 위 안내 화면 · 끝 통로문
+  const map = canvasTex(2048, 64), mapM = new THREE.MeshBasicMaterial({ map: map.t, toneMapped: false });
+  for (const sx of [1, -1]) { const p = new THREE.Mesh(new THREE.PlaneGeometry(L - 3, 0.26), mapM); p.position.set(sx * (hw - 0.04), F + 2.02, 0); p.rotation.y = sx > 0 ? -Math.PI / 2 : Math.PI / 2; g.add(p); }
+  const scr = canvasTex(512, 96), scrM = new THREE.MeshBasicMaterial({ map: scr.t, toneMapped: false });
+  for (const sx of [1, -1]) for (const z of DZ) { const p = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.15), scrM); p.position.set(sx * (hw - 0.05), F + H - 0.12, z); p.rotation.y = sx > 0 ? -Math.PI / 2 : Math.PI / 2; g.add(p); }
+  for (const ez of [-1, 1]) { box(g, hw * 2, H, 0.06, wallM, 0, F + H / 2, ez * L / 2); box(g, 0.8, 1.9, 0.07, doorM, 0, F + 0.95, ez * (L / 2 - 0.01)); box(g, 0.5, 0.7, 0.08, M('#3a4048', 0.05), 0, F + 1.35, ez * (L / 2 - 0.02)); }
+  const stand = [{ x: 0.6, y: F, z: -4.9, face: Math.PI / 2, stand: true }, { x: -0.6, y: F, z: 4.9, face: -Math.PI / 2, stand: true }, { x: 0, y: F, z: 0, face: Math.PI / 2, stand: true }];
+  return { g, kind: 'train', seats, stand, mats, map, scr, F, L, line };
+}
+// 터널 (땅 밑 구간): 짙은 콘크리트 통 + 지나가는 불빛, 역에 가까우면 승강장 (스크린도어 · 역 이름판)
+function buildTunnel() {
+  const g = new THREE.Group(), t = canvasTex(256, 512), c = t.c;
+  c.fillStyle = '#26282c'; c.fillRect(0, 0, 256, 512); for (let i = 0; i < 900; i++) { c.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '0,0,0'},.05)`; c.fillRect(Math.random() * 256, Math.random() * 512, 3, 3); }
+  c.fillStyle = '#3b3e44'; for (const y of [40, 52, 64]) c.fillRect(0, y, 256, 4);
+  c.fillStyle = '#ffe9b0'; c.fillRect(110, 0, 36, 22); t.t.wrapS = t.t.wrapT = THREE.RepeatWrapping; t.t.repeat.set(1, 6);
+  const m = new THREE.MeshBasicMaterial({ map: t.t, side: THREE.BackSide }), tube = new THREE.Mesh(new THREE.BoxGeometry(6.4, 6, 160), m); tube.position.y = 2.6; g.add(tube);
+  return { g, tex: t.t };
+}
+function buildPlatform() {
+  const g = new THREE.Group(), name = canvasTex(512, 128), nameM = new THREE.MeshBasicMaterial({ map: name.t, toneMapped: false }), tile = new THREE.MeshLambertMaterial({ color: '#d9d4c8', emissive: '#d9d4c8', emissiveIntensity: 0.45 }), floorM = new THREE.MeshLambertMaterial({ color: '#b8b2a6', emissive: '#b8b2a6', emissiveIntensity: 0.35 }), glass = new THREE.MeshBasicMaterial({ color: '#a8c8d8', transparent: true, opacity: 0.25 }), frame = new THREE.MeshLambertMaterial({ color: '#8d949c', emissive: '#8d949c', emissiveIntensity: 0.3 }), lightM = new THREE.MeshBasicMaterial({ color: '#fffbea' });
+  // 오른쪽(-x) 승강장: 폭 6m · 길이 120m, 높이는 열차 바닥과 같게
+  box(g, 6, 1.1, 120, floorM, -4.7, 0.55, 0); box(g, 0.3, 6, 120, tile, -7.8, 3, 0); box(g, 6.5, 0.2, 120, tile, -4.7, 5.0, 0);
+  for (let z = -57; z <= 57; z += 3.2) { box(g, 0.08, 2.2, 0.12, frame, -1.75, 2.2, z); const gp = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 1.9), glass); gp.position.set(-1.75, 2.15, z + 1.6); gp.rotation.y = Math.PI / 2; g.add(gp); box(g, 0.1, 0.25, 3.2, frame, -1.75, 3.4, z + 1.6); }
+  for (let z = -55; z <= 55; z += 6) box(g, 1.2, 0.05, 3, lightM, -4.7, 4.88, z);
+  for (const z of [-30, 0, 30]) { const p = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.8), nameM); p.position.set(-7.6, 3.0, z); p.rotation.y = Math.PI / 2; g.add(p); }
+  return { g, name };
+}
+
+export class LiveRide {
+  constructor(hg) { this.hg = hg; this.on = null; this.cand = null; this.t = 0; this.cache = new Map(); ui(); this.wire(); }
+  wire() {
+    const $ = (id) => document.getElementById(id);
+    this.el = { card: $('rd-card'), led: $('rd-led'), seat: $('rd-seat') };
+    this.el.card.querySelector('.b1').onclick = () => this.act(); this.el.card.querySelector('.b2').onclick = () => this.bell();
+    this.el.seat.querySelector('.stand').onclick = () => this.sit(this.on?.I.stand[0]); this.el.seat.querySelector('.auto').onclick = () => this.sit(this.freeSeat());
+  }
+  get lock() { return !!this.on; }
+  lockInput(inp) { return { ...inp, mx: 0, mz: 0, lat: 0, jump: false, jumpHeld: false, slide: false }; }
+  // ---------- 탈 수 있는 것 찾기 ----------
+  findCand() {
+    const hg = this.hg, L = hg.live; if (!L) return null; let best = null;
+    if (!hg.inside && !hg.inShop && !hg.inMall) for (const o of L.buses.values()) { if (!o.mesh || !o.L) continue; const d = Math.hypot(o.x - hg.px, o.z - hg.pz), still = (o.cur ?? 0) < 0.4; if (d < 7 && still && (!best || d < best.d)) best = { kind: 'bus', o, d }; }
+    if (best || !L.sub) return best;
+    // 지하철: 역 안이거나 출구 8m 안 → 그 역에 진입 · 도착한 실제 열차
+    let stName = hg.inside?.st?.name; if (!stName && hg.nearSt) { const [n] = hg.nearSt.split(':'); const e = (hg.entrances || []).find((q) => q.st.name === n && Math.hypot(q.x - hg.px, q.z - hg.pz) < 8); if (e) stName = n; }
+    if (!stName) return null;
+    for (const o of L.trains.values()) { const Ln = L.sub.lines[o.line]; if (!Ln) continue; const k = L.stKey(Ln, stName); if (!k || o.e.b !== k || o.e.len - o.d > 40 || (o.v || 0) > 2) continue; const pri = o.dwellAt ? 0 : 1; if (!best || pri < best.pri) best = { kind: 'train', o, st: stName, pri, key: k }; }
+    return best;
+  }
+  // ---------- E ----------
+  act() {
+    if (this.el.seat && !this.el.seat.classList.contains('hidden')) return true;
+    if (this.on) { if (this.canAlight()) this.alight(); else if (this.on.kind === 'bus') this.bell(); return true; }
+    if (this.cand) { this.board(this.cand); return true; }
+    return false;
+  }
+  bell() { const R = this.on; if (!R || R.kind !== 'bus' || R.bell) return; R.bell = true; beep(SND.bell); this.led(); }
+  // ---------- 타기 ----------
+  board(c) {
+    const hg = this.hg; hg.exitInterior?.(); beep(SND.card);
+    let I; if (c.kind === 'bus') { const k = `bus:${c.o.type}`; I = this.cache.get(k) || buildBus(c.o.type); this.cache.set(k, I); }
+    else { const k = `car:${c.o.line}`; I = this.cache.get(k) || buildCar(c.o.line, hg.live.sub.lines[c.o.line]); this.cache.set(k, I); }
+    I.g.userData.noDrape = true; hg.scene.add(I.g); I.g.visible = true;
+    const r = rnd(((Date.now() / 1000) | 0) * 7 + 1), taken = new Set(), n = Math.min(I.seats.length - 2, 3 + Math.floor(r() * 3));
+    while (taken.size < n) taken.add(Math.floor(r() * I.seats.length));
+    this.on = { kind: c.kind, o: c.o, I, taken, seat: null, yaw0: hg.camYaw, pitch0: hg.camPitch ?? 0.3, t: 0, lastSay: '', stName: c.st };
+    this.passengers(r);
+    if (c.kind === 'bus') { this.on.stops = null; if (c.o.rid && hg.api) hg.api(`/api/seoul/bus/stops?rid=${c.o.rid}`).then((j) => { if (this.on?.o === c.o) this.on.stops = (j.stops || []).map((s) => ({ ...s, xy: hg.live.toLocal(s.lat, s.lon) })); }).catch(() => {}); if (c.o.mesh) c.o.mesh.visible = false; }
+    else { this.tun ||= buildTunnel(); this.plat ||= buildPlatform(); for (const q of [this.tun.g, this.plat.g]) { q.userData.noDrape = true; hg.scene.add(q); q.visible = false; } this.mapDraw(); }
+    this.follow(0); this.openSeats();
+    hg.onRide?.(c.kind === 'bus' ? `${c.o.route}번 버스` : `${c.o.line}`);
+  }
+  passengers(r) {
+    const hg = this.hg, R = this.on; R.bears = [];
+    const put = (s, seated) => { const b = hg.mkBear(r() < 0.5 ? 'street' : 'stroll', r, 1.05); hg.scene.remove(b.root); R.I.g.add(b.root); b.root.position.set(s.x, s.y + (seated ? 0.02 : 0), s.z); b.root.rotation.y = s.face; if (seated) b.setSeated?.(true); b.root.userData.npc = false; R.bears.push(b); };
+    for (const i of R.taken) put(R.I.seats[i], true);
+    if (R.kind === 'bus') put({ x: 0.7, y: R.I.F + 0.42, z: 4.3, face: 0 }, true); // 운전사
+    if (r() < 0.6) put({ ...R.I.stand[R.I.stand.length - 1], face: R.I.stand[R.I.stand.length - 1].face + 0.4 }, false);
+  }
+  freeSeat() { const R = this.on; if (!R) return null; const free = R.I.seats.map((s, i) => i).filter((i) => !R.taken.has(i)); return free.length ? R.I.seats[free[Math.floor(Math.random() * free.length)]] : R.I.stand[0]; }
+  // 좌석 고르기 창: 위에서 본 배치 (앞이 위)
+  openSeats() {
+    const R = this.on, el = this.el.seat, map = el.querySelector('.map'), I = R.I, isBus = R.kind === 'bus';
+    el.querySelector('h3').textContent = isBus ? `🚌 ${R.o.route}번 버스 · 자리를 골라요` : `🚇 ${R.o.line} ${R.o.to || ''}행 · 자리를 골라요`;
+    const Wm = isBus ? 2.6 : 3.1, Lm = isBus ? 11 : 19.5, S = isBus ? 48 : 24, w = Wm * S, h = Lm * S; map.style.width = (isBus ? w : h) + 'px'; map.style.height = (isBus ? h : w) + 'px'; map.innerHTML = '';
+    // 버스는 세로(앞이 위), 지하철은 가로(앞이 오른쪽)
+    const P = (x, z) => (isBus ? [w / 2 - x * S, h / 2 - z * S] : [h / 2 + z * S, w / 2 - x * S]);
+    I.seats.forEach((s, i) => { const b = document.createElement('button'), [a, c] = P(s.x, s.z), sz = isBus ? 10 : 5; b.className = 's' + (R.taken.has(i) ? ' taken' : ''); b.style.left = a - sz + 'px'; b.style.top = c - sz + 'px'; b.style.width = b.style.height = sz * 2 + 'px'; b.style.background = s.pink ? '#f29bb8' : s.prio ? '#e98a2a' : isBus ? '#3c5a9a' : '#4f6fb0'; b.title = s.pink ? '임산부석' : s.prio ? '노약자석' : '좌석'; if (!R.taken.has(i)) b.onclick = () => this.sit(s); map.appendChild(b); });
+    const lab = (t, x, z) => { const d = document.createElement('span'), [a, c] = P(x, z); d.className = 'lab'; d.textContent = t; d.style.left = a - 18 + 'px'; d.style.top = c - 7 + 'px'; map.appendChild(d); };
+    if (isBus) { lab('운전석', 0.7, 4.75); lab('앞문', -1.05, 4.6); lab('뒷문', -1.05, 0); } else { for (const z of [-7.3, -2.45, 2.45, 7.3]) { lab('문', 1.35, z); lab('문', -1.35, z); } lab('▶ 앞', 0, 9.3); }
+    el.classList.remove('hidden'); document.exitPointerLock?.();
+  }
+  sit(s) {
+    const R = this.on; if (!R || !s) return; R.seat = s; this.el.seat.classList.add('hidden');
+    this.hg.camYaw = R.yaw0; this.hg.camPitch = 0.3; R.pitch0 = 0.3;
+    if (R.kind === 'bus') this.say(`${R.o.route}번 버스입니다.`, true); else this.trainSay(true);
+  }
+  // ---------- 따라가기 ----------
+  // 탈 것의 지금 자리 → 실내 무리 자리 · 방향 (지하철 땅 밑이면 땅에서 30m 아래 + 터널)
+  follow(dt) {
+    const hg = this.hg, R = this.on, L = hg.live; let x, z, yaw, y, under = false;
+    if (R.kind === 'bus') { const o = R.o; x = o.x; z = o.z; yaw = o.yaw; y = hg.terr ? hg.terrAt(x, z) : 0; if (o.mesh) o.mesh.visible = false; }
+    else { const o = R.o, n = (L.sub.lines[o.line].cars || [8, 20])[0], p = L.carPose(o, Math.min(1, n - 1)); x = p.x - L.cx; z = p.z - L.cz; yaw = Math.atan2(p.dx, p.dz); under = p.k === 1; y = under ? (hg.terr ? hg.terrAt(x, z) : 0) - 30 : L.trackY(x, z, p.k) - 0.3; R.under = under; R.pose = p; }
+    const g = R.I.g; g.position.set(x, y, z); g.rotation.y = yaw; R.x = x; R.z = z; R.y = y; R.yaw = yaw;
+    hg.px = x; hg.pz = z; hg.y = 0;
+    if (R.kind === 'train') {
+      this.tun.g.visible = under; if (under) { this.tun.g.position.set(x, y, z); this.tun.g.rotation.y = yaw; this.tun.tex.offset.y -= ((R.o.v || 0) * dt) / 26.7; }
+      // 승강장: 지하 역 150m 안 (도착하는 역 · 막 떠난 역)
+      let show = false; if (under) { const e = R.o.e, near = e.len - R.o.d < 150 ? [e, e.len, e.b] : R.o.d < 150 ? [e, 0, e.a] : null; if (near) { const sp = L.edgeAt(near[0], near[1]), sx = sp.x - L.cx, sz = sp.z - L.cz; show = Math.hypot(sx - x, sz - z) < 160; if (show) { this.plat.g.position.set(sx, y, sz); this.plat.g.rotation.y = yaw; if (this.plat.st !== near[2]) { this.plat.st = near[2]; this.nameBoard(L.sub.lines[R.o.line].st[near[2]]?.[0] || near[2], L.sub.lines[R.o.line].color); } } } }
+      this.plat.g.visible = show;
+    }
+  }
+  nameBoard(name, color) { const { c, t } = this.plat.name; c.fillStyle = '#ffffff'; c.fillRect(0, 0, 512, 128); c.fillStyle = color; c.fillRect(0, 96, 512, 32); c.fillStyle = '#1d1d1f'; c.font = 'bold 64px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(name, 256, 52); t.needsUpdate = true; }
+  // ---------- 안내 ----------
+  say(text, chime = false, sub = '') { const R = this.on; if (!R || R.lastSay === text) return; R.lastSay = text; R.ledText = text; R.ledSub = sub; if (chime) beep(SND.chime); setTimeout(() => say(text), chime ? 900 : 0); this.led(); }
+  led() { const R = this.on, el = this.el.led; if (!R) { el.classList.add('hidden'); return; } el.classList.remove('hidden'); el.innerHTML = `${R.bell ? '<span class="stop">● 정차합니다 · </span>' : ''}${R.ledText || ''}${R.ledSub ? `<small>${R.ledSub}</small>` : ''}`;
+    if (R.kind === 'bus') { const { c, t } = R.I.led; c.fillStyle = '#0b0b0c'; c.fillRect(0, 0, 512, 64); c.fillStyle = R.bell ? '#ff4a3a' : '#ffae1a'; c.font = 'bold 34px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(R.bell ? '정차합니다' : (R.next ? `다음 ${R.next.n}` : `${R.o.route}번`), 256, 34, 500); t.needsUpdate = true; } }
+  // 버스: 정류소 목록에서 지금 자리 다음 정류소 (버스 머리 앞쪽에서 가장 가까운 것)
+  busNext() {
+    const R = this.on, S = R.stops; if (!S?.length) return; const fx = Math.sin(R.yaw), fz = Math.cos(R.yaw); let bi = -1, bd = Infinity;
+    S.forEach((s, i) => { const dx = s.xy[0] - R.x, dz = s.xy[1] - R.z, d = Math.hypot(dx, dz); if (d < bd) { bd = d; bi = i; } });
+    if (bi < 0) return; const s = S[bi], ahead = (s.xy[0] - R.x) * fx + (s.xy[1] - R.z) * fz; const ni = ahead > -6 ? bi : bi + 1; const nx = S[ni], nn = S[ni + 1];
+    R.next = nx; R.nextD = nx ? Math.hypot(nx.xy[0] - R.x, nx.xy[1] - R.z) : Infinity;
+    if (nx) this.say(`이번 정류장은 ${nx.n}입니다.${nn ? ` 다음 정류장은 ${nn.n}입니다.` : ''}`, true, nn ? `다음: ${nn.n}${nx.dir ? ` · ${nx.dir} 방면` : ''}` : '');
+  }
+  // 지하철: 이번 역 · 다음 역 (운행 순서), 갈아타는 노선
+  trainSay(first = false) {
+    const R = this.on, L = this.hg.live, Ln = L.sub.lines[R.o.line], o = R.o, nm = (k) => Ln.st[k]?.[0] || k, B = o.e.b;
+    const xfer = Object.entries(L.sub.lines).filter(([n, q]) => n !== o.line && L.stKey(q, nm(B))).map(([n]) => n);
+    const arrived = o.sttus === 1 && o.e.len - o.d < 30;
+    const text = arrived ? `${nm(B)}, ${nm(B)}역입니다.` : `이번 역은 ${nm(B)}역입니다.`;
+    this.say(first ? `이 열차는 ${o.to || ''}행 열차입니다. ${text}` : text + (xfer.length ? ` ${xfer.join(', ')}으로 갈아타실 수 있습니다.` : ''), !first, `${o.line} ${o.to || ''}행${o.next && arrived ? ` · 다음 ${nm(o.next)}` : ''}`);
+    if (R.mapAt !== B) { R.mapAt = B; this.mapDraw(); }
+  }
+  // 노선도 · 안내 화면 (지하철 실내)
+  mapDraw() {
+    const R = this.on; if (!R || R.kind !== 'train') return; const L = this.hg.live, Ln = L.sub.lines[R.o.line], I = R.I, o = R.o;
+    const seq = (Ln.seqs.find((q) => q.s.includes(o.e.b) && q.s.includes(o.e.a) && q.s.indexOf(o.e.b) > q.s.indexOf(o.e.a)) || Ln.seqs[0]).s, bi = Math.max(0, seq.indexOf(o.e.b)), from = Math.max(0, Math.min(bi - 6, seq.length - 16)), part = seq.slice(from, from + 16);
+    { const { c, t } = I.map; c.fillStyle = '#ffffff'; c.fillRect(0, 0, 2048, 64); c.fillStyle = Ln.color; c.fillRect(30, 26, 1988, 10); c.textAlign = 'center'; part.forEach((k, i) => { const x = 60 + i * (1928 / Math.max(1, part.length - 1)), here = k === o.e.b; c.fillStyle = here ? '#ff3b30' : '#ffffff'; c.strokeStyle = Ln.color; c.lineWidth = 5; c.beginPath(); c.arc(x, 31, here ? 13 : 9, 0, 7); c.fill(); c.stroke(); c.fillStyle = here ? '#d0021b' : '#222'; c.font = `${here ? 'bold ' : ''}20px sans-serif`; c.fillText(Ln.st[k]?.[0] || k, x, 60); }); t.needsUpdate = true; }
+    { const { c, t } = I.scr; c.fillStyle = '#101418'; c.fillRect(0, 0, 512, 96); c.fillStyle = '#7cd3ff'; c.font = 'bold 22px sans-serif'; c.textAlign = 'center'; c.fillText(`${o.line} ${o.to || ''}행`, 256, 30); c.fillStyle = '#ffffff'; c.font = 'bold 36px sans-serif'; c.fillText(`이번 역  ${Ln.st[o.e.b]?.[0] || o.e.b}`, 256, 76); t.needsUpdate = true; }
+  }
+  canAlight() { const R = this.on; if (!R) return false; if (R.kind === 'bus') return (R.o.hold > 0 || R.o.stop) && (R.o.cur ?? 0) < 0.3 && (R.next ? R.nextD < 60 : true); return !!R.o.dwellAt && R.o.e.len - R.o.d < 40; }
+  // ---------- 내리기 ----------
+  alight(silent = false) {
+    const hg = this.hg, R = this.on; if (!R) return; beep(SND.door);
+    let tx = R.x, tz = R.z, face = R.yaw, enter = null;
+    if (R.kind === 'bus') { const rx = -Math.cos(R.yaw), rz = Math.sin(R.yaw); tx += rx * 3.6; tz += rz * 3.6; if (R.o.mesh) R.o.mesh.visible = true; }
+    else { const L = hg.live, Ln = L.sub.lines[R.o.line], name = Ln.st[R.o.e.b]?.[0] || ''; const e = (hg.entrances || []).filter((q) => norm(q.st.name) === norm(name)).sort((a, b) => Math.hypot(a.x - R.x, a.z - R.z) - Math.hypot(b.x - R.x, b.z - R.z))[0]; if (e && Math.hypot(e.x - R.x, e.z - R.z) < 700) enter = e; else { const s = Ln.st[R.o.e.b]; if (s) { tx = s[1] - L.cx; tz = s[2] - L.cz; } } }
+    for (const b of R.bears || []) { R.I.g.remove(b.root); }
+    R.I.g.visible = false; hg.scene.remove(R.I.g); if (this.tun) { this.tun.g.visible = false; this.plat.g.visible = false; }
+    this.on = null; this.el.led.classList.add('hidden'); this.el.seat.classList.add('hidden'); try { speechSynthesis?.cancel(); } catch { /* 없음 */ }
+    if (this.camRef && this.near0) { this.camRef.near = this.near0; this.camRef.updateProjectionMatrix(); this.near0 = null; }
+    if (enter) hg.enterStation(enter); else hg.placeAt(tx, tz, face);
+    if (!silent) hg.onRide?.(null);
+  }
+  // ---------- 매 프레임 ----------
+  tick(dt) {
+    const hg = this.hg; this.t += dt;
+    if (!this.on) {
+      if (this.t > 0.3) { this.t = 0; this.cand = this.findCand(); this.card(); }
+      return;
+    }
+    const R = this.on, L = hg.live;
+    // 탈 것이 사라지면(자료가 끊김) 그 자리에서 내린다
+    if (R.kind === 'bus' ? !L.buses.has(R.o.id) : !L.trains.has(R.o.id)) { this.alight(); return; }
+    this.follow(dt); R.t += dt;
+    // 문: 버스가 서 있으면 열림
+    // 버스: 정류장 14m 앞이면 10초 선다 (GPS 는 100초마다라 정차를 놓치기 쉬워서, 타고 있을 땐 정류소 목록으로)
+    if (R.kind === 'bus' && R.next && R.nextD < 14 && R.heldAt !== R.next.seq) { R.heldAt = R.next.seq; R.o.hold = R.bell ? 12 : 8; }
+    if (R.kind === 'bus') { const open = (R.o.cur ?? 0) < 0.3 && (R.o.stop || R.o.hold > 0); for (const p of R.I.doorP) p.position.z += ((open ? p.userData.openZ : p.userData.closedZ) - p.position.z) * Math.min(1, dt * 4); if (open && !R.wasOpen) { beep(SND.door); if (R.bell) { R.bell = false; this.led(); } } R.wasOpen = open; }
+    const night = hg.light?.night || 0, under = R.under; for (const m of R.I.mats) m.emissiveIntensity = m.userData.glow + (under ? 0.5 : night * 0.55);
+    if (this.t > 1) { this.t = 0; if (R.seat) { if (R.kind === 'bus') this.busNext(); else this.trainSay(); } this.card(); }
+  }
+  card() {
+    const el = this.el.card, R = this.on, c = this.cand, b1 = el.querySelector('.b1'), b2 = el.querySelector('.b2'), ic = el.querySelector('.ic');
+    if (R) { const can = this.canAlight(); ic.textContent = R.kind === 'bus' ? '🚌' : '🚇'; el.querySelector('b').textContent = R.kind === 'bus' ? `${R.o.route}번 버스 안` : `${R.o.line} ${R.o.to || ''}행 열차 안`; el.querySelector('small').textContent = can ? '문이 열렸어요 · 내릴 수 있어요' : R.kind === 'bus' ? (R.bell ? '다음 정류장에서 서요' : '내리려면 하차벨을 눌러요') : '역에 서면 내릴 수 있어요'; b1.innerHTML = can ? '내리기 <kbd>E</kbd>' : '🪑 자리 바꾸기'; b1.onclick = can ? () => this.alight() : () => this.openSeats(); b2.classList.toggle('hidden', R.kind !== 'bus' || can); el.classList.remove('hidden'); return; }
+    if (!c) { el.classList.add('hidden'); return; }
+    b2.classList.add('hidden'); b1.onclick = () => this.act();
+    if (c.kind === 'bus') { ic.textContent = '🚌'; el.querySelector('b').textContent = `${c.o.route}번 버스가 서 있어요`; el.querySelector('small').textContent = '문이 열렸어요 · 교통카드를 찍고 타요'; }
+    else { ic.textContent = '🚇'; el.querySelector('b').textContent = `${c.o.line} ${c.o.to || ''}행 · ${c.o.sttus === 1 ? '도착' : '곧 도착'}`; el.querySelector('small').textContent = `${c.st}역 · 실제 열차 위치 그대로`; }
+    b1.innerHTML = '타기 <kbd>E</kbd>'; el.classList.remove('hidden');
+  }
+  // 카메라: 고른 자리 눈높이 (앉으면 1.15m, 서면 1.6m), 끌어서 둘러보기 · 살짝 흔들림
+  cam(camera) {
+    const R = this.on, hg = this.hg; if (!R) return; if (hg.bear) hg.bear.root.visible = false; if (hg.shadow) hg.shadow.visible = false;
+    const s = R.seat || R.I.stand[0], eye = s.stand ? 1.6 : 0.8, sh = Math.sin(performance.now() / 160) * 0.006 * Math.min(1, (R.kind === 'bus' ? R.o.cur ?? 0 : R.o.v || 0) / 6);
+    const v = new THREE.Vector3(s.x, s.y + eye + sh, s.z); R.I.g.localToWorld(v); camera.position.copy(v);
+    const yaw = R.yaw + s.face + (hg.camYaw - R.yaw0), pt = clamp((hg.camPitch ?? 0.3) - R.pitch0, -0.7, 0.7);
+    camera.up.set(0, 1, 0); camera.lookAt(v.x + Math.sin(yaw) * Math.cos(pt), v.y - Math.sin(pt), v.z + Math.cos(yaw) * Math.cos(pt));
+    if (camera.near > 0.05) { this.camRef = camera; this.near0 = camera.near; camera.near = 0.05; camera.updateProjectionMatrix(); }
+  }
+  where() { const R = this.on; if (!R) return null; return R.kind === 'bus' ? `🚌 ${R.o.route}번 버스 안${R.next ? ` · 다음 ${R.next.n}` : ''}` : `🚇 ${R.o.line} 열차 안 · 이번 ${this.hg.live.sub.lines[R.o.line].st[R.o.e.b]?.[0] || ''}`; }
+  dispose() { if (this.on) this.alight(true); for (const I of this.cache.values()) this.hg.scene.remove(I.g); this.cache.clear(); }
+}

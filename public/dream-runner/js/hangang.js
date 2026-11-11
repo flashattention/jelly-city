@@ -15,6 +15,7 @@ import { buildSummit, tickSummit, deckBears } from './hangang-summit.js';
 import { buildStreetFurniture, buildLandmarkStatues } from './hangang-street.js';
 import { setupAttractions, ATTR_SKIP } from './hangang-attractions.js';
 import { LiveTransit } from './hangang-transit.js';
+import { LiveRide } from './hangang-ride.js';
 
 export const SEASONS = { spring: '🌸 봄', summer: '🌿 여름', autumn: '🍁 가을', winter: '❄️ 겨울' };
 export const WEATHERS = { clear: '☀️ 맑음', cloudy: '☁️ 구름', rain: '🌧️ 비', snow: '🌨️ 눈' };
@@ -1926,6 +1927,8 @@ export class Hangang {
     this.trains = []; this.trainT = 5; this.trainSeen = new Set(); this.buses = new Map();
     // 실시간 버스 · 지하철 (서울 어디든): hangang-transit.js
     this.live?.dispose(); this.live = new LiveTransit(this);
+    // 버스 · 지하철 타기: hangang-ride.js
+    this.rideL?.dispose(); this.rideL = new LiveRide(this);
     // 다른 호선 철교 (4호선 동작대교 · 2호선 당산철교 등): 그 호선 색 열차가 몇 분마다 지나간다
     this.lineTracks = (this.railPaths || []).map((rp) => ({ ...rp, line: (/(\d)호선/.exec(rp.n) || [])[1], len: rp.fine.reduce((a, p, i) => a + (i ? Math.hypot(p[0] - rp.fine[i - 1][0], p[1] - rp.fine[i - 1][1]) : 0), 0) })).filter((rp) => rp.line && rp.line !== '1' && rp.len > 200); this.lineT = 8;
   }
@@ -1962,7 +1965,7 @@ export class Hangang {
     for (const t of this.trains) { t.d += t.dir * t.v * dt; t.g.children.forEach((car, i) => { const p = this.trainAt(t.tp, clamp(t.d - t.dir * i * 20, 0, t.tp.len)); car.position.set(p.x, p.y + 0.4, p.z); car.rotation.y = Math.atan2(p.dx, p.dz); car.visible = t.d - t.dir * i * 20 > 0 && t.d - t.dir * i * 20 < t.tp.len; }); }
     this.trains = this.trains.filter((t) => { const done = t.dir > 0 ? t.d > t.tp.len + 220 : t.d < -220; if (done) this.scene.remove(t.g); return !done; });
     // 실시간 버스 · 지하철: 실제 GPS · 실제 열차 위치 (hangang-transit.js)
-    this.live?.tick(dt, px, pz);
+    this.live?.tick(dt, px, pz); this.rideL?.tick(dt);
     // 가까운 지하철 출입구
     let near = null; for (const e of this.entrances) { const d = Math.hypot(e.x - px, e.z - pz); if (d < 7 && (!near || d < near.d)) near = { ...e, d }; }
     // 남산: 타워 아래로 다가가면 엘리베이터로 전망대(140m), 전망대 가운데 엘리베이터 앞에서 다시 아래로
@@ -2035,6 +2038,7 @@ export class Hangang {
     const st = this.state;
     // 서울 명소 체험 (hangang-attractions.js): 타고 있는 동안은 움직임 잠금
     if (this.chunks) { this.attr ||= setupAttractions(this); if (this.attr.lock) inp = this.attr.lockInput(inp); }
+    if (this.rideL?.lock) inp = this.rideL.lockInput(inp);
     // 시간 흐름 (기본: 게임 속 1시간 = 1분)
     if (this.opt.time === 'auto' || this.opt.flow > 0) st.hour = (st.hour + (dt / 60) * (this.opt.flow ?? 1)) % 24;
     // 날씨는 가끔 바뀐다
@@ -2132,6 +2136,7 @@ export class Hangang {
     if (this.chunks) this.liftMovers();
     this.tickCamera(dt, camera, bx, bz, Math.sin(this.camYaw), Math.cos(this.camYaw));
     this.attr?.cam(camera, dt);
+    this.rideL?.cam(camera, dt);
   }
   // 사람 수 · 구성: 계절 · 날씨 · 시간에 따라 (벚꽃 철엔 연인이 가득, 비 · 추위 · 한밤엔 드문드문 러너만)
   crowd() {
@@ -2409,6 +2414,7 @@ export class Hangang {
     if (this.inMall) return `🛍️ ${this.inMall.D.name}`;
     if (this.inDeck) return '🗼 N서울타워 전망대 · 140m';
     if (this.attr?.exp) return this.attr.where();
+    if (this.rideL?.on) return this.rideL.where();
     if (this.chunks) { const gu = this.guAt(this.px, this.pz); return [gu, this.regionName].filter(Boolean).join(' · ') || '서울'; }
     const marks = this.map.marks || [], s = this.s, d = this.dir;
     const next = d > 0 ? marks.find(([, ms]) => ms > s + 5) : [...marks].reverse().find(([, ms]) => ms < s - 5);
