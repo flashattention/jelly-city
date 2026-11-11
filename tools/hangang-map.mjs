@@ -5,6 +5,7 @@
 //   지도 데이터 © OpenStreetMap contributors (ODbL) — 게임 화면에 출처를 표시한다
 import fs from 'node:fs';
 import { QUERIES } from './osm-queries.mjs';
+import { fixHeights } from './height-sanity.mjs';
 import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
@@ -426,6 +427,8 @@ out.far = C.far.map(([n, lat, lon, h, k]) => [n, ...q(P(lat, lon)), h, k]);
   out.terrain = { x0: rect[0], z0: rect[1], step: STEP, nx, nz, h: hs }; }
 const file = TILE_MODE ? path.join(ROOT, 'public', 'dream-runner', 'seoul', `${id}.json`) : path.join(ROOT, 'public', 'dream-runner', 'hangang', `${id}.json`);
 fs.mkdirSync(path.dirname(file), { recursive: true });
+// 높이 자료 오류 바로잡기 (아파트 옆에 혼자 수백 m 로 솟는 이름 없는 건물)
+console.log(`높이 바로잡음 ${fixHeights(out, (m) => console.log('  ' + m))}`);
 fs.writeFileSync(file, JSON.stringify(out));
 console.log(`먼 물줄기 ${out.water.length} · 먼 높은 건물 ${out.tall.length}`);
 console.log(`${C.name}: 코스 ${Math.round(routeLen)}m · 물 ${out.water.length} · 섬 ${out.island.length} · 녹지 ${out.green.length} · 길 ${out.roads.length} · 산책로 ${out.paths.length} · 다리 ${out.bridges.length} · 철길 ${out.rails.length} · 건물 ${out.buildings.length} (뺀 것 ${dropped}) · ${(fs.statSync(file).size / 1024).toFixed(0)}KB`);
