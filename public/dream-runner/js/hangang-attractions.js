@@ -101,7 +101,7 @@ class Attractions {
     this.drum(0.9, 70, 0.25);
   }
   openBook() {
-    const B = this.el.book, list = SPOTS.filter((s) => !s.hidden), n = list.filter((s) => this.stamps[s.id]).length;
+    const B = this.el.book, list = SPOTS.filter((s) => !s.hidden && s.start), n = list.filter((s) => this.stamps[s.id]).length;
     B.innerHTML = `<div class="pg"><button class="x">닫기</button><h3>🎫 서울 명소 도장첩</h3><div class="sub">명소에서 체험하면 도장이 찍혀요 · ${n} / ${list.length} · 누르면 그곳으로 가요</div><div class="grid">${list.map((s) => { const t = this.stamps[s.id]; return `<div class="it${t ? ' on' : ''}" data-id="${s.id}"><span class="ic">${s.icon}</span><span class="nm">${s.name}</span><span class="d">${t ? new Date(t).toLocaleDateString('ko-KR') : s.intro}</span>${t ? `<span class="seal">${s.seal || s.name.slice(0, 4)}</span>` : ''}</div>`; }).join('')}</div></div>`;
     B.querySelector('.x').onclick = () => B.classList.add('hidden');
     for (const it of B.querySelectorAll('.it')) it.onclick = () => { const s = SPOTS.find((q) => q.id === it.dataset.id); B.classList.add('hidden'); if (s) this.goTo(s); };
@@ -203,6 +203,8 @@ export function part(geo, col, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx =
 export function merge(list) { return mergeGeometries(list.filter(Boolean), false); }
 export const vcMat = (o = {}) => new THREE.MeshLambertMaterial({ vertexColors: true, ...o });
 
+// 롯데월드(8-17, 에이전트 E 담당): 지도에만 먼저 표시. 체험(놀이기구)은 그쪽 모듈이 같은 id 로 registerAttraction 하면 바뀐다
+{ const [x, z] = LL(37.5111, 127.0980); registerAttraction({ id: 'lotteworld', name: '롯데월드', icon: '🎢', intro: '석촌호수 매직아일랜드 · 실내 어드벤처', x, z, r: 0, go: [x + 60, z + 120, Math.PI] }); }
 // ============================================================
 // 경복궁: 수문장 교대식 (10:00 · 14:00) · 근정전 조정(품계석 · 어도 · 박석) · 경회루 연못가
 // ============================================================
@@ -426,7 +428,7 @@ function buildGyeonghoeru(A, g) {
   A.addFloor((x, z) => { const on = (x > isl[0] && x < isl[1] && z > isl[2] && z < isl[3]) || ([-D * 0.32, 0, D * 0.32].some((oz) => x > bx0 - 2 && x < bx1 + 2 && Math.abs(z - (lz + oz)) < 1.4)); return on ? y0 + 0.1 - A.H(x, z) : -1; });
 }
 registerAttraction({
-  id: 'gbg', name: '경복궁 수문장 교대식', seal: '경복궁', icon: '🏯', x: G.heung[0] - 4, z: G.heung[1] + 40, r: 70, face: Math.PI, buildR: 900,
+  id: 'gbg', name: '경복궁', seal: '경복궁', icon: '🏯', x: G.heung[0] - 4, z: G.heung[1] + 40, r: 70, face: Math.PI, buildR: 900,
   intro: '조선의 으뜸 궁궐 · 매일 10시 · 14시 흥례문 앞에서 북 · 깃발 · 행렬의 교대식',
   introNow(A) { const h = A.hg.state.hour, B = A.built.get('gbg'); if (B?.S?.t >= 0) return '지금 교대식이 열리고 있어요! 가까이에서 봐요'; const nx = h < 10 ? 10 : h < 14 ? 14 : 10; return `다음 교대식 ${nx}:00 · 지금 ${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')} (체험하면 그 시각으로)`; },
   build: buildGyeongbokgung,

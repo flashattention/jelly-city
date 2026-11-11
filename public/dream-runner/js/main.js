@@ -23,6 +23,7 @@ import { openPatchNotes, showWhatsNew } from '../../shared/js/patchnotes.js';
 import { openWardrobe, notifyNew, titleHtml, medalHtml, loadCos } from '../../shared/js/wardrobe.js';
 import { starsEarned } from '../../shared/js/cos-items.js';
 import { Hangang, SEASONS, WEATHERS, TIMES, SPEEDS, V_MIN, V_MAX } from './hangang.js';
+import { mapPlaces, HOOD_SPOTS } from './hangang-attractions.js';
 
 const $ = (id) => document.getElementById(id);
 const MODE_KEY = 'dreamrunner.mode', DIFF_KEY = 'dreamrunner.diff', CAM_KEY = 'dreamrunner.cam', MAP_KEY = 'dreamrunner.map';
@@ -1041,20 +1042,36 @@ $('hg-from-start').onclick = () => { $('hg-start').classList.add('hidden'); star
 $('hg-pick').onclick = async () => { $('hg-start').classList.add('hidden'); try { if (await hgCheckWorld()) hgUse(hgRegion); await hg.load(hgWorld ? 'seoul' : hgRegion); } catch (e) { toast(e.message); return; } hgOpenMap(true); };
 let hgPick = null, hgMapStart = false, hgMapMode = 'seoul', hgSeoul = null, hgMapT = null;
 // 큰 지도: 기본은 서울 전체(지역 · 구 · 준비 중인 구), '이 지역 자세히'로 지금 지역 지도
-async function hgLoadSeoul() { if (!hgSeoul) { const { SeoulMap } = await import('./seoul-map.js'); const d = await (await fetch('hangang/seoul.json')).json(); hgSeoul = new SeoulMap(d, Object.fromEntries(Object.entries(HG_REGIONS).map(([k, v]) => [k, v.label]))); } hgSeoul.allOpen = hgWorld; return hgSeoul; }
-function hgMapTitle() { $('hg-map-title').innerHTML = hgMapMode === 'seoul' ? (hgWorld ? '🗺️ 서울 전체 <small>어디든 누르면 그곳으로 가요 · 걸어서 · 날아서도 이어져 있어요</small>' : '🗺️ 서울 전체 <small>색 있는 선 = 걸을 수 있는 지역 · 회색 = 준비 중 · 가고 싶은 곳을 누르세요</small>') : `🗺️ ${hg.map?.name || ''} <small>가고 싶은 곳을 누르세요 (빨간 선이 코스)</small>`; $('hg-map-mode').textContent = hgMapMode === 'seoul' ? '🔍 이 지역 자세히' : '🗺️ 서울 전체'; $('hg-map-mode').classList.toggle('hidden', !hg.ready || hgWorld); }
+async function hgLoadSeoul() { if (!hgSeoul) { const { SeoulMap } = await import('./seoul-map.js'); const d = await (await fetch('hangang/seoul.json')).json(); hgSeoul = new SeoulMap(d, Object.fromEntries(Object.entries(HG_REGIONS).map(([k, v]) => [k, v.label]))); } hgSeoul.allOpen = hgWorld; hgSeoul.places = hgMapPlaces(); return hgSeoul; }
+// 큰 지도에 그릴 것: 첫 화면 동네 28곳(지역 코스 가운데 · 구 대표 자리) + 체험 명소 (도장 받은 곳은 빨간 테)
+function hgMapPlaces() {
+  const out = [], st = (() => { try { return { ...JSON.parse(store.get('dreamrunner.hangang.stamps') || '{}'), ...(hg.attr?.stamps || {}) }; } catch { return hg.attr?.stamps || {}; } })();
+  for (const R of hgSeoul.regions) { if (!HG_REGIONS[R.id]) continue; const k = Math.floor(R.pts.length / 2), [x, z] = R.pts[k], [ic, ...nm] = HG_REGIONS[R.id].label.split(' '); out.push({ kind: 'hood', region: R.id, name: nm.join(' '), icon: ic, x, z, s: R.acc[k], go: [x, z, 0] }); }
+  for (const [name, icon, x, z] of HOOD_SPOTS) out.push({ kind: 'hood', name, icon, x, z, go: [x, z, 0] });
+  for (const p of mapPlaces()) out.push({ ...p, done: !!st[p.id] });
+  return out;
+}
+function hgMapTitle() { $('hg-map-title').innerHTML = hgMapMode === 'seoul' ? (hgWorld ? '🗺️ 서울 전체 <small>어디든 누르면 그곳으로 가요 · 아이콘 = 동네 · 체험 명소 · 휠 · 두 손가락으로 확대, 끌어서 옮기기</small>' : '🗺️ 서울 전체 <small>색 있는 선 = 걸을 수 있는 지역 · 회색 = 준비 중 · 가고 싶은 곳을 누르세요</small>') : `🗺️ ${hg.map?.name || ''} <small>가고 싶은 곳을 누르세요 (빨간 선이 코스)</small>`; $('hg-map-mode').textContent = hgMapMode === 'seoul' ? '🔍 이 지역 자세히' : '🗺️ 서울 전체'; $('hg-map-mode').classList.toggle('hidden', !hg.ready || hgWorld); }
 async function hgOpenMap(start = false) { hgMapStart = start; hgPick = null; hgMapMode = 'seoul'; $('hg-go').disabled = true; $('hg-go').textContent = start ? '🏃 여기서 시작' : '📍 새 위치로 이동'; $('hg-map').classList.remove('hidden'); if (document.pointerLockElement) document.exitPointerLock?.(); try { await hgLoadSeoul(); } catch { hgMapMode = 'detail'; } hgMapTitle(); hgDrawMap(); clearInterval(hgMapT); hgMapT = setInterval(() => { if ($('hg-map').classList.contains('hidden')) { clearInterval(hgMapT); return; } if (hgMapMode === 'seoul') hgDrawMap(); }, 120); }
 function hgHere() { return hg.ready && game.mode === 'hangang' && hg.px != null ? { x: hg.map.center[0] + hg.px, z: hg.map.center[1] + hg.pz } : null; }
 function hgDrawMap() { const c = $('hg-map-c'); if (hgMapMode === 'seoul' && hgSeoul) hgSeoul.draw(c.getContext('2d'), c.width, c.height, { here: hgHere(), pick: hgPick?.seoul ? hgPick : null, t: performance.now() / 1000 }); else hg.drawBigMap(c.getContext('2d'), c.width, hgPick?.seoul ? null : hgPick); }
 $('hg-map-mode').onclick = () => { hgMapMode = hgMapMode === 'seoul' ? 'detail' : 'seoul'; hgPick = null; $('hg-go').disabled = true; hgMapTitle(); hgDrawMap(); };
-$('hg-map-c').addEventListener('pointerdown', (e) => { const r = e.currentTarget.getBoundingClientRect(), u = (e.clientX - r.left) / r.width, v = (e.clientY - r.top) / r.height;
-  if (hgMapMode === 'seoul' && hgSeoul) { const p = hgSeoul.pickAt(u, v); hgPick = { seoul: true, ...p }; const ok = hgWorld ? hgTileAt(p.x, p.z) : !!p.region; $('hg-go').disabled = !ok; $('hg-go').textContent = !ok ? `🚧 ${p.gu || '이곳'}은 준비 중이에요` : p.region ? `📍 ${p.name}(으)로` : `📍 ${p.gu || '이곳'}(으)로`; }
+// 큰 지도: 휠 · 두 손가락으로 확대, 끌어서 옮기기, 짧게 누르면 고르기 (동네 · 명소 아이콘을 누르면 그곳)
+const hgMapPtr = new Map(); let hgMapDrag = null;
+const hgMapUV = (e) => { const r = $('hg-map-c').getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height]; };
+$('hg-map-c').addEventListener('wheel', (e) => { if (hgMapMode !== 'seoul' || !hgSeoul) return; e.preventDefault(); const [u, v] = hgMapUV(e); hgSeoul.zoomAt(u, v, e.deltaY < 0 ? 1.25 : 0.8); hgDrawMap(); }, { passive: false });
+$('hg-map-c').addEventListener('pointerdown', (e) => { e.currentTarget.setPointerCapture?.(e.pointerId); hgMapPtr.set(e.pointerId, hgMapUV(e)); hgMapDrag = { uv: hgMapUV(e), moved: false, pinch: hgMapPtr.size > 1 ? null : undefined }; });
+$('hg-map-c').addEventListener('pointermove', (e) => { if (!hgMapPtr.has(e.pointerId) || !hgSeoul || hgMapMode !== 'seoul') return; const prev = hgMapPtr.get(e.pointerId), uv = hgMapUV(e); hgMapPtr.set(e.pointerId, uv);
+  if (hgMapPtr.size === 2) { const [a, b] = [...hgMapPtr.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (hgMapDrag) { if (hgMapDrag.pd) hgSeoul.zoomAt((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, d / hgMapDrag.pd); hgMapDrag.pd = d; hgMapDrag.moved = true; } hgDrawMap(); return; }
+  if (hgMapDrag && (hgMapDrag.moved || Math.hypot(uv[0] - hgMapDrag.uv[0], uv[1] - hgMapDrag.uv[1]) > 0.012)) { hgMapDrag.moved = true; hgSeoul.pan(uv[0] - prev[0], uv[1] - prev[1]); hgDrawMap(); } });
+for (const ev of ['pointerup', 'pointercancel']) $('hg-map-c').addEventListener(ev, (e) => { const had = hgMapPtr.delete(e.pointerId); if (!had || ev === 'pointercancel' || !hgMapDrag || hgMapDrag.moved) { if (!hgMapPtr.size) hgMapDrag = null; return; } hgMapDrag = null; const [u, v] = hgMapUV(e);
+  if (hgMapMode === 'seoul' && hgSeoul) { const p = hgSeoul.pickAt(u, v); hgPick = { seoul: true, ...p }; const ok = hgWorld ? hgTileAt(p.x, p.z) : !!p.region; $('hg-go').disabled = !ok; $('hg-go').textContent = !ok ? `🚧 ${p.gu || '이곳'}은 준비 중이에요` : p.place ? `${p.place.icon || '📍'} ${p.name}(으)로` : p.region ? `📍 ${p.name}(으)로` : `📍 ${p.gu || '이곳'}(으)로`; }
   else { hgPick = hg.pickAt(u, v); $('hg-go').disabled = false; $('hg-go').textContent = hgMapStart ? '🏃 여기서 시작' : '📍 새 위치로 이동'; }
   hgDrawMap(); });
 // 다른 지역으로 옮기기 (지금 지역은 저장하고 정리)
 async function hgSwitchRegion(id, pos) { if (game.mode === 'hangang') { hgReport(true); hgSavePos(); hg.exitInterior?.(); hg.onShop(null); hg.onStation(null); hgKeepNow(); hg.leave(); } hgUse(id); await startHangang(pos); }
 $('hg-go').onclick = () => { if (!hgPick) return; $('hg-map').classList.add('hidden'); clearInterval(hgMapT);
-  if (hgPick.seoul && hgWorld) { const P = hgPick, nm = P.region ? P.name : P.gu || '이곳'; if (game.mode === 'hangang') { hg.placeAt(P.x, P.z, hg.face); toast(`📍 ${nm} · 새 위치로 왔어요`, 1600); } else { toast(`${nm}(으)로 가요…`, 2000); if (P.region) hgUse(P.region); startHangang({ x: P.x, z: P.z }); } return; }
+  if (hgPick.seoul && hgWorld) { const P = hgPick, nm = P.place || P.region ? P.name : P.gu || '이곳'; if (game.mode === 'hangang') { hg.exitInterior?.(); hg.placeAt(P.x, P.z, P.face ?? hg.face); toast(`📍 ${nm} · 새 위치로 왔어요`, 1600); } else { toast(`${nm}(으)로 가요…`, 2000); if (P.region) hgUse(P.region); startHangang({ x: P.x, z: P.z }); } return; }
   if (hgPick.seoul) { if (!hgPick.region) return; const pos = { s: hgPick.s, lat: 0 }; if (game.mode === 'hangang' && hgPick.region === hgRegion) { hg.teleport(pos.s, pos.lat); toast(`📍 ${hgPick.name} · 새 위치로 왔어요`, 1600); } else { toast(`${hgPick.name}(으)로 가요…`, 2000); hgSwitchRegion(hgPick.region, pos); } return; }
   if (hgMapStart || game.mode !== 'hangang') startHangang({ s: hgPick.s, lat: hgPick.lat }); else { hg.teleport(hgPick.s, hgPick.lat); toast('📍 새 위치로 왔어요', 1400); } };
 $('hg-map-x').onclick = () => $('hg-map').classList.add('hidden');
