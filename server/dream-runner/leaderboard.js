@@ -22,6 +22,8 @@ const TOP_GUARD = 10, DAY_STARS = 300000; // 확인 안 된 기록이 이 순위
 // 운영 지표: 하루(한국 시간)마다 달린 사람 · 판수 · 광고 (기획 지표용, tools/metrics.mjs 가 읽는다)
 const dayKey = (t = Date.now()) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);
 const DAILY_KEEP = 120;
+// 서울 명소 도장: 명소 id → 체험에 걸리는 최소 시간(초, 실제 시간). 시작(begin)을 알리고 이 시간이 지나야 도장(done)이 찍힌다
+const HG_STAMPS = { gbg: 30, cable: 40, lock: 3, cruise: 60, bike: 45, obs63: 20, lwt: 20, lotteworld: 30 };
 const HG_TTL = 10 * 3600e3, HG_MO = ['sunset', 'sunrise', 'night', 'rain', 'snow', 'spring', 'summer', 'autumn', 'winter']; // 한강 러닝: 한 번에 10시간까지 · 순간들 // 이 날수보다 오래된 하루 기록은 지운다
 const MAPS = ['dream', 'hell', 'void'], mapOf = (m) => (m === 'hell' || m === 'void' ? m : 'dream'); // 꿈나라 · 지옥 · 이공간
 const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n);
@@ -160,8 +162,21 @@ export class DreamBoard {
     const fresh = getCos()?.refresh(sub) || [];
     return { m: U.m, best: U.best, fresh };
   }
+  // 서울 명소 도장: 출발표(그 판) 안에서 begin → (최소 시간) → done. 같은 판에서 begin 은 명소마다 기억, 도장은 처음 찍은 시각만 남는다
+  hgStamp(sub, b) {
+    const now = Date.now(), tk = this.tickets.read(b.tk), id = String(b.id || '');
+    if (!tk || tk.mode !== 'hangang' || now - tk.at > HG_TTL) throw new Error('출발표가 없거나 오래됐어요');
+    if (!(id in HG_STAMPS)) throw new Error('모르는 명소예요');
+    const S = (this.hgSess[tk.id] ||= { sub, m: 0, sec: 0, mo: {}, at: tk.at }); if (S.sub !== sub) throw new Error('다른 사람의 판이에요');
+    const U = (this.hg[sub] ||= { m: 0, best: 0, runs: 0, sec: 0, mo: {} }); U.stamps ||= {};
+    if (b.phase === 'begin') { S.exp ||= {}; S.exp[id] = now; this.dirty = true; return { stamps: U.stamps }; }
+    const t0 = S.exp?.[id]; if (!t0 || now - t0 < HG_STAMPS[id] * 1000) throw new Error('체험을 끝까지 해 주세요');
+    delete S.exp[id]; const fresh0 = !U.stamps[id]; if (fresh0) U.stamps[id] = now; this.dirty = true;
+    const fresh = fresh0 ? getCos()?.refresh(sub) || [] : [];
+    return { stamps: U.stamps, fresh };
+  }
   // 서울 산책: 로그인한 사람만 계정에 위치(지역마다) · 가 본 칸을 둔다 (로그인 없이도 기기에 저장되어 그대로 즐길 수 있다)
-  hgMe(sub) { const U = this.hg[sub] || {}; return { pos: U.pos || null, visit: U.visit || [], m: U.m || 0, best: U.best || 0 }; }
+  hgMe(sub) { const U = this.hg[sub] || {}; return { pos: U.pos || null, visit: U.visit || [], m: U.m || 0, best: U.best || 0, stamps: U.stamps || {} }; }
   hgSave(sub, b) {
     const U = (this.hg[sub] ||= { m: 0, best: 0, runs: 0, sec: 0, mo: {} }), num = (v) => (Number.isFinite(+v) && v !== null && v !== '' ? Math.round(+v * 100) / 100 : undefined);
     if (b.pos && typeof b.pos === 'object') {
@@ -300,6 +315,13 @@ export async function dreamApi(req, res, url, who, board, json, isAdmin) {
     if (!who && !ANON.test(String(b.anon || ''))) return json(res, 401, { error: 'login' });
     try { return json(res, 200, board.hgRun(who?.sub || 'anon:' + b.anon, b)); } catch (e) { return json(res, 400, { error: e.message }); }
   }
+  // 서울 명소 도장 (로그인 없이도 이 기기 아이디로)
+  if (url.pathname === '/api/dream/hangang/stamp' && req.method === 'POST') {
+    const b = await readJson(req);
+    if (!who && !ANON.test(String(b.anon || ''))) return json(res, 401, { error: 'login' });
+    try { return json(res, 200, board.hgStamp(who?.sub || 'anon:' + b.anon, b)); } catch (e) { return json(res, 400, { error: e.message }); }
+  }
+  if (url.pathname === '/api/dream/hangang/stamps') { const sub = who?.sub || (ANON.test(anonId || '') ? 'anon:' + anonId : null); if (!sub) return json(res, 401, { error: 'login' }); return json(res, 200, { stamps: board.hg[sub]?.stamps || {} }); }
   // 서울 산책: 계정에 저장된 위치 · 가 본 칸 (로그인한 사람만)
   if (url.pathname === '/api/dream/hangang/me') { if (!who) return json(res, 401, { error: 'login' }); return json(res, 200, board.hgMe(who.sub)); }
   if (url.pathname === '/api/dream/hangang/save' && req.method === 'POST') { if (!who) return json(res, 401, { error: 'login' }); const b = await readJson(req, 64 * 1024); return json(res, 200, board.hgSave(who.sub, b)); }

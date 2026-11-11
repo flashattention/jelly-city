@@ -207,6 +207,9 @@ function buildAch() {
   [['sunset', '노을 러너', '노을 지는 한강을 500m 달리기', '🌇'], ['sunrise', '해돋이 러너', '해 뜨는 한강을 500m 달리기', '🌅'], ['night', '달빛 러너', '밤의 한강을 500m 달리기', '🌙'], ['rain', '빗속 러너', '비 오는 한강을 500m 달리기', '🌧️'], ['snow', '눈길 러너', '눈 오는 한강을 500m 달리기', '🌨️'],
     ['spring', '벚꽃 러너', '봄의 한강을 1km 달리기', '🌸'], ['summer', '초록 러너', '여름의 한강을 1km 달리기', '🌿'], ['autumn', '단풍 러너', '가을의 한강을 1km 달리기', '🍁'], ['winter', '겨울 러너', '겨울의 한강을 1km 달리기', '❄️']]
     .forEach(([k, n, d, e]) => hg(`mo.${k}`, n, d, ['spring', 'summer', 'autumn', 'winter'].includes(k) ? 'bronze' : 'silver', { kind: 'hgMo', mo: k, value: d.includes('1km') ? 1000 : 500 }, e));
+  // 🎫 서울 명소 도장 (젤리 서울 러너: 명소를 직접 체험하면 도장)
+  [[1, 'bronze', '첫 명소 도장', '서울 명소 한 곳을 체험해 도장 받기'], [3, 'silver', '서울 나들이', '서울 명소 세 곳에서 도장 받기'], [6, 'gold', '서울 명소 정복', '서울 명소 여섯 곳에서 도장 받기']]
+    .forEach(([v, t, n, d]) => hg(`stamp${v}`, n, d, t, { kind: 'hgStamp', value: v }, '🎫'));
   // 기록판 게임
   for (const [g, c] of Object.entries(RECORD_GAMES)) for (const [b, bn] of Object.entries(c.boards)) {
     const base = `${g}.${b}`, label = `${GAMES[g].name} ${bn}`;

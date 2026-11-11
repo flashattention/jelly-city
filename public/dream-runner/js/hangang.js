@@ -13,6 +13,7 @@ import { buildMall } from './hangang-mall.js';
 import { winLights, winProfile, winEra, winSeed, tickWindows, WIN_GRID } from './hangang-windows.js';
 import { buildSummit, tickSummit, deckBears } from './hangang-summit.js';
 import { buildStreetFurniture, buildLandmarkStatues } from './hangang-street.js';
+import { setupAttractions, ATTR_SKIP } from './hangang-attractions.js';
 
 export const SEASONS = { spring: '🌸 봄', summer: '🌿 여름', autumn: '🍁 가을', winter: '❄️ 겨울' };
 export const WEATHERS = { clear: '☀️ 맑음', cloudy: '☁️ 구름', rain: '🌧️ 비', snow: '🌨️ 눈' };
@@ -544,7 +545,7 @@ export class Hangang {
   world(s, lat) { const p = this.at(s); return [p.x + p.rx * lat, p.z + p.rz * lat]; }
   // 걸어갈 수 있는 곳: 물이 아니고, 코스 둘레 45m 안이거나 공원 · 녹지 · 섬 안 (5m 칸마다 기억)
   walkable(x, z, lat) {
-    if (this.map.kind === 'world') return !this.inWater(x, z);
+    if (this.map.kind === 'world') return !this.inWater(x, z) || !!this.attrWalk?.(x, z);
     if (this.walkLimit && Math.hypot(x - this.walkLimit.x, z - this.walkLimit.z) > this.walkLimit.r) return false; // 남산 정상: 광장 밖(비탈)으로는 못 간다
     if (Math.abs(lat + 2) < 7.5) return true; // 코스(자전거길 · 트랙)는 물 위도 다리로 건넌다
     return !this.inWater(x, z); // 이제 서울을 걸어 다니는 게임: 물이 아니면 어디든 (도시 골목까지)
@@ -579,7 +580,7 @@ export class Hangang {
     this.placeAt(e.x - Math.sin(th) * 3.6, e.z - Math.cos(th) * 3.6, th + Math.PI); this.stationCool = 2; this.onInside?.(null);
   }
   // 한강을 나갈 때: 가게 · 역 · 열차 안이면 바깥으로 되돌려 놓는다 (다음에 들어왔을 때 바깥이 숨겨져 있지 않게)
-  exitInterior() { if (this.inShop) this.leaveShop(); if (this.inMall) this.leaveMall(); if (this.ride) { this.ride.C.g.visible = false; this.ride = null; } if (this.inside) this.leaveStation(this.inside.from?.ref); }
+  exitInterior() { if (this.attr?.exp) this.attr.finish(this.attr.exp, true); if (this.inShop) this.leaveShop(); if (this.inMall) this.leaveMall(); if (this.ride) { this.ride.C.g.visible = false; this.ride = null; } if (this.inside) this.leaveStation(this.inside.from?.ref); }
   // 지금 있는 실내의 바닥 상자 [x0, x1, z0, z1] (곰이 서 있는 칸)
   interiorBox() {
     const px = this.px, pz = this.pz, box = (cx, cz, hw, hd) => [cx - hw, cx + hw, cz - hd, cz + hd], inBox = (b) => px >= b[0] - 1 && px <= b[1] + 1 && pz >= b[2] - 1 && pz <= b[3] + 1;
@@ -655,6 +656,7 @@ export class Hangang {
   groundAt(x, z, y) {
     const cell = this.footGrid?.get(`${Math.floor(x / 40)},${Math.floor(z / 40)}`); let g = Math.max(0, this.deckAt(x, z, y));
     if (cell) for (const fi of cell) { const f = this.foot[fi]; if (x < f.x0 || x > f.x1 || z < f.z0 || z > f.z1) continue; const fh = f.base === undefined ? f.h : f.h + f.base - this.terrAt(x, z); if (fh > g && y >= fh - 0.35 && inRing(x, z, f.ring)) g = fh; }
+    if (this.attrFloor) { const fa = this.attrFloor(x, z, y); if (fa > g) g = fa; }
     return g;
   }
   // 부딪힘: 건물 외곽선(그 높이보다 낮을 때) · 둥근 물체(나무 · 가로등 · 교각 · 사람)에서 밀어낸다. wall = 부딪힌 벽 (벽 타기용)
@@ -1303,6 +1305,7 @@ export class Hangang {
       // 돔 지붕 부분: 벽은 돔 아래까지, 그 위에 돔 (높이 · 색은 지도 데이터대로)
       const palaceHanok = (!info || !info[0]) && !LANDMARKS[ni >= 0 ? M.names[ni] : ''] && h0 <= 14 && Math.abs(ringArea(ring)) < 1500 && palaces.some(([x, z]) => Math.hypot(b[7] * M.scale - x, b[8] * M.scale - z) < 420), domeR = dome ? Math.sqrt(Math.abs(ringArea(ring)) / Math.PI) : 0, domeH = dome ? (dome > 1 ? dome : domeR * 0.6) : 0, h = palaceHanok ? 4.5 : LANDMARKS[ni >= 0 ? M.names[ni] : '']?.height || Math.min(Math.max(mh + 0.5, h0 - domeH), (M.kind === 'summit' || (towerC && Math.hypot(b[7] * M.scale - towerC[0], b[8] * M.scale - towerC[1]) < 160)) && M.names[ni] !== '남산서울타워' ? 12 : 1e9);
       const name = ni >= 0 ? M.names[ni] : '', cTag = ci >= 0 ? M.colors[ci] : '';
+      if (M.kind === 'tile' && ATTR_SKIP.has(name)) continue; // 명소 체험에서 따로 만드는 건물 (경회루)
       // 외벽 종류
       let type = kind === 1 ? (h > 14 ? 'apt' : r() < 0.5 ? 'brick' : 'stone') : kind === 4 ? (r() < 0.6 ? 'brick' : 'stone') : kind === 5 ? 'brick' : kind === 3 ? 'stone' : kind === 2 || kind === 0 ? (glassTag || h > 55 || (h > 30 && r() < 0.5) ? 'glass' : 'stone') : 'stone';
       // 종류를 모르는 길쭉한 판상형 (폭 10 ~ 17m · 길이 3배 이상 · 25 ~ 50m 높이) 은 아파트 (여의도 아파트 단지들)
@@ -2030,6 +2033,8 @@ export class Hangang {
     if (!this.ready || !this.bear) return;
     this.t += dt; this.time += dt;
     const st = this.state;
+    // 서울 명소 체험 (hangang-attractions.js): 타고 있는 동안은 움직임 잠금
+    if (this.chunks) { this.attr ||= setupAttractions(this); if (this.attr.lock) inp = this.attr.lockInput(inp); }
     // 시간 흐름 (기본: 게임 속 1시간 = 1분)
     if (this.opt.time === 'auto' || this.opt.flow > 0) st.hour = (st.hour + (dt / 60) * (this.opt.flow ?? 1)) % 24;
     // 날씨는 가끔 바뀐다
@@ -2102,6 +2107,7 @@ export class Hangang {
     const h = st.hour, mo = h >= 17.9 && h < 19.4 ? 'sunset' : h >= 5.3 && h < 6.9 ? 'sunrise' : h >= 20.5 || h < 4.2 ? 'night' : null;
     const add = (k) => { this.moments[k] = (this.moments[k] || 0) + ds; };
     if (mo) add(mo); if (st.weather === 'rain') add('rain'); if (st.weather === 'snow') add('snow'); add(st.season);
+    this.attr?.tick(dt, inp);
     // 곰돌이
     const bx = this.px, bz = this.pz;
     const tb = this.terrAt(bx, bz); this.bear.root.position.set(bx, this.y + tb, bz); this.bear.root.rotation.y = this.face; this.bear.root.visible = true;
@@ -2125,6 +2131,7 @@ export class Hangang {
     if ((this.inside || this.inShop || this.inMall) && this.scene.fog) { this.scene.fog.density = 0.004; this.scene.fog.color.set('#d8d2c8'); } // 역 안: 안개 거의 없이
     if (this.chunks) this.liftMovers();
     this.tickCamera(dt, camera, bx, bz, Math.sin(this.camYaw), Math.cos(this.camYaw));
+    this.attr?.cam(camera, dt);
   }
   // 사람 수 · 구성: 계절 · 날씨 · 시간에 따라 (벚꽃 철엔 연인이 가득, 비 · 추위 · 한밤엔 드문드문 러너만)
   crowd() {
@@ -2361,6 +2368,7 @@ export class Hangang {
     ctx.fillStyle = 'rgba(30,30,40,.9)'; ctx.font = `bold ${Math.round(size / 15)}px sans-serif`; ctx.textAlign = 'center';
     for (const [n, ms] of this.map.marks || []) { const p = this.at(ms), x = c + (p.x - this.px) * m, y = c + (p.z - this.pz) * m; if (x > 8 && x < size - 8 && y > 8 && y < size - 8) ctx.fillText(n, x, y - 4); }
     for (const p of this.people) { const [x0, z0] = this.world(p.s, p.lat), x = c + (x0 - this.px) * m, y = c + (z0 - this.pz) * m; ctx.fillStyle = p.kind.startsWith('runner') ? '#ffffff' : '#ffd23f'; ctx.beginPath(); ctx.arc(x, y, 2.2, 0, 7); ctx.fill(); }
+    this.attr?.drawMini(ctx, size, m, c);
     // 보는 쪽 부채꼴 · 나
     ctx.translate(c, c); ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.beginPath(); ctx.moveTo(0, 0); const ya = Math.atan2(Math.cos(this.camYaw), Math.sin(this.camYaw)); ctx.arc(0, 0, size * 0.32, ya - 0.5, ya + 0.5); ctx.closePath(); ctx.fill();
     ctx.rotate(-this.face + Math.PI); ctx.fillStyle = '#ff2d55'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6.5, 7); ctx.lineTo(0, 3.5); ctx.lineTo(-6.5, 7); ctx.closePath(); ctx.fill(); ctx.stroke();
@@ -2399,6 +2407,7 @@ export class Hangang {
     if (this.inShop) return `${SHOP_KIND[this.inShop.F.kind].emoji} ${this.inShop.F.name}`;
     if (this.inMall) return `🛍️ ${this.inMall.D.name}`;
     if (this.inDeck) return '🗼 N서울타워 전망대 · 140m';
+    if (this.attr?.exp) return this.attr.where();
     if (this.chunks) { const gu = this.guAt(this.px, this.pz); return [gu, this.regionName].filter(Boolean).join(' · ') || '서울'; }
     const marks = this.map.marks || [], s = this.s, d = this.dir;
     const next = d > 0 ? marks.find(([, ms]) => ms > s + 5) : [...marks].reverse().find(([, ms]) => ms < s - 5);

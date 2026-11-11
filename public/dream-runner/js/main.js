@@ -1078,8 +1078,17 @@ async function startHangang(pos = null) {
   $('t-shove').textContent = '💨';
   setMusic(['pent', 62, 66, 'sine']); hgRun.tk = null; hgRun.sent = 0; hgRun.sendT = 20;
   account.api('/api/dream/hangang/start', { method: 'POST', body: logged() ? {} : { anon: anonId() } }).then((r) => { hgRun.tk = r.tk; }).catch(() => {});
+  hgStampsLoad();
   toast(`🌉 ${hg.map.name} · ${SEASONS[hg.state.season]} · ${WEATHERS[hg.state.weather]}`, 2600);
 }
+// 서울 명소 도장 (hangang-attractions.js): 체험 시작 · 끝을 서버에 알리고, 계정(또는 이 기기 아이디)의 도장을 받아 합친다
+function hgStampsLoad() { account.api(`/api/dream/hangang/stamps${logged() ? '' : `?anon=${anonId()}`}`).then((r) => { if (r?.stamps) { hg.cloudStamps = r.stamps; hg.attr?.mergeStamps(r.stamps); } }).catch(() => {}); }
+function hgStampSend(id, phase, tries = 0) {
+  if (!hgRun.tk) { if (tries < 10) setTimeout(() => hgStampSend(id, phase, tries + 1), 1500); return; }
+  account.api('/api/dream/hangang/stamp', { method: 'POST', body: { tk: hgRun.tk, id, phase, ...(logged() ? {} : { anon: anonId() }) } }).then((r) => { if (r?.stamps) hg.attr?.mergeStamps(r.stamps); if (r?.fresh?.length && !document.body.classList.contains('solo')) setTimeout(notifyNew, 300); }).catch(() => {});
+}
+hg.onStamp = (id, phase) => hgStampSend(id, phase);
+hg.onToast = (t) => toast(t, 2200);
 function hgReport(final = false) {
   if (!hgRun.tk || hg.dist - hgRun.sent < (final ? 30 : 100)) return;
   hgRun.sent = hg.dist;
@@ -1110,7 +1119,7 @@ addEventListener('keydown', (e) => {
   if (game.mode !== 'hangang') return;
   if (e.code === 'KeyV') $('hg-cam').onclick();
   if (e.code === 'Escape' && !$('hg-set').classList.contains('hidden')) $('hg-set').classList.add('hidden'); // Esc 로는 나가지 않는다: 나가기는 오른쪽 위 ✕ 로만
-  if (e.code === 'KeyE' && !e.repeat) hgStep(1);
+  if (e.code === 'KeyE' && !e.repeat && !hg.attr?.act()) hgStep(1); // 명소 가까이 · 체험 중이면 E = 체험하기
   if (e.code === 'KeyQ' && !e.repeat) hgStep(-1);
 });
 // 설정: 계절 · 날씨 · 시간 · 시간 흐름 · 시점 · 소리
