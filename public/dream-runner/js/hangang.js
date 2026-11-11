@@ -2081,7 +2081,8 @@ export class Hangang {
       let nx = this.px + this.mdx * this.v * slopeK * dt, nz = this.pz + this.mdz * this.v * slopeK * dt;
       // 지도 밖 · 물속(코스 다리 제외)은 못 간다
       // 지역 지도는 가운데 ±2.5km 상자 안. 서울 전체는 서울 좌표라 그 상자에 갇히면 안 된다(마포 같은 곳에서 앞으로 못 가던 것) → 서울 지형 격자 끝까지
-      if (this.chunks) { const T = this.terr; if (T) { nx = clamp(nx, T.x0 + 50, T.x0 + (T.nx - 1) * T.step - 50); nz = clamp(nz, T.z0 + 50, T.z0 + (T.nz - 1) * T.step - 50); } }
+      //   역 · 가게 · 몰 안(멀리 따로 지은 실내)에서는 가두지 않는다 (가두면 역 안에서 걷자마자 서울 끝 땅속으로 튕겨 벽에 끼었다)
+      if (this.chunks && !this.inside && !this.inShop && !this.inMall) { const T = this.terr; if (T) { nx = clamp(nx, T.x0 + 50, T.x0 + (T.nx - 1) * T.step - 50); nz = clamp(nz, T.z0 + 50, T.z0 + (T.nz - 1) * T.step - 50); } }
       else { nx = clamp(nx, -2500, 2500); nz = clamp(nz, -2500, 2500); }
       const qn = this.project(nx, nz);
       // 물 위로는 점프 중에도 못 나간다 (2 · 3단 점프로 한강을 건너지 못하게)
