@@ -109,7 +109,7 @@ main section { content-visibility: auto; contain-intrinsic-size: 1px 1200px; }
 .map-ui { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; } .map-ui h3 { margin: 6px 0 0; font-family: var(--ko); font-weight: 800; font-size: clamp(30px, 3.6vw, 48px); } .map-ui p { margin: 0; color: var(--mute); line-height: 1.7; font-size: 14.5px; }
 
 @media (max-width: 900px) {
-  .bar nav a:not(.go) { display: none; }
+  .bar nav a:not(.go):not(.home) { display: none; } .bar nav .home span { display: none; }
   .intro { grid-template-columns: 1fr; gap: 26px; padding-top: 86px; overflow-y: auto; align-content: start; }
   .title { align-self: start; } .title .meta span:nth-child(3) { display: none; }
   .start { padding-bottom: 60px; }

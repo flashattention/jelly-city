@@ -1095,6 +1095,8 @@ function leaveHangang() {
   toTitle();
 }
 $('hg-exit').onclick = leaveHangang;
+// 설정 창: 젤리 게임즈 메인으로 (지금 자리를 저장하고 간다)
+$('hg-home').onclick = () => { hgReport(true); hgSavePos(); window.onbeforeunload = null; location.href = '/'; };
 const hgTime = (sec) => { const m = Math.floor(sec / 60), h = Math.floor(m / 60); return h ? `${h}:${String(m % 60).padStart(2, '0')}:${String(Math.floor(sec % 60)).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(Math.floor(sec % 60)).padStart(2, '0')}`; };
 const hgSpeedIdx = () => { let best = 0; SPEEDS.forEach(([, v], i) => { if (Math.abs(v - hg.target) < Math.abs(SPEEDS[best][1] - hg.target)) best = i; }); return best; };
 const hgStep = (d) => { const i = Math.max(0, Math.min(SPEEDS.length - 1, hgSpeedIdx() + d)); hg.target = SPEEDS[i][1]; };
