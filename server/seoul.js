@@ -50,7 +50,7 @@ async function busCall(op, api, q) {
   spend(op);
   const r = await F(`http://ws.bus.go.kr/api/rest/${api}?serviceKey=${BUS_KEY}&${q}&resultType=json`, { signal: AbortSignal.timeout(7000) }), t = await r.text();
   let j = null; try { j = JSON.parse(t); } catch { /* XML 오류 */ }
-  const head = j?.msgHeader || {}, msg = String(head.headerMsg || (j ? '' : t.slice(0, 300)));
+  const head = j?.msgHeader || j?.comMsgHeader || {}, msg = String(head.headerMsg || head.errMsg || (j ? `cd=${head.headerCd ?? '?'} ${t.slice(0, 160)}` : t.slice(0, 300)));
   if (j && (head.headerCd === '0' || head.headerCd === '4' || head.headerCd === 4 || head.headerCd === 0)) { delete lastErr[op]; return j.msgBody?.itemList || []; }
   if (/LIMITED|초과/i.test(msg)) st.off[op] = 'limit'; else if (/KEY|등록|DENIED|인증|권한/i.test(msg)) st.off[op] = 'key';
   lastErr[op] = { at: Date.now(), msg: msg.replace(/serviceKey=[^&\s]+/g, '').slice(0, 120) }; dirty = true;
