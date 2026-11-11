@@ -612,6 +612,8 @@ export class Hangang {
   tickInside(dt) {
     if (this.ride) return this.tickRide(dt);
     const I = this.inside, S = I.S; S.tick(dt, this.arrivals, this.arrivalsAt);
+    // 벽 속에 끼었으면(밀어내는 거리가 크면) 대합실 바닥으로 꺼내 준다
+    { const q = this.pushOut(this.px, this.pz, this.y, 0.3); if (q && Math.hypot(q.x - this.px, q.z - this.pz) > 0.8) { const sp = S.spawnFromExit(String(I.from?.ref || '1')); this.placeAt(sp.x, sp.z, sp.face); } }
     { const dtn = S.doorTrain(this.px, this.pz); if (dtn && !(this.zoneCool > 0)) return this.startRide(dtn.p, dtn.T); }
     const z = S.zoneAt(this.px, this.pz); if (!z || (this.zoneCool || 0) > 0) { this.zoneCool = Math.max(0, (this.zoneCool || 0) - dt); return; }
     this.zoneCool = 1.2;
@@ -1914,7 +1916,8 @@ export class Hangang {
       { const tc = exitTotemTex(st.name, st.lines, ref).image; for (const sd of [1, -1]) { const pl = EA.plane(0.6, 2.68, 'totem', tc); pl.position.set(1.95, 1.35, -2.2 + sd * 0.102); if (sd < 0) pl.rotation.y = Math.PI; g.add(pl); } }
       this.scene.add(g); const E = { x, z, st, ref, g, key: this.chunkKey }; H.entrances.push(E); mine.push(E);
       // 부딪힘: 양옆 화강석 벽 · 뒤 벽 · 안내 기둥 (가운데 계단으로는 걸어 내려갈 수 있다)
-      { const th = g.rotation.y, W = (lx, lz) => [x + lx * Math.cos(th) + lz * Math.sin(th), z - lx * Math.sin(th) + lz * Math.cos(th)], rect = (a0, b0, a1, b1) => { const ring = [W(a0, b0), W(a1, b0), W(a1, b1), W(a0, b1)], xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); this.addFoot({ ring, h: 2.6, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), name: `${st.name}역 ${ref || ''}번 출구`, type: 'stone', noClimb: false }); }; rect(-1.45, -2.3, -1.15, 2.4); rect(1.15, -2.3, 1.45, 2.4); rect(-1.45, 2.3, 1.45, 2.6); this.addCircle(W(1.95, -2.2)[0], W(1.95, -2.2)[1], 0.4, 2.7); }
+      //   출구 벽은 타고 오를 수 없다 (옆 · 뒤에서 타고 올라 계단 구덩이로 떨어져 역 안 벽에 끼던 것)
+      { const th = g.rotation.y, W = (lx, lz) => [x + lx * Math.cos(th) + lz * Math.sin(th), z - lx * Math.sin(th) + lz * Math.cos(th)], rect = (a0, b0, a1, b1) => { const ring = [W(a0, b0), W(a1, b0), W(a1, b1), W(a0, b1)], xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); this.addFoot({ ring, h: 2.6, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), name: `${st.name}역 ${ref || ''}번 출구`, type: 'stone', noClimb: true }); }; rect(-1.45, -2.3, -1.15, 2.4); rect(1.15, -2.3, 1.45, 2.4); rect(-1.45, 2.3, 1.45, 2.6); this.addCircle(W(1.95, -2.2)[0], W(1.95, -2.2)[1], 0.4, 2.7); }
     }
     batchStatic(this.scene, mine.map((e) => e.g), (this.lodObjs ||= [])); // 출구 수백 개를 재질별로 묶고, 멀면 숨긴다
   }
@@ -1980,7 +1983,10 @@ export class Hangang {
     if (!this.inShop && !this.inside && !this.inMall && !this.shopCool && this.y < 0.5) for (const i of this.shopGrid?.get(`${Math.floor(px / 40)},${Math.floor(pz / 40)}`) || []) { const F = this.shopFronts[i]; if (Math.hypot(px - F.x, pz - F.z) < 0.9 && (this.mdx ?? 0) * F.nx + (this.mdz ?? 0) * F.nz < -0.3) { this.enterShop(F); return; } }
     // 출구 계단을 반쯤 내려가면 역 안으로
     this.stationCool = Math.max(0, (this.stationCool || 0) - dt);
-    if (near && near.d < 3 && !this.inside && !this.stationCool && this.y < 0.5) { const th = near.g.rotation.y, dx = px - near.x, dz = pz - near.z, lx = dx * Math.cos(th) - dz * Math.sin(th), lz = dx * Math.sin(th) + dz * Math.cos(th); if (Math.abs(lx) < 1.1 && lz > -0.4 && lz < 2.2) { this.enterStation(near); return; } }
+    //   앞쪽 입구(계단 앞 인도)를 걸어서 지나온 때만 (옆 · 뒤 · 위에서 비비거나 떨어져 들어가지 않게)
+    if (near && near.d < 4 && !this.inside && this.y < 0.3 && !this.flying && !this.climb) { const th = near.g.rotation.y, dx = px - near.x, dz = pz - near.z, lx = dx * Math.cos(th) - dz * Math.sin(th), lz = dx * Math.sin(th) + dz * Math.cos(th);
+      if (Math.abs(lx) < 1.1 && lz > -3.2 && lz < -0.6) this.exitMouth = { g: near.g, t: this.time };
+      if (!this.stationCool && Math.abs(lx) < 1.1 && lz > -0.4 && lz < 2.2 && this.exitMouth?.g === near.g && this.time - this.exitMouth.t < 2.5) { this.exitMouth = null; this.enterStation(near); return; } }
     const key = near ? `${near.st.name}:${near.ref}` : null; if (key !== this.nearSt) { this.nearSt = key; this.onStation?.(near ? { name: near.st.name, ref: near.ref, lines: near.st.lines } : null); }
   }
   // ---------- 들어가기 · 나가기 ----------
