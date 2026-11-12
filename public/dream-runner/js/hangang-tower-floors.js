@@ -2,11 +2,12 @@
 //   층 안쪽 좌표: 탑 가운데가 (0, 0), x 동쪽 · z 남쪽 · 바닥 y = 0. 창이 보는 방향 = 실제 동서남북
 //   상표 · 가게 이름 대신 일반 이름(하늘 호텔 · 하늘 뷔페 · 전망대)
 import * as THREE from 'three';
-import { G, T, TKit, Atlas, Area, instanced, canvasTex, txt, clamp, lerp, hash } from './hangang-tower-lib.js';
+import { G, T, TKit, Atlas, Area, instanced, canvasTex, txt, clamp, lerp, hash, inRSq, rsqOutline } from './hangang-tower-lib.js';
+import { Riders } from './hangang-park.js';
 
 export const FLOORS = {
   lobby: { n: 1, btn: '1', name: '1층 로비', alt: 0, sub: '안내 데스크 · 밖으로 나가는 문' },
-  hlobby: { n: 79, btn: '79', name: '79층 하늘 호텔 로비', alt: 320, sub: '프론트 · 체크인', soon: true },
+  hlobby: { n: 79, btn: '79', name: '79층 하늘 호텔 로비', alt: 320, sub: '프론트 · 체크인' },
   buffet: { n: 81, btn: '81', name: '81층 하늘 뷔페', alt: 328, sub: '창가 자리 · 음식 줄', soon: true },
   room: { n: 87, btn: '87', name: '87층 일반 객실', alt: 352, need: 'room', soon: true },
   suite: { n: 94, btn: '94', name: '94층 스위트', alt: 381, need: 'suite', soon: true },
@@ -174,4 +175,105 @@ function car(C) {
   return F;
 }
 
-const BUILD = { lobby, car };
+// ---------- 탑 층 바탕: 둥근 네모 바닥 · 천장 · 둘레 통유리 · 창턱 ----------
+function towerFloor(F, C, { R, cr = 7, H = 4, floor = 'marble', floorTile = 1.2, ceil = '#efe9e0', sill = '#d8d0c4', frame = '#2f3236', step = 1.6 }) {
+  const k = F.kit; F.R = R; F.cr = cr; F.H = H; F.center = [0, 0];
+  { const sh = new THREE.Shape(rsqOutline(R + 0.4, cr + 0.4).map(([x, z]) => new THREE.Vector2(x, -z))); const g = new THREE.ShapeGeometry(sh, 6); g.rotateX(-Math.PI / 2); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / floorTile, uv.getY(i) / floorTile); k.add(g, '#ffffff', floor, T(0, 0, 0)); const c = g.clone(); c.rotateX(Math.PI); k.add(c, ceil, 'ceil', T(0, H, 0)); }
+  const P = rsqOutline(R, cr); for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.2) continue; glassWall(F, a[0], a[1], b[0], b[1], H, { step, frame }); const L = Math.hypot(b[0] - a[0], b[1] - a[1]), ry = Math.atan2(b[1] - a[1], -(b[0] - a[0])); k.add(G.box(L + 0.05, 0.12, 0.32), sill, 'satin', T((a[0] + b[0]) / 2 + Math.sin(ry) * 0.16, 0, (a[1] + b[1]) / 2 + Math.cos(ry) * 0.16, ry)); }
+  F.area.fn((x, z, y, r) => inRSq(x, z, R - 0.45 - r, Math.max(0.5, cr - 0.45 - r)));
+  const m = R - 2.4; F.box = () => [-m, m, -m, m]; F.ceil = () => H;
+}
+// 가운데 코어 (엘리베이터 · 계단이 있는 벽): 호두나무 판 · 놋쇠 줄눈, 남쪽 면에 엘리베이터 문
+function core(F, C, { hw = 6, hd = 6, H = 4, doors = [-2.6, 0, 2.6], face = 'wood', label = '' }) {
+  const k = F.kit; k.add(G.box(hw * 2, H, hd * 2), '#ffffff', face, T(0, 0, 0)); for (let x = -hw + 1.5; x < hw; x += 1.5) for (const z of [-hd - 0.01, hd + 0.01]) k.add(G.box(0.025, H, 0.02), '#b08a52', 'metal', T(x, 0, z)); for (let z = -hd + 1.5; z < hd; z += 1.5) for (const x of [-hw - 0.01, hw + 0.01]) k.add(G.box(0.02, H, 0.025), '#b08a52', 'metal', T(x, 0, z));
+  for (const x of doors) { k.add(G.box(1.5, 2.7, 0.06), '#c4c7cb', 'chrome', T(x, 0, hd + 0.03)); k.add(G.box(0.012, 2.7, 0.07), '#6d7075', 'metal', T(x, 0, hd + 0.04)); for (const s of [-1, 1]) k.add(G.box(0.12, 2.9, 0.12), '#8a6a45', 'metal', T(x + s * 0.81, 0, hd + 0.05)); k.add(G.box(1.74, 0.14, 0.12), '#8a6a45', 'metal', T(x, 2.84, hd + 0.05)); k.add(G.box(0.4, 0.07, 0.02), '#140f0c', 'gloss', T(x, 3.15, hd + 0.03)); k.add(G.ball(0.025, 8), '#ffb24a', 'glow', T(x - 0.12, 3.185, hd + 0.05)); }
+  k.add(G.box(0.08, 0.16, 0.03), '#d6d0c6', 'metal', T(doors[doors.length - 1] + 1.05, 1.1, hd + 0.02)); k.add(G.ball(0.026, 8), '#ffb24a', 'glow', T(doors[doors.length - 1] + 1.05, 1.24, hd + 0.05));
+  if (label) { const r = F.atlas.rect(720, 100, (c, w, h) => { c.clearRect(0, 0, w, h); txt(c, label, w / 2, h / 2, 54, '#e9d2a2'); }); F.atlas.plane(k, r, 4.3, 0.6, T(0, 3.55, hd + 0.03), '#ffffff', 'signGlow'); }
+  F.area.wall(-hw, -hd, hw, hd); (F.camRects ||= []).push([-hw, -hd, hw, hd]);
+  F.spots.push({ x: 0, z: hd + 1.4, r: 2.8, label: '엘리베이터 타기', hint: '층 단추판이 열려요', act: () => C.enterCar() });
+  F.spawn = { ...(F.spawn || {}), elev: { x: 0, z: hd + 1.6, face: 0 } };
+}
+// 소파 (등받이 · 팔걸이 · 방석이 둥근 상자), 앉을 자리마다 spots. 돌려주는 값 = 앉는 자리 [x, z, 앞 방향]
+function sofa(F, C, x, z, ry, { w = 2.2, col = '#3d4a5c', mat = 'velvet', seats = 2, legs = '#b08a52', label = '앉기', camD = 2.6 } = {}) {
+  const k = F.kit, M = (lx, lz) => { const c = Math.cos(ry), s = Math.sin(ry); return [x + lx * c + lz * s, z - lx * s + lz * c]; };
+  const put = (g, col2, m, lx, ly, lz) => { const [a, c] = M(lx, lz); k.add(g, col2, m, T(a, ly, c, ry)); };
+  put(G.pillow(w, 0.24, 0.9, 0.06), col, mat, 0, 0.18, 0); put(G.pillow(w, 0.55, 0.22, 0.08), col, mat, 0, 0.36, -0.36); for (const s2 of [-1, 1]) put(G.pillow(0.2, 0.42, 0.9, 0.06), col, mat, s2 * (w / 2 - 0.08), 0.18, 0);
+  for (let i = 0; i < seats; i++) put(G.pillow(w / seats - 0.12, 0.14, 0.66, 0.06), col, mat, -w / 2 + 0.2 + (i + 0.5) * (w - 0.4) / seats, 0.4, 0.06);
+  for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) put(G.cyl(0.025, 0.02, 0.18, 6), legs, 'metal', a * (w / 2 - 0.1), 0, b * 0.38);
+  const c = Math.cos(ry), s = Math.sin(ry), hx = Math.abs(c) * w / 2 + Math.abs(s) * 0.48, hz = Math.abs(s) * w / 2 + Math.abs(c) * 0.48; F.area.wall(x - hx, z - hz, x + hx, z + hz);
+  const out = [];
+  for (let i = 0; i < seats; i++) { const lx = -w / 2 + 0.2 + (i + 0.5) * (w - 0.4) / seats, [sx, sz] = M(lx, 0.08), [fx, fz] = M(lx, 0.95); out.push([sx, sz, ry]); F.spots.push({ x: fx, z: fz, r: 0.85, label, act: () => C.sit({ x: sx, y: 0.54, z: sz, yaw: ry, label: '일어나기', out: [fx, fz], camD }) }); }
+  return out;
+}
+// 낮은 탁자: 대리석 윗판 · 놋쇠 다리
+function lowTable(F, x, z, { w = 1.2, d = 0.7, h = 0.42, top = 'marble', round = false } = {}) {
+  const k = F.kit; if (round) { k.add(G.cyl(w / 2, w / 2, 0.04, 28), '#ffffff', top, T(x, h - 0.04, z)); k.add(G.cyl(0.05, 0.05, h - 0.04, 10), '#b08a52', 'metal', T(x, 0, z)); k.add(G.cyl(w * 0.3, w * 0.32, 0.03, 20), '#b08a52', 'metal', T(x, 0, z)); F.area.pole(x, z, w / 2); }
+  else { k.add(G.box(w, 0.04, d), '#ffffff', top, T(x, h - 0.04, z)); for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) k.add(G.box(0.03, h - 0.04, 0.03), '#b08a52', 'metal', T(x + a * (w / 2 - 0.06), 0, z + b * (d / 2 - 0.06))); F.area.wall(x - w / 2, z - d / 2, x + w / 2, z + d / 2); }
+}
+// 러그 (둥근 · 네모)
+function rug(F, x, z, w, d, col = '#ffffff', round = false) { const g = round ? new THREE.CircleGeometry(w / 2, 40) : new THREE.PlaneGeometry(w, d); g.rotateX(-Math.PI / 2); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / 1.6, uv.getY(i) * (round ? w : d) / 1.6); F.kit.add(g, col, 'carpetR', T(x, 0.008, z)); }
+// 꽃 (꽃송이 여럿 · 잎): 꽃병 위
+function flowers(F, x, y, z, R = 0.6, n = 40, cols = ['#ffffff', '#f6c9d4', '#e88aa6', '#fff1c9', '#c9b6e8']) { const k = F.kit; for (let i = 0; i < n; i++) { const a = hash(i, 1) * Math.PI * 2, r = Math.sqrt(hash(i, 2)) * R, h = y + (1 - (r / R) ** 2) * R * 0.7 + hash(i, 3) * 0.12; k.add(G.ball(0.07 + hash(i, 4) * 0.06, 7), cols[i % cols.length], 'std', T(x + Math.cos(a) * r, h, z + Math.sin(a) * r)); if (i % 2) k.add(new THREE.ConeGeometry(0.05, 0.22, 4), '#4f7a3e', 'std', T(x + Math.cos(a) * r * 1.1, h - 0.08, z + Math.sin(a) * r * 1.1, a, 0.9 + hash(i, 5), 0)); } }
+
+// ============================================================
+// 79층 하늘 호텔 로비: 두 층 높이 통유리 · 대리석 바닥 · 프론트(뒤에 빛나는 오닉스 벽) · 라운지 소파 · 큰 꽃 장식 · 벨 데스크 · 짐 수레 · 샹들리에
+// ============================================================
+function hlobby(C) {
+  const F = floorBase('hlobby', C), k = F.kit, A = F.atlas, R = 24, H = 8.4;
+  towerFloor(F, C, { R, cr: 7, H, floor: 'marble', floorTile: 1.4, ceil: '#e8e1d6', step: 1.7 });
+  F.sunK = 1; F.hemiD = 0.85; F.hemiN = 0.18; F.ambN = 0.4; F.floorTint = '#c9b9a2'; F.lampCol = '#ffe2b8';
+  core(F, C, { hw: 6, hd: 5.5, H, doors: [-2.6, 0, 2.6], label: '엘리베이터 · 객실 · 뷔페' });
+  F.spawn.door = F.spawn.elev;
+  // 바닥 테두리: 짙은 대리석 띠 (창가 둘레)
+  { const P = rsqOutline(R - 1.2, 6); for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 0.2) continue; k.add(G.box(L + 0.3, 0.01, 0.6), '#ffffff', 'marbleD', T((a[0] + b[0]) / 2, 0.003, (a[1] + b[1]) / 2, Math.atan2(b[1] - a[1], -(b[0] - a[0])))); } }
+  // 천장: 코어 둘레 숨은 빛
+  for (const [x, z, w, d] of [[0, -5.8, 12.6, 0.06], [0, 5.8, 12.6, 0.06], [-6.3, 0, 0.06, 11.6], [6.3, 0, 0.06, 11.6]]) k.add(G.box(w, 0.05, d), '#ffdcae', 'glow', T(x, H - 0.06, z));
+  // 프론트 데스크 (동쪽): 긴 짙은 대리석 · 참나무 윗판 · 뒤에 빛나는 오닉스 벽 · 직원 둘
+  { k.add(G.box(1.0, 1.05, 7), '#ffffff', 'marbleD', T(12.5, 0, 1)); k.add(G.box(1.1, 0.05, 7.1), '#ffffff', 'oak', T(12.5, 1.05, 1)); k.add(G.box(0.02, 0.06, 6.8), '#ffd29a', 'glow', T(11.99, 0.9, 1));
+    for (const z2 of [-1.2, 1, 3.2]) k.add(G.box(0.36, 0.26, 0.03), '#16181c', 'gloss', T(12.7, 1.1, z2, -Math.PI / 2, 0.25));
+    k.add(G.cyl(0.08, 0.1, 0.05, 14), '#c9a56a', 'metal', T(12.3, 1.08, -2.0)); k.add(G.ball(0.07, 12), '#d4af6e', 'metal', T(12.3, 1.12, -2.0));
+    const onyx = canvasTex(512, 256, (c, w, h) => { const gr = c.createLinearGradient(0, 0, w, h); gr.addColorStop(0, '#f6d29a'); gr.addColorStop(0.5, '#ffe9c4'); gr.addColorStop(1, '#e9b874'); c.fillStyle = gr; c.fillRect(0, 0, w, h); for (let i = 0; i < 40; i++) { c.strokeStyle = `rgba(${150 + hash(i, 1) * 60},${90 + hash(i, 2) * 50},40,${0.1 + hash(i, 3) * 0.25})`; c.lineWidth = 1 + hash(i, 4) * 5; c.beginPath(); let x = hash(i, 5) * w, y = 0; c.moveTo(x, y); while (y < h) { y += 20; x += (hash(i, y) - 0.5) * 40; c.lineTo(x, y); } c.stroke(); } }, false);
+    const om = new THREE.MeshBasicMaterial({ map: onyx, color: '#ffffff' }); om.userData.own = true; const op = new THREE.Mesh(new THREE.PlaneGeometry(8, 4.2), om); op.position.set(15.33, 2.3, 1); op.rotation.y = -Math.PI / 2; F.g.add(op); F.onyx = om;
+    k.add(G.box(0.3, 4.6, 8.4), '#ffffff', 'wood', T(15.5, 0, 1)); k.add(G.box(0.2, 0.2, 8.4), '#b08a52', 'metal', T(15.3, 4.4, 1));
+    const r = A.rect(600, 110, (c, w, h) => { c.clearRect(0, 0, w, h); txt(c, '하늘 호텔  ·  프론트', w / 2, h / 2, 58, '#3a2410', 'Georgia, serif'); }); A.plane(k, r, 3.6, 0.66, T(15.31, 3.9, 1, -Math.PI / 2), '#ffffff', 'sign');
+    F.area.wall(11.9, -2.6, 16, 4.6); }
+  const staff = [npc(F, C, 13.6, -0.3, -Math.PI / 2, { top: '#1f2a44', tie: '#c9a56a' }), npc(F, C, 13.6, 2.4, -Math.PI / 2, { top: '#1f2a44', tie: '#c9a56a', fur: '#f2e6d8' })];
+  // 라운지 (서쪽 · 남쪽 · 북쪽 창가): 소파 무리 · 낮은 탁자 · 러그 · 스탠드 등
+  const seats = [];
+  const group = (cx, cz, ry, col) => { rug(F, cx, cz, 5.2, 4.2, '#efe6d8'); seats.push(...sofa(F, C, cx - Math.sin(ry) * 1.4, cz - Math.cos(ry) * 1.4, ry, { w: 2.4, col, seats: 3 })); seats.push(...sofa(F, C, cx + Math.cos(ry) * 1.9, cz - Math.sin(ry) * 1.9, ry - Math.PI / 2, { w: 1.0, col: '#8a5a3a', mat: 'satin', seats: 1 })); seats.push(...sofa(F, C, cx - Math.cos(ry) * 1.9, cz + Math.sin(ry) * 1.9, ry + Math.PI / 2, { w: 1.0, col: '#8a5a3a', mat: 'satin', seats: 1 })); lowTable(F, cx, cz, { w: 1.4, d: 0.8 }); k.add(G.cyl(0.12, 0.14, 0.26, 12), '#2d4a3e', 'gloss', T(cx + 0.3, 0.42, cz)); flowers(F, cx + 0.3, 0.7, cz, 0.16, 10); };
+  group(-15.5, -8, Math.PI / 2, '#334257'); group(-16.5, 3, Math.PI / 2, '#5a3c4a'); group(-11, 15.5, 0, '#334257'); group(-11, -16, Math.PI, '#5a3c4a');
+  // 스탠드 등 (따뜻한 갓 · 놋쇠 기둥)
+  const lampAt = [[-19.2, -11.5], [-19.2, 6.8], [-14.8, 19]]; for (const [x, z] of lampAt) { k.add(G.cyl(0.18, 0.18, 0.03, 16), '#b08a52', 'metal', T(x, 0, z)); k.add(G.cyl(0.02, 0.02, 1.5, 8), '#b08a52', 'metal', T(x, 0, z)); k.add(G.cyl(0.26, 0.2, 0.34, 18, true), '#fff0d6', 'glow', T(x, 1.45, z)); F.area.pole(x, z, 0.25); }
+  // 큰 꽃 장식 (남쪽 가운데 둥근 탁자)
+  { lowTable(F, 0, 13, { w: 2.2, h: 0.78, round: true, top: 'marbleD' }); k.add(G.cyl(0.32, 0.22, 0.7, 20), '#f2efe9', 'gloss', T(0, 0.78, 13)); flowers(F, 0, 1.45, 13, 0.9, 90); for (let i = 0; i < 18; i++) { const a = (i / 18) * Math.PI * 2; k.add(new THREE.ConeGeometry(0.06, 0.9, 4), '#5c8a46', 'std', T(Math.cos(a) * 0.5, 1.6, 13 + Math.sin(a) * 0.5, a, 0.5, 0)); }
+    F.spots.push({ x: 0, z: 11.4, r: 1.6, label: '꽃 향기 맡기', act: () => C.toast('🌷 장미 · 작약 · 백합… 은은한 꽃 향기') }); }
+  // 벨 데스크 · 벨보이
+  const bell = npc(F, C, 8, 13.2, Math.PI, { top: '#5a1f24', tie: '#c9a56a' });
+  { k.add(G.box(1.2, 1.0, 0.6), '#ffffff', 'wood', T(8, 0, 14)); k.add(G.box(1.3, 0.04, 0.7), '#ffffff', 'marble', T(8, 1.0, 14)); k.add(G.cyl(0.09, 0.11, 0.03, 14), '#c9a56a', 'metal', T(8.3, 1.04, 14)); k.add(G.ball(0.08, 12), '#d4af6e', 'metal', T(8.3, 1.07, 14)); F.area.wall(7.3, 13.6, 8.7, 14.4);
+    const r = A.rect(300, 80, (c, w, h) => { c.clearRect(0, 0, w, h); txt(c, '벨 데스크', w / 2, h / 2, 44, '#e9d2a2'); }); A.plane(k, r, 0.9, 0.24, T(8, 0.7, 14.31), '#ffffff', 'signGlow');
+    F.spots.push({ x: 8, z: 15.3, r: 1.4, label: '짐 맡기기', act: () => { bell.wave = 1.8; C.SND.clink(); C.toast('🧳 벨보이: 짐은 방으로 올려 드릴게요'); } }); }
+  // 짐 수레: 놋쇠 아치 · 붉은 융단 바닥 · 여행 가방
+  { const cx = 10.2, cz = 15.2; k.add(G.box(1.2, 0.08, 0.7), '#7a1f28', 'velvet', T(cx, 0.22, cz)); for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) k.add(G.cyl(0.04, 0.04, 0.12, 8), '#222222', 'std', T(cx + a * 0.5, 0.02, cz + b * 0.28)); for (const s2 of [-1, 1]) k.add(G.cyl(0.025, 0.025, 1.8, 8), '#d4af6e', 'metal', T(cx + s2 * 0.55, 0.26, cz)); k.add(new THREE.TorusGeometry(0.55, 0.025, 6, 20, Math.PI), '#d4af6e', 'metal', T(cx, 2.06, cz)); const bar = new THREE.CylinderGeometry(0.02, 0.02, 1.1, 8); bar.rotateZ(Math.PI / 2); k.add(bar, '#d4af6e', 'metal', T(cx, 1.7, cz)); k.add(G.pillow(0.5, 0.7, 0.26, 0.04), '#2e4a6b', 'satin', T(cx - 0.22, 0.3, cz)); k.add(G.pillow(0.44, 0.56, 0.24, 0.04), '#b8452f', 'satin', T(cx + 0.28, 0.3, cz)); k.add(G.pillow(0.36, 0.26, 0.5, 0.04), '#d9c39a', 'satin', T(cx + 0.05, 1.0, cz)); F.area.wall(cx - 0.65, cz - 0.4, cx + 0.65, cz + 0.4); }
+  // 샹들리에: 라운지 위 고리에 매달린 유리 방울 (인스턴스 하나, 밤에 반짝)
+  { const n = 240, geo = new THREE.OctahedronGeometry(0.07, 0), m = new THREE.MeshBasicMaterial({ color: '#fff3dc' }); m.userData.own = true; const im = new THREE.InstancedMesh(geo, m, n); for (let i = 0; i < n; i++) { const ring = i % 4, a = (i / n) * Math.PI * 2 * 4 + ring, r = 1.0 + ring * 0.7, y = H - 1.4 - ring * 0.5 - hash(i, 7) * 1.6; im.setMatrixAt(i, T(-10 + Math.cos(a) * r, y, Math.sin(a) * r, a, 0, 0, new THREE.Vector3(1, 2.2, 1))); } F.g.add(im); F.chand = m;
+    for (let r2 = 1; r2 <= 3.2; r2 += 0.7) k.add(new THREE.TorusGeometry(r2, 0.015, 4, 48), '#d4af6e', 'metal', T(-10, H - 1.15, 0, 0, Math.PI / 2)); for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; k.add(G.cyl(0.006, 0.006, 1.15, 4), '#d4af6e', 'metal', T(-10 + Math.cos(a) * 3.1, H - 1.15, Math.sin(a) * 3.1)); } }
+  // 앉아 있는 손님 (인스턴스 하나)
+  const RD = new Riders(F.g, 16); RD.begin(); seats.forEach(([x, z, ry], i) => { if (hash(i, 9) < 0.4) RD.put(T(x, 0.45, z, ry, 0, 0, 0.62)); }); RD.end(); RD.im.castShadow = true;
+  // 프론트에서 체크인
+  const checkIn = (key, nm) => { C.S.key2 = key; C.SND.clink(); staff[1].wave = 1.8; C.toast(`🗝️ 카드 키를 받았어요 · ${nm} · 엘리베이터 단추가 켜졌어요`); };
+  F.spots.push({ x: 11.2, z: 1, r: 2.2, label: () => (C.S.key2 ? '방 바꾸기' : '체크인'), hint: '방 종류를 골라요', act: () => { staff[0].wave = 1.8; C.choose('🛎️ 하늘 호텔 체크인', '방 종류를 고르면 카드 키를 드려요 · 엘리베이터에서 그 층 단추가 켜져요', [
+    { label: '일반 객실 (87층)', sub: '킹 침대 · 창가 소파 · 욕조 · 서쪽 전망', on: () => checkIn('room', '87층 일반 객실') },
+    { label: '스위트 (94층)', sub: '거실 · 침실 · 창가 욕조 · 북쪽 한강 전망', on: () => checkIn('suite', '94층 스위트') },
+    { label: '펜트하우스 (100 ~ 101층)', sub: '두 층 높이 거실 · 피아노 · 사방 통창', on: () => checkIn('ph', '100층 펜트하우스') },
+  ]); } });
+  k.build(F.g);
+  const lamps = lampAt.map(([x, z]) => { const l = new THREE.PointLight('#ffcf94', 0, 9, 1.8); l.position.set(x, 1.6, z); F.g.add(l); return l; });
+  F.tick = (dt, night) => {
+    tickStaff(staff[0], dt, C, F, '🛎️ 직원: 어서 오세요, 하늘 호텔입니다'); tickStaff(staff[1], dt, C, F, null); tickStaff(bell, dt, C, F, null);
+    for (const l of lamps) l.intensity = 0.6 + night * 3.2; F.chand.color.setScalar(0.75 + night * 0.7); F.onyx.color.setScalar(0.75 + night * 0.35);
+  };
+  return F;
+}
+
+const BUILD = { lobby, car, hlobby };
+

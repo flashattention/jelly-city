@@ -50,7 +50,9 @@ export function mats() {
   if (MATS) return MATS;
   const L = (o) => new THREE.MeshLambertMaterial({ vertexColors: true, ...o }), P = (o) => new THREE.MeshPhongMaterial({ vertexColors: true, ...o });
   MATS = {
-    std: L(), fabric: L(), velvet: P({ shininess: 12, specular: '#3a3040' }),
+    std: L(), fabric: L(),
+    // 천장: 아래만 보는 면이라 빛을 덜 받는다 → 조금 스스로 밝게
+    ceil: L({ emissive: '#4a4238', emissiveIntensity: 1 }), velvet: P({ shininess: 12, specular: '#3a3040' }),
     satin: P({ shininess: 30, specular: '#40382e' }), gloss: P({ shininess: 90, specular: '#ffffff' }),
     metal: P({ shininess: 120, specular: '#ffe8c0' }), chrome: P({ shininess: 160, specular: '#ffffff' }),
     glow: new THREE.MeshBasicMaterial({ vertexColors: true }),
@@ -136,12 +138,14 @@ export function windowMat() {
 
 // ---------- 걸을 수 있는 곳: 열린 사각형들 - 막힌 사각형 · 원 ----------
 export class Area {
-  constructor() { this.open = []; this.block = []; this.circ = []; }
+  constructor() { this.open = []; this.block = []; this.circ = []; this.fns = []; }
+  // 모양이 있는 열린 곳 (둥근 네모 바닥 등): fn(x, z, y, r) → 그 안이면 true
+  fn(f) { this.fns.push(f); return this; }
   add(x0, z0, x1, z1, y0 = -1, y1 = 99) { this.open.push([Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1), y0, y1]); return this; }
   wall(x0, z0, x1, z1, y0 = -1, y1 = 99) { this.block.push([Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1), y0, y1]); return this; }
   pole(x, z, r, y0 = -1, y1 = 99) { this.circ.push([x, z, r, y0, y1]); return this; }
   ok(x, z, y = 0, r = 0.26) {
-    let inside = false; for (const [a, b, c, d, y0, y1] of this.open) if (x >= a + r && x <= c - r && z >= b + r && z <= d - r && y >= y0 && y <= y1) { inside = true; break; } if (!inside) return false;
+    let inside = this.fns.some((f) => f(x, z, y, r)); if (!inside) for (const [a, b, c, d, y0, y1] of this.open) if (x >= a + r && x <= c - r && z >= b + r && z <= d - r && y >= y0 && y <= y1) { inside = true; break; } if (!inside) return false;
     for (const [a, b, c, d, y0, y1] of this.block) if (x > a - r && x < c + r && z > b - r && z < d + r && y >= y0 && y <= y1) return false;
     for (const [cx, cz, rr, y0, y1] of this.circ) if (Math.hypot(x - cx, z - cz) < rr + r && y >= y0 && y <= y1) return false;
     return true;
@@ -157,4 +161,13 @@ export function tone(freqs, { type = 'sine', dur = 0.6, vol = 0.15, at = 0, atta
 }
 export function noise({ dur = 0.2, vol = 0.2, freq = 900, type = 'lowpass', at = 0, q = 0.7 } = {}) {
   const a = ac(); if (!a) return; const t0 = a.currentTime + at, n = a.createBufferSource(), buf = a.createBuffer(1, Math.ceil(a.sampleRate * dur), a.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 2; n.buffer = buf; const f = a.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q; const g = a.createGain(); g.gain.value = vol; n.connect(f).connect(g).connect(a.destination); n.start(t0);
+}
+
+// 둥근 네모 (탑 층 바닥 모양): 반 너비 R · 모서리 반지름 cr
+export const inRSq = (x, z, R, cr) => Math.hypot(Math.max(Math.abs(x) - (R - cr), 0), Math.max(Math.abs(z) - (R - cr), 0)) <= cr;
+// 둥근 네모 외곽선 (남쪽 변을 서 → 동으로 시작해 한 바퀴: 이 순서면 glassWall 판이 안쪽을 본다)
+export function rsqOutline(R, cr, seg = 4) {
+  const P = [], arc = (cx, cz, a0, a1) => { for (let i = 1; i <= seg; i++) { const a = a0 + ((a1 - a0) * i) / seg; P.push([cx + Math.cos(a) * cr, cz + Math.sin(a) * cr]); } };
+  P.push([-R + cr, R]); P.push([R - cr, R]); arc(R - cr, R - cr, Math.PI / 2, 0); P.push([R, -R + cr]); arc(R - cr, -R + cr, 0, -Math.PI / 2); P.push([-R + cr, -R]); arc(-R + cr, -R + cr, -Math.PI / 2, -Math.PI); P.push([-R, R - cr]); arc(-R + cr, R - cr, -Math.PI, -Math.PI * 1.5);
+  return P;
 }

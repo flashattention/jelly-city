@@ -226,6 +226,8 @@ function camExp(camera, dt) {
     return;
   }
   if (camera.fov !== 62) { camera.fov = 62; camera.updateProjectionMatrix(); }
+  // 카메라가 코어 벽 · 큰 가구 속으로 들어가면 곰 쪽으로 당긴다 (벽 안에서 보면 벽이 비쳐 보였다)
+  if (!S.pose && F.camRects) { const bx = b.root.position.x - O.x, bz = b.root.position.z - O.z; let cx = camera.position.x - O.x, cz = camera.position.z - O.z, moved = false; for (const [x0, z0, x1, z1] of F.camRects) { if (cx > x0 - 0.25 && cx < x1 + 0.25 && cz > z0 - 0.25 && cz < z1 + 0.25) { let lo = 0, hi = 1; for (let i = 0; i < 12; i++) { const m = (lo + hi) / 2, x = bx + (cx - bx) * m, z = bz + (cz - bz) * m; if (x > x0 - 0.25 && x < x1 + 0.25 && z > z0 - 0.25 && z < z1 + 0.25) hi = m; else lo = m; } cx = bx + (cx - bx) * lo; cz = bz + (cz - bz) * lo; moved = true; } } if (moved) { camera.position.x = O.x + cx; camera.position.z = O.z + cz; camera.lookAt(b.root.position.x, b.root.position.y + 0.6, b.root.position.z); } }
   const P = S.pose; if (!P) return;
   // 앉기 · 눕기: 곰을 가구 높이에 맞춰 놓고, 카메라는 그 둘레를 돈다 (마우스 · 끌기로 돌려 보기)
   const wx = O.x + P.x, wz = O.z + P.z; b.seated = P.kind !== 'lie';
