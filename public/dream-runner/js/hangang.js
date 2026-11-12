@@ -661,7 +661,7 @@ export class Hangang {
     I.drawMenu(F.name); this.hideOutdoor(I.g); I.g.visible = true; this.inShop = { F, I, ordered: null, menuShown: false }; this.placeAt(I.spawn.x, I.spawn.z, I.spawn.face); this.onShopEnter?.({ name: F.name, kind: F.kind, label: SHOP_KIND[F.kind].label });
   }
   leaveShop() {
-    const S2 = this.inShop; if (!S2) return; S2.I.g.visible = false; if (S2.food) S2.I.g.remove(S2.food); this.inShop = null; this.eating = null;
+    const S2 = this.inShop; if (!S2) return; S2.I.g.visible = false; if (S2.food) S2.I.g.remove(S2.food); this.inShop = null; if (this.eating) { this.bear.inner.position.y = 0; this.bear.setSeated?.(false); } this.eating = null;
     if (S2.F.mall && this.inMall) { this.inMall.I.g.visible = true; this.placeAt(S2.F.x - S2.F.nx * 2.4, S2.F.z - S2.F.nz * 2.4, Math.atan2(-S2.F.nx, -S2.F.nz)); this.shopCool = 1.5; this.onShop?.(null); return; }
     this.showOutdoor();
     const F = S2.F; this.placeAt(F.x + F.nx * 2.2, F.z + F.nz * 2.2, Math.atan2(F.nx, F.nz)); this.shopCool = 2; this.onShop?.(null); this.onShopEnter?.(null);
@@ -672,9 +672,9 @@ export class Hangang {
   tickShop(dt) {
     const S2 = this.inShop, I = S2.I;
     if (S2.ordered) { S2.ordered.t -= dt; if (S2.ordered.t <= 0) { const { item, mode } = S2.ordered; S2.ordered = null;
-      if (mode === 'here' && I.seats.length) { const seat = I.seats[Math.floor(Math.random() * I.seats.length)], f = foodMesh(S2.F.kind, item); f.position.set(seat.tx - I.O.x - 0.3, 0.81, seat.tz - I.O.z); I.g.add(f); S2.food = f; this.placeAt(seat.x, seat.z, Math.atan2(seat.tx - seat.x, 0)); this.eating = { t: 7, item }; this.onEat?.({ item, mode }); }
+      if (mode === 'here' && I.seats.length) { const seat = I.seats[Math.floor(Math.random() * I.seats.length)], f = foodMesh(S2.F.kind, item); f.position.set(seat.tx - 0.3, 0.81, seat.tz); I.g.add(f); S2.food = f; this.placeAt(I.O.x + seat.x, I.O.z + seat.z, Math.atan2(seat.tx - seat.x, 0)); this.eating = { t: 7, item }; this.bear.setSeated?.(true); this.onEat?.({ item, mode }); }
       else { const f = foodMesh(S2.F.kind, item); f.scale.setScalar(2.2); f.position.set(0.55, 1.0, 0.35); this.bear.root.add(f); this.carry && this.bear.root.remove(this.carry); this.carry = f; this.carryT = 180; this.onEat?.({ item, mode: 'togo' }); } } }
-    if (this.eating) { this.eating.t -= dt; this.bear.inner.position.y = Math.abs(Math.sin(this.t * 6)) * 0.04; if (this.eating.t <= 0) { this.bear.inner.position.y = 0; if (S2.food) { I.g.remove(S2.food); S2.food = null; } this.onEat?.({ item: this.eating.item, mode: 'done' }); this.eating = null; } return; }
+    if (this.eating) { this.eating.t -= dt; this.bear.inner.position.y = 0.47 + Math.abs(Math.sin(this.t * 6)) * 0.03; if (this.eating.t <= 0) { this.bear.inner.position.y = 0; this.bear.setSeated?.(false); if (S2.food) { I.g.remove(S2.food); S2.food = null; } this.onEat?.({ item: this.eating.item, mode: 'done' }); this.eating = null; } return; }
     const dc = Math.hypot(this.px - I.counter.x, this.pz - I.counter.z), dd = Math.hypot(this.px - I.door.x, this.pz - I.door.z);
     if (dc < 1.4 && !S2.menuShown && !S2.ordered) { S2.menuShown = true; this.onShop?.({ name: S2.F.name, kind: S2.F.kind, label: SHOP_KIND[S2.F.kind].label, emoji: SHOP_KIND[S2.F.kind].emoji, menu: SHOP_MENU[S2.F.kind] || [] }); }
     if (dc > 2.4 && S2.menuShown && !S2.ordered) { S2.menuShown = false; this.onShop?.(null); }
