@@ -2364,6 +2364,8 @@ export class Hangang {
     const own = new Set((this.footGrid?.get(`${Math.floor(bx / 40)},${Math.floor(bz / 40)}`) || []).filter((fi) => { const f = this.foot[fi]; return bx >= f.x0 - 3 && bx <= f.x1 + 3 && bz >= f.z0 - 3 && bz <= f.z1 + 3 && (inRing(bx, bz, f.ring) || Math.hypot((f.x0 + f.x1) / 2 - bx, (f.z0 + f.z1) / 2 - bz) < 25); }));
     for (let i = 1; i < n; i++) {
       const t = i / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t, y = ay + (by - ay) * t;
+      // 외곽선 높이보다 훨씬 높은 명소(성 첨탑 · 자유낙하 탑 등)는 따로 둥근 가림막으로 (명소 모듈이 labelOcc 에 넣는다)
+      for (const o of this.labelOcc || []) if (!o.off?.() && y < o.top && Math.hypot(x - o.x, z - o.z) < o.r) return true;
       const cell = this.footGrid?.get(`${Math.floor(x / 40)},${Math.floor(z / 40)}`); if (!cell) continue;
       for (const fi of cell) { const f = this.foot[fi]; if (own.has(fi) || f.name === l.name || x < f.x0 || x > f.x1 || z < f.z0 || z > f.z1) continue; const top = f.h + (this.chunks ? f.base ?? this.terrAt(x, z, true) : 0); if (top < y) continue; if (inRing(x, z, f.ring)) return true; }
     }
@@ -2384,6 +2386,8 @@ export class Hangang {
         const d = Math.hypot(l.x - px, l.z - pz), range = Math.min(1300, 160 + l.h * 3.2 + (this.flying ? Math.min(400, this.y * 1.5) : 0)); if (d > range) continue;
         // 서울 전체는 땅 높이가 있다: 이름표 자리에 그곳 땅 높이를 더한다
         const ty = Math.min(l.h * 0.62, 90) + (this.chunks ? this.terrAt(l.x, l.z, true) : 0); v.set(l.x, ty, l.z).project(camera); if (v.z > 1 || Math.abs(v.x) > 0.95 || v.y < -0.85 || v.y > 0.95) continue;
+        // 명소 안(예: 롯데월드 섬 위)에서는 먼 이름표를 띄우지 않는다 (명소 풍경 위로 뒤쪽 아파트 이름이 겹쳤다)
+        if (this.labelSkip?.(l, d)) continue;
         if (this.occluded(camera.position, { x: l.x, y: ty, z: l.z, name: l.name })) continue;
         picks.push({ l, score: Math.abs(v.x) + d / range * 0.4 });
       }

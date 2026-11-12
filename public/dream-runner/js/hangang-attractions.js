@@ -126,6 +126,8 @@ class Attractions {
         let best = null, bd = Infinity; for (const s of SPOTS) { if (s.hidden || !s.start) continue; for (const [x, z] of s.pts || [[s.x, s.z]]) { const d = Math.hypot(px - x, pz - z); if (d < (s.r || 30) && d < bd) { bd = d; best = s; } } }
         if (best && hg.y > 30 && !best.high) best = null;
         if (best !== this.near) { this.near = best; this.showCard(best); }
+        // 같은 명소 안에서 옆 기구로 옮겨 가면 소개 문구도 그 기구 것으로 (롯데월드처럼 체험 자리가 여럿인 곳)
+        else if (best?.introNow && best.introNow(this) !== this.cardTxt) this.showCard(best);
       }
     }
     for (const [id, B] of this.built) if (B.tick) B.tick(dt, this.exp?.spot?.id === id ? this.exp : null);
@@ -134,8 +136,8 @@ class Attractions {
   cam(camera, dt) { this.exp?.cam?.(camera, dt); }
   showCard(s) {
     const C = this.el.card; if (!s) { C.classList.add('hidden'); return; }
-    const t = this.stamps[s.id];
-    C.innerHTML = `<span class="ic">${s.icon}</span><div><b>${s.name}</b><small>${typeof s.introNow === 'function' ? s.introNow(this) : s.intro}</small>${t ? '<span class="done">🎫 도장 받음</span>' : ''}</div><button>${s.verb || '체험하기'}<kbd>E</kbd></button>`;
+    const t = this.stamps[s.id]; this.cardTxt = typeof s.introNow === 'function' ? s.introNow(this) : s.intro;
+    C.innerHTML = `<span class="ic">${s.icon}</span><div><b>${s.name}</b><small>${this.cardTxt}</small>${t ? '<span class="done">🎫 도장 받음</span>' : ''}</div><button>${s.verb || '체험하기'}<kbd>E</kbd></button>`;
     C.querySelector('button').onclick = () => this.act(); C.classList.remove('hidden');
   }
   drawBar() {

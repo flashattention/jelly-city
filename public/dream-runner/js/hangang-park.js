@@ -135,7 +135,7 @@ export class DropTower extends Ride {
     for (let i = 0; i < N; i++) { const a = (i / N) * Math.PI * 2, sx = Math.cos(a) * Rr, sz = Math.sin(a) * Rr, ry = Math.atan2(sx, sz);
       mk.add(G.box(0.62, 0.12, 0.55), '#2b2f36', 'std', T(sx, 0.55, sz, ry)); mk.add(G.box(0.62, 0.9, 0.12), cols.seat[i % cols.seat.length], 'std', T(sx - Math.sin(ry) * 0.3, 0.6, sz - Math.cos(ry) * 0.3, ry)); mk.add(G.box(0.5, 0.12, 0.3), '#e8e8e8', 'metal', T(sx - Math.sin(ry) * 0.2, 1.62, sz - Math.cos(ry) * 0.2, ry));
       this.seat(ring, sx, 0.58, sz, ry); }
-    mk.build(ring); park.addCircle(x, z, R * 0.7, 999); this.ry = 0; this.spec = [x + 40, y0 + 18, z + 40];
+    mk.build(ring); park.addCircle(x, z, R * 0.7, 999); this.ry = 0; this.spec = [x + H * 0.9, y0 + H * 0.35, z + H * 0.75];
   }
   // 높이 · 회전: 0~10 타기, 10~48 오르기(한 바퀴 돌며), 48~52 꼭대기에서 멈춤, 52~ 자유낙하(약 3초) → 자석 브레이크(2g) → 천천히 내려와 내리기
   pose(t) { const top = this.H - 3, yb = top * 0.36, ftb = Math.sqrt((top - yb) / 4.9), tb = 52 + ftb, vb = 9.8 * ftb, tbr = 2 * (yb - 3) / vb; let y = 0;
@@ -272,7 +272,7 @@ export class Monorail extends Train {
 function buildCastle(park) {
   // 매직아일랜드 성: 상아빛 벽 · 코발트 파랑 뾰족 지붕 · 금빛 꼭대기 장식, 가운데 높은 탑(꼭대기 42m) 둘레로 크고 작은 둥근 탑. 정문은 다리 쪽
   const k = park.castleKit, cx = 10593, cz = 2336, y0 = park.ground(cx, cz) + 0.3, f = Math.atan2(cx - 10575, cz - 2312);
-  const IV = '#f4ecdf', IV2 = '#e9dcc8', BL = '#2f5fb8', BL2 = '#3a72cc', GD = '#e6b84a', WN = '#3b4f78';
+  const IV = '#fbf2ec', IV2 = '#f0dfd8', BL = '#2f5fb8', BL2 = '#3a72cc', GD = '#e6b84a', WN = '#3b4f78';
   const at = (lx, lz) => [cx + Math.cos(f) * lx + Math.sin(f) * lz, cz - Math.sin(f) * lx + Math.cos(f) * lz];
   const tower = (lx, lz, r, h, roofH, col = IV, roof = BL, win = true) => { const [x, z] = at(lx, lz); k.add(G.cyl(r * 1.04, r, h, 16), col, 'castle', T(x, y0, z)); k.add(G.cyl(r * 1.18, r * 1.18, 0.6, 16), IV2, 'castle', T(x, y0 + h - 0.6, z)); for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; k.add(G.box(r * 0.4, 0.7, r * 0.3), IV2, 'castle', T(x + Math.cos(a) * r * 1.1, y0 + h, z + Math.sin(a) * r * 1.1, -a)); }
     k.add(G.cone(r * 1.22, roofH, 16), roof, 'castle', T(x, y0 + h + 0.2, z)); k.add(G.cyl(0.07, 0.07, 2.2, 5), GD, 'metal', T(x, y0 + h + roofH, z)); k.add(G.ball(0.3, 8), GD, 'metal', T(x, y0 + h + roofH + 0.4, z));
@@ -427,6 +427,10 @@ export function buildPark(hg, makeBear, buildAdventure) {
   park.statM = park.stat.build(g, { shadow: true }); park.castleM = park.castleKit.build(g, { shadow: true });
   // 이름 판 (글씨 그림 한 장)
   for (const S of park.signs) { const tx = canvasTex(512, 96, (c, w, h) => { c.fillStyle = 'rgba(0,0,0,0)'; c.clearRect(0, 0, w, h); c.font = 'bold 72px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#e8202f'; c.fillText(S.text, w / 2, h / 2 + 4); }); const m = new THREE.MeshBasicMaterial({ map: tx, transparent: true, depthWrite: false }); const me = new THREE.Mesh(new THREE.PlaneGeometry(S.w, S.w * 96 / 512), m); me.position.set(S.x, S.y, S.z); me.rotation.y = S.ry; me.userData.noDrape = true; g.add(me); park.signM = m; }
+  // 이름표 가림: 성(꼭대기 42m) · 자유낙하 탑(70m) · 진자 뒤 아파트 이름표는 숨긴다. 섬 · 다리 위에서는 150m 밖 이름표를 띄우지 않는다
+  { const off = () => park.hidden || !park.g.visible, c = park.castle; H.labelOcc = (H.labelOcc || []).filter((o) => o.key !== 'park');
+    H.labelOcc.push({ key: 'park', x: c.x, z: c.z, r: 13, top: c.y0 + 42, off }, { key: 'park', x: 10641, z: 2353, r: 4, top: park.ground(10641, 2353) + 72, off }, { key: 'park', x: 10570, z: 2402, r: 8, top: park.ground(10570, 2402) + 30, off });
+    H.labelSkip = (l, d) => !off() && d > 150 && (inRing(H.px, H.pz, R_ISLE) || inRing(H.px, H.pz, R_ISLET) || inRing(H.px, H.pz, R_BRIDGE)); }
   park.riders = new Riders(g, 300);
   // 어드벤처 문 둘 (북쪽 정문 · 남쪽 섬 가는 문): 몰처럼 걸어 들어가면 실내로
   const doorAt = (x, z, nx, nz, label) => { const D = { name: '롯데월드 어드벤처', x: x + nx * 0.8, z: z + nz * 0.8, nx, nz, key: 'park', label, build: (hg2, mb) => buildAdventure(hg2, park, mb) }; (H.malls ||= []).push(D); park.doors = [...(park.doors || []), D];
@@ -471,7 +475,9 @@ export function rideExp(A, park, r) {
       const mode = hg.opt.cam || 0, look = hg.camYaw - R.yaw0, pitch = -(hg.camPitch ?? 0.32) + 0.32; R.cam = camera;
       if (mode === 0) { camera.position.copy(_o.position).addScaledVector(V1.set(0, 1, 0).applyQuaternion(_o.quaternion), 0.78); _q.setFromEuler(_e.set(Math.max(-1.2, Math.min(1.2, pitch * 1.5)), Math.PI + look, 0, 'YXZ')); camera.quaternion.copy(_o.quaternion).multiply(_q); }
       else if (mode === 1) { const back = V1.set(0, 0, -1).applyQuaternion(_o.quaternion); back.y = 0; back.normalize(); const p = V2.copy(_o.position).addScaledVector(back, 5.5); p.y += 2.6; camera.position.lerp(p, Math.min(1, dt * 6)); camera.up.set(0, 1, 0); camera.lookAt(_o.position.x, _o.position.y + 0.6, _o.position.z); }
-      else { const sp = r.spec || [_o.position.x + 30, _o.position.y + 15, _o.position.z + 30]; camera.position.set(sp[0], sp[1], sp[2]); camera.up.set(0, 1, 0); camera.lookAt(_o.position); }
+      else {
+        // 멀리서: 기구 바닥과 탄 자리 사이를 본다 (높은 기구도 아래부터 화면에 들어오게)
+        const sp = r.spec || [_o.position.x + 30, _o.position.y + 15, _o.position.z + 30], gy = r.g0 ?? _o.position.y; camera.position.set(sp[0], sp[1], sp[2]); camera.up.set(0, 1, 0); camera.lookAt(_o.position.x, gy + (_o.position.y - gy) * 0.6, _o.position.z); }
       if (camera.fov !== 62) { camera.fov = 62; camera.updateProjectionMatrix(); } },
     act() { A.finish(this, true); },
     end() { park.ride = null; hg.placeAt(R.x, R.z, R.face); hg.bear.root.visible = true; hg.bear.root.quaternion.identity(); if (hg.shadow) hg.shadow.visible = true; R.cam?.up.set(0, 1, 0); },
