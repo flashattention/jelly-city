@@ -975,6 +975,8 @@ const hgTileAt = (x, z) => !!hgWorldIdx?.have?.some(([i, j]) => i === Math.floor
 async function hgRegionStart(id) { const S = await hgLoadSeoul(), R = S.regions.find((q) => q.id === id) || S.regions[0]; let k = 1; while (k < R.pts.length - 1 && R.acc[k] < 30) k++; const [ax, az] = R.pts[k - 1], [bx, bz] = R.pts[k]; return { x: bx, z: bz, face: Math.atan2(bx - ax, bz - az) }; }
 function hgUse(id) { if (!HG_REGIONS[id]) id = 'yeouido'; if (hgWorld) { if (!hgInst.seoul) { const n = new Hangang(); for (const k of Object.keys(hg)) if (/^on[A-Z]|^api$/.test(k) && typeof hg[k] === 'function') n[k] = hg[k]; hgInst.seoul = n; } hg = hgInst.seoul; hgRegion = id; return; } if (!hgInst[id]) { const n = new Hangang(); for (const k of Object.keys(hg)) if (/^on[A-Z]|^api$/.test(k) && typeof hg[k] === 'function') n[k] = hg[k]; hgInst[id] = n; } hg = hgInst[id]; hgRegion = id; }
 hg.api = (path) => account.api(path);
+// 서울 칸의 셰이더를 보이기 전에 미리 만든다 (처음 보일 때 100 ~ 200ms 멈추던 것, 8-23)
+hg.onCompile = (obj) => (renderer.compileAsync ? renderer.compileAsync(obj, camera, hg.scene) : null);
 // 역 출구 계단을 오르내릴 때 잠깐 어두워졌다 밝아진다
 hg.onFade = () => { let f = document.getElementById('hg-fade'); if (!f) { f = document.createElement('div'); f.id = 'hg-fade'; f.style.cssText = 'position:fixed;inset:0;background:#000;pointer-events:none;z-index:30;opacity:0;transition:opacity .5s ease-out'; document.body.appendChild(f); } f.style.transition = 'none'; f.style.opacity = '0.85'; requestAnimationFrame(() => requestAnimationFrame(() => { f.style.transition = 'opacity .5s ease-out'; f.style.opacity = '0'; })); };
 // 지하철 출입구 앞: 그 역 실시간 도착 (20초마다)

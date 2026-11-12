@@ -37,6 +37,8 @@ export function makePost(renderer, scene, camera, opt = {}) {
   composer.addPass(new RenderPass(scene, camera));
   // 빛 번짐 그림판을 작게 할 수 있다 (bloomScale, 그리기 비용 ↓)
   const bloom = new UnrealBloomPass(new THREE.Vector2(size.x * bs, size.y * bs), 0.32, 0.65, 0.86); if (bs !== 1) { const ss = bloom.setSize.bind(bloom); bloom.setSize = (w, h) => ss(Math.max(64, Math.round(w * bs)), Math.max(64, Math.round(h * bs))); } composer.addPass(bloom);
+  // 화면에 NaN · 무한대 점이 하나라도 있으면 빛 번짐이 그것을 큰 검정 사각형으로 퍼뜨린다 (8-23): 밝은 곳 고르기에서 0 으로
+  { const hp = bloom.materialHighPassFilter; hp.fragmentShader = hp.fragmentShader.replace('vec4 texel = texture2D( tDiffuse, vUv );', 'vec4 texel = texture2D( tDiffuse, vUv ); if ( any( isnan( texel ) ) || any( isinf( texel ) ) ) texel = vec4( 0.0 ); texel = clamp( texel, 0.0, 64.0 );'); hp.needsUpdate = true; }
   const grade = new ShaderPass(Grade); grade.uniforms.res.value.set(size.x, size.y); composer.addPass(grade);
   composer.addPass(new OutputPass());
   return {
