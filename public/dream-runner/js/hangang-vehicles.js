@@ -78,6 +78,8 @@ export class Traffic {
       const c = TYPES[k].cat; let k2 = w;
       if (night) k2 *= c === 'truck' ? 0.35 : c === 'bus' ? 0.5 : k.startsWith('taxi') ? 2.2 : c === 'bike' ? 1.3 : 1;
       if (L.w < 12 && (k === 'mixer' || k === 'dump' || k === 'fire' || k === 'busTour')) k2 *= 0.2;
+      if (L.w < 10 && (c === 'truck' && k !== 'truckS' && k !== 'truckBox' && k !== 'parcel' || c === 'bus')) k2 = 0;
+      if (L.w < 10 && (k === 'light' || c === 'bike')) k2 *= 2;
       return [k, k2];
     });
     let s = r() * list.reduce((a, b) => a + b[1], 0); for (const [k, w] of list) { s -= w; if (s <= 0) return k; } return 'sedanM';
@@ -121,6 +123,8 @@ export class Traffic {
       // 큰길(폭 20m 넘게)에 더 많이: 좁은 길이 뽑히면 반은 다시 뽑는다
       this.spawnT = 0.15 + r() * 0.25; let pk = hg.pickNear(hg.driveGrid, hg.driveLines, px, pz, 55, 300, r);
       if (pk && pk.L.w < 20 && r() < 0.5) pk = hg.pickNear(hg.driveGrid, hg.driveLines, px, pz, 55, 300, r);
+      // 폭 10m 아래 좁은 길(북촌 같은 동네 길)엔 드문드문, 큰 차는 안 들어간다
+      if (pk && pk.L.w < 10 && r() < 0.6) pk = null;
       if (pk) this.spawn(pk.L, pk.d, r() < 0.5 ? 1 : -1, r);
     }
     // 세워 둔 차: 좁은 길 가장자리에 (골목마다 차가 서 있다), 겹치거나 건물에 닿으면 안 만든다

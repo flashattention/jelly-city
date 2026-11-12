@@ -1850,7 +1850,7 @@ export class Hangang {
     const lines = [], drives = [], maps = this.map.kind === 'world' ? [...this.chunks.values()].map((c) => c.map) : [this.map];
     const mk = (pts, w, kind) => { const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); return { pts, cum, len: cum[cum.length - 1], w, kind }; };
     for (const Mx of maps) { const S = Mx.scale;
-      for (const rd of Mx.roads) { if (rd[1]) continue; const pts = unpack(rd.slice(2), S); if (pts.length < 2) continue; const L = mk(pts, rd[0], 'road'); if (L.len > 40) { lines.push(L); if (rd[0] >= 10) drives.push(L); } }
+      for (const rd of Mx.roads) { if (rd[1]) continue; const pts = unpack(rd.slice(2), S); if (pts.length < 2) continue; const L = mk(pts, rd[0], 'road'); if (L.len > 40) { lines.push(L); if (rd[0] >= 8) drives.push(L); } }
       for (const pa of Mx.paths) { if (pa[0]) continue; const pts = unpack(pa.slice(2), S); if (pts.length < 2) continue; const L = mk(pts, pa[1], 'path'); if (L.len > 25) lines.push(L); } }
     const grid = (arr) => { const g = new Map(); arr.forEach((L, li) => { for (let i = 0; i < L.pts.length; i++) { const k = `${Math.floor(L.pts[i][0] / 50)},${Math.floor(L.pts[i][1] / 50)}`; if (!g.has(k)) g.set(k, []); g.get(k).push([li, i]); } }); return g; };
     this.walkLines = lines; this.walkGrid = grid(lines); this.driveLines = drives; this.driveGrid = grid(drives);
