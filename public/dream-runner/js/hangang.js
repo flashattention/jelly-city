@@ -389,11 +389,19 @@ export class Hangang {
     for (const D of c.malls || []) { D.key = key; (this.malls ||= []).push(D); }
     for (const f of c.foot) { f.key ??= key; this.addFoot(f); } c.foot = this.foot; c.footGrid = this.footGrid; for (let k = d0; k < this.decks.length; k++) this.decks[k].key = key;
     const tb1 = performance.now(); await idle(); this.maskWater(key); const tw = performance.now(); { let t0 = performance.now(); for (const _ of this.drapeGen(c)) if (performance.now() - t0 > 8) { await idle(); t0 = performance.now(); } } const td = performance.now(); await idle(); const tm = performance.now(); this.mergeChunk(c); const tm2 = performance.now(); await idle(); c.scene.userData.chunk = key; c.buildMs = [Math.round(tb1 - tb0), Math.round(performance.now() - tb1)]; c.stepMs = [Math.round(tw - tb1), Math.round(td - tw), Math.round(tm2 - tm)]; // 만들기 · 지형 얹기+묶기 (ms)
-    c.applySeason();
+    c.applySeason(); this.cullTrees(c);
     // 셰이더를 미리 만들어 둔다 (처음 보일 때 그리기가 100 ~ 200ms 멈췄다, 8-23). 늦어도 3초 뒤엔 그냥 넣는다
     if (this.onCompile) { try { await Promise.race([this.onCompile(c.scene), new Promise((ok) => setTimeout(ok, 3000))]); } catch { /* 그냥 그린다 */ } }
     this.scene.add(c.scene);
     return c;
+  }
+  // 새 칸(c)의 찻길 위에 서 있는 다른 칸 나무를 숨기고 부딪힘도 뺀다 (8-24: 칸마다 길 목록이 달라 이웃 칸 찻길 위에 나무가 섰다)
+  cullTrees(c) {
+    const S = c.map.scale, RG = 30, rg = new Map(); for (const rd of c.map.roads || []) { const w = rd[0], pts = unpack(rd.slice(2), S); for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k], e = w / 2 + 1; for (let gx = Math.floor((Math.min(a[0], b[0]) - e) / RG); gx <= Math.floor((Math.max(a[0], b[0]) + e) / RG); gx++) for (let gz = Math.floor((Math.min(a[1], b[1]) - e) / RG); gz <= Math.floor((Math.max(a[1], b[1]) + e) / RG); gz++) { const kk = `${gx},${gz}`; if (!rg.has(kk)) rg.set(kk, []); rg.get(kk).push([a, b, w / 2 + 0.6]); } } }
+    const onRoad = (x, z) => { for (const [a, b, hw] of rg.get(`${Math.floor(x / RG)},${Math.floor(z / RG)}`) || []) { const dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1, t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / L2, 0, 1); if (Math.hypot(a[0] + dx * t - x, a[1] + dz * t - z) < hw) return true; } return false; };
+    const zero = new THREE.Matrix4().makeScale(0, 0, 0); let n = 0;
+    for (const o of this.chunks.values()) { if (o === c || !o.treeGroups) continue; for (const G of o.treeGroups) { let hit = false; const A = G.arr === 'f' ? o.forestFill || [] : o.trees || []; G.idx.forEach((si, q) => { const p = A[si]; if (!p || !rg.has(`${Math.floor(p[0] / RG)},${Math.floor(p[1] / RG)}`) || !onRoad(p[0], p[1])) return; for (const m of G.ms) m?.setMatrixAt(q, zero); p.cut = true; hit = true; n++; const l = this.circGrid?.get(`${Math.floor(p[0] / 20)},${Math.floor(p[1] / 20)}`); if (l) { const i = l.findIndex((q2) => q2.x === p[0] && q2.z === p[1]); if (i >= 0) l.splice(i, 1); } }); if (hit) for (const m of G.ms) if (m) m.instanceMatrix.needsUpdate = true; } }
+    return n;
   }
   unloadChunk(key) {
     const c = this.chunks.get(key); if (!c) return; this.chunks.delete(key); this.scene.remove(c.scene);
@@ -1546,18 +1554,20 @@ export class Hangang {
     const spots = [], near = isPhone ? 0.55 : 1;
     // 물 · 다리(경사로 포함, 둘레 4m) · 건물 안에는 심지 않는다 (다리를 가로막지 않게)
     const okAt = (x, z) => !inWater(x, z) && !this.nearDeck(x, z, 4) && this.groundAt(x, z, 9999) === 0;
-    // 강 쪽은 탁 트이게 드문드문, 공원 쪽은 줄지어
-    for (let s = 4; s < this.L; s += 9 / near) for (const lat of [-12.5, 7.5]) { if (lat < 0 && r() < 0.72) continue; const j = lat + (r() - 0.5) * 2.4, [x, z] = this.world(s + (r() - 0.5) * 3, j); if (okAt(x, z)) spots.push([x, z, 0.7 + r() * 0.3]); }
+    // 찻길(차로 폭 + 0.6m) 위에는 어떤 나무도 심지 않는다 (8-24: 홍대 앞 찻길 한가운데 나무 줄). 나뉜 큰길은 한쪽 가로수 자리가 반대쪽 찻길 위였다
+    // 서울 칸: 칸 지도의 길 목록엔 칸을 지나는 길이 다 들어 있지 않다 → 이미 불러온 이웃 칸의 길도 함께 본다 (나중에 불러온 칸 길 위 나무는 cullTrees 가 숨긴다)
+    const SR = this.map.scale, rg = new Map(), RG = 30; for (const rd of [...(this.map.roads || []), ...(this.isChunk ? [...(this.host?.chunks?.values() || [])].filter((c2) => c2 !== this && c2.map?.scale === SR).flatMap((c2) => c2.map.roads || []) : [])]) { const w = rd[0], pts = unpack(rd.slice(2), SR); for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k], e = w / 2 + 1; for (let gx = Math.floor((Math.min(a[0], b[0]) - e) / RG); gx <= Math.floor((Math.max(a[0], b[0]) + e) / RG); gx++) for (let gz = Math.floor((Math.min(a[1], b[1]) - e) / RG); gz <= Math.floor((Math.max(a[1], b[1]) + e) / RG); gz++) { const kk = `${gx},${gz}`; if (!rg.has(kk)) rg.set(kk, []); rg.get(kk).push([a, b, w / 2 + 0.6]); } } }
+    const onRoad = (x, z) => { for (const [a, b, hw] of rg.get(`${Math.floor(x / RG)},${Math.floor(z / RG)}`) || []) { const dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1, t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / L2, 0, 1); if (Math.hypot(a[0] + dx * t - x, a[1] + dz * t - z) < hw) return true; } return false; };
+    // 강 쪽은 탁 트이게 드문드문, 공원 쪽은 줄지어 (코스가 있는 지역 지도만. 서울 칸의 '코스'는 칸 가운데를 가로지르는 가짜 선이라, 거기 심으면 찻길을 가로지르는 나무 줄이 생겼다)
+    const course = this.map.kind !== 'tile';
+    if (course) for (let s = 4; s < this.L; s += 9 / near) for (const lat of [-12.5, 7.5]) { if (lat < 0 && r() < 0.72) continue; const j = lat + (r() - 0.5) * 2.4, [x, z] = this.world(s + (r() - 0.5) * 3, j); if (okAt(x, z) && !onRoad(x, z)) spots.push([x, z, 0.7 + r() * 0.3]); }
     // 공원 안 (코스 주변 450m)
-    for (let n = 0; n < 2600 * near; n++) { const s = r() * this.L, lat = (r() < 0.25 ? -1 : 1) * (12 + r() * 260), [x, z] = this.world(s, lat); if (okAt(x, z) && this.greenPolys.some((g) => inPoly(x, z, g))) spots.push([x, z, 0.7 + r() * 0.6]); }
-    for (const [x, z] of this.extraTrees || []) spots.push([x, z, 0.85 + r() * 0.35]);
+    if (course) for (let n = 0; n < 2600 * near; n++) { const s = r() * this.L, lat = (r() < 0.25 ? -1 : 1) * (12 + r() * 260), [x, z] = this.world(s, lat); if (okAt(x, z) && !onRoad(x, z) && this.greenPolys.some((g) => inPoly(x, z, g))) spots.push([x, z, 0.7 + r() * 0.6]); }
+    for (const [x, z] of this.extraTrees || []) if (!onRoad(x, z)) spots.push([x, z, 0.85 + r() * 0.35]);
     // 서울 전체 칸: 코스가 없으니 칸 전체에서 — 숲은 빽빽이, 공원 · 잔디는 드문드문(넓이에 맞게), 큰길(폭 10m 이상)은 양옆 가로수
     if (this.map.kind === 'tile') {
       const M = this.map, S = M.scale, kinds = new Map(); for (const g of M.green) kinds.set(g, g[0]);
       const lim = Math.round((isPhone ? 2600 : 6000) * near); let n0 = spots.length;
-      // 찻길 위에는 심지 않는다 (나뉜 큰길은 한쪽 가로수 자리가 반대쪽 찻길 위였다)
-      const rg = new Map(), RG = 30; for (const rd of M.roads) { const w = rd[0], pts = unpack(rd.slice(2), S); for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k], e = w / 2 + 1; for (let gx = Math.floor((Math.min(a[0], b[0]) - e) / RG); gx <= Math.floor((Math.max(a[0], b[0]) + e) / RG); gx++) for (let gz = Math.floor((Math.min(a[1], b[1]) - e) / RG); gz <= Math.floor((Math.max(a[1], b[1]) + e) / RG); gz++) { const kk = `${gx},${gz}`; if (!rg.has(kk)) rg.set(kk, []); rg.get(kk).push([a, b, w / 2 + 0.6]); } } }
-      const onRoad = (x, z) => { for (const [a, b, hw] of rg.get(`${Math.floor(x / RG)},${Math.floor(z / RG)}`) || []) { const dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1, t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / L2, 0, 1); if (Math.hypot(a[0] + dx * t - x, a[1] + dz * t - z) < hw) return true; } return false; };
       for (const g of M.green) { const kind = g[0]; if (kind === 'pitch' || kind === 'sand') continue; const poly = g.slice(1).map((rg) => unpack(rg, S)); let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of poly[0] || []) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } if (!isFinite(x0)) continue;
         const area = Math.abs(ringArea(poly[0])), per = kind === 'wood' ? 110 : kind === 'wild' ? 260 : 420, want = Math.min(900, Math.round((area / per) * near));
         for (let t = 0, got = 0; t < want * 3 && got < want && spots.length - n0 < lim; t++) { const x = x0 + r() * (x1 - x0), z = z0 + r() * (z1 - z0); if (!inPoly(x, z, poly) || !okAt(x, z) || onRoad(x, z)) continue; spots.push([x, z, (kind === 'wood' ? 0.8 : 0.7) + r() * 0.6]); got++; } }
@@ -1573,6 +1583,8 @@ export class Hangang {
       for (const poly of woods) { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of poly[0] || []) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
         for (let gx = x0; gx < x1 && fill.length < FB; gx += sp) for (let gz = z0; gz < z1; gz += sp) { const x = gx + r() * sp, z = gz + r() * sp; if (!inPoly(x, z, poly) || !okAt(x, z) || onRoad(x, z) || onPath(x, z)) continue; fill.push([x, z, 0.8 + r() * 0.55]); } }
     }
+    // 서울 칸: 길 · 공원은 칸 밖까지 통째로 들어 있어, 칸 밖에 심은 나무가 이웃 칸 찻길 위에 서거나 이웃 칸 나무와 겹쳤다 → 내 칸 안에만 심는다
+    if (this.isChunk && this.chunkKey && this.host?.world0) { const T0 = this.host.world0.tile, [ti, tj] = this.chunkKey.split('_').map(Number), mine = (p) => p[0] >= ti * T0 && p[0] < (ti + 1) * T0 && p[1] >= tj * T0 && p[1] < (tj + 1) * T0; for (const A of [spots, this.forestFill || []]) { let w = 0; for (const p of A) if (mine(p)) A[w++] = p; A.length = w; } }
     for (const [x, z, k] of this.forestFill || []) this.addCircle(x, z, 0.3 * k, 7);
     this.trees = spots; for (const [x, z, k] of spots) this.addCircle(x, z, 0.34 * k, 7);
     const N = spots.length, o = new THREE.Object3D();
@@ -1623,7 +1635,7 @@ export class Hangang {
       const crowns = new THREE.InstancedMesh(sh.crown, cm, n), trunks = new THREE.InstancedMesh(tg, barkM, n), tw = sh.pine ? null : new THREE.InstancedMesh(twigG, twigM, n);
       idx.forEach((si, q) => { const [x, z, k] = spots[si]; o.position.set(x, 0, z); o.rotation.set(0, r() * 6.28, 0); o.scale.set(k * (0.85 + r() * 0.3), k * (0.85 + r() * 0.35), k * (0.85 + r() * 0.3)); o.updateMatrix(); crowns.setMatrixAt(q, o.matrix); trunks.setMatrixAt(q, o.matrix); tw?.setMatrixAt(q, o.matrix); });
       for (const m of [crowns, trunks, tw]) if (m) { m.castShadow = true; m.receiveShadow = false; this.scene.add(m); if (this.isChunk) { const [gx, gz] = gk.split(',').map(Number); m.userData.lod = [(gx + 0.5) * 500, (gz + 0.5) * 500, n]; m.userData.noMerge = true; } }
-      this.crownSets.push({ crowns, idx, pine: !!sh.pine }); if (tw) this.twigSets.push(tw); }
+      this.crownSets.push({ crowns, idx, pine: !!sh.pine }); if (tw) this.twigSets.push(tw); (this.treeGroups ||= []).push({ ms: [crowns, trunks, tw], idx }); }
     });
     // 숲 채우기 나무: 둥근 활엽수 · 키 큰 활엽수 · 소나무 (가벼운 모양, 500m 칸마다 · 800m 안에서만 그린다)
     if (this.forestFill?.length) {
@@ -1642,15 +1654,16 @@ export class Hangang {
       const cells = new Map(); F.forEach(([x, z], i) => { const k = `${Math.floor(x / 500)},${Math.floor(z / 500)}`; if (!cells.has(k)) cells.set(k, []); cells.get(k).push(i); });
       for (const [gk, all] of cells) {
         const [gx, gz] = gk.split(',').map(Number), lod = (m, n) => { m.receiveShadow = false; this.scene.add(m); m.userData.lod = [(gx + 0.5) * 500, (gz + 0.5) * 500, n, 800]; m.userData.noMerge = true; };
-        const trunks = new THREE.InstancedMesh(unitTrunk, fBark, all.length); let tq = 0;
+        const trunks = new THREE.InstancedMesh(unitTrunk, fBark, all.length), tOrd = []; let tq = 0;
         FS.forEach((sh, t) => {
           const idx = all.filter((i) => fk[i] === t), n = idx.length; if (!n) return;
           const crowns = new THREE.InstancedMesh(sh.crown, sh.pine ? pineM : leafM, n), tw = sh.pine ? null : new THREE.InstancedMesh(twigG, twigM, n);
           idx.forEach((si, q) => { const [x, z, k] = F[si], sx = k * (0.85 + r() * 0.3), sy = k * (0.85 + r() * 0.35), sz = k * (0.85 + r() * 0.3), ry = r() * 6.28; o.position.set(x, 0, z); o.rotation.set(0, ry, 0); o.scale.set(sx, sy, sz); o.updateMatrix(); crowns.setMatrixAt(q, o.matrix); tw?.setMatrixAt(q, o.matrix);
-            o.scale.set(sh.tr * sx, sh.th * sy, sh.tr * sz); o.updateMatrix(); trunks.setMatrixAt(tq, o.matrix); trunks.setColorAt(tq++, tcol.set(sh.pine ? '#8a5a44' : r() < 0.5 ? '#7a6e62' : '#6a5e52').offsetHSL(0, 0, (r() - 0.5) * 0.08)); });
+            o.scale.set(sh.tr * sx, sh.th * sy, sh.tr * sz); o.updateMatrix(); trunks.setMatrixAt(tq, o.matrix); tOrd.push(si); trunks.setColorAt(tq++, tcol.set(sh.pine ? '#8a5a44' : r() < 0.5 ? '#7a6e62' : '#6a5e52').offsetHSL(0, 0, (r() - 0.5) * 0.08)); });
           crowns.castShadow = true; lod(crowns, n); if (tw) { lod(tw, n); this.twigSets.push(tw); }
-          this.crownSets.push({ crowns, idx, pine: !!sh.pine, forest: true });
+          this.crownSets.push({ crowns, idx, pine: !!sh.pine, forest: true }); (this.treeGroups ||= []).push({ ms: [crowns, tw], idx, arr: 'f' });
         });
+        (this.treeGroups ||= []).push({ ms: [trunks], idx: tOrd, arr: 'f' });
         trunks.count = tq; lod(trunks, tq);
       }
     }
