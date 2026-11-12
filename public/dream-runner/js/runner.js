@@ -291,7 +291,7 @@ export class Ghost {
     this.tag.position.set(this.x, this.y + 2.5, origin - this.s);
     this.tag.visible = b.root.visible;
   }
-  remove() { this.booster.dispose(); this.scene.remove(this.bear.root, this.tag); }
+  remove() { this.booster.dispose(); this.bear.root.removeFromParent(); this.tag.removeFromParent(); }
 }
 
 function nameTag(name, color, team) {

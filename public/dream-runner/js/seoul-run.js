@@ -72,7 +72,12 @@ export class SeoulRun {
     return this.initP;
   }
   // 이번 판 시작: 첫 코스 칸부터 불러온다 (track 은 씨앗으로 코스 순서가 정해진 뒤)
-  start(track) { this.track = track; this.course = -1; this.flashT = 0; this.tick(0, 0, true); }
+  start(track) { this.track = track; this.course = -1; this.flashT = 0; this.tick(0, 0, true); this.weather(); }
+  // 날씨는 지금 서울 날씨 그대로 (서울 산책과 같은 서버 도시 정보, 5분마다). 못 받으면 맑음
+  weather() {
+    if (!this.api || (this.cityAt && Date.now() - this.cityAt < 300000)) return; this.cityAt = Date.now();
+    this.api('/api/seoul/city?area=' + encodeURIComponent('여의도')).then((c) => { if (!c || c.rain === undefined) return; this.hw.state.weather = /눈/.test(c.rain) ? 'snow' : c.rain ? 'rain' : /흐림|구름/.test(c.sky || '') ? 'cloudy' : 'clear'; }).catch(() => {});
+  }
   pathOf(dream) { return PATHS[seoulCourseOf(this.track, dream)]; }
   // 판정 좌표(s) → 그 코스 길 위 거리(u)
   uOf(s, dream) { return s - this.track.bounds[dream] + SEOUL_U0; }
@@ -91,7 +96,16 @@ export class SeoulRun {
     const next = this.tilesOf(cNext, 0, Math.min(this.endU(cNext, d + 1), 420), RT).map((t) => ({ t, c: cNext, u1: this.endU(cNext, d + 1) }));
     this.wantNow = now; this.want = [...now, ...next.filter((w) => !now.some((n) => n.t === w.t && n.c === w.c))];
     this.paths(new Set([cNow, cNext]));
+    this.show(cNow);
     return this.want;
+  }
+  // 지금 코스 조각(과 그 조각이 지을 때 빼 둔 건물을 가진 조각)만 보인다. 다음 코스 칸은 몇 km 떨어져 있어도 화면 쪽이면 그려져서 그리기 호출만 늘었다
+  show(cNow) {
+    const hw = this.hw, mine = [...hw.chunks.entries()].filter(([k]) => +k.split('_')[2] === cNow).map(([, c]) => c), on = new Set(mine);
+    for (const c of mine) for (const d2 of c.deps || []) on.add(d2);
+    for (const c of hw.chunks.values()) c.scene.visible = on.has(c);
+    for (const [c, m] of this.pathMs || []) if (m) m.visible = c === cNow;
+    this.shown = cNow;
   }
   // 첫 코스 칸이 다 지어졌나 (카운트다운이 기다린다)
   firstReady() { return !!this.wantNow && this.wantNow.every((w) => this.hw.chunks.has(`${w.t}_${w.c}`) || this.hw.chunkFail?.has(`${w.t}_${w.c}`)); }
@@ -105,7 +119,7 @@ export class SeoulRun {
     const w = this.want.find((q) => !hw.chunks.has(`${q.t}_${q.c}`) && !hw.chunkFail?.has(`${q.t}_${q.c}`)); if (!w) return;
     const key = `${w.t}_${w.c}`, same = [...hw.chunks.entries()].filter(([k2]) => k2.startsWith(`${w.t}_`)).map(([, c2]) => c2);
     hw.chunkLoading = key;
-    hw.loadChunk(key, () => this.pick(w.t, w.c, w.u1, same)).then((c) => { c.kept = c.map.__kept; c.deps = same; hw.chunks.set(key, c); for (const c2 of hw.chunks.values()) if (c2.chunkKey.startsWith(`${w.t}_`)) this.cullRoute(c2, w.c); for (const P of PATHS) if (P.R.tiles.includes(w.t)) P.sampleH(hw); this.onChunk?.(); })
+    hw.loadChunk(key, () => this.pick(w.t, w.c, w.u1, same)).then((c) => { c.kept = c.map.__kept; c.deps = same; hw.chunks.set(key, c); for (const c2 of hw.chunks.values()) if (c2.chunkKey.startsWith(`${w.t}_`)) this.cullRoute(c2, w.c); if (this.shown != null) this.show(this.shown); for (const P of PATHS) if (P.R.tiles.includes(w.t)) P.sampleH(hw); this.onChunk?.(); })
       .catch((e) => { console.warn('서울 칸', key, e); (hw.chunkFail ||= new Set()).add(key); }).finally(() => { hw.chunkLoading = null; });
   }
   // 칸 지도에서 코스 길 둘레(건물 RB · 길 · 녹지 RR)만 남긴다 (seoul-run-worker.js, 따로 스레드에서)
@@ -132,8 +146,9 @@ export class SeoulRun {
   }
   unbend(objs) { for (const o of objs) if (o) { o.matrixAutoUpdate = true; o.updateMatrix(); } }
   // 매 프레임: 하늘 · 빛 · 신호등 · 먼 나무 숨기기
-  frame(dt, camera, px, pz, th) {
-    const hw = this.hw; if (!this.ready) return; this.t += dt; hw.t += dt; hw.time = (hw.time || 0) + dt;
+  frame(dt, camera, px, pz, th, dream) {
+    const hw = this.hw; if (!this.ready) return;
+    if (dream != null && this.track) { const c = seoulCourseOf(this.track, dream); if (c !== this.shown) this.show(c); } this.t += dt; hw.t += dt; hw.time = (hw.time || 0) + dt;
     const want = HOUR[th?.course?.time] ?? 13; if (this.hourTo !== want) { this.hourTo = want; if (this.hourJump || hw.state.hour == null) hw.state.hour = want; this.hourJump = false; }
     hw.state.hour += (this.hourTo - hw.state.hour) * Math.min(1, dt * 3);
     hw.tickEnv(dt, camera, px, pz); hw.tickSignals(hw.time);

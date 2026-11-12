@@ -59,6 +59,7 @@ env.originRef = track;
 const runner = new Runner(scene, {});
 // 🗺️ 서울 맵 그리기 (6-7): 서울 산책 엔진으로 실제 서울을, 판정 자리 물체는 실제 길 위로 휘어서
 const seoulRun = new SeoulRun(renderer, camera), seoulCam = new THREE.PerspectiveCamera();
+seoulRun.api = (path) => account.api(path);
 let seoulPost = null, seoulWas = false, seoulWaitT = 0;
 const seoulOn = () => track.seoul && seoulRun.ready && game.mode !== 'title';
 // 서울 맵 판에 들어가고 나올 때: 곰 · 길 · 그림자를 서울 장면으로 옮기고, 화면 설정(색 · 그림자 · 먼 거리)을 서울 산책처럼
@@ -886,7 +887,7 @@ function seoulFrame(dt) {
   seoulRun.world(seoulCam.position, d, camera.position); seoulRun.world(camLook, d, seoulP); camera.lookAt(seoulP);
   if (game.shake > 0) camera.rotation.z += (Math.random() - 0.5) * game.shake * 0.05;
   seoulRun.world(new THREE.Vector3(runner.x, 0, track.origin - runner.s), track.dreamAt(runner.s), seoulP);
-  seoulRun.frame(dt, camera, seoulP.x, seoulP.z, track.themeOf(game.dream));
+  seoulRun.frame(dt, camera, seoulP.x, seoulP.z, track.themeOf(game.dream), d);
   if (seoulPost) { seoulPost.mood(seoulRun.hw.light); seoulPost.render(); } else renderer.render(seoulRun.hw.scene, camera);
 }
 $('spectate').onclick = () => cycleWatch();
@@ -1088,7 +1089,7 @@ try { Object.assign(hg.opt, JSON.parse(store.get(HG_OPT_KEY) || '{}')); } catch 
 const hgSave = () => store.set(HG_OPT_KEY, JSON.stringify(hg.opt));
 const hgRun = { tk: null, sent: 0, sendT: 0 };
 let hgPost = null; // 화면 보정 (블룸 · 색감) · 컴퓨터에서만
-addEventListener('resize', () => hgPost?.setSize(innerWidth, innerHeight));
+addEventListener('resize', () => { hgPost?.setSize(innerWidth, innerHeight); seoulPost?.setSize(innerWidth, innerHeight); });
 // 입장: 이어 달리기 · 서강대교에서 · 지도에서 고르기
 const HG_POS_KEY = 'dreamrunner.hangang.pos';
 // 저장 위치: 지역마다 따로 + 마지막으로 있던 지역 ({ last, regions: { id: { s, lat, where } } }) · 예전 한 칸짜리 저장도 읽는다

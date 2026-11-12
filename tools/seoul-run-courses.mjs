@@ -18,12 +18,13 @@ const P = (lat, lon) => [(lon - LON0) * KX, -(lat - LAT0) * KZ];
 // seouls.js 의 SEOULS 와 같은 순서
 //   via = 지나는 곳 [위도, 경도] (그 사이는 찻길 · 골목 · 산책길로 가장 짧게)
 //   ['R', 지역, 시작 m, 길이 m, 거꾸로] = 젤리 서울 러너 지역 코스 선(hangang/seoul.json)의 그 구간을 그대로
+//   넷째 칸 { path: 산책길 비용 (작을수록 산책길을 따라간다), off: 오른쪽으로 옮기기 m }
 const COURSES = [
   ['banpo', '반포 한강공원', [['R', 'banpo', 600, 1500]]],
   ['yeouido', '여의도 한강공원', [['R', 'yeouido', 900, 1600]]],
   ['yunjung', '윤중로', [[37.53340, 126.91250], [37.53020, 126.91240], [37.52520, 126.91640]]],
   ['hongdae', '홍대 걷고싶은거리', [['R', 'hongdae', 0, 770], [37.55720, 126.92450]]],
-  ['yeonnam', '경의선숲길', [[37.55780, 126.92480], [37.56150, 126.92160], [37.56600, 126.91700]]],
+  ['yeonnam', '연남동 동교로', [[37.55780, 126.92480], [37.56150, 126.92160], [37.56600, 126.91700]]],
   ['myeongdong', '명동', [['R', 'myeongdong', 0, 521], [37.56600, 126.98870], [37.56650, 126.99350]]],
   ['insadong', '인사동', [['R', 'insadong', 0, 638], [37.57040, 126.99300]]],
   ['cheonggye', '청계천', [[37.56930, 126.97900], [37.56940, 126.98800], [37.56970, 126.99800]]],
@@ -32,7 +33,7 @@ const COURSES = [
   ['namsan', '남산 소월길', [[37.55700, 126.97640], [37.55501, 126.97706], [37.55340, 126.97891], [37.55224, 126.98142], [37.55041, 126.98356], [37.54840, 126.98438], [37.54654, 126.98530], [37.54603, 126.98739], [37.54617, 126.98917], [37.54442, 126.99097], [37.54267, 126.99187], [37.54232, 126.99425]]],
   ['seokchon', '석촌호수', [['R', 'jamsil', 0, 1286]]],
   ['jamsil', '롯데월드타워', [[37.51370, 127.09900], [37.51480, 127.10500], [37.51650, 127.11300]]],
-  ['seongsu', '성수 카페거리', [['R', 'seongsu', 0, 1264]]],
+  ['seongsu', '성수 카페거리', [['R', 'seongsu', 0, 1264]], { off: 4.5 }],
   ['itaewon', '이태원', [['R', 'itaewon', 0, 1661]]],
   ['gangnam', '강남대로', [['R', 'gangnam', 0, 1600]]],
   ['seoulforest', '서울숲', [[37.54320, 127.03780], [37.54520, 127.04050], [37.54780, 127.04250]]],
@@ -50,7 +51,7 @@ function tile(i, j) { const k = `${i}_${j}`; if (!tileCache.has(k)) { const f = 
 const unpack = (a, s = 0.1) => { const o = []; for (let i = 0; i < a.length; i += 2) o.push([a[i] * s, a[i + 1] * s]); return o; };
 
 function build(idx) {
-  const [id, name, via] = COURSES[idx], parts = via.map((v) => (v[0] === 'R' ? { pts: regionPart(v[1], v[2], v[3], v[4]) } : { pts: [P(v[0], v[1])], via: true })), W = parts.flatMap((q) => q.pts);
+  const [id, name, via, opt = {}] = COURSES[idx], parts = via.map((v) => (v[0] === 'R' ? { pts: regionPart(v[1], v[2], v[3], v[4]) } : { pts: [P(v[0], v[1])], via: true })), W = parts.flatMap((q) => q.pts);
   let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of W) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
   const PAD = 500; x0 -= PAD; x1 += PAD; z0 -= PAD; z1 += PAD;
   // 그 둘레 칸들의 길 (찻길 · 골목 · 산책길)
@@ -67,7 +68,8 @@ function build(idx) {
   const paint = (L, base) => { const hw = L.w / 2 + 0.5; for (let k = 1; k < L.pts.length; k++) { const [ax, az] = L.pts[k - 1], [bx, bz] = L.pts[k], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1;
     const gx0 = Math.max(0, Math.floor((Math.min(ax, bx) - hw - x0) / C)), gx1 = Math.min(NX - 1, Math.floor((Math.max(ax, bx) + hw - x0) / C)), gz0 = Math.max(0, Math.floor((Math.min(az, bz) - hw - z0) / C)), gz1 = Math.min(NZ - 1, Math.floor((Math.max(az, bz) + hw - z0) / C));
     for (let gx = gx0; gx <= gx1; gx++) for (let gz = gz0; gz <= gz1; gz++) { const px = x0 + (gx + 0.5) * C, pz = z0 + (gz + 0.5) * C, t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / L2)), d = Math.hypot(ax + dx * t - px, az + dz * t - pz); if (d > hw) continue; const c = base * (1 + 3 * (d / hw) ** 2), q = gz * NX + gx; if (c < cost[q]) cost[q] = c; } } };
-  for (const L of others) paint(L, L.kind === 'path' ? 1.15 : 1.35);
+  // opt.path: 산책길을 더 싸게 (경의선숲길처럼 공원 길을 따라가는 코스)
+  for (const L of others) paint(L, L.kind === 'path' ? opt.path ?? 1.15 : 1.35);
   for (const L of roads) paint(L, 1);
   // 지나는 곳마다 가까운 길 칸으로 붙이고, 차례로 A* (8방향)
   const snap = ([x, z]) => { const gx = Math.floor((x - x0) / C), gz = Math.floor((z - z0) / C); let best = -1, bd = Infinity; for (let r = 0; r < 80 && best < 0; r++) for (let a = -r; a <= r; a++) for (let b = -r; b <= r; b++) { if (Math.max(Math.abs(a), Math.abs(b)) !== r) continue; const X = gx + a, Z = gz + b; if (X < 0 || Z < 0 || X >= NX || Z >= NZ) continue; const q = Z * NX + X; if (cost[q] < 40) { const d = a * a + b * b + cost[q] * 4; if (d < bd) { bd = d; best = q; } } } return best; };
@@ -96,6 +98,8 @@ function build(idx) {
   const acc = [0]; for (let i = 1; i < pts.length; i++) acc.push(acc[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
   const len = acc[acc.length - 1], at = (d) => { let i = 1; while (i < acc.length - 1 && acc[i] < d) i++; const k = (d - acc[i - 1]) / (acc[i] - acc[i - 1] || 1); return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * k, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * k]; };
   const R = []; for (let d = 0; d <= len; d += 4) R.push(at(d)); if (len % 4 > 1) R.push(at(len));
+  // opt.off: 달리는 방향 오른쪽으로 옮긴다 (m). 길 가운데에 고가 기둥이 선 곳(성수 아차산로 2호선)은 한쪽 차로로
+  if (opt.off) { const o = R.map((p, i) => { const a2 = R[Math.max(0, i - 2)], b2 = R[Math.min(R.length - 1, i + 2)], dx = b2[0] - a2[0], dz = b2[1] - a2[1], L = Math.hypot(dx, dz) || 1; return [p[0] - (dz / L) * opt.off, p[1] + (dx / L) * opt.off]; }); R.splice(0, R.length, ...o); }
   const racc = [0]; for (let i = 1; i < R.length; i++) racc.push(racc[i - 1] + Math.hypot(R[i][0] - R[i - 1][0], R[i][1] - R[i - 1][1]));
   // 달리는 길(가장 가까운 찻길)의 이름 · 폭
   const near = (p) => { let best = null, bd = Infinity; for (const L of roads) for (let k = 1; k < L.pts.length; k++) { const [ax, az] = L.pts[k - 1], [bx, bz] = L.pts[k], dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((p[0] - ax) * dx + (p[1] - az) * dz) / (dx * dx + dz * dz || 1))), d = Math.hypot(ax + dx * t - p[0], az + dz * t - p[1]); if (d < bd) { bd = d; best = L; } } return bd <= (best?.w || 0) / 2 + 1 ? best : null; };
