@@ -973,7 +973,8 @@ async function hgCheckWorld() { try { hgWorldIdx ||= await (await fetch('seoul/i
 const hgTileAt = (x, z) => !!hgWorldIdx?.have?.some(([i, j]) => i === Math.floor(x / (hgWorldIdx.tile || 2000)) && j === Math.floor(z / (hgWorldIdx.tile || 2000)));
 // 지역의 시작 자리(서울 좌표): 그 지역 코스 30m 지점, 코스 방향을 본다
 async function hgRegionStart(id) { const S = await hgLoadSeoul(), R = S.regions.find((q) => q.id === id) || S.regions[0]; let k = 1; while (k < R.pts.length - 1 && R.acc[k] < 30) k++; const [ax, az] = R.pts[k - 1], [bx, bz] = R.pts[k]; return { x: bx, z: bz, face: Math.atan2(bx - ax, bz - az) }; }
-function hgUse(id) { if (!HG_REGIONS[id]) id = 'yeouido'; if (hgWorld) { if (!hgInst.seoul) { const n = new Hangang(); for (const k of Object.keys(hg)) if (/^on[A-Z]|^api$/.test(k) && typeof hg[k] === 'function') n[k] = hg[k]; hgInst.seoul = n; } hg = hgInst.seoul; hgRegion = id; return; } if (!hgInst[id]) { const n = new Hangang(); for (const k of Object.keys(hg)) if (/^on[A-Z]|^api$/.test(k) && typeof hg[k] === 'function') n[k] = hg[k]; hgInst[id] = n; } hg = hgInst[id]; hgRegion = id; }
+// 새 지역 지도에도 기억해 둔 설정(미니맵 회전 · 계절 · 시간 …)을 그대로 (8-21: 다시 켜면 미니맵 설정이 풀리던 것)
+function hgUse(id) { if (!HG_REGIONS[id]) id = 'yeouido'; if (hgWorld) { if (!hgInst.seoul) { const n = new Hangang(); for (const k of Object.keys(hg)) if (/^on[A-Z]|^api$/.test(k) && typeof hg[k] === 'function') n[k] = hg[k]; Object.assign(n.opt, hg.opt); hgInst.seoul = n; } hg = hgInst.seoul; hgRegion = id; return; } if (!hgInst[id]) { const n = new Hangang(); for (const k of Object.keys(hg)) if (/^on[A-Z]|^api$/.test(k) && typeof hg[k] === 'function') n[k] = hg[k]; Object.assign(n.opt, hg.opt); hgInst[id] = n; } hg = hgInst[id]; hgRegion = id; }
 hg.api = (path) => account.api(path);
 // 서울 칸의 셰이더를 보이기 전에 미리 만든다 (처음 보일 때 100 ~ 200ms 멈추던 것, 8-23)
 hg.onCompile = (obj) => (renderer.compileAsync ? renderer.compileAsync(obj, camera, hg.scene) : null);

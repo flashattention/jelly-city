@@ -216,7 +216,8 @@ export class LiveTransit {
       // 다음 소식(20초 남짓) 전에 닿게, 닿은 뒤엔 상태대로 조금 더 (출발 · 전역출발이면 다음 역 앞 92% 까지, 도착이면 정차)
       // 역에 닿으면 20초 선다 (문 열림 · 타고 내리기)
       if (o.sttus === 1 && !T.hop && T.e === o.e && o.e.len - o.d < 1.5 && !o.dwellAt) o.dwellAt = now;
-      if (o.dwellAt && (now - o.dwellAt > 20 || o.e.len - o.d > 30)) o.dwellAt = 0;
+      // 곰이 승강장에 있으면 hangang-ride.js 가 dwellMax 를 40초까지 늘린다
+      if (o.dwellAt && (now - o.dwellAt > (o.dwellMax || 20) || o.e.len - o.d > 30)) { o.dwellAt = 0; o.dwellMax = 0; }
       let v; if (o.dwellAt) v = 0; else if (remain > 0.5) v = clamp(remain / (T.hop ? 14 : 8), remain < 25 ? 1.5 : 3, 26); else if (o.sttus === 2 || o.sttus === 3) v = (T.e.len * 0.92 - o.d > 0 && !T.hop) ? 11 : 0; else if (o.sttus === 0) v = o.d < T.e.len - 0.5 ? 4 : 0; else if (o.sttus === 1 && !T.hop && o.e.len - o.d > 0.5) v = clamp((o.e.len - o.d) / 8, 1.5, 26); else { v = 0; if (now - o.at > 40 && o.next) { const ne = this.edge(o.line, T.e.b, o.next); if (ne) { o.tgt = { e: ne, d: ne.len * 0.25, hop: true }; o.sttus = 3; } } }
       o.v += (v - o.v) * Math.min(1, dt * 1.2); o.d += o.v * dt;
       if (o.d >= o.e.len && T.hop) { o.d -= o.e.len; o.e = T.e; T.hop = false; }

@@ -25,6 +25,8 @@ const lam = (o) => new THREE.MeshLambertMaterial(o), phong = (o) => new THREE.Me
 
 export function buildStation(hg, st, si, exitRefs) {
   const O = new THREE.Vector3(90000 + si * 700, 0, 0), g = new THREE.Group(); g.position.copy(O); g.visible = false; hg.scene.add(g);
+  // 손으로 적어 둔 호선이 모자란 역(교대 3호선 · 당산 …)은 실제 노선 자료(subway.json)에서 그 역이 있는 호선을 찾는다 (예전엔 모두 5호선 승강장이 되었다)
+  if (hg.live?.sub?.lines && !st.linesFull) { st.linesFull = true; for (const [ln, L] of Object.entries(hg.live.sub.lines)) if (Object.values(L.st || {}).some((v) => String(v?.[0] || '').replace(/\(.*\)$/, '') === st.name)) { const k = ln === '공항철도' ? '공항' : ln.replace(/호선$/, '').replace(/선$/, ''), v = /^\d+$/.test(k) ? +k : k; if (!st.lines.some((q) => String(q) === String(v))) st.lines.push(v); } }
   const lines = st.lines.length ? st.lines : [5], col0 = LINE_COLOR2[lines[0]] || '#888', foots = [], zones = [];
   // 두 층: 대합실은 승강장 위 LV(6m) 층(덱 바닥), 승강장은 0. 계단 · 에스컬레이터를 걸어서 오르내린다
   //   P = 지금 만드는 층의 무리, WL = 그 층 높이 (벽 · 둥근 물체는 그 층에서만 막는다)
@@ -125,6 +127,11 @@ export function buildStation(hg, st, si, exitRefs) {
       for (let x = -PL / 2 + 2; x < PL / 2 - 1; x += 3.6) { box(0.1, 2.1, 0.16, frameM, x, 1.05, ez); plane(1.6, 1.95, glassM, x + 0.9, 1.05, ez); plane(1.6, 1.95, glassM, x + 2.6, 1.05, ez); }
       const tp = plane(PL, 0.3, tactM, 0, 0.02, ez - sd * 0.6); tp.rotation.x = -Math.PI / 2;
     }
+    // 문 닫힘 경고등: 스크린도어마다 위에 주황 등 (출발 전 깜빡인다), 쪽마다 인스턴스 하나
+    const doorLamp = [-1, 1].map((sd) => { const ez = pz + sd * (PW / 2 - 0.15), xs = []; for (let x = -PL / 2 + 2; x < PL / 2 - 1; x += 3.6) xs.push(x + 1.75); const im = new THREE.InstancedMesh(new THREE.BoxGeometry(0.7, 0.1, 0.26), new THREE.MeshBasicMaterial({ color: '#ff8a1a' }), xs.length), o = new THREE.Object3D(); xs.forEach((x, i) => { o.position.set(x, 2.08, ez - sd * 0.02); o.updateMatrix(); im.setMatrixAt(i, o.matrix); }); im.visible = false; g.add(im); return im; });
+    // 승강장 도착 안내판 (천장에 매단 LED, 승강장 길이 방향으로 양면): 이 승강장 두 방면의 다음 열차까지 남은 시간
+    const pbC = document.createElement('canvas'); pbC.width = 512; pbC.height = 128; const pbT = new THREE.CanvasTexture(pbC); pbT.colorSpace = THREE.SRGBColorSpace; const pbM = new THREE.MeshBasicMaterial({ map: pbT });
+    for (const bx of [-PL / 4 - 6, PL / 4 + 6]) { box(0.22, 1.5, 5.6, darkM, bx, 3.55, pz); plane(5.4, 1.35, pbM, bx - 0.12, 3.55, pz, -Math.PI / 2); plane(5.4, 1.35, pbM, bx + 0.12, 3.55, pz, Math.PI / 2); for (const lz of [-2, 2]) box(0.05, 0.8, 0.05, steelM, bx, 4.2, pz + lz); }
     wall(-PL / 2 - 0.5, pz - PW / 2, -PL / 2, pz + PW / 2); wall(PL / 2, pz - PW / 2, PL / 2 + 0.5, pz + PW / 2);
     // 역 이름판 (이전 · 다음 역) · 벤치 · 기둥
     const signT = tex(1024, 200, (c, w, h) => { c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, h); c.fillStyle = lc; c.fillRect(0, h - 46, w, 46); c.fillStyle = '#1d1d1f'; c.font = 'bold 92px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(st.name, w / 2, 76); c.fillStyle = '#fff'; c.font = 'bold 30px sans-serif'; c.textAlign = 'left'; c.fillText(prev ? `← ${prev}` : '', 24, h - 22); c.textAlign = 'right'; c.fillText(next ? `${next} →` : '', w - 24, h - 22); });
@@ -133,7 +140,7 @@ export function buildStation(hg, st, si, exitRefs) {
     for (let x = -PL / 2 + 18; x < PL / 2 - 6; x += 24) for (const sd of [-1, 1]) { if (Math.abs(x - 20) < 10) continue; box(2.2, 0.08, 0.5, lam({ color: '#c9a77a' }), x, 0.45, pz + sd * 1.6); box(0.08, 0.45, 0.4, steelM, x - 0.9, 0.22, pz + sd * 1.6); box(0.08, 0.45, 0.4, steelM, x + 0.9, 0.22, pz + sd * 1.6); hg.addCircle(O.x + x, pz + sd * 1.6, 0.6, 0.5); }
     // 열차 두 대 (양쪽 방면): 들어와 서고 문 열고 떠난다
     const trains = [-1, 1].map((sd, k) => { const tr = makeTrain(l); tr.position.set(0, -0.9, pz + sd * (PW / 2 + 2.6)); tr.visible = false; g.add(tr); return { tr, sd, phase: 'gone', t: 20 + k * 70 + Math.random() * 40, to: sd < 0 ? seq[0] || '' : seq[seq.length - 1] || '' }; });
-    return { l, pz, PL, trains, prev, next };
+    return { l, pz, PL, PW, trains, prev, next, doorLamp, pbC, pbT };
   });
 
   // 조명: 따뜻한 흰빛 (바깥 해 · 하늘빛은 들어가 있는 동안 꺼진다)
@@ -144,10 +151,14 @@ export function buildStation(hg, st, si, exitRefs) {
     spawnFromExit(ref) { const z = zones.find((q) => q.kind === 'exit' && q.ref === ref) || zones.find((q) => q.kind === 'exit'); const side = Math.sign(z.z) || 1; return { x: z.x, z: z.z - side * 3.2, face: side > 0 ? Math.PI : 0, y: LV }; },
     spawnPlatform(li) { const p = plats[li] || plats[0]; return { x: O.x + HX1 + 4, z: p.pz - 3, face: Math.PI / 2, y: 0 }; },
     spawnConcourse(li) { return { x: O.x + HX0 - 3, z: PZ(li) + 0.8, face: -Math.PI / 2, y: LV }; },
-    lineIndex(line) { const n = String(line || '').replace(/호선$/, '').replace(/선$/, ''); const i = lines.findIndex((l) => String(l) === n || String(l).replace(/선$/, '') === n); return Math.max(0, i); },
+    // 그 역에 없는 호선이면 -1 (예전엔 0 = 첫 승강장이라, 교대 2호선 승강장에 3호선 열차가 섰다)
+    lineIndex(line) { const n = String(line || '').replace(/호선$/, '').replace(/선$/, ''); const i = lines.findIndex((l) => String(l) === n || String(l).replace(/선$/, '') === n); return i; },
     // 실제 열차(hangang-transit.js)에 맞춰: 들어오는 중이면 진입, 역에 서 있으면 정차 · 문 열림
     liveArrive(li, sd, eta) { const p = plats[li] || plats[0], T = p.trains[sd > 0 ? 1 : 0]; if (T.phase === 'gone' || T.phase === 'out') { T.phase = 'in'; T.t = Math.max(3, Math.min(9, eta)); T.tr.visible = true; return true; } return false; },
-    liveStop(li, sd) { const p = plats[li] || plats[0], T = p.trains[sd > 0 ? 1 : 0]; if (T.phase !== 'stop' || T.t < 3) { const was = T.phase; T.phase = 'stop'; T.t = 22; T.tr.position.x = 0; T.tr.visible = true; setDoors(T.tr, 1); return was !== 'stop'; } return false; },
+    // left = 실제 열차가 더 서 있을 초 (곰이 승강장에 있으면 최대 40초까지 늘어난다, hangang-ride.js)
+    liveStop(li, sd, left = 22) { const p = plats[li] || plats[0], T = p.trains[sd > 0 ? 1 : 0]; if (T.phase !== 'stop') { const was = T.phase; T.phase = 'stop'; T.t = left; T.closeSaid = false; T.liveOK = true; T.tr.position.x = 0; T.tr.visible = true; setDoors(T.tr, 1); return was !== 'stop'; } T.t = left; T.liveOK = true; return false; },
+    // 곰이 그 승강장(승강장 층, 섬식 승강장 폭 안)에 서 있나
+    onPlat(p) { return hg.inside?.S === S && hg.y < 1.5 && Math.abs(hg.pz - p.pz) < p.PW / 2 + 0.3 && Math.abs(hg.px - O.x) < p.PL / 2 + 1; },
     zoneAt(x, z, y = LV) { return y > LV - 1 ? zones.find((q) => Math.hypot(x - q.x, z - q.z) < q.r) || null : null; },
     tick(dt, arrivals, at) {
       for (const p of plats) for (const T of p.trains) {
@@ -155,15 +166,37 @@ export function buildStation(hg, st, si, exitRefs) {
         // 실제 도착 정보: "○○방면" 이 다음 역이면 이쪽 선로, 이전 역이면 반대쪽. 남은 초에 맞춰 들어온다
         if (T.phase === 'gone' && arrivals?.length) { const want = T.sd > 0 ? p.next : p.prev, a = arrivals.find((q) => String(q.line).startsWith(String(p.l)) && new RegExp(`${want}\\s*방면`).test(`${q.to || ''} ${q.msg || ''}`)); if (a) { const rem = (a.sec || 0) - (Date.now() - (at || Date.now())) / 1000; if (/도착|진입/.test(a.msg || '') && !/전역|후/.test(a.msg || '')) T.t = Math.min(T.t, 0); else if (rem > 0) T.t = Math.max(0, rem - 9); } }
         if (T.phase === 'gone' && T.t <= 0 && !this.live) { T.phase = 'in'; T.t = 9; T.tr.visible = true; }
-        if (T.phase === 'in') { const k = Math.max(0, T.t / 9); T.tr.position.x = -T.sd * half * k * k; if (T.t <= 0) { T.phase = 'stop'; T.t = 22; setDoors(T.tr, 1); } }
-        else if (T.phase === 'stop') { if (T.t < 3) setDoors(T.tr, Math.max(0, T.t / 3)); if (T.t <= 0) { T.phase = 'out'; T.t = 9; setDoors(T.tr, 0); } }
+        if (T.phase === 'in') { const k = Math.max(0, T.t / 9); T.tr.position.x = -T.sd * half * k * k; if (T.t <= 0) { T.phase = 'stop'; T.t = 22; T.held = false; T.closeSaid = false; T.liveOK = false; T.w = 0; setDoors(T.tr, 1); } }
+        else if (T.phase === 'stop') {
+          // 실시간이 없을 때(흉내 열차): 곰이 이 승강장에 있으면 18초 더 (모두 40초)
+          if (!this.live && !T.held && T.t > 5 && this.onPlat(p)) { T.held = true; T.t += 18; }
+          // 실시간: 실제 열차가 서기(liveStop) 전엔 문을 닫지 않고 기다린다 (30초까지)
+          if (this.live && !T.liveOK && (T.w = (T.w || 0) + dt) < 30) T.t = Math.max(T.t, 8);
+          if (T.t < 3) setDoors(T.tr, Math.max(0, T.t / 3)); if (T.t <= 0) { T.phase = 'out'; T.t = 9; setDoors(T.tr, 0); } }
         else if (T.phase === 'out') { const k = 1 - Math.max(0, T.t / 9); T.tr.position.x = T.sd * half * k * k; if (T.t <= 0) { T.phase = 'gone'; T.tr.visible = false; T.t = 120 + Math.random() * 120; } }
+        // 출발 5초 전부터 문 위 경고등이 깜빡인다
+        const lamp = p.doorLamp[T.sd > 0 ? 1 : 0]; lamp.visible = T.phase === 'stop' && T.t < 5 && Math.floor(T.t * 4) % 2 === 0;
       }
       // 안내판: 실제 도착 정보가 있으면 그것, 없으면 열차 상태
       this.boardT = (this.boardT || 0) - dt; if (this.boardT > 0) return; this.boardT = 1;
       const c = boardC.getContext('2d'); c.fillStyle = '#0b0b0d'; c.fillRect(0, 0, 512, 96); c.fillStyle = '#ffb020'; c.font = 'bold 30px sans-serif'; c.textBaseline = 'middle';
       const rows = (arrivals && arrivals.length ? arrivals.slice(0, 2).map((a) => `${a.line} ${a.to || ''} ${a.msg || ''}`) : plats.flatMap((p) => p.trains.map((T) => `${p.l}호선 ${T.to}행 ${T.phase === 'stop' ? '도착' : T.phase === 'in' ? '진입 중' : T.phase === 'gone' ? `${Math.ceil(T.t / 60)}분 후` : '출발'}`)).slice(0, 2));
       rows.forEach((r, i) => c.fillText(r.slice(0, 22), 14, 26 + i * 44)); boardT.needsUpdate = true;
+      for (const p of plats) { const c2 = p.pbC.getContext('2d'); c2.fillStyle = '#0b0b0d'; c2.fillRect(0, 0, 512, 128); c2.textBaseline = 'middle';
+        p.trains.forEach((T, i) => { const y = 34 + i * 60, [txt, hot] = this.etaText(p, T, arrivals, at); c2.fillStyle = LINE_COLOR2[p.l] || '#888'; c2.fillRect(12, y - 20, 8, 40); c2.fillStyle = '#ffb020'; c2.font = 'bold 30px sans-serif'; c2.textAlign = 'left'; c2.fillText(`${T.to || (T.sd > 0 ? p.next : p.prev)}행`.slice(0, 9), 30, y); c2.fillStyle = hot ? '#ff5a3c' : '#ffd88a'; c2.textAlign = 'right'; c2.fillText(txt, 500, y); });
+        p.pbT.needsUpdate = true; }
+    },
+    // 안내판 한 줄: [글씨, 빨강?] — 서 있으면 '도착' · 닫히면 '문 닫힘', 아니면 다음 열차까지 남은 시간
+    etaText(p, T, arrivals, at) {
+      if (T.phase === 'stop') return this.live && !T.liveOK ? ['도착', true] : T.t < 5 ? ['문 닫힘', true] : [`도착 · ${Math.ceil(T.t)}초`, true];
+      if (T.phase === 'in') return ['진입 중', true];
+      const mmss = (s) => (s >= 60 ? `${Math.floor(s / 60)}분 ${String(Math.floor(s % 60)).padStart(2, '0')}초` : `${Math.max(1, Math.ceil(s))}초`);
+      const want = T.sd > 0 ? p.next : p.prev, a = want && arrivals?.find((q) => String(q.line).startsWith(String(p.l)) && new RegExp(`${want}\\s*방면`).test(`${q.to || ''} ${q.msg || ''}`));
+      if (a) { const rem = (a.sec || 0) - (Date.now() - (at || Date.now())) / 1000; if (rem > 0) return [mmss(rem), rem < 60]; return [String(a.msg || '곧 도착').slice(0, 8), true]; }
+      // 실시간 열차 위치: 이 역으로 오는 선로 위 열차
+      const L = hg.live; if (this.live && L?.sub) { let best = Infinity; for (const o of L.trains.values()) { const Ln = L.sub.lines[o.line]; if (!Ln || S.lineIndex(o.line) !== plats.indexOf(p) || (o.up ? 1 : -1) !== T.sd) continue; const k = L.stKey(Ln, st.name); if (k && o.e.b === k && !o.dwellAt) best = Math.min(best, (o.e.len - o.d) / Math.max(8, o.v || 0)); } if (best < Infinity) return [mmss(best + 9), best < 60]; return ['잠시 후', false]; }
+      if (T.phase === 'gone') return [mmss(T.t + 9), T.t < 51];
+      return ['출발', false];
     },
     // 열차 문이 열려 있는 곳 가까이에 있으면 그 열차 (타기)
     doorTrain(x, z) { for (const p of plats) for (const T of p.trains) { if (T.phase !== 'stop' || T.t < 4) continue; const ez = p.pz + T.sd * (5 - 0.15); if (Math.abs(z - ez) < 1.2 && Math.abs(x - O.x) < p.PL / 2) return { p, T }; } return null; },
