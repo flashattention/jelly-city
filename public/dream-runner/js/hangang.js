@@ -19,6 +19,7 @@ import { LiveRide } from './hangang-ride.js';
 // 롯데월드 (8-17): 섬 · 어드벤처 건물은 지도 상자 건물 대신 hangang-park.js 가 실제 모습으로. 놀이기구는 명소 체험(registerAttraction)으로 붙는다
 import { parkSkip } from './hangang-park.js';
 import './hangang-park-in.js';
+import './hangang-tower.js';
 
 // 길이 0 인 법선(겹친 점 · 서로 반대로 접힌 면)을 셰이더가 normalize 하면 NaN 이 되고,
 //   빛 번짐(블룸)이 그 NaN 을 넓게 퍼뜨려 날 때 화면에 검정 사각형이 생겼다 (8-23). 모든 재질에서 막는다
@@ -2189,6 +2190,8 @@ export class Hangang {
     this.tickEnv(dt, camera, bx, bz);
     // 안에 있는 동안: 바깥 것은 새로 생긴 것(차 · 행인)까지 모두 숨긴다
     if (this.inside || this.inShop || this.inMall) { const keep = this.ride?.C.g || (this.inShop ? this.inShop.I.g : this.inMall ? this.inMall.I.g : this.inside?.S.g); this.hidden ||= []; for (const o of this.scene.children) if (o !== keep && o !== this.bear?.root && o !== this.shadow && o.visible) { o.visible = false; this.hidden.push(o); } } // 날씨 · 계절이 다시 켠 바깥 것들은 다시 숨긴다
+    // 실내로 바꾸기 전 바깥 안개 색을 기억 (롯데월드타워 창밖을 바깥 그대로 그릴 때)
+    if (this.inMall?.I?.isTower) (this.fogOutC ||= new THREE.Color()).copy(this.scene.fog.color);
     if ((this.inside || this.inShop || this.inMall) && this.scene.fog) { this.scene.fog.density = this.inMall?.I?.fog ?? 0.004; this.scene.fog.color.set('#d8d2c8'); } // 역 안: 안개 거의 없이
     if (this.chunks) this.liftMovers();
     this.tickCamera(dt, camera, bx, bz, Math.sin(this.camYaw), Math.cos(this.camYaw));
@@ -2322,7 +2325,7 @@ export class Hangang {
   tickCamera(dt, camera, bx, bz, fx, fz) {
     const k = 1 - Math.exp(-dt * ((this.dragT || 0) > 0 && (this.opt.cam || 0) === 0 ? 14 : 3)), mode = this.opt.cam || 0, tb = this.terrAt(bx, bz), y = this.y + tb;
     let cx, cy, cz, lx, ly, lz;
-    if (mode === 0) { const pt = this.camPitch ?? 0.3, d = (this.ride || this.inShop || this.inDeck ? 3.2 : 4.8) * (pt < 0 ? 1 + pt * 0.6 : 1), hd = Math.cos(pt) * d; cx = bx - fx * hd; cy = Math.max(0.35, 0.55 + Math.sin(pt) * d) + y; cz = bz - fz * hd; lx = bx + fx * 1.0; ly = 0.55 + y + (pt < 0 ? -pt * 7 : 0); lz = bz + fz * 1.0;
+    if (mode === 0) { const pt = this.camPitch ?? 0.3, d = (this.ride || this.inShop || this.inDeck || this.inMall?.I?.near ? 3.2 : 4.8) * (pt < 0 ? 1 + pt * 0.6 : 1), hd = Math.cos(pt) * d; cx = bx - fx * hd; cy = Math.max(0.35, 0.55 + Math.sin(pt) * d) + y; cz = bz - fz * hd; lx = bx + fx * 1.0; ly = 0.55 + y + (pt < 0 ? -pt * 7 : 0); lz = bz + fz * 1.0;
       // 벽 타기: 벽에서 6m 떨어져 살짝 아래에서 곰과 벽을 올려다본다
       // 마우스로 돌릴 수 있게: 시점 방향 그대로 따라가되, 벽 안쪽으로는 못 들어가게 벽 바깥 반쪽으로만
       if (this.climb) { const C = this.climb; let dx = -fx, dz = -fz; const dot = dx * C.nx + dz * C.nz; if (dot < 0.3) { dx += C.nx * (0.3 - dot); dz += C.nz * (0.3 - dot); const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L; } const D = 6 * Math.cos(pt), up = 0.6 + Math.sin(pt) * 6; cx = bx + dx * D; cz = bz + dz * D; cy = y + up; lx = bx; ly = y + 1.2; lz = bz; } }
@@ -2333,6 +2336,8 @@ export class Hangang {
     camera.position.z += (cz - camera.position.z) * k; camera.position.y = Math.max(0.3 + (tb ? Math.max(tb, this.terrAt(camera.position.x, camera.position.z)) : 0), camera.position.y); { const dg = this.deckAt(camera.position.x, camera.position.z, this.y + 0.5); if (dg > 0.5 && this.y >= dg - 0.3) camera.position.y = Math.max(camera.position.y, dg + tb + 0.6); } // 다리 위에 있을 땐 카메라가 다리 밑으로 안 내려간다
     if (this.inside) camera.position.y = Math.min(camera.position.y, (this.ride ? 2.2 : 4.1) + (this.ride ? 0 : this.y > 3 ? (this.inside.S.LV || 0) : 0));
     if (this.inShop) camera.position.y = Math.min(camera.position.y, 3.1);
+    // 실내가 알려 주는 천장 높이 (롯데월드타워 층마다)
+    { const ce = this.inMall?.I?.ceil; if (ce != null) camera.position.y = Math.min(camera.position.y, ce - 0.25); }
     // 안에서는 카메라가 벽 밖으로 나가지 않게 (벽은 안쪽만 그려져서, 밖에 나가면 어두운 빈 곳만 보인다)
     { const B = this.interiorBox?.(); if (B) { const [x0, x1, z0, z1] = B, m = 0.35; camera.position.x = clamp(camera.position.x, x0 + m, x1 - m); camera.position.z = clamp(camera.position.z, z0 + m, z1 - m); } }
     if (this.inDeck) { const D = this.deckInfo; camera.position.y = Math.min(Math.max(camera.position.y, D.DY + tb + 0.6), D.DY + tb + 3.1); const dx = camera.position.x - D.cx, dz = camera.position.z - D.cz, dd = Math.hypot(dx, dz); if (dd > D.DR - 0.6) { camera.position.x = D.cx + dx / dd * (D.DR - 0.6); camera.position.z = D.cz + dz / dd * (D.DR - 0.6); } if (dd < 4.9) { camera.position.x = D.cx + dx / (dd || 1) * 4.9; camera.position.z = D.cz + dz / (dd || 1) * 4.9; } }
