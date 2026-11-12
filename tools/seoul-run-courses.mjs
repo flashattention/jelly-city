@@ -33,7 +33,8 @@ const COURSES = [
   ['namsan', '남산 소월길', [[37.55700, 126.97640], [37.55501, 126.97706], [37.55340, 126.97891], [37.55224, 126.98142], [37.55041, 126.98356], [37.54840, 126.98438], [37.54654, 126.98530], [37.54603, 126.98739], [37.54617, 126.98917], [37.54442, 126.99097], [37.54267, 126.99187], [37.54232, 126.99425]]],
   ['seokchon', '석촌호수', [['R', 'jamsil', 0, 1286]]],
   ['jamsil', '롯데월드타워', [[37.51370, 127.09900], [37.51480, 127.10500], [37.51650, 127.11300]]],
-  ['seongsu', '성수 카페거리', [['R', 'seongsu', 0, 1264]], { off: 4.5 }],
+  // 성수: 아차산로는 코스 거의 전부가 2호선 고가 바로 아래라(하늘이 덮이고 기둥이 차로에 선다) 실제 카페거리 연무장길로 (서울숲 쪽 → 성수이로)
+  ['seongsu', '성수 카페거리', [[37.54413, 127.04962], [37.54316, 127.05297], [37.54216, 127.05625], [37.54124, 127.05933], [37.54025, 127.06261]], { center: true }],
   ['itaewon', '이태원', [['R', 'itaewon', 0, 1661]]],
   ['gangnam', '강남대로', [['R', 'gangnam', 0, 1600]]],
   ['seoulforest', '서울숲', [[37.54320, 127.03780], [37.54520, 127.04050], [37.54780, 127.04250]]],
@@ -100,6 +101,18 @@ function build(idx) {
   const R = []; for (let d = 0; d <= len; d += 4) R.push(at(d)); if (len % 4 > 1) R.push(at(len));
   // opt.off: 달리는 방향 오른쪽으로 옮긴다 (m). 길 가운데에 고가 기둥이 선 곳(성수 아차산로 2호선)은 한쪽 차로로
   if (opt.off) { const o = R.map((p, i) => { const a2 = R[Math.max(0, i - 2)], b2 = R[Math.min(R.length - 1, i + 2)], dx = b2[0] - a2[0], dz = b2[1] - a2[1], L = Math.hypot(dx, dz) || 1; return [p[0] - (dz / L) * opt.off, p[1] + (dx / L) * opt.off]; }); R.splice(0, R.length, ...o); }
+  // opt.center: 좁은 골목은 양쪽 건물 벽 사이 가운데로 (지도 길 선이 한쪽 벽에 붙어 곰이 벽을 스쳤다). 좌우 6m 까지 재고, 앞뒤 40m 로 매끈하게, 최대 2.5m
+  if (opt.center) {
+    const polys = [], G = new Map();
+    for (let i = Math.floor(x0 / T); i <= Math.floor(x1 / T); i++) for (let j = Math.floor(z0 / T); j <= Math.floor(z1 / T); j++) { const M = tile(i, j); if (!M) continue; const S = M.scale || 0.1; for (const b of M.buildings || []) { const q = []; for (let k = 7; k + 1 < b.length; k += 2) q.push([b[k] * S, b[k + 1] * S]); if (q.length > 2) polys.push(q); } }
+    polys.forEach((q, i) => { let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity; for (const [x, z] of q) { a0 = Math.min(a0, x); a1 = Math.max(a1, x); b0 = Math.min(b0, z); b1 = Math.max(b1, z); } for (let a = Math.floor(a0 / 20); a <= Math.floor(a1 / 20); a++) for (let b = Math.floor(b0 / 20); b <= Math.floor(b1 / 20); b++) { const k = a + ',' + b; if (!G.has(k)) G.set(k, []); G.get(k).push(i); } });
+    const inside = (q, x, z) => { let c = false; for (let i = 0, j = q.length - 1; i < q.length; j = i++) { const [xi, zi] = q[i], [xj, zj] = q[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c; } return c; };
+    const hit = (x, z) => (G.get(`${Math.floor(x / 20)},${Math.floor(z / 20)}`) || []).some((pi) => inside(polys[pi], x, z));
+    const nrm = R.map((p, i) => { const a2 = R[Math.max(0, i - 2)], b2 = R[Math.min(R.length - 1, i + 2)], dx = b2[0] - a2[0], dz = b2[1] - a2[1], L = Math.hypot(dx, dz) || 1; return [-dz / L, dx / L]; });
+    const raw = R.map(([x, z], i) => { const [rx, rz] = nrm[i], side = (sg) => { for (let d = 0; d <= 6; d += 0.25) if (hit(x + rx * d * sg, z + rz * d * sg)) return d; return 6; }; return (side(1) - side(-1)) / 2; });
+    const sh = raw.map((_, i) => { let s = 0, c = 0; for (let j = -10; j <= 10; j++) { const q = i + j; if (q < 0 || q >= raw.length) continue; s += raw[q]; c++; } return Math.max(-2.5, Math.min(2.5, s / c)); });
+    R.splice(0, R.length, ...R.map(([x, z], i) => [x + nrm[i][0] * sh[i], z + nrm[i][1] * sh[i]]));
+  }
   const racc = [0]; for (let i = 1; i < R.length; i++) racc.push(racc[i - 1] + Math.hypot(R[i][0] - R[i - 1][0], R[i][1] - R[i - 1][1]));
   // 달리는 길(가장 가까운 찻길)의 이름 · 폭
   const near = (p) => { let best = null, bd = Infinity; for (const L of roads) for (let k = 1; k < L.pts.length; k++) { const [ax, az] = L.pts[k - 1], [bx, bz] = L.pts[k], dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((p[0] - ax) * dx + (p[1] - az) * dz) / (dx * dx + dz * dz || 1))), d = Math.hypot(ax + dx * t - p[0], az + dz * t - p[1]); if (d < bd) { bd = d; best = L; } } return bd <= (best?.w || 0) / 2 + 1 ? best : null; };
