@@ -167,6 +167,47 @@ export class SeoulRun {
     const zero = new THREE.Matrix4().makeScale(0, 0, 0);
     for (const T of chunk.treeGroups || []) { const A = T.arr === 'f' ? chunk.forestFill || [] : chunk.trees || [], R = T.arr === 'f' ? half + 4.5 : half + 1.2; let hit = false;
       T.idx.forEach((si, k) => { const p = A[si]; if (!p || !near(p[0], p[1], R)) return; for (const m of T.ms) m?.setMatrixAt(k, zero); hit = true; }); if (hit) for (const m of T.ms) if (m) m.instanceMatrix.needsUpdate = true; }
+    this.cullPoles(chunk, c);
+  }
+  // 6-9 9-1: 판정 차로(레인 폭/2 + 0.7) 안에 선 기둥(전봇대 · 가로등 · 신호등)은 차로 밖(+0.3m)으로 민다. 민 자리가 건물 안이면 숨긴다. 판정은 주지 않는다
+  //   기둥에 딸린 것(팔 · 등 · 변압기 · 불빛 웅덩이 · 빛 방울 · 전깃줄 끝)도 같이 옮긴다. 도로명판 기둥(3.6m)은 판이 묶여 있어 그대로 (길 모퉁이라 차로 밖)
+  cullPoles(chunk, c) {
+    const P = PATHS[c], R = seoulLaneW(c) / 2 + 0.7, GS = 20, G = new Map(), segs = [], a = { x: 0, z: 0 }, b = { x: 0, z: 0 };
+    for (let u = 4; u <= P.len; u += 4) { P.pos(u - 4, a); P.pos(u, b); const sg = [a.x, a.z, b.x, b.z], k = `${Math.floor(a.x / GS)},${Math.floor(a.z / GS)}`; if (!G.has(k)) G.set(k, []); G.get(k).push(segs.push(sg) - 1); }
+    // 가장 가까운 코스 길 선분: { d 옆 거리, px pz 길 위 점 }
+    const nearest = (x, z) => { let best = null; const gx = Math.floor(x / GS), gz = Math.floor(z / GS); for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const si of G.get(`${gx + i},${gz + j}`) || []) { const [ax, az, bx, bz] = segs[si], dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1))), px = ax + dx * t, pz = az + dz * t, d = Math.hypot(x - px, z - pz); if (!best || d < best.d) best = { d, px, pz, si }; } return best; };
+    const moved = [];
+    for (const list of chunk.circGrid?.values() || []) for (const ci of list) {
+      if (ci.r > 0.25 || ci.h < 4 || ci.h > 10 || ci.poleDone === c) continue; ci.poleDone = c;
+      const q = nearest(ci.x, ci.z); if (!q || q.d >= R) continue;
+      let nx = ci.x - q.px, nz = ci.z - q.pz;
+      // 길 선 바로 위면 오른쪽으로
+      if (Math.hypot(nx, nz) < 0.05) { const [ax, az, bx, bz] = segs[q.si]; nx = -(bz - az); nz = bx - ax; }
+      const nl = Math.hypot(nx, nz) || 1; nx /= nl; nz /= nl;
+      // 민 자리가 건물 안이어도 벽이 1.2m 안쪽이면 벽에 붙여 세운다(골목 전봇대처럼 팔 · 등 · 전깃줄은 골목 위로). 더 깊으면 숨긴다
+      const tx = q.px + nx * (R + 0.3), tz = q.pz + nz * (R + 0.3), inB = (d) => chunk.groundAt?.(q.px + nx * d, q.pz + nz * d, 9999) > 0, hide = inB(R + 0.3) && inB(R - 0.9);
+      moved.push({ x: ci.x, z: ci.z, dx: tx - ci.x, dz: tz - ci.z, hide }); if (hide) ci.hidden = true; else { ci.x = tx; ci.z = tz; }
+    }
+    if (!moved.length) return;
+    const MG = new Map(), mk = (x, z) => `${Math.floor(x / 5)},${Math.floor(z / 5)}`; moved.forEach((m, i) => { const k = mk(m.x, m.z); if (!MG.has(k)) MG.set(k, []); MG.get(k).push(i); });
+    const pole = (x, z, r) => { let best = null, bd = r; const gx = Math.floor(x / 5), gz = Math.floor(z / 5); for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const mi of MG.get(`${gx + i},${gz + j}`) || []) { const m = moved[mi], d = Math.hypot(m.x - x, m.z - z); if (d < bd) { bd = d; best = m; } } return best; };
+    const M = new THREE.Matrix4(), zero = new THREE.Matrix4().makeScale(0, 0, 0);
+    chunk.scene.traverse((o) => {
+      if (o.isInstancedMesh) {
+        let hit = false; for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, M); const e = M.elements, x = e[12], z = e[14]; if (Math.abs(e[13] - this.hw.terrAt(x, z)) > 0.8) continue; const m = pole(x, z, 1.9); if (!m) continue;
+          if (m.hide) o.setMatrixAt(i, zero); else { e[12] += m.dx; e[14] += m.dz; o.setMatrixAt(i, M); } hit = true; }
+        if (hit) { o.instanceMatrix.needsUpdate = true; o.computeBoundingSphere?.(); }
+      } else if (o.isPoints || o.isLineSegments) {
+        // 빛 방울(등 높이 점) · 전깃줄(이웃 전봇대 사이 7 마디, 끝이 기둥에서 0.6m 옆)
+        const p = o.geometry.attributes.position; if (!p) return; let hit = false;
+        if (o.isPoints) { for (let i = 0; i < p.count; i++) { if (p.getY(i) < 4) continue; const m = pole(p.getX(i), p.getZ(i), 3); if (!m) continue; if (m.hide) p.setY(i, -1e4); else { p.setX(i, p.getX(i) + m.dx); p.setZ(i, p.getZ(i) + m.dz); } hit = true; } }
+        else if (o.material?.color?.getHex?.() === 0x2a2a2c && p.count % 14 === 0) for (let w = 0; w < p.count; w += 14) {
+          const A = pole(p.getX(w), p.getZ(w), 1.2), B = pole(p.getX(w + 13), p.getZ(w + 13), 1.2); if (!A && !B) continue; hit = true;
+          for (let j = 0; j < 14; j++) { const t = (Math.floor(j / 2) + (j % 2)) / 7, i = w + j; if (A?.hide || B?.hide) { p.setY(i, -1e4); continue; } p.setX(i, p.getX(i) + (A ? A.dx * (1 - t) : 0) + (B ? B.dx * t : 0)); p.setZ(i, p.getZ(i) + (A ? A.dz * (1 - t) : 0) + (B ? B.dz * t : 0)); } }
+        if (hit) { p.needsUpdate = true; o.geometry.computeBoundingSphere(); }
+      }
+    });
+    this.poleMoved = (this.poleMoved || 0) + moved.filter((m) => !m.hide).length; this.poleHidden = (this.poleHidden || 0) + moved.filter((m) => m.hide).length;
   }
   // 달리는 길 띠: 코스 길이 찻길 · 골목 위가 아닌 곳(한강 공원 산책로 · 광장 · 잔디)에 짙은 아스팔트 띠 + 노란 가운데 점선 + 흰 가장자리 (한강 자전거길처럼)
   //   서울 산책은 지역 지도에서 이 띠를 깔았다. 서울 전체 칸에는 없어 러너가 그 코스 길 위에 깐다
