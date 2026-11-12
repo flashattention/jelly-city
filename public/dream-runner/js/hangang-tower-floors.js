@@ -8,7 +8,7 @@ import { Riders } from './hangang-park.js';
 export const FLOORS = {
   lobby: { n: 1, btn: '1', name: '1층 로비', alt: 0, sub: '안내 데스크 · 밖으로 나가는 문' },
   hlobby: { n: 79, btn: '79', name: '79층 하늘 호텔 로비', alt: 320, sub: '프론트 · 체크인' },
-  buffet: { n: 81, btn: '81', name: '81층 하늘 뷔페', alt: 328, sub: '창가 자리 · 음식 줄', soon: true },
+  buffet: { n: 81, btn: '81', name: '81층 하늘 뷔페', alt: 328, sub: '창가 자리 · 음식 줄' },
   room: { n: 87, btn: '87', name: '87층 일반 객실', alt: 352, need: 'room' },
   suite: { n: 94, btn: '94', name: '94층 스위트', alt: 381, need: 'suite' },
   ph: { n: 100, btn: '100', name: '100층 펜트하우스', alt: 405, need: 'ph' },
@@ -655,7 +655,8 @@ function buffet(C) {
   // 고기 굽는 곳: 철판 · 불꽃 · 연기 없이 빛만, 요리사 둘 (모자)
   { k.add(G.box(1.2, 0.04, 0.6), '#2a2a2c', 'metal', T(8.9, 0.94, -2.4)); }
   const fireM = new THREE.MeshBasicMaterial({ color: '#ff8a3a', transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }); fireM.userData.own = true; const flames = []; for (let i = 0; i < 6; i++) { const f = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 5), fireM); f.position.set(8.75 + (i % 2) * 0.3, 1.05, -2.8 + i * 0.16); F.g.add(f); flames.push(f); }
-  const chefs = [npc(F, C, 10.3, -2.4, -Math.PI / 2, { top: '#ffffff', hat: 'chef' }), npc(F, C, -3, -10.3, 0, { top: '#ffffff', hat: 'chef' })];
+  // 요리사는 음식 줄 안쪽(코어와 판 사이)에서 손님 쪽을 본다
+  const chefs = [npc(F, C, 7.6, -2.4, Math.PI / 2, { top: '#ffffff', hat: 'chef' }), npc(F, C, -3, -7.6, Math.PI, { top: '#ffffff', hat: 'chef' })];
   // 접시 더미 (엘리베이터 앞 서쪽)
   { k.add(G.box(1.0, 0.9, 0.6), '#ffffff', 'wood', T(-5.6, 0, 9.4)); k.add(G.box(1.04, 0.03, 0.64), '#ffffff', 'marble', T(-5.6, 0.9, 9.4)); for (let i = 0; i < 14; i++) k.add(G.cyl(0.14, 0.11, 0.012, 20), '#fbfbf9', 'gloss', T(-5.8, 0.93 + i * 0.014, 9.4)); for (let i = 0; i < 10; i++) k.add(G.cyl(0.14, 0.11, 0.012, 20), '#fbfbf9', 'gloss', T(-5.4, 0.93 + i * 0.014, 9.4)); F.area.wall(-6.1, 9.1, -5.1, 9.7);
     F.spots.push({ x: -5.6, z: 10.4, r: 1.0, label: () => (C.S.plate ? '접시 내려놓기' : '접시 들기'), act: () => { if (C.S.plate) { dropPlate(C); C.toast('🍽️ 접시를 내려놓았어요'); return; } holdPlate(C); C.toast('🍽️ 접시를 들었어요 · 음식 줄 앞에서 E 로 담아요'); } }); }
