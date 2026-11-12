@@ -16,6 +16,9 @@ import { buildStreetFurniture, buildLandmarkStatues } from './hangang-street.js'
 import { setupAttractions, ATTR_SKIP } from './hangang-attractions.js';
 import { LiveTransit } from './hangang-transit.js';
 import { LiveRide } from './hangang-ride.js';
+// 롯데월드 (8-17): 섬 · 어드벤처 건물은 지도 상자 건물 대신 hangang-park.js 가 실제 모습으로. 놀이기구는 명소 체험(registerAttraction)으로 붙는다
+import { parkSkip } from './hangang-park.js';
+import './hangang-park-in.js';
 
 export const SEASONS = { spring: '🌸 봄', summer: '🌿 여름', autumn: '🍁 가을', winter: '❄️ 겨울' };
 export const WEATHERS = { clear: '☀️ 맑음', cloudy: '☁️ 구름', rain: '🌧️ 비', snow: '🌨️ 눈' };
@@ -589,7 +592,7 @@ export class Hangang {
     const px = this.px, pz = this.pz, box = (cx, cz, hw, hd) => [cx - hw, cx + hw, cz - hd, cz + hd], inBox = (b) => px >= b[0] - 1 && px <= b[1] + 1 && pz >= b[2] - 1 && pz <= b[3] + 1;
     if (this.ride) { const O = this.ride.C.g.position; return box(O.x, O.z, 19.5 / 2, 1.5); }
     if (this.inShop) { const O = this.inShop.I.O; return box(O.x, O.z, 7, 5.5); }
-    if (this.inMall) { const O = this.inMall.I.O; return box(O.x, O.z, 35, 20); }
+    if (this.inMall) { const I = this.inMall.I, O = I.O; if (I.box) return I.box; return box(O.x, O.z, 35, 20); }
     if (this.inside) { const S = this.inside.S, O = S.O, list = [box(O.x, O.z, S.CW / 2, S.CD / 2), ...S.plats.map((p) => box(O.x, p.pz, p.PL / 2, 5 + 5.2))]; return list.find(inBox) || list[0]; }
     return null;
   }
@@ -627,7 +630,7 @@ export class Hangang {
   //   가게 문 앞(벽 쪽으로)으로 걸어가면 들어간다. 계산대 앞에 서면 메뉴 (onShop) → shopOrder(번호, 'here' | 'togo')
   hideOutdoor(keep) { this.hidden = []; for (const o of this.scene.children) if (o !== keep && o !== this.bear?.root && o !== this.shadow && o.visible) { this.hidden.push(o); o.visible = false; } }
   showOutdoor() { for (const o of this.hidden || []) o.visible = true; this.hidden = null; }
-  enterMall(D2) { this.mallInt ||= {}; const I = this.mallInt[D2.name] ||= buildMall(this, D2.name, Object.keys(this.mallInt).length, makeBear); this.hideOutdoor(I.g); I.g.visible = true; this.inMall = { D: D2, I }; this.placeAt(I.spawn.x, I.spawn.z, I.spawn.face); this.onShopEnter?.({ name: D2.name }); }
+  enterMall(D2) { this.mallInt ||= {}; const I = this.mallInt[D2.name] ||= D2.build ? D2.build(this, makeBear) : buildMall(this, D2.name, Object.keys(this.mallInt).length, makeBear); this.hideOutdoor(I.g); I.g.visible = true; this.inMall = { D: D2, I }; this.placeAt(I.spawn.x, I.spawn.z, I.spawn.face); this.onShopEnter?.({ name: D2.name }); }
   leaveMall() { const M2 = this.inMall; if (!M2) return; M2.I.g.visible = false; this.showOutdoor(); this.inMall = null; const D2 = M2.D; this.placeAt(D2.x + D2.nx * 3, D2.z + D2.nz * 3, Math.atan2(D2.nx, D2.nz)); this.shopCool = 2; }
   tickMall(dt) { const I = this.inMall.I; I.tick(dt); if ((this.shopCool || 0) > 0) { this.shopCool -= dt; return; } if (Math.hypot(this.px - I.door.x, this.pz - I.door.z) < 1.4) return this.leaveMall(); for (const F of I.fronts) if (Math.hypot(this.px - F.x, this.pz - F.z) < 1.3) return this.enterShop(F); }
   enterShop(F) {
@@ -1309,6 +1312,8 @@ export class Hangang {
       const r = rnd(bSeed(b));
       const info = M.binfo?.[bi] || null;
       const [h0, mh, km, ci, ni, rci, dome] = b, kind = km >> 1, glassTag = km & 1, ring = P2(b.slice(7)); if (ring.length < 3) continue;
+      // 롯데월드 어드벤처 · 매직아일랜드 위 건물은 hangang-park.js 가 실제 모습으로 따로 만든다
+      if (this.isChunk && parkSkip(ring)) continue;
       // 돔 지붕 부분: 벽은 돔 아래까지, 그 위에 돔 (높이 · 색은 지도 데이터대로)
       const palaceHanok = (!info || !info[0]) && !LANDMARKS[ni >= 0 ? M.names[ni] : ''] && h0 <= 14 && Math.abs(ringArea(ring)) < 1500 && palaces.some(([x, z]) => Math.hypot(b[7] * M.scale - x, b[8] * M.scale - z) < 420), domeR = dome ? Math.sqrt(Math.abs(ringArea(ring)) / Math.PI) : 0, domeH = dome ? (dome > 1 ? dome : domeR * 0.6) : 0, h = palaceHanok ? 4.5 : LANDMARKS[ni >= 0 ? M.names[ni] : '']?.height || Math.min(Math.max(mh + 0.5, h0 - domeH), (M.kind === 'summit' || (towerC && Math.hypot(b[7] * M.scale - towerC[0], b[8] * M.scale - towerC[1]) < 160)) && M.names[ni] !== '남산서울타워' ? 12 : 1e9);
       const name = ni >= 0 ? M.names[ni] : '', cTag = ci >= 0 ? M.colors[ci] : '';
@@ -2142,7 +2147,7 @@ export class Hangang {
     this.tickEnv(dt, camera, bx, bz);
     // 안에 있는 동안: 바깥 것은 새로 생긴 것(차 · 행인)까지 모두 숨긴다
     if (this.inside || this.inShop || this.inMall) { const keep = this.ride?.C.g || (this.inShop ? this.inShop.I.g : this.inMall ? this.inMall.I.g : this.inside?.S.g); this.hidden ||= []; for (const o of this.scene.children) if (o !== keep && o !== this.bear?.root && o !== this.shadow && o.visible) { o.visible = false; this.hidden.push(o); } } // 날씨 · 계절이 다시 켠 바깥 것들은 다시 숨긴다
-    if ((this.inside || this.inShop || this.inMall) && this.scene.fog) { this.scene.fog.density = 0.004; this.scene.fog.color.set('#d8d2c8'); } // 역 안: 안개 거의 없이
+    if ((this.inside || this.inShop || this.inMall) && this.scene.fog) { this.scene.fog.density = this.inMall?.I?.fog ?? 0.004; this.scene.fog.color.set('#d8d2c8'); } // 역 안: 안개 거의 없이
     if (this.chunks) this.liftMovers();
     this.tickCamera(dt, camera, bx, bz, Math.sin(this.camYaw), Math.cos(this.camYaw));
     this.attr?.cam(camera, dt);
