@@ -7,6 +7,8 @@ import { ITEMS, MAX_ITEMS, randomItem, EffectFx } from './items.js';
 
 const GRAV = 30, JUMP = 11.5, JUMP2 = 10.5, SIDE = 8.5;
 export const BOOST = 0.5;  // 가속: 모든 난이도에서 언제나 켜져 있다
+// 다른 사람 곰(Ghost) 부스터 불꽃이 켜지고 꺼지는 데 걸리는 시간 (초). 보기만, 판정과 상관없다
+const BOOST_UP = 2, BOOST_DOWN = 2.5;
 
 export const H_STAND = 1.45, H_SLIDE = 0.7;
 
