@@ -22,7 +22,7 @@ function drawOutdoor(hg, shell, pos, draw) {
   const R = globalThis.dream?.renderer, sc = hg.scene; if (!R) return 0;
   const on = []; for (const o of hg.hidden || []) if (!o.visible) { o.visible = true; on.push(o); }
   shell.g.visible = false; const bv = hg.bear?.root.visible, sv = hg.shadow?.visible; if (hg.bear) hg.bear.root.visible = false; if (hg.shadow) hg.shadow.visible = false;
-  const fog = sc.fog, fc = fog.color.getHex(), fdv = fog.density, wt = hg.state.weather, fd = (wt === 'rain' ? 0.00095 : wt === 'snow' ? 0.0012 : wt === 'cloudy' ? 0.00055 : 0.00042) * (wt === 'clear' ? 0.32 : 0.6);
+  const fog = sc.fog, fc = fog.color.getHex(), fdv = fog.density, wt = hg.state.weather, fd = (wt === 'rain' ? 0.00095 : wt === 'snow' ? 0.0012 : wt === 'cloudy' ? 0.00055 : 0.00042) * (wt === 'clear' ? 0.2 : wt === 'cloudy' ? 0.4 : 0.6);
   if (hg.fogOutC) fog.color.copy(hg.fogOutC); fog.density = fd; const wf = hg.waterU?.fogD.value; if (hg.waterU) hg.waterU.fogD.value = fd;
   const skyP = hg.sky?.position.clone(); if (hg.sky) hg.sky.position.set(pos.x, 0, pos.z);
   const au = R.shadowMap.autoUpdate, prev = R.getRenderTarget(), ai = R.info.autoReset; R.shadowMap.autoUpdate = false; R.info.autoReset = false; const c0 = R.info.render.calls;

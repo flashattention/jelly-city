@@ -120,8 +120,8 @@ export function windowMat() {
       void main(){
         vec3 d = normalize(vW - cameraPosition);
         // 비: 유리를 타고 내려오는 물줄기 · 맺힌 방울 (굴절로 창밖이 살짝 일그러진다)
-        vec2 off = vec2(0.0);
-        if (uRain > 0.01) { vec2 p = vW.xz * 0.0 + vec2(vW.x + vW.z, vW.y) * vec2(9.0, 3.0); vec2 c = floor(p); float r = h21(c); float y = fract(p.y + uTime * (0.4 + r) + r * 7.0); float line = smoothstep(0.08, 0.0, abs(fract(p.x) - 0.5 - (r - 0.5) * 0.3)) * smoothstep(0.0, 0.25, y) * (1.0 - y); vec2 q = fract(vec2(vW.x + vW.z, vW.y) * 14.0) - 0.5; float drop = smoothstep(0.18, 0.05, length(q + (h21(floor(vec2(vW.x + vW.z, vW.y) * 14.0)) - 0.5) * 0.4)) * step(0.72, h21(floor(vec2(vW.x + vW.z, vW.y) * 14.0) + 3.0)); off = vec2(line * 0.03 + drop * 0.05) * uRain; }
+        vec2 off = vec2(0.0); float wet = 0.0;
+        if (uRain > 0.01) { vec2 p = vW.xz * 0.0 + vec2(vW.x + vW.z, vW.y) * vec2(9.0, 3.0); vec2 c = floor(p); float r = h21(c); float y = fract(p.y + uTime * (0.4 + r) + r * 7.0); float line = smoothstep(0.08, 0.0, abs(fract(p.x) - 0.5 - (r - 0.5) * 0.3)) * smoothstep(0.0, 0.25, y) * (1.0 - y); vec2 q = fract(vec2(vW.x + vW.z, vW.y) * 14.0) - 0.5; float drop = smoothstep(0.18, 0.05, length(q + (h21(floor(vec2(vW.x + vW.z, vW.y) * 14.0)) - 0.5) * 0.4)) * step(0.72, h21(floor(vec2(vW.x + vW.z, vW.y) * 14.0) + 3.0)); off = vec2(line * 0.03 + drop * 0.05) * uRain; wet = (line * 0.5 + drop) * uRain; }
         vec3 dd = normalize(d + vec3(off.x, -off.y, off.x));
         vec3 col = textureCube(env, dd).rgb * uTint * uDim;
         // 비 오는 날은 뿌옇게
@@ -129,6 +129,8 @@ export function windowMat() {
         // 유리 반사: 비스듬히 볼수록, 밤일수록 방 안 불빛이 비친다
         float f = pow(1.0 - abs(dot(d, normalize(vN))), 3.0);
         col += uGlow * (0.012 + f * 0.1) * (0.25 + uNight * 0.9);
+        // 물방울 · 물줄기는 빛을 받아 살짝 밝게
+        col += vec3(0.75, 0.8, 0.85) * wet * 0.12;
         gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
