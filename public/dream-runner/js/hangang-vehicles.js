@@ -140,7 +140,7 @@ export class Traffic {
       if (v.player || v.parked) continue;
       // 앞차 · 곰돌이 앞에서 선다
       const q = hg.lineAt(v.L, v.d, v.off), fx = q.dx * v.dir, fz = q.dz * v.dir;
-      let want = v.vMax, blocked = false;
+      let want = v.stopReq ? 0 : v.vMax, blocked = false;
       const ax = px - q.x, az = pz - q.z, ahead = ax * fx + az * fz, sideD = Math.abs(ax * -fz + az * fx);
       if (ahead > 0 && ahead < 6 + v.len / 2 && sideD < v.hw + 0.9 && hg.y < 2 && !hg.drive?.on) want = 0;
       for (const o of this.list) {

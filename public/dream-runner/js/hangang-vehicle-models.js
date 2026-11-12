@@ -145,7 +145,7 @@ export class Build {
   // 모든 조각을 같은 속성(position · normal · uv · color · vk)으로
   norm(geo, m) {
     let g = geo.index ? geo.toNonIndexed() : geo.clone();
-    for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+    for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv', 'row'].includes(k)) g.deleteAttribute(k);
     if (!g.attributes.normal) g.computeVertexNormals();
     if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
     if (m) g.applyMatrix4(m);
@@ -163,10 +163,10 @@ export class Build {
     for (let t = 0; t < n; t += 3) {
       ce.set(0, 0, 0); nn.set(0, 0, 0);
       for (let j = 0; j < 3; j++) { ce.x += P.getX(t + j) / 3; ce.y += P.getY(t + j) / 3; ce.z += P.getZ(t + j) / 3; nn.x += N.getX(t + j); nn.y += N.getY(t + j); nn.z += N.getZ(t + j); }
-      nn.normalize(); const [col, kind] = fn(ce, nn); C3.set(col);
+      nn.normalize(); const R = g.attributes.row, [col, kind] = fn(ce, nn, R ? [R.getX(t), R.getX(t + 1), R.getX(t + 2)] : null); C3.set(col);
       for (let j = 0; j < 3; j++) { c[(t + j) * 3] = C3.r; c[(t + j) * 3 + 1] = C3.g; c[(t + j) * 3 + 2] = C3.b; k[t + j] = kind; }
     }
-    g.setAttribute('color', new THREE.BufferAttribute(c, 3)); g.setAttribute('vk', new THREE.BufferAttribute(k, 1)); this.parts.push(g); return g;
+    g.setAttribute('color', new THREE.BufferAttribute(c, 3)); g.setAttribute('vk', new THREE.BufferAttribute(k, 1)); if (g.attributes.row) g.deleteAttribute('row'); this.parts.push(g); return g;
   }
   // 글씨 판 (고정 글씨 칸 i): 판 앞이 +z
   //   bg: 글씨 뒤 바탕색 (글씨 칸의 빈 곳은 이 색)
@@ -213,7 +213,7 @@ function carRing(P, z, lod) {
   return [...pts, ...pts.slice(1, -1).reverse().map(([x, y]) => [-x, y])];
 }
 function carLoft(P, lod) {
-  const keys = new Set([-P.L / 2, P.L / 2, ...P.top.map((p) => p[0]), P.ws[0], P.ws[1], P.rg[0], P.rg[1], P.dlo[0], P.dlo[1], ...(P.pillars || []).flatMap((z) => [z - 0.06, z + 0.06]), P.wheel.zf - P.wheel.r - 0.08, P.wheel.zf + P.wheel.r + 0.08, P.wheel.zr - P.wheel.r - 0.08, P.wheel.zr + P.wheel.r + 0.08]);
+  const keys = new Set([-P.L / 2, P.L / 2, ...P.top.map((p) => p[0]), P.ws[0], P.ws[1], P.rg[0], P.rg[1], P.dlo[0], P.dlo[1], Math.max(P.dlo[1], P.ws[1] - 0.22), ...(P.pillars || []).flatMap((z) => [z - 0.06, z + 0.06]), P.wheel.zf - P.wheel.r - 0.08, P.wheel.zf + P.wheel.r + 0.08, P.wheel.zr - P.wheel.r - 0.08, P.wheel.zr + P.wheel.r + 0.08]);
   let zs = [...keys].filter((z) => z >= -P.L / 2 && z <= P.L / 2).sort((a, b) => a - b);
   // 가까운 것은 0.13m 마다 고리, 먼 것은 굵게
   const step = lod ? 0.13 : 0.6, out = [];
@@ -222,7 +222,9 @@ function carLoft(P, lod) {
   const rings = zs.map((z) => carRing(P, z, lod)), NR = rings[0].length, pos = [], idx = [];
   rings.forEach((rg, i) => rg.forEach(([x, y]) => pos.push(x, y, zs[i])));
   for (let i = 0; i < rings.length - 1; i++) for (let j = 0; j < NR; j++) { const a = i * NR + j, b = i * NR + ((j + 1) % NR), c = (i + 1) * NR + j, d = (i + 1) * NR + ((j + 1) % NR); idx.push(a, c, b, b, c, d); }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  // 고리 안 몇 번째 점인지 (양쪽 대칭: 0 바닥 가운데 → 지붕 가운데). 옆 유리를 줄 단위로 또렷하게 고르는 데 쓴다
+  const half = (NR + 2) / 2 - 1, rows = []; rings.forEach(() => { for (let j = 0; j < NR; j++) rows.push(j <= half ? j : NR - j); });
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('row', new THREE.Float32BufferAttribute(rows, 1)); g.setIndex(idx); g.computeVertexNormals();
   // 바깥을 보게 (옆 가운데 법선이 +x 여야)
   const mid = Math.floor(rings.length / 2) * NR + 3; if (g.attributes.normal.getX(mid) < 0) { for (let i = 0; i < idx.length; i += 3) { const t = idx[i + 1]; idx[i + 1] = idx[i + 2]; idx[i + 2] = t; } g.setIndex(idx); g.computeVertexNormals(); }
   // 앞 · 뒤 면: 평평하게 (따로 꼭짓점)
@@ -230,25 +232,27 @@ function carLoft(P, lod) {
   return { body: g, caps };
 }
 // 몸통 삼각형 색: 유리 · 기둥 · 바퀴 집 · 아래 · 도색
-function carPaint(P) {
+function carPaint(P, lod = true) {
   // 앞 문 유리는 앞 유리 기둥(A) 밑까지 이어진다
   const glass = '#18222c', dloF = Math.max(P.dlo[1], P.ws[1] - 0.22);
-  return (c, n) => {
+  // 옆 유리 줄: 가까운 것은 고리 점 5 ~ 6(창 아랫선 위 ~ 지붕선 아래), 먼 것은 2 ~ 3
+  const g0 = lod ? 5 : 2, g1 = lod ? 6 : 3;
+  return (c, n, rows) => {
     if (n.y < -0.55) return ['#1b1c1f', 0];
     const side = Math.abs(n.x) > 0.55, top = topAt(P, c.z);
     if (P.clad && side && c.y < botAt(P, c.z) + 0.16) return ['#2b2d31', 0];
-    if (c.y > P.belt + 0.03 && (!side || c.y < top - 0.04)) {
+    const inBand = rows ? rows.every((r) => r >= g0 && r <= g1) : c.y < top - 0.04;
+    if (c.y > P.belt + 0.03 && (!side || inBand)) {
       if (side) { if (c.z > P.dlo[0] && c.z < dloF && !(P.pillars || []).some((pz) => Math.abs(c.z - pz) < (P.pw ?? 0.065))) return [glass, VK.glass]; if (P.blackPillar && c.z > P.dlo[0] - 0.3 && c.z < dloF) return ['#121316', 0]; }
       else if (n.y < 0.93) { const hwTop = halfW(P, c.z) * (P.tumble ?? 0.8); if (c.z > P.ws[0] - 0.02 && c.z < P.ws[1] && Math.abs(c.x) < hwTop * 0.9) return [glass, VK.glass]; if (c.z > P.rg[0] && c.z < P.rg[1] + 0.02 && Math.abs(c.x) < hwTop * 0.8) return [glass, VK.glass]; }
       else if (P.roofBlack) return ['#15161a', 0];
     }
-    if (P.roofRails && n.y > 0.9 && c.y > top - 0.02 && Math.abs(Math.abs(c.x) - halfW(P, c.z) * 0.62) < 0.05) return ['#2a2b2f', 0];
     return ['#ffffff', VK.paint];
   };
 }
 // 승용차 한 대: 몸통 + 앞 · 뒤 얼굴(등 · 그릴 · 번호판) + 거울 · 손잡이 · 바퀴 + 종류별 지붕 물건
 function buildCar(P, lod) {
-  const B = new Build(), { body, caps } = carLoft(P, lod), paint = carPaint(P);
+  const B = new Build(), { body, caps } = carLoft(P, lod), paint = carPaint(P, lod);
   B.addPainted(body, paint); for (const cg of caps) B.addPainted(cg, (c, n) => (c.y < botAt(P, c.z) + 0.05 ? ['#1b1c1f', 0] : ['#ffffff', VK.paint]));
   const zF = P.L / 2 + 0.004, zR = -P.L / 2 - 0.004, hwF = halfW(P, P.L / 2), hwR = halfW(P, -P.L / 2), yN = topAt(P, P.L / 2), yT = topAt(P, -P.L / 2), yb = botAt(P, P.L / 2);
   // 앞: 그릴(가운데 어두운 판) · 전조등(가로로 가늘게, 차마다 모양) · 아래 공기 구멍 · 번호판
@@ -414,7 +418,7 @@ export const TYPES = {
   busTown: { name: '마을버스', cat: 'bus', commercial: true, L: 7.2, W: 2.06, H: 2.75, mass: 6500, acc: 1.5, vmax: 22, turn: 0.6, brake: 5.5, colors: [['#6fb92c', 1]], seats: busSeats(7.2), eye: [0.62, 1.75, 2.9], build: (lod) => bus(lod, 'town') },
   busTour: { name: '관광버스', cat: 'bus', commercial: true, L: 12.0, W: 2.49, H: 3.5, mass: 13000, acc: 1.2, vmax: 28, turn: 0.5, brake: 5, colors: [['#1f4f9a', 1], ['#c8161d', 1], ['#5a2a8a', 1], ['#1b8a7a', 1]], seats: busSeats(12, true), eye: [0.75, 2.4, 5.4], build: (lod) => bus(lod, 'tour') },
   // 오토바이
-  scooter: { name: '배달 오토바이', cat: 'bike', L: 1.95, W: 0.72, H: 1.15, mass: 130, acc: 3.2, vmax: 24, turn: 0.75, brake: 7, colors: [['#c8161d', 3], ['#f4f5f6', 2], ['#1a1b1f', 2], ['#2f5fa8', 1]], seats: [['운전석', 0, 0.78, -0.12, true], ['뒷자리', 0, 0.84, -0.48]], eye: [0, 1.45, -0.05], build: (lod, e) => scooter(lod, e) },
+  scooter: { name: '배달 오토바이', cat: 'bike', L: 1.95, W: 0.72, H: 1.15, mass: 130, acc: 3.2, vmax: 24, turn: 0.75, brake: 7, colors: [['#c8161d', 3], ['#f4f5f6', 2], ['#1a1b1f', 2], ['#2f5fa8', 1]], seats: [['운전석', 0, 0.78, -0.12, true]], eye: [0, 1.45, -0.05], build: (lod, e) => scooter(lod, e) },
   moto: { name: '오토바이', cat: 'bike', L: 2.1, W: 0.8, H: 1.12, mass: 190, acc: 5.5, vmax: 40, turn: 0.7, brake: 8, colors: [['#1a1b1f', 3], ['#c8161d', 2], ['#2f5fa8', 1], ['#e8e9ea', 1]], seats: [['운전석', 0, 0.82, -0.15, true], ['뒷자리', 0, 0.9, -0.5]], eye: [0, 1.42, -0.05], build: (lod, e) => motoBike(lod, e) },
 };
 for (const [k, t] of Object.entries(TYPES)) { t.key = k; if (t.base) { const b = TYPES[t.base], ex = t.extra; Object.assign(t, { ...b, ...t, extra: ex }); delete t.base; } }
@@ -538,7 +542,7 @@ function bus(lod, kind) {
   const B = new Build(), tour = kind === 'tour', town = kind === 'town';
   const L = tour ? 12 : town ? 7.2 : 11, W = town ? 2.06 : 2.49, y0 = tour ? 0.38 : 0.3, H = (tour ? 3.5 : town ? 2.75 : 3.25) - y0;
   const zAF = L / 2 - (tour ? 2.6 : town ? 1.7 : 2.5), zAR = -L / 2 + (tour ? 3.0 : town ? 1.9 : 3.0);
-  const winLo = tour ? 1.75 : town ? 1.2 : 1.3, winHi = H - (tour ? 0.18 : 0.38), doorF = [L / 2 - 1.55, L / 2 - 0.42], doorM = town ? [-0.6, 0.45] : [-0.95, 0.3];
+  const winLo = tour ? 1.75 : town ? 0.95 : 1.0, winHi = H - (tour ? 0.18 : 0.38), doorF = [L / 2 - 1.55, L / 2 - 0.42], doorM = town ? [-0.6, 0.45] : [-0.95, 0.3];
   rbox(B, W, H, L, 0.16, 0, y0 + H / 2, 0, (x, y, z, n) => {
     if (n.y < -0.5) return ['#1d1e21', 0];
     const side = Math.abs(n.x) > 0.6, right = n.x < 0;

@@ -5,7 +5,7 @@
 //   휴대폰: 조이스틱 = 가속 · 조향, 화면 단추 = 시점 · 경적 · 손 브레이크 · 내리기
 import * as THREE from 'three';
 import { sound } from './music.js';
-import { TYPES } from './hangang-vehicle-models.js';
+import { TYPES, topAt } from './hangang-vehicle-models.js';
 import { buildInterior, drawGauge, seatEye } from './hangang-vehicle-interior.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -40,28 +40,55 @@ const CSS = `
 #dv-pop.hidden{opacity:0}
 body:not(.touch) #dv-hud .tch{display:none}
 body.touch #dv-hud kbd,body.touch #dv-card kbd{display:none}
+#dv-hud.pass .drv{display:none}
+#dv-seat{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:rgba(6,10,20,.5);backdrop-filter:blur(3px)}
+#dv-seat.hidden{display:none}
+#dv-seat .pg{width:min(560px,calc(100vw - 24px));max-height:calc(100vh - 40px);overflow:auto;border-radius:20px;padding:14px 16px;background:#f6f3ec;color:#2a2a2a;font-family:'Jua',sans-serif;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+#dv-seat h3{margin:0;font-size:20px}
+#dv-seat .sub{font-family:system-ui,sans-serif;font-size:12.5px;color:#5a5a5a;margin:2px 0 10px}
+#dv-seat .wrap{display:flex;gap:14px;align-items:flex-start;justify-content:center;flex-wrap:wrap}
+#dv-seat .map{position:relative;background:#d9dde2;border-radius:28px 28px 14px 14px;border:3px solid #9aa1aa;flex:none}
+#dv-seat .map .s{position:absolute;border:0;border-radius:7px;cursor:pointer;font-family:'Jua',sans-serif;font-size:12px;color:#fff;padding:0;background:#4f6fb0}
+#dv-seat .map .s.drv{background:#e98a2a}
+#dv-seat .map .s.me{outline:3px solid #ffd23f}
+#dv-seat .list{display:flex;flex-direction:column;gap:6px;min-width:170px}
+#dv-seat .list button{border:0;border-radius:12px;padding:7px 10px;font-family:'Jua',sans-serif;font-size:14px;cursor:pointer;background:#e4e1d8;text-align:left}
+#dv-seat .list button.drv{background:#ffd9a8}
+#dv-seat .list button.me{outline:3px solid #ffd23f}
+#dv-seat .row{display:flex;gap:8px;justify-content:center;margin-top:12px}
+#dv-seat .row button{border:0;border-radius:12px;padding:8px 12px;font-family:'Jua',sans-serif;font-size:14px;cursor:pointer;background:#e4e1d8}
 `;
 function ui() {
   if (document.getElementById('dv-card')) return; const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
   const host = document.getElementById('hg-hud') || document.body, d = document.createElement('div');
   d.innerHTML = `<div id="dv-card" class="hidden"><span class="ic">🚗</span><span><b></b><small></small></span><button class="b1"></button></div>
 <div id="dv-hud" class="hidden"><div class="spd"><b>0</b> km/h<small></small></div>
-<div class="row"><button data-k="view">🎥 시점<kbd>V</kbd></button><button data-k="horn">📯 경적<kbd>H</kbd></button><button data-k="blinkL">◀<kbd>Z</kbd></button><button data-k="blinkR">▶<kbd>X</kbd></button><button data-k="lights">💡<kbd>L</kbd></button></div>
-<div class="row"><button class="tch" data-k="hand">🅿️ 손 브레이크</button><button class="out" data-k="out">🚪 내리기<kbd>E</kbd></button></div></div>
+<div class="row"><button data-k="view">🎥 시점<kbd>V</kbd></button><button class="drv" data-k="horn">📯 경적<kbd>H</kbd></button><button class="drv" data-k="blinkL">◀<kbd>Z</kbd></button><button class="drv" data-k="blinkR">▶<kbd>X</kbd></button><button class="drv" data-k="lights">💡<kbd>L</kbd></button></div>
+<div class="row"><button class="tch drv" data-k="hand">🅿️ 손 브레이크</button><button data-k="seat">🪑 자리 바꾸기</button><button class="out" data-k="out">🚪 내리기<kbd>E</kbd></button></div></div>
+<div id="dv-seat" class="hidden"><div class="pg"><h3></h3><div class="sub"></div><div class="wrap"><div class="map"></div><div class="list"></div></div><div class="row"><button class="x">닫기</button></div></div></div>
 <div id="dv-pop" class="hidden"></div>`;
   while (d.firstChild) host.appendChild(d.firstChild);
 }
 // 놀란 젤리 머리 위 '!' (그림 한 장)
 let BANG = null; function bang() { if (BANG) return BANG; const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.beginPath(); g.arc(32, 32, 26, 0, 7); g.fill(); g.fillStyle = '#ff7a2a'; g.font = 'bold 44px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('!', 32, 34); BANG = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthTest: false, transparent: true }); return BANG; }
 
+// 앉은 곰이 지붕을 뚫지 않게: 그 자리 천장까지 높이에 맞춰 줄인다 (최대 원래 크기)
+function roofAbove(t, s) { if (t.cat === 'bike') return 9; return (t.top ? topAt(t, s[3]) - 0.07 : t.H - 0.22) - (s[2] + 0.05); }
+const BOX = new THREE.Box3(), WP = new THREE.Vector3();
+function fitSeated(root, t, s, base) { root.scale.setScalar(base); root.updateMatrixWorld(true); BOX.setFromObject(root); root.getWorldPosition(WP); const h = BOX.max.y - WP.y; if (!(h > 0.1)) return; const k = clamp((roofAbove(t, s) - 0.03) / h, 0.5, 1); root.scale.setScalar(base * k); }
+
 export class Drive {
   constructor(hg) { this.hg = hg; this.on = null; this.near = null; this.scanT = 0; this.peds = []; this.held = new Set(); ui(); this.wire(); }
   wire() {
-    const $ = (id) => document.getElementById(id); this.el = { card: $('dv-card'), hud: $('dv-hud'), pop: $('dv-pop') };
+    const $ = (id) => document.getElementById(id); this.el = { card: $('dv-card'), hud: $('dv-hud'), pop: $('dv-pop'), seat: $('dv-seat') };
+    this.el.seat.querySelector('.x').onclick = () => this.closeSeats();
+    // 자리 고르기 창: 숫자 1 ~ 9 · 0 = 그 번호 자리, Esc = 닫기
+    window.addEventListener('keydown', (e) => { if (this.el.seat.classList.contains('hidden')) return; const m = /^Digit(\d)$/.exec(e.code); if (m) { const i = (+m[1] + 9) % 10; if (this.pick && i < this.pick.v.t.seats.length) this.choose(i); e.stopPropagation(); } else if (e.code === 'Escape') { this.closeSeats(); e.stopPropagation(); } }, true);
     this.el.card.querySelector('.b1').onclick = () => this.act();
     for (const b of this.el.hud.querySelectorAll('button')) {
       const k = b.dataset.k;
       if (k === 'hand') { b.addEventListener('pointerdown', (e) => { e.preventDefault(); this.held.add('hand'); }); for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) b.addEventListener(ev, () => this.held.delete('hand')); }
+      else if (k === 'seat') b.onclick = () => this.on && this.openSeats(this.on.v, true);
       else b.onclick = () => this.key({ view: 'KeyV', horn: 'KeyH', blinkL: 'KeyZ', blinkR: 'KeyX', lights: 'KeyL', out: 'KeyE' }[k]);
     }
   }
@@ -79,15 +106,38 @@ export class Drive {
     return best;
   }
   // E: 타고 있으면 내리기, 아니면 가까운 차 타기 (버스 · 지하철 타기 · 역 출구가 더 가까우면 그쪽)
+  //   자리 고르기 창이 열려 있으면 E = 운전석
   act() {
+    if (this.pick) { this.choose(Math.max(0, this.pick.v.t.seats.findIndex((s) => s[4]))); return true; }
     if (this.on) { this.exit(); return true; }
     const c = this.near; if (!c) return false;
     const R = this.hg.rideL?.cand; if (R) { const rd = R.d ?? (R.e ? Math.hypot(R.e.x - this.hg.px, R.e.z - this.hg.pz) : 99); if (rd < c.d) return false; }
-    this.enter(c.v); return true;
+    this.openSeats(c.v); return true;
+  }
+  // ---------- 자리 고르기 (8-27-4): 위에서 본 차 모양에 자리 단추, 옆에 이름 목록 ----------
+  openSeats(v, switching = false) {
+    const t = v.t, el = this.el.seat, map = el.querySelector('.map'), list = el.querySelector('.list'), cur = switching ? this.on?.seat : -1;
+    this.pick = { v, switching };
+    el.querySelector('h3').textContent = `${{ bike: '🛵', bus: '🚌', truck: '🚚' }[t.cat] || '🚗'} ${t.name} · ${switching ? '자리 바꾸기' : '어디에 앉을까요?'}`;
+    el.querySelector('.sub').textContent = `운전석 = 직접 운전${v.parked || switching ? '' : ' (운전하던 젤리는 내려요)'} · 다른 자리 = 젤리 운전사가 길을 따라 달려요 · 숫자 키로도 골라요`;
+    const S = Math.min(72, 330 / t.L), w = t.W * S + 16, h = t.L * S + 16; map.style.width = w + 'px'; map.style.height = h + 'px'; map.innerHTML = ''; list.innerHTML = '';
+    const P = (x, z) => [w / 2 - x * S, h / 2 - z * S];
+    t.seats.forEach((st, i) => {
+      const b = document.createElement('button'), [a, c] = P(st[1], st[3]), sz = Math.max(11, Math.min(26, S * 0.42)); b.className = 's' + (st[4] ? ' drv' : '') + (i === cur ? ' me' : ''); b.style.left = a - sz / 2 + 'px'; b.style.top = c - sz / 2 + 'px'; b.style.width = b.style.height = sz + 'px'; b.textContent = i < 10 ? String((i + 1) % 10) : ''; b.title = st[0]; b.onclick = () => this.choose(i); map.appendChild(b);
+      if (t.seats.length <= 10) { const l = document.createElement('button'); l.className = (st[4] ? 'drv' : '') + (i === cur ? ' me' : ''); l.textContent = `${(i + 1) % 10}. ${st[0]}${st[4] ? ' (운전)' : ''}`; l.onclick = () => this.choose(i); list.appendChild(l); }
+    });
+    if (t.seats.length > 10) { const l = document.createElement('button'); l.textContent = '🎲 빈자리 아무 데나'; l.onclick = () => this.choose(1 + Math.floor(Math.random() * (t.seats.length - 1))); list.appendChild(l); const d = document.createElement('button'); d.className = 'drv'; d.textContent = '🧑‍✈️ 운전석 (E)'; d.onclick = () => this.choose(0); list.appendChild(d); }
+    el.classList.remove('hidden'); document.exitPointerLock?.();
+  }
+  closeSeats() { this.el.seat.classList.add('hidden'); this.pick = null; }
+  choose(i) {
+    const P = this.pick; if (!P) return; this.closeSeats();
+    if (P.switching) this.switchSeat(i); else this.board(P.v, i);
   }
   key(code) {
     const D = this.on; if (!D) return false;
-    if (code === 'KeyV') { D.view = D.view === 'fp' ? 'chase' : 'fp'; this.pop(D.view === 'fp' ? '🎥 운전석에서' : '🎥 뒤에서'); return true; }
+    if (code === 'KeyV') { D.view = D.view === 'fp' ? 'chase' : 'fp'; this.pop(D.view === 'fp' ? `🎥 ${D.t.seats[D.seat][0]}에서` : '🎥 뒤에서'); return true; }
+    if (!D.driver && ['KeyH', 'KeyZ', 'KeyX', 'KeyL'].includes(code)) return true;
     if (code === 'KeyH') { this.horn(); return true; }
     if (code === 'KeyZ') { D.v.blink = D.v.blink === 1 ? 0 : 1; return true; }
     if (code === 'KeyX') { D.v.blink = D.v.blink === 2 ? 0 : 2; return true; }
@@ -99,19 +149,65 @@ export class Drive {
   honked(v) { if (!this.on) return; tone([[392, 0, 0.3, 'square', 0.03], [494, 0, 0.3, 'square', 0.025]]); this.pop('📯 빵! 뒤차가 기다려요'); void v; }
   pop(t) { const P = this.el.pop; P.textContent = t; P.classList.remove('hidden'); clearTimeout(P.h); P.h = setTimeout(() => P.classList.add('hidden'), 1500); }
   // ---------- 타기 ----------
-  enter(v) {
-    const hg = this.hg, t = v.t, si = Math.max(0, t.seats.findIndex((s) => s[4]));
-    // 운전하던 젤리: 세워 둔 차가 아니면 놀라서 내린다
-    if (!v.parked) this.flee(v);
-    v.player = true; v.parked = false; v.keep = true; v.empty = true; v.next = null; v.blink = 0; v.siren = 0;
+  enter(v) { this.board(v, Math.max(0, v.t.seats.findIndex((s) => s[4]))); }
+  //   si: 앉을 자리. 운전석이면 내가 운전(운전하던 젤리는 놀라 내림), 아니면 젤리 운전사가 길을 따라 달린다
+  board(v, si) {
+    const hg = this.hg, t = v.t;
     const I = buildInterior(v.key);
     if (I.shell) { I.shell.setColorAt(0, v.col); I.shell.instanceColor.needsUpdate = true; }
     I.g.visible = false; I.g.userData.noDrape = true; if (I.g.parent !== hg.scene) hg.scene.add(I.g);
-    this.on = { v, t, I, seat: si, view: 'chase', speed: v.cur * (v.dir ? 1 : 1), steer: 0, lights: 0, t0: 0, shake: 0, hornT: 0, gT: 0, camInit: false };
+    this.on = { v, t, I, seat: si, driver: false, view: 'chase', speed: v.cur, steer: 0, lights: 0, t0: 0, shake: 0, hornT: 0, gT: 0, camInit: false };
     hg.exitInterior?.(); hg.flying = false; hg.climb = null; hg.v = 0;
     this.el.card.classList.add('hidden'); this.el.hud.classList.remove('hidden');
-    hg.onToast?.(`${t.cat === 'bike' ? '🛵' : t.cat === 'bus' ? '🚌' : t.cat === 'truck' ? '🚚' : '🚗'} ${t.name} 운전! W 가속 · S 브레이크 · A D 핸들 · V 시점 · E 내리기`);
+    if (t.seats[si][4]) this.takeWheel(true); else this.giveWheel(true);
+  }
+  // 내가 운전석으로: 운전하던 젤리(있으면)는 놀라 내린다
+  takeWheel(first = false) {
+    const D = this.on, v = D.v, t = D.t;
+    if (!v.parked && !v.player) { this.dropNpc(); this.flee(v); }
+    v.player = true; v.ride = false; v.parked = false; v.keep = true; v.empty = true; v.next = null; v.blink = 0; v.siren = 0; v.stopReq = false;
+    D.driver = true; D.speed = v.cur; D.seat = Math.max(0, t.seats.findIndex((s) => s[4])); D.view = first ? 'chase' : D.view; D.ghost = undefined;
+    this.el.hud.classList.remove('pass');
+    this.hg.onToast?.(`${{ bike: '🛵', bus: '🚌', truck: '🚚' }[t.cat] || '🚗'} ${t.name} 운전! W 가속 · S 브레이크 · A D 핸들 · V 시점 · E 내리기`);
     this.engine(true);
+  }
+  // 내가 다른 자리로: 젤리 운전사가 운전한다 (세워 둔 차 · 내가 몰던 차면 새로 앉고, 가까운 찻길로 돌아가 달린다)
+  giveWheel(first = false) {
+    const D = this.on, v = D.v, t = D.t, hg = this.hg;
+    if (v.player || v.parked) {
+      const L = this.snapRoad(v);
+      if (L) { v.L = L.L; v.d = L.d; v.dir = L.dir; v.off = L.dir * Math.max(1.8, Math.min(Math.abs(v.off || 1.8), L.L.w / 2 - 1.2)); v.vMax = (t.cat === 'bus' ? 9 : t.cat === 'truck' ? 10 : 12) * (hg.jamSpeed || 1); v.parked = false; v.next = null; v.cur = Math.abs(D.speed || 0); }
+      else { v.parked = true; v.cur = 0; }
+      v.empty = false;
+    }
+    v.player = false; v.ride = true; v.keep = true; v.stopReq = false;
+    D.driver = false; D.view = first ? 'fp' : D.view;
+    if (t.cat !== 'bike') this.addNpc();
+    this.el.hud.classList.add('pass'); this.engine(false);
+    hg.onToast?.(`🪑 ${t.seats[D.seat][0]}에 앉았어요 · 젤리 운전사가 달려요 · 🪑 자리 바꾸기 · V 시점 · E 내리기`);
+  }
+  // 차 안 운전석의 젤리 운전사 (차 안 그림에 앉힌다)
+  addNpc() {
+    const D = this.on, hg = this.hg; if (this.npc || !D.I.g) return; const ds = D.t.seats.find((s) => s[4]); if (!ds) return;
+    const b = hg.mkBear(Math.random() < 0.5 ? 'office' : 'stroll', Math.random, 1.0, { weather: 'clear' }); hg.scene.remove(b.root); D.I.g.add(b.root);
+    b.root.position.set(ds[1], ds[2] + 0.05, ds[3]); b.root.rotation.y = 0; b.setSeated?.(true); b.update?.(0.016, 0, { noCrawl: true }); b.root.userData.npc = false; this.npc = b; b.base = b.root.scale.x; this.npcFitT = 0.1;
+  }
+  dropNpc() { if (!this.npc) return; this.npc.root.parent?.remove(this.npc.root); this.npc = null; }
+  // 가까운 찻길 (30m 안, 차 머리 방향과 같은 쪽으로)
+  snapRoad(v) {
+    const hg = this.hg; let best = null; const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const [li, i] of hg.driveGrid?.get(`${Math.floor(v.x / 50) + a},${Math.floor(v.z / 50) + b}`) || []) {
+      const L = hg.driveLines[li]; if (!L) continue;
+      for (const k of [i, i + 1]) { if (k < 1 || k >= L.pts.length) continue; const p = L.pts[k - 1], q = L.pts[k], dx = q[0] - p[0], dz = q[1] - p[1], l2 = dx * dx + dz * dz || 1, tt = clamp(((v.x - p[0]) * dx + (v.z - p[1]) * dz) / l2, 0, 1), x = p[0] + dx * tt, z = p[1] + dz * tt, d = Math.hypot(x - v.x, z - v.z); if (d < 30 && (!best || d < best.dd)) { const l = Math.sqrt(l2); best = { L, d: L.cum[k - 1] + l * tt, dd: d, dir: (dx * fx + dz * fz) >= 0 ? 1 : -1 }; } }
+    }
+    return best;
+  }
+  // 타고 있는 동안 자리 바꾸기
+  switchSeat(i) {
+    const D = this.on; if (!D || i === D.seat) return; const t = D.t;
+    if (t.seats[i][4]) { this.dropNpc(); D.seat = i; this.takeWheel(); return; }
+    const wasDriver = D.driver; D.seat = i;
+    if (wasDriver) this.giveWheel(); else this.hg.onToast?.(`🪑 ${t.seats[i][0]}(으)로 옮겼어요`);
   }
   // 놀란 젤리: 운전석 문 → 차 앞 돌아 → 인도로 걸어가 20m 뒤 사라진다
   flee(v) {
@@ -141,17 +237,21 @@ export class Drive {
   // ---------- 내리기 ----------
   exit(force = false) {
     const D = this.on, hg = this.hg; if (!D) return;
-    if (!force && Math.abs(D.speed) > 2.2) { this.pop('🛑 멈춘 뒤 내려요 (S 브레이크)'); return; }
+    if (!force && !D.driver && D.v.cur > 2.2) { D.v.stopReq = true; D.exitReq = true; this.pop('🛑 세워 달라고 했어요 · 서면 내려요'); return; }
+    if (!force && D.driver && Math.abs(D.speed) > 2.2) { this.pop('🛑 멈춘 뒤 내려요 (S 브레이크)'); return; }
     const v = D.v, lx = Math.cos(v.yaw), lz = -Math.sin(v.yaw), fx = Math.sin(v.yaw), fz = Math.cos(v.yaw), s = D.t.seats[D.seat];
     // 내 자리 쪽 문 밖으로 (막혔으면 반대쪽 · 뒤)
     const tries = [[Math.sign(s[1]) || 1, s[3]], [-(Math.sign(s[1]) || 1), s[3]], [0, -v.len / 2 - 1]], out = [];
     for (const [sd, lz2] of tries) { const k = sd === 0 ? 0 : v.hw + 0.7, x = v.x + lx * sd * k + fx * lz2, z = v.z + lz * sd * k + fz * lz2; out.push([x, z]); }
     let pick = out[0]; for (const p of out) { const r = hg.pushOut(p[0], p[1], 0.2, 0.3); if (!r.hit && hg.walkable(p[0], p[1], 0)) { pick = p; break; } }
-    v.player = false; v.parked = true; v.keep = false; v.hidden = false; v.cur = 0; v.brake = 0; v.blink = 0;
+    // 내가 몰던 차는 그 자리에 세워 두고, 젤리 운전사가 몰던 차는 다시 제 길을 간다
+    if (D.driver) { v.player = false; v.parked = true; v.cur = 0; v.brake = 0; v.blink = 0; } else { v.ride = false; v.stopReq = false; }
+    v.keep = false; v.hidden = false; this.dropNpc();
     D.I.g.visible = false; if (D.I.g.parent) D.I.g.parent.remove(D.I.g);
     this.on = null; this.el.hud.classList.add('hidden'); this.engine(false);
-    hg.bear.setSeated?.(false); hg.bear.root.rotation.set(0, 0, 0); hg.placeAt(pick[0], pick[1], v.yaw); hg.y = 0;
+    hg.bear.setSeated?.(false); hg.bear.root.rotation.set(0, 0, 0); if (this.bearBase != null) { hg.bear.root.scale.setScalar(this.bearBase); this.bearBase = null; this.fitSeat = -1; } hg.placeAt(pick[0], pick[1], v.yaw); hg.y = 0;
     if (this.cam0) { this.cam0.near = this.near0; this.cam0.updateProjectionMatrix(); this.cam0 = null; }
+    this.el.hud.classList.remove('pass'); this.closeSeats();
     hg.onToast?.('🚪 내렸어요');
   }
   // ---------- 엔진 소리 (낮은 톱니파 + 걸러서, 속도 따라 높아짐) ----------
@@ -169,6 +269,14 @@ export class Drive {
     }
     const D = this.on, v = D.v, t = D.t, bike = t.cat === 'bike';
     D.t0 += dt; D.hornT = Math.max(0, D.hornT - dt);
+    // 손님 자리: 차는 hangang-vehicles.js 가 길을 따라 몬다. 나는 따라가기만
+    if (!D.driver) {
+      D.speed = v.cur; hg.px = v.x; hg.pz = v.z; hg.face = v.yaw; hg.v = 0; hg.y = 0;
+      if (this.npc) { this.npc.update?.(dt, 0, { noCrawl: true }); this.npcFitT -= dt; if (this.npcFitT <= 0) { this.npcFitT = 1; fitSeated(this.npc.root, t, t.seats.find((q) => q[4]), this.npc.base); } }
+      if (D.exitReq && v.cur < 0.4) { this.exit(true); return; }
+      this.hudT = (this.hudT || 0) - dt; if (this.hudT <= 0) { this.hudT = 0.2; this.el.hud.querySelector('.spd b').textContent = Math.round(v.cur * 3.6); this.el.hud.querySelector('.spd small').textContent = `${t.seats[D.seat][0]} · 젤리 운전사`; for (const b of this.el.hud.querySelectorAll('button')) b.classList.toggle('on', b.dataset.k === 'view' && D.view === 'fp'); }
+      return;
+    }
     // 입력: W/S · 조이스틱 세로 = 가속 · 브레이크, A/D = 조향, Space = 손 브레이크
     const thr = clamp(inp.mz || 0, -1, 1), str = clamp(inp.mx || 0, -1, 1), hand = !!inp.jumpHeld || this.held.has('hand');
     const mk = clamp(1500 / t.mass, 0.35, 1.6);
@@ -219,12 +327,15 @@ export class Drive {
   post() {
     const D = this.on, hg = this.hg; if (!D) return; const v = D.v, t = D.t, bike = t.cat === 'bike', s = t.seats[D.seat];
     const ty = (hg.terr ? hg.terrAt(v.x, v.z) : 0) + (v.lift || 0);
-    const inside = D.view === 'fp' && !bike; v.hidden = inside;
-    const I = D.I; if (I.g) { I.g.visible = inside; I.g.position.set(v.x, ty, v.z); I.g.rotation.set(v.pitch || 0, v.yaw, v.roll || 0, 'YXZ'); if (I.shell) { const st = I.shell.geometry.attributes.iSt; st.setXYZW(0, v.head, v.brake, v.blink, 0); st.needsUpdate = true; } }
+    // 탄 차는 차 안 그림(바깥 몸통 + 엷은 유리)으로 그린다 → 밖에서도 창 너머로 앉은 젤리가 보인다
+    v.hidden = !bike;
+    const I = D.I; if (I.g) { I.g.visible = !bike; I.g.position.set(v.x, ty, v.z); I.g.rotation.set(v.pitch || 0, v.yaw, v.roll || 0, 'YXZ'); if (I.shell) { const st = I.shell.geometry.attributes.iSt; st.setXYZW(0, v.head, v.brake, v.blink, 0); st.needsUpdate = true; } }
     if (hg.shadow) hg.shadow.visible = false;
-    if (bike && D.view !== 'fp') {
-      const lx = Math.cos(v.yaw), lz = -Math.sin(v.yaw), fx = Math.sin(v.yaw), fz = Math.cos(v.yaw), up = s[2] + 0.02;
-      hg.bear.root.visible = true; hg.bear.setSeated?.(true); hg.bear.root.position.set(v.x + fx * s[3] + lx * Math.sin(v.roll || 0) * -up, ty + up * Math.cos(v.roll || 0), v.z + fz * s[3] + lz * Math.sin(v.roll || 0) * -up); hg.bear.root.rotation.set(0, v.yaw, v.roll || 0, 'YXZ');
+    // 곰: 고른 자리 방석 위에 앉은 자세 (8-21-3 승객과 같은 방식), 1인칭이면 숨긴다
+    if (D.view !== 'fp') {
+      const m = new THREE.Matrix4().compose(new THREE.Vector3(v.x, ty, v.z), new THREE.Quaternion().setFromEuler(new THREE.Euler(v.pitch || 0, v.yaw, v.roll || 0, 'YXZ')), new THREE.Vector3(1, 1, 1)), p = new THREE.Vector3(s[1], s[2] + (bike ? 0.02 : 0.05), s[3]).applyMatrix4(m);
+      hg.bear.root.visible = true; hg.bear.setSeated?.(true); hg.bear.root.position.copy(p); hg.bear.root.rotation.set(v.pitch || 0, v.yaw, v.roll || 0, 'YXZ');
+      this.bearBase ??= hg.bear.root.scale.x; this.fitT = (this.fitT ?? 0) - 1 / 60; if (this.fitT <= 0 || this.fitSeat !== D.seat) { this.fitT = 0.5; this.fitSeat = D.seat; fitSeated(hg.bear.root, t, s, this.bearBase); }
     } else hg.bear.root.visible = false;
   }
   // ---------- 카메라 ----------
@@ -251,8 +362,8 @@ export class Drive {
     const el = this.el.card, c = this.near; if (!c || this.on) { el.classList.add('hidden'); return; }
     const t = c.v.t; el.querySelector('.ic').textContent = t.cat === 'bike' ? '🛵' : t.cat === 'bus' ? '🚌' : t.cat === 'truck' ? '🚚' : '🚗';
     el.querySelector('b').textContent = t.name; el.querySelector('small').textContent = c.v.parked ? '세워 둔 차예요' : '운전하는 젤리가 깜짝 놀라 내려요';
-    el.querySelector('.b1').innerHTML = '타기 <kbd>E</kbd>'; el.classList.remove('hidden');
+    el.querySelector('.b1').innerHTML = '타기 · 자리 고르기 <kbd>E</kbd>'; el.classList.remove('hidden');
   }
-  where() { const D = this.on; return D ? `${{ bike: '🛵', bus: '🚌', truck: '🚚' }[D.t.cat] || '🚗'} ${D.t.name} 운전 중 · ${Math.round(Math.abs(D.speed) * 3.6)}km/h` : null; }
+  where() { const D = this.on; return D ? `${{ bike: '🛵', bus: '🚌', truck: '🚚' }[D.t.cat] || '🚗'} ${D.t.name} ${D.driver ? '운전 중' : D.t.seats[D.seat][0]} · ${Math.round(Math.abs(D.speed) * 3.6)}km/h` : null; }
   dispose() { if (this.on) this.exit(true); for (const p of this.peds) this.hg.removePerson({ bears: [p.b] }); this.peds = []; this.el.card.classList.add('hidden'); }
 }
