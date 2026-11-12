@@ -16,6 +16,7 @@ import { buildStreetFurniture, buildLandmarkStatues } from './hangang-street.js'
 import { setupAttractions, ATTR_SKIP } from './hangang-attractions.js';
 import { LiveTransit } from './hangang-transit.js';
 import { LiveRide } from './hangang-ride.js';
+import { Traffic } from './hangang-vehicles.js';
 // 롯데월드 (8-17): 섬 · 어드벤처 건물은 지도 상자 건물 대신 hangang-park.js 가 실제 모습으로. 놀이기구는 명소 체험(registerAttraction)으로 붙는다
 import { parkSkip } from './hangang-park.js';
 import './hangang-park-in.js';
@@ -356,6 +357,8 @@ export class Hangang {
     this.ready = false; this.t = 0;
     this.opt = { season: 'auto', weather: 'auto', time: 'auto', flow: 1, cam: 0 };
     this.state = { season: 'spring', weather: 'clear', hour: 12 };
+    // 길 위 차량 (hangang-vehicles.js)
+    this.traffic = new Traffic(this);
   }
   async load(id = 'yeouido', opt = {}) {
     if (this.ready && this.id === id) return;
@@ -749,7 +752,7 @@ export class Hangang {
     for (const gd of this.groups || []) if (gd.solid && Math.abs(gd.g.position.x - x) < 6 && Math.abs(gd.g.position.z - z) < 6) out.push({ x: gd.g.position.x, z: gd.g.position.z, r: gd.solid, h: 1.5 });
     // 실시간 버스: 길이 11m 라 앞 · 가운데 · 뒤 세 동그라미
     for (const o of this.live?.buses?.values() || []) if (o.mesh && Math.abs(o.x - x) < 10 && Math.abs(o.z - z) < 10) for (const k of [-3.6, 0, 3.6]) out.push({ x: o.x + Math.sin(o.yaw) * k, z: o.z + Math.cos(o.yaw) * k, r: 1.6, h: 3.2 });
-    for (const c of this.cars3 || []) if (c.mesh && Math.abs(c.mesh.position.x - x) < 8 && Math.abs(c.mesh.position.z - z) < 8) out.push({ x: c.mesh.position.x, z: c.mesh.position.z, r: c.r || 1.6, h: 2 });
+    this.traffic?.circles(x, z, out);
     return out;
   }
   // 위치 → 코스 위 (s, 옆으로 얼마나)
@@ -1734,13 +1737,8 @@ export class Hangang {
     // 가로등 불빛 웅덩이: 가까운 몇 개만
     this.pools = []; for (let i = 0; i < 6; i++) { const p = this.lampPool.clone(); p.material = this.lampPool.material; p.rotation.x = -Math.PI / 2; p.scale.setScalar(6); p.renderOrder = -45; this.scene.add(p); this.pools.push(p); }
     this.poleXZ = poles;
-    // 길 위 차들 (밤에 불빛 띠)
-    const cars = []; for (const rd of this.map.roads) if (rd[0] >= 14 && !rd[1]) { const pts = unpack(rd.slice(2), this.map.scale); if (pts.length > 1) cars.push(pts); }
-    this.carLines = cars; const cN = isPhone ? 260 : 600, cp = new Float32Array(cN * 3), cc = new Float32Array(cN * 3);
-    this.cars = []; for (let i = 0; i < cN; i++) { const line = cars[Math.floor(r() * cars.length)]; if (!line) break; this.cars.push({ line, t: r(), v: (r() < 0.5 ? 1 : -1) * (0.00004 + r() * 0.00004), seg: 0 }); const cl = this.cars[i].v > 0 ? [1, 0.95, 0.85] : [1, 0.25, 0.2]; cc.set(cl, i * 3); }
-    const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.BufferAttribute(cp, 3)); cg.setAttribute('color', new THREE.BufferAttribute(cc, 3));
-    this.carPts = new THREE.Points(cg, new THREE.PointsMaterial({ size: 2.4, vertexColors: true, map: this.dot ||= dotTex(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.9 })); this.scene.add(this.carPts);
-    for (const c of this.cars) { const L = c.line.reduce((a, p, i) => a + (i ? Math.hypot(p[0] - c.line[i - 1][0], p[1] - c.line[i - 1][1]) : 0), 0); c.len = L; c.v *= 3000 / Math.max(L, 50); }
+    // 길 위 차들 (밤에 불빛 띠): hangang-vehicles.js
+    this.traffic.buildFar(r, dotTex);
   }
   // 구름 · 비 · 눈 · 벌레 · 반딧불
   buildSkyStuff(r) {
@@ -1855,7 +1853,7 @@ export class Hangang {
       for (const pa of Mx.paths) { if (pa[0]) continue; const pts = unpack(pa.slice(2), S); if (pts.length < 2) continue; const L = mk(pts, pa[1], 'path'); if (L.len > 25) lines.push(L); } }
     const grid = (arr) => { const g = new Map(); arr.forEach((L, li) => { for (let i = 0; i < L.pts.length; i++) { const k = `${Math.floor(L.pts[i][0] / 50)},${Math.floor(L.pts[i][1] / 50)}`; if (!g.has(k)) g.set(k, []); g.get(k).push([li, i]); } }); return g; };
     this.walkLines = lines; this.walkGrid = grid(lines); this.driveLines = drives; this.driveGrid = grid(drives);
-    this.walkers ||= []; this.cars3 ||= []; this.cityT ||= 0; this.carT ||= 0; this.cityDirty = false;
+    this.walkers ||= []; this.cityT ||= 0; this.cityDirty = false;
   }
   lineAt(L, d, off) { d = clamp(d, 0, L.len); let i = 1; while (i < L.cum.length - 1 && L.cum[i] < d) i++; const a = L.pts[i - 1], b = L.pts[i], seg = L.cum[i] - L.cum[i - 1] || 1, t = (d - L.cum[i - 1]) / seg, dx = (b[0] - a[0]) / seg, dz = (b[1] - a[1]) / seg; return { x: lerp(a[0], b[0], t) - dz * off, z: lerp(a[1], b[1], t) + dx * off, dx, dz }; }
   pickNear(grid, lines, px, pz, minD, maxD, r) {
@@ -1926,29 +1924,7 @@ export class Hangang {
       const x = a[0] + (b[0] - a[0]) * sp.t, z = a[1] + (b[1] - a[1]) * sp.t, ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
       sp.bears.forEach((bb, i) => { bb.root.position.set(x - uz * (i - (sp.bears.length - 1) / 2) * 0.7, 0, z + ux * (i - (sp.bears.length - 1) / 2) * 0.7); bb.root.rotation.y = Math.atan2(ux, uz); bb.update(dt, sp.v * 2, { noCrawl: true }); });
     }
-    // 차: 오른쪽 차로로, 출퇴근 시간엔 많고 밤엔 적게 · 앞에 곰돌이가 있으면 멈춘다
-    const rush = (h >= 7 && h < 9.5) || (h >= 17 && h < 20), jam = { 원활: 1, 서행: 1.35, 정체: 1.7 }[this.city?.road] || (rush ? 1.3 : 1), maxC = Math.round((isPhone ? 10 : 34) * jam * (h >= 23 || h < 6 ? 0.35 : 0.9)); this.jamSpeed = this.city?.roadSpd ? clamp(this.city.roadSpd / 40, 0.25, 1.1) : 1;
-    this.carT -= dt;
-    if (this.carT <= 0 && this.cars3.length < maxC && this.driveLines.length) {
-      this.carT = 0.25 + r() * 0.4; const pk = this.pickNear(this.driveGrid, this.driveLines, px, pz, 70, 320, r);
-      if (pk) {
-        const L = pk.L, dir = r() < 0.5 ? 1 : -1, lanes = Math.max(1, Math.floor(L.w / 7)), lane = Math.floor(r() * lanes), off = dir * (1.8 + lane * 3.3);
-        const x = r(), kind = x < 0.08 && L.w >= 14 ? 'bus' : x < 0.24 ? 'taxi' : 'car';
-        const mesh = makeVehicle(kind, r); this.scene.add(mesh);
-        this.cars3.push({ L, d: pk.d, dir, off, v: (kind === 'bus' ? 9 : 10 + r() * 5) * (this.jamSpeed || 1), mesh, kind, r: kind === 'bus' ? 2.6 : 1.7 });
-      }
-    }
-    const night = this.light?.night || 0;
-    for (const c of this.cars3) {
-      const q = this.lineAt(c.L, c.d, c.off), fx = q.dx * c.dir, fz = q.dz * c.dir;
-      const ax = px - q.x, az = pz - q.z, ahead = ax * fx + az * fz, sideD = Math.abs(ax * -fz + az * fx);
-      c.vMax ??= c.v; const want = ahead > 0 && ahead < 9 && sideD < 2.2 && this.y < 2 ? 0 : c.vMax;
-      c.cur = (c.cur ?? c.vMax) + (want - (c.cur ?? c.vMax)) * Math.min(1, dt * 3);
-      c.d += c.dir * c.cur * dt; if (c.d < 0 || c.d > c.L.len) { c.dir *= -1; c.off = -c.off; c.d = clamp(c.d, 0, c.L.len); }
-      c.mesh.position.set(q.x, 0, q.z); c.mesh.rotation.y = Math.atan2(fx, fz);
-      c.mesh.userData.lights.material.emissiveIntensity = 0.3 + night * 2.5;
-    }
-    for (const c of [...this.cars3]) if (Math.hypot(c.mesh.position.x - px, c.mesh.position.z - pz) > 360) { this.scene.remove(c.mesh); this.cars3.splice(this.cars3.indexOf(c), 1); }
+    this.traffic.tick(dt, px, pz);
   }
   // ---------- 지하철 · 버스 (실시간) ----------
   //   출입구: 실제 위치에 유리 지붕 계단 + 호선 색 표지판 · 가까이 가면 그 역 실시간 도착 (onStation)
@@ -2083,7 +2059,7 @@ export class Hangang {
     if (!K && this.opt.weather === 'auto') this.state.weather = this.randWeather(r);
     if (!K && this.opt.time === 'auto') this.state.hour = [5.9, 6.4, 9.5, 15.8, 16.6, 17.2, 17.7, 18.1, 18.4, 19.2, 21, 13][Math.floor(r() * 12)]; // 감성적인 시간(늦은 오후 · 노을 · 해 뜰 녘)이 더 자주
     this.applySeason(); this.weatherT = K?.weatherT ?? 240 + r() * 360; this.r = r;
-    for (const p of this.people) this.removePerson(p); this.people = []; for (const gd of this.groups) this.removeGroup(gd); this.groups = []; for (const w of this.walkers || []) this.removePerson(w); this.walkers = []; for (const w of this.shoppers || []) this.removePerson(w); this.shoppers = []; for (const c of this.cars3 || []) this.scene.remove(c.mesh); this.cars3 = []; this.seenLabel = new Set(); this.activeLabels = []; this.regionName = null; this.regionSeen = new Map(); this.jumps = 0; this.flipT = 0;
+    for (const p of this.people) this.removePerson(p); this.people = []; for (const gd of this.groups) this.removeGroup(gd); this.groups = []; for (const w of this.walkers || []) this.removePerson(w); this.walkers = []; for (const w of this.shoppers || []) this.removePerson(w); this.shoppers = []; this.traffic?.clear(); this.seenLabel = new Set(); this.activeLabels = []; this.regionName = null; this.regionSeen = new Map(); this.jumps = 0; this.flipT = 0;
   }
   leave() { if (this.bear) { this.bear.root.traverse((o) => { if (o.isMesh) o.castShadow = false; }); this.bear.root.scale.setScalar(1); this.bear.inner.rotation.set(0, 0, 0); this.bear.inner.position.set(0, 0, 0); } if (this.bear && this.prevParent) this.prevParent.add(this.bear.root); for (const p of this.people) this.removePerson(p); this.people = []; for (const gd of this.groups) this.removeGroup(gd); this.groups = []; this.bear = null; }
   randWeather(r) { const s = this.state.season, x = r(); if (s === 'winter') return x < 0.45 ? 'clear' : x < 0.75 ? 'cloudy' : 'snow'; return x < 0.55 ? 'clear' : x < 0.82 ? 'cloudy' : 'rain'; }
@@ -2313,13 +2289,10 @@ export class Hangang {
     const hr = h, home = hr >= 17 && hr < 19 ? 0.6 : hr >= 19 && hr < 23 ? 1 : hr >= 23 || hr < 1 ? 0.55 : hr < 5 ? 0.12 : hr < 7 ? 0.3 : 0.2;
     const work = hr >= 17 && hr < 20 ? 1 : hr >= 20 && hr < 22 ? 0.55 : hr >= 22 || hr < 6 ? 0.08 : hr < 8 ? 0.35 : 0.3;
     tickWindows(hr, this.t); this.tickLit(lit, hr, home, work, dt); for (const c of this.chunks?.values() || []) { c.time = this.time; c.tickLit(lit, hr, home, work, dt); }
-    this.lampGlow.material.opacity = lit; if (this.lampHeadM) this.lampHeadM.emissiveIntensity = 0.2 + lit * 2.2; this.carPts.material.opacity = 0.25 + lit * 0.75;
+    this.lampGlow.material.opacity = lit; if (this.lampHeadM) this.lampHeadM.emissiveIntensity = 0.2 + lit * 2.2;
     this.lampPool.material.opacity = lit * 0.32;
     let pi = 0; for (const [x, z] of this.poleXZ) { if (pi >= this.pools.length) break; if (Math.abs(x - px) < 90 && Math.abs(z - pz) < 90) { this.pools[pi].position.set(x, 0.03, z); this.pools[pi].visible = true; pi++; } } for (; pi < this.pools.length; pi++) this.pools[pi].visible = false;
-    // 자동차 불빛
-    const cp = this.carPts.geometry.attributes.position;
-    for (let i = 0; i < this.cars.length; i++) { const c = this.cars[i]; c.t = (c.t + c.v * dt + 1) % 1; const want = c.t * c.len; let acc = 0, k = 1; const L = c.line; for (; k < L.length; k++) { const d = Math.hypot(L[k][0] - L[k - 1][0], L[k][1] - L[k - 1][1]); if (acc + d >= want) break; acc += d; } k = Math.min(k, L.length - 1); const a = L[k - 1], b = L[k], d = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, t = clamp((want - acc) / d, 0, 1); cp.setXYZ(i, lerp(a[0], b[0], t), 1, lerp(a[1], b[1], t)); }
-    cp.needsUpdate = true;
+    this.traffic.tickFar(dt, lit);
     // 구름
     for (const c of this.clouds) { c.position.x += c.userData.sp * dt; if (c.position.x > 6000) c.position.x = -6000; c.material.opacity = clamp((c.userData.k < 0.45 ? 0.16 : 0.02) + ck * 0.85 * (0.6 + c.userData.k * 0.4), 0, 0.92); c.material.color.copy(sk.top).lerp(C('#ffffff'), 0.25 + sunUp * 0.55).lerp(sunCol, (1 - smooth(0.05, 0.35, sun.y)) * sunUp * 0.35); }
     // 비 · 눈: 카메라 둘레 상자 안에서
@@ -2745,27 +2718,6 @@ export const LANDMARKS = {
   경복궁: { facade: 'hanok', color: '#e8dccb', height: 9, roofH: 7 }, '경복궁 건춘문': { facade: 'hanok', color: '#e8dccb', height: 9, roofH: 5 }, 조계사: { facade: 'hanok', color: '#e8dccb', roofH: 7 },
   여의도순복음교회: { facade: 'panels', color: '#5d4f48', campus: 160, campusFacade: 'stone', campusColor: '#a08a7a', front: { w: 16, d: 9, up: 13, face: 'west', screen: true, cross: true, sign: '여의도순복음교회' }, rimLight: true },
 };
-const CAR_COLORS = ['#f4f4f2', '#f4f4f2', '#1d1d1f', '#9aa0a6', '#c9ccd0', '#2a3a5a', '#7a1d22', '#3d4a3a', '#d8d2c4'];
-function makeVehicle(kind, r, busColor = null, routeNo = '') {
-  const g = new THREE.Group(), M2 = (c, o = {}) => new THREE.MeshLambertMaterial({ color: c, ...o });
-  const L = kind === 'bus' ? 11 : 4.5, W = kind === 'bus' ? 2.5 : 1.8, H = kind === 'bus' ? 2.9 : 0.75;
-  const color = kind === 'taxi' ? (r() < 0.6 ? '#f39a2b' : '#f4f4f2') : kind === 'bus' ? busColor || ['#3a63b8', '#47a83c', '#3a63b8', '#47a83c', '#d8352a'][Math.floor(r() * 5)] : CAR_COLORS[Math.floor(r() * CAR_COLORS.length)];
-  const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, L), M2(color)); body.position.y = 0.35 + H / 2; g.add(body);
-  if (kind === 'bus') { const win = new THREE.Mesh(new THREE.BoxGeometry(W + 0.02, 0.9, L - 1.2), M2('#2a3442')); win.position.set(0, 2.25, 0.2); g.add(win); const roof = new THREE.Mesh(new THREE.BoxGeometry(W - 0.2, 0.25, L - 0.6), M2('#e8e8e8')); roof.position.y = 3.37; g.add(roof); }
-  if (kind === 'bus' && routeNo) { const cv = document.createElement('canvas'); cv.width = 128; cv.height = 40; const c2 = cv.getContext('2d'); c2.fillStyle = '#111'; c2.fillRect(0, 0, 128, 40); c2.fillStyle = '#ffb020'; c2.font = 'bold 30px sans-serif'; c2.textAlign = 'center'; c2.textBaseline = 'middle'; c2.fillText(routeNo, 64, 22); const t = new THREE.CanvasTexture(cv); const sm = new THREE.MeshBasicMaterial({ map: t }); const f = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.38), sm); f.position.set(0, 2.95, L / 2 + 0.02); g.add(f); const sd = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.44), sm); sd.position.set(W / 2 + 0.02, 2.95, 2); sd.rotation.y = Math.PI / 2; g.add(sd); }
-  else {
-    const cab = new THREE.Mesh(new THREE.BoxGeometry(W - 0.15, 0.6, L * 0.52), M2('#24303c')); cab.position.set(0, 0.35 + H + 0.3, -0.15); g.add(cab);
-    const top = new THREE.Mesh(new THREE.BoxGeometry(W - 0.25, 0.06, L * 0.46), M2(color)); top.position.set(0, 0.35 + H + 0.62, -0.15); g.add(top);
-    if (kind === 'taxi') { const sign = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.22, 0.25), M2('#ffd84a', { emissive: '#ffb020', emissiveIntensity: 0.6 })); sign.position.set(0, 0.35 + H + 0.76, -0.15); g.add(sign); }
-  }
-  const wg = new THREE.CylinderGeometry(0.34, 0.34, 0.26, 12); wg.rotateZ(Math.PI / 2); const wm = M2('#1a1a1c');
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const w = new THREE.Mesh(wg, wm); w.position.set(sx * (W / 2 - 0.05), 0.34, sz * (L / 2 - (kind === 'bus' ? 2.0 : 0.85))); g.add(w); }
-  const lm = new THREE.MeshLambertMaterial({ color: '#ffffff', emissive: '#fff4d8', emissiveIntensity: 0.3 }), tm = new THREE.MeshLambertMaterial({ color: '#8a1010', emissive: '#ff2a1a', emissiveIntensity: 0.8 });
-  for (const sx of [-1, 1]) { const hl = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.16, 0.05), lm); hl.position.set(sx * (W / 2 - 0.35), 0.75, L / 2 + 0.01); g.add(hl); const tl = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.16, 0.05), tm); tl.position.set(sx * (W / 2 - 0.35), 0.8, -L / 2 - 0.01); g.add(tl); }
-  g.userData.lights = { material: lm };
-  g.traverse((o) => { if (o.isMesh) o.castShadow = false; });
-  return g;
-}
 // 역 · 호선 (서울 지하철 노선 색)
 const LINE_COLOR = { 1: '#0052A4', 2: '#00A84D', 3: '#EF7C1C', 4: '#00A5DE', 5: '#996CAC', 6: '#CD7C2F', 7: '#747F00', 8: '#E6186C', 9: '#BDB092', 경의중앙: '#77C4A3', 공항: '#0090D2', 신림: '#6789CA', 신분당: '#D4003B', 수인분당: '#F5A200' };
 const STATION_LINES = { 여의나루: [5], 여의도: [5, 9], 국회의사당: [9], 샛강: [9, '신림'], 노들: [9], 노량진: [1, 9], 대방: [1, '신림'], 영등포: [1], 신길: [1, 5], 영등포시장: [5], 마포: [5], 공덕: [5, 6, '경의중앙', '공항'], 효창공원앞: [6, '경의중앙'], 대흥: [6], 광흥창: [6], 상수: [6], 합정: [2, 6], 홍대입구: [2, '공항', '경의중앙'], 망원: [6], 서강대: ['경의중앙'], 신촌: [2], 가좌: ['경의중앙'], 디지털미디어시티: [6, '경의중앙', '공항'], 녹사평: [6], 이태원: [6], 한강진: [6], 삼각지: [4, 6], 버티고개: [6], 강남: [2, '신분당'], 신논현: [9, '신분당'], 역삼: [2], 잠실: [2, 8], 석촌: [8, 9], 송파나루: [9], 명동: [4], 을지로입구: [2], 회현: [4], 안국: [3], 종각: [1], 종로3가: [1, 3, 5], 신촌: [2], 이대: [2], 서울숲: ['수인분당'], 성수: [2], 뚝섬: [2] };
