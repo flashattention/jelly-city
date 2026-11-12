@@ -567,14 +567,15 @@ export class Hangang {
   // ---------- 지하철역 안 ----------
   //   출구 계단으로 내려가면 그 역 대합실로. 대합실 동쪽 계단 → 승강장, 서쪽 번호 계단 → 그 번호 출구로 나간다
   enterStation(e) {
+    this.onFade?.(); // 출구 계단 ↔ 대합실: 잠깐 어두워졌다 밝아진다 (계단을 내려간 느낌)
     const si = this.stations.indexOf(e.st); this.stationInt ||= {};
     const S = this.stationInt[si] ||= buildStation(this, e.st, si, this.entrances.filter((q) => q.st === e.st).map((q) => String(q.ref || '1')));
     this.inside = { S, st: e.st, from: e }; this.hidden = [];
     for (const o of this.scene.children) if (o !== S.g && o !== this.bear?.root && o !== this.shadow && o.visible) { this.hidden.push(o); o.visible = false; }
-    S.g.visible = true; const sp = S.spawnFromExit(String(e.ref || '1')); this.placeAt(sp.x, sp.z, sp.face); this.onInside?.({ name: e.st.name, lines: e.st.lines });
+    S.g.visible = true; const sp = S.spawnFromExit(String(e.ref || '1')); this.placeAt(sp.x, sp.z, sp.face); this.y = sp.y || 0; this.onInside?.({ name: e.st.name, lines: e.st.lines });
   }
   leaveStation(ref) {
-    const I = this.inside; if (!I) return; I.S.g.visible = false; for (const o of this.hidden || []) o.visible = true; this.hidden = null; this.inside = null;
+    const I = this.inside; if (!I) return; this.onFade?.(); I.S.g.visible = false; for (const o of this.hidden || []) o.visible = true; this.hidden = null; this.inside = null;
     // 열차를 타고 온 역(I.from 없음)에서 나갈 때도: 그 역의 아무 출구 → 같은 이름 역의 출구 → 역 자리
     const e = this.entrances.find((q) => q.st === I.st && String(q.ref) === String(ref)) || I.from || this.entrances.find((q) => q.st === I.st) || this.entrances.find((q) => q.st?.name === I.st?.name);
     if (!e) { if (I.st) this.placeAt(I.st.x, I.st.z, 0); this.stationCool = 2; this.onInside?.(null); return; }
@@ -613,9 +614,10 @@ export class Hangang {
     if (this.ride) return this.tickRide(dt);
     const I = this.inside, S = I.S; S.tick(dt, this.arrivals, this.arrivalsAt);
     // 벽 속에 끼었으면(밀어내는 거리가 크면) 대합실 바닥으로 꺼내 준다
-    { const q = this.pushOut(this.px, this.pz, this.y, 0.3); if (q && Math.hypot(q.x - this.px, q.z - this.pz) > 0.8) { const sp = S.spawnFromExit(String(I.from?.ref || '1')); this.placeAt(sp.x, sp.z, sp.face); } }
-    { const dtn = S.doorTrain(this.px, this.pz); if (dtn && !(this.zoneCool > 0)) return this.startRide(dtn.p, dtn.T); }
-    const z = S.zoneAt(this.px, this.pz); if (!z || (this.zoneCool || 0) > 0) { this.zoneCool = Math.max(0, (this.zoneCool || 0) - dt); return; }
+    { const q = this.pushOut(this.px, this.pz, this.y, 0.3); if (q && Math.hypot(q.x - this.px, q.z - this.pz) > 0.8) { const sp = S.spawnFromExit(String(I.from?.ref || '1')); this.placeAt(sp.x, sp.z, sp.face); this.y = sp.y || 0; } }
+    // 실제 열차가 돌면(S.live) 승강장 열차는 E 로 탄다 (hangang-ride.js). 예전 짧은 열차 타기는 실시간이 없을 때만
+    { const dtn = S.live ? null : S.doorTrain(this.px, this.pz); if (dtn && !(this.zoneCool > 0)) return this.startRide(dtn.p, dtn.T); }
+    const z = S.zoneAt(this.px, this.pz, this.y); if (!z || (this.zoneCool || 0) > 0) { this.zoneCool = Math.max(0, (this.zoneCool || 0) - dt); return; }
     this.zoneCool = 1.2;
     if (z.kind === 'exit') this.leaveStation(z.ref);
     else if (z.kind === 'down') { const sp = S.spawnPlatform(z.li); this.placeAt(sp.x, sp.z, sp.face); }
@@ -678,7 +680,7 @@ export class Hangang {
         if (inside || best < r) { x = bx + bnx * r * 1.001; z = bz + bnz * r * 1.001; wall = { f, nx: bnx, nz: bnz }; hit = true; }
       }
       // 둥근 물체
-      for (const c of this.circlesNear(x, z)) { if (y > (c.h ?? 99)) continue; const dx = x - c.x, dz = z - c.z, d = Math.hypot(dx, dz), m = c.r + r; if (d < m && d > 1e-4) { x = c.x + dx / d * m; z = c.z + dz / d * m; hit = true; } }
+      for (const c of this.circlesNear(x, z)) { if (y > (c.h ?? 99) || (c.mh && y < c.mh - 1.8)) continue; const dx = x - c.x, dz = z - c.z, d = Math.hypot(dx, dz), m = c.r + r; if (d < m && d > 1e-4) { x = c.x + dx / d * m; z = c.z + dz / d * m; hit = true; } }
     }
     void roofF; return { x, z, wall, hit };
   }
@@ -2081,7 +2083,7 @@ export class Hangang {
       let nx = this.px + this.mdx * this.v * slopeK * dt, nz = this.pz + this.mdz * this.v * slopeK * dt;
       // 지도 밖 · 물속(코스 다리 제외)은 못 간다
       // 지역 지도는 가운데 ±2.5km 상자 안. 서울 전체는 서울 좌표라 그 상자에 갇히면 안 된다(마포 같은 곳에서 앞으로 못 가던 것) → 서울 지형 격자 끝까지
-      //   역 · 가게 · 몰 안(멀리 따로 지은 실내)에서는 가두지 않는다 (가두면 역 안에서 걷자마자 서울 끝 땅속으로 튕겨 벽에 끼었다)
+      //   역 · 가게 · 몰 안(멀리 따로 지은 실내)에서는 가두지 않는다 (가두면 대합실에서 걷자마자 서울 끝으로 튕겼다)
       if (this.chunks && !this.inside && !this.inShop && !this.inMall) { const T = this.terr; if (T) { nx = clamp(nx, T.x0 + 50, T.x0 + (T.nx - 1) * T.step - 50); nz = clamp(nz, T.z0 + 50, T.z0 + (T.nz - 1) * T.step - 50); } }
       else if (!this.chunks) { nx = clamp(nx, -2500, 2500); nz = clamp(nz, -2500, 2500); }
       const qn = this.project(nx, nz);
@@ -2282,7 +2284,7 @@ export class Hangang {
     if (!this.camInit) { camera.position.set(cx, cy, cz); this.camInit = true; }
     const ky = this.climb || Math.abs(cy - camera.position.y) > 3 ? 1 - Math.exp(-dt * 12) : k; camera.position.x += (cx - camera.position.x) * k; camera.position.y += (cy - camera.position.y) * ky; // 높이: 벽 타기나 크게 벌어졌을 땐 빨리 따라간다 (작은 점프는 부드럽게)
     camera.position.z += (cz - camera.position.z) * k; camera.position.y = Math.max(0.3 + (tb ? Math.max(tb, this.terrAt(camera.position.x, camera.position.z)) : 0), camera.position.y); { const dg = this.deckAt(camera.position.x, camera.position.z, this.y + 0.5); if (dg > 0.5 && this.y >= dg - 0.3) camera.position.y = Math.max(camera.position.y, dg + tb + 0.6); } // 다리 위에 있을 땐 카메라가 다리 밑으로 안 내려간다
-    if (this.inside) camera.position.y = Math.min(camera.position.y, this.ride ? 2.2 : 4.1);
+    if (this.inside) camera.position.y = Math.min(camera.position.y, (this.ride ? 2.2 : 4.1) + (this.ride ? 0 : this.y > 3 ? (this.inside.S.LV || 0) : 0));
     if (this.inShop) camera.position.y = Math.min(camera.position.y, 3.1);
     // 안에서는 카메라가 벽 밖으로 나가지 않게 (벽은 안쪽만 그려져서, 밖에 나가면 어두운 빈 곳만 보인다)
     { const B = this.interiorBox?.(); if (B) { const [x0, x1, z0, z1] = B, m = 0.35; camera.position.x = clamp(camera.position.x, x0 + m, x1 - m); camera.position.z = clamp(camera.position.z, z0 + m, z1 - m); } }
@@ -2378,6 +2380,8 @@ export class Hangang {
   drawMinimap(ctx, size, span = 700) {
     const img = this.minimapImage(), N = img.width, [ox, oz, R] = this.miniO || [0, 0, 2600], k = N / (2 * R), cx = (this.px - ox + R) * k, cz = (this.pz - oz + R) * k, w = span * k;
     ctx.clearRect(0, 0, size, size); ctx.save(); ctx.beginPath(); ctx.arc(size / 2, size / 2, size / 2, 0, 7); ctx.clip();
+    // 기본은 북쪽 위 고정(화살표만 돈다). 설정에서 '회전'을 고르면 보는 쪽이 위로 오게 지도 전체를 돌린다
+    if (this.opt.miniRot) { ctx.translate(size / 2, size / 2); ctx.rotate(Math.PI + this.camYaw); ctx.translate(-size / 2, -size / 2); }
     ctx.drawImage(img, cx - w / 2, cz - w / 2, w, w, 0, 0, size, size);
     const m = size / span, c = size / 2;
     ctx.fillStyle = 'rgba(30,30,40,.9)'; ctx.font = `bold ${Math.round(size / 15)}px sans-serif`; ctx.textAlign = 'center';
@@ -2385,6 +2389,8 @@ export class Hangang {
     for (const p of this.people) { const [x0, z0] = this.world(p.s, p.lat), x = c + (x0 - this.px) * m, y = c + (z0 - this.pz) * m; ctx.fillStyle = p.kind.startsWith('runner') ? '#ffffff' : '#ffd23f'; ctx.beginPath(); ctx.arc(x, y, 2.2, 0, 7); ctx.fill(); }
     this.attr?.drawMini(ctx, size, m, c);
     this.live?.drawMini(ctx, c, m, this.px, this.pz, size);
+    // 북쪽 표시 (지도와 같이 돈다)
+    { ctx.save(); ctx.font = `bold ${Math.round(size / 13)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.strokeText('N', c, size * 0.08); ctx.fillStyle = '#d0283c'; ctx.fillText('N', c, size * 0.08); ctx.restore(); }
     // 보는 쪽 부채꼴 · 나
     ctx.translate(c, c); ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.beginPath(); ctx.moveTo(0, 0); const ya = Math.atan2(Math.cos(this.camYaw), Math.sin(this.camYaw)); ctx.arc(0, 0, size * 0.32, ya - 0.5, ya + 0.5); ctx.closePath(); ctx.fill();
     ctx.rotate(-this.face + Math.PI); ctx.fillStyle = '#ff2d55'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6.5, 7); ctx.lineTo(0, 3.5); ctx.lineTo(-6.5, 7); ctx.closePath(); ctx.fill(); ctx.stroke();

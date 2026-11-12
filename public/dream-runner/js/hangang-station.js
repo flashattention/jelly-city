@@ -26,18 +26,36 @@ const lam = (o) => new THREE.MeshLambertMaterial(o), phong = (o) => new THREE.Me
 export function buildStation(hg, st, si, exitRefs) {
   const O = new THREE.Vector3(90000 + si * 700, 0, 0), g = new THREE.Group(); g.position.copy(O); g.visible = false; hg.scene.add(g);
   const lines = st.lines.length ? st.lines : [5], col0 = LINE_COLOR2[lines[0]] || '#888', foots = [], zones = [];
-  const wall = (x0, z0, x1, z1, h = 4.4) => { const f = { ring: [[O.x + x0, z0], [O.x + x1, z0], [O.x + x1, z1], [O.x + x0, z1]], h, x0: O.x + Math.min(x0, x1), x1: O.x + Math.max(x0, x1), z0: Math.min(z0, z1), z1: Math.max(z0, z1), name: '', type: 'stone', noClimb: true }; foots.push(f); hg.addFoot(f); };
-  const box = (w, h, d, m, x, y, z, parent = g) => { const me = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); me.position.set(x, y, z); parent.add(me); return me; };
-  const plane = (w, h, m, x, y, z, ry = 0, parent = g) => { const me = new THREE.Mesh(new THREE.PlaneGeometry(w, h), m); me.position.set(x, y, z); me.rotation.y = ry; parent.add(me); return me; };
+  // 두 층: 대합실은 승강장 위 LV(6m) 층(덱 바닥), 승강장은 0. 계단 · 에스컬레이터를 걸어서 오르내린다
+  //   P = 지금 만드는 층의 무리, WL = 그 층 높이 (벽 · 둥근 물체는 그 층에서만 막는다)
+  const LV = 6; let P = g, WL = 0; const cg = new THREE.Group(); cg.position.y = LV; g.add(cg);
+  const circ = (x, z, r, h) => { hg.addCircle(O.x + x, z, r, WL + h); if (WL) { const k = `${Math.floor((O.x + x) / 20)},${Math.floor(z / 20)}`, l = hg.circGrid.get(k); l[l.length - 1].mh = WL; } };
+  const deck = (ax, az, cx, cz, hw, ya, yc) => { const sg = { ax: O.x + ax, az, cx: O.x + cx, cz, hw, ya, yc }, si = (hg.decks ||= []).push(sg) - 1; hg.deckGrid ||= new Map(); for (let gx = Math.floor((Math.min(sg.ax, sg.cx) - hw) / 40); gx <= Math.floor((Math.max(sg.ax, sg.cx) + hw) / 40); gx++) for (let gz = Math.floor((Math.min(az, cz) - hw) / 40); gz <= Math.floor((Math.max(az, cz) + hw) / 40); gz++) { const k = `${gx},${gz}`; if (!hg.deckGrid.has(k)) hg.deckGrid.set(k, []); hg.deckGrid.get(k).push(si); } };
+  const wall = (x0, z0, x1, z1, h = 4.4) => { const f = { ring: [[O.x + x0, z0], [O.x + x1, z0], [O.x + x1, z1], [O.x + x0, z1]], h: WL + h, mh: WL || undefined, x0: O.x + Math.min(x0, x1), x1: O.x + Math.max(x0, x1), z0: Math.min(z0, z1), z1: Math.max(z0, z1), name: '', type: 'stone', noClimb: true }; foots.push(f); hg.addFoot(f); };
+  const box = (w, h, d, m, x, y, z, parent = P) => { const me = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); me.position.set(x, y, z); parent.add(me); return me; };
+  const plane = (w, h, m, x, y, z, ry = 0, parent = P) => { const me = new THREE.Mesh(new THREE.PlaneGeometry(w, h), m); me.position.set(x, y, z); me.rotation.y = ry; parent.add(me); return me; };
   // 재료: 연회색 타일 바닥(반짝) · 흰 패널 벽 · 호선 색 띠 · 천장 · 조명
   const floorT = tex(256, 256, (c) => { c.fillStyle = '#d9d6d0'; c.fillRect(0, 0, 256, 256); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { c.fillStyle = (i + j) % 2 ? '#d2cfc8' : '#dedbd4'; c.fillRect(i * 64 + 1, j * 64 + 1, 62, 62); } }); floorT.wrapS = floorT.wrapT = THREE.RepeatWrapping;
   const wallT = tex(256, 128, (c) => { c.fillStyle = '#f1efea'; c.fillRect(0, 0, 256, 128); c.fillStyle = 'rgba(0,0,0,.06)'; for (let x = 0; x < 256; x += 64) c.fillRect(x, 0, 2, 128); c.fillRect(0, 63, 256, 1); }); wallT.wrapS = wallT.wrapT = THREE.RepeatWrapping;
   const wallM = lam({ map: wallT }), ceilM = lam({ color: '#e9e7e2' }), lineM = lam({ color: col0, emissive: col0, emissiveIntensity: 0.15 }), darkM = lam({ color: '#3a3f47' }), steelM = phong({ color: '#c9cdd2', shininess: 90 }), lightM = new THREE.MeshBasicMaterial({ color: '#fff7e8' }), tactM = lam({ color: '#e8c22a' });
-  const ground = (w, d, x, z) => { const t2 = floorT.clone(); t2.needsUpdate = true; t2.repeat.set(w / 4, d / 4); const m = plane(w, d, phong({ map: t2, shininess: 70, specular: '#ffffff' }), x, 0.01, z); m.rotation.x = -Math.PI / 2; const c = plane(w, d, ceilM, x, 4.6, z); c.rotation.x = Math.PI / 2; for (let lx = x - w / 2 + 3; lx < x + w / 2 - 1; lx += 6) box(0.5, 0.04, d * 0.86, lightM, lx, 4.56, z); };
+  const ground = (w, d, x, z, ceil = true) => { const t2 = floorT.clone(); t2.needsUpdate = true; t2.repeat.set(w / 4, d / 4); const m = plane(w, d, phong({ map: t2, shininess: 70, specular: '#ffffff' }), x, 0.01, z); m.rotation.x = -Math.PI / 2; if (!ceil) return; const c = plane(w, d, ceilM, x, 4.6, z); c.rotation.x = Math.PI / 2; for (let lx = x - w / 2 + 3; lx < x + w / 2 - 1; lx += 6) box(0.5, 0.04, d * 0.86, lightM, lx, 4.56, z); };
   const sideWall = (w, x, z, ry) => { const t2 = wallT.clone(); t2.needsUpdate = true; t2.repeat.set(w / 4, 1); const m = plane(w, 4.6, lam({ map: t2 }), x, 2.3, z, ry); void m; const b = plane(w, 0.32, lineM, x, 2.75, z + (ry === 0 ? 0.01 : ry === Math.PI ? -0.01 : 0), ry); if (ry === Math.PI / 2) b.position.x += 0.01; if (ry === -Math.PI / 2) b.position.x -= 0.01; };
 
-  // ---------- 대합실 (48 × 18 m) ----------
-  const CW = 48, CD = 18; ground(CW, CD, 0, 0);
+  // ---------- 대합실 (승강장 위 6m, 96 × 승강장 수에 맞춘 깊이) ----------
+  const CW = 96, CD = Math.max(26, lines.length * 22 + 4), PZ = (li) => (li - (lines.length - 1) / 2) * 22;
+  // 계단 · 에스컬레이터 구멍: 승강장마다 x 14 ~ 26 (위 끝 x 14 = 대합실, 아래 끝 x 26 = 승강장)
+  const HX0 = 14, HX1 = 26, holes = lines.map((l, li) => [HX0, PZ(li) - 1.8, HX1, PZ(li) + 3.4]);
+  P = cg; WL = LV;
+  { // 바닥 (구멍 뚫린 모양) + 아래에서 본 면(승강장 천장)
+    const sh = new THREE.Shape([new THREE.Vector2(-CW / 2, -CD / 2), new THREE.Vector2(CW / 2, -CD / 2), new THREE.Vector2(CW / 2, CD / 2), new THREE.Vector2(-CW / 2, CD / 2)]);
+    for (const [x0, z0, x1, z1] of holes) sh.holes.push(new THREE.Path([new THREE.Vector2(x0, -z0), new THREE.Vector2(x0, -z1), new THREE.Vector2(x1, -z1), new THREE.Vector2(x1, -z0)]));
+    const geo = new THREE.ShapeGeometry(sh); geo.rotateX(-Math.PI / 2); const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 4, uv.getY(i) / 4);
+    const t2 = floorT.clone(); t2.needsUpdate = true; const fl = new THREE.Mesh(geo, phong({ map: t2, shininess: 70, specular: '#ffffff' })); fl.position.y = 0.01; cg.add(fl);
+    const under = new THREE.Mesh(geo, lam({ color: '#e9e7e2', side: THREE.DoubleSide })); under.position.y = LV - 0.08; g.add(under);
+    const c = plane(CW, CD, ceilM, 0, 4.6, 0); c.rotation.x = Math.PI / 2; for (let lx = -CW / 2 + 3; lx < CW / 2 - 1; lx += 6) box(0.5, 0.04, CD * 0.86, lightM, lx, 4.56, 0);
+    // 걷는 바닥: 2m 줄마다 덱, 구멍은 비운다
+    for (let z = -CD / 2 + 1; z <= CD / 2 - 0.9; z += 2) { let xs = [-CW / 2 + 1]; const cut = holes.filter(([, z0, , z1]) => z + 1 > z0 && z - 1 < z1); for (const [x0, , x1] of cut) { xs.push(x0 - 1, x1 + 1); } xs.push(CW / 2 - 1); for (let i = 0; i < xs.length; i += 2) if (xs[i + 1] > xs[i]) deck(xs[i], z, xs[i + 1], z, 1.05, LV, LV); }
+  }
   sideWall(CW, 0, -CD / 2, 0); sideWall(CW, 0, CD / 2, Math.PI); sideWall(CD, -CW / 2, 0, Math.PI / 2); sideWall(CD, CW / 2, 0, -Math.PI / 2);
   wall(-CW / 2 - 0.5, -CD / 2 - 0.5, CW / 2 + 0.5, -CD / 2); wall(-CW / 2 - 0.5, CD / 2, CW / 2 + 0.5, CD / 2 + 0.5); wall(-CW / 2 - 0.5, -CD / 2, -CW / 2, CD / 2); wall(CW / 2, -CD / 2, CW / 2 + 0.5, CD / 2);
   // 역 이름 큰 판 (호선 색 동그라미 + 한글 이름)
@@ -46,14 +64,14 @@ export function buildStation(hg, st, si, exitRefs) {
   plane(9, 1.4, nameM, 0, 3.5, -CD / 2 + 0.03); plane(9, 1.4, nameM, 0, 3.5, CD / 2 - 0.03, Math.PI);
   // 개찰구 줄 (x = 6): 문 사이로 지나간다. 초록 화살표 · 카드 찍는 곳
   const gateM = phong({ color: '#b9bec4', shininess: 60 }), arrowT = tex(64, 64, (c) => { c.fillStyle = '#111'; c.fillRect(0, 0, 64, 64); c.fillStyle = '#29d07a'; c.beginPath(); c.moveTo(14, 20); c.lineTo(38, 20); c.lineTo(38, 10); c.lineTo(56, 32); c.lineTo(38, 54); c.lineTo(38, 44); c.lineTo(14, 44); c.fill(); }), arrowM = new THREE.MeshBasicMaterial({ map: arrowT });
-  for (let z = -6.6; z <= 6.6; z += 1.65) { box(1.6, 1.0, 0.28, gateM, 6, 0.5, z); plane(0.22, 0.22, arrowM, 5.18, 0.95, z, -Math.PI / 2); box(0.2, 0.06, 0.18, lam({ color: '#2a8cff', emissive: '#2a8cff', emissiveIntensity: 0.6 }), 6.5, 1.03, z); hg.addCircle(O.x + 6, z, 0.2, 1.1); hg.addCircle(O.x + 5.4, z, 0.16, 1.1); hg.addCircle(O.x + 6.6, z, 0.16, 1.1); }
+  for (let z = -6.6; z <= 6.6; z += 1.65) { box(1.6, 1.0, 0.28, gateM, 6, 0.5, z); plane(0.22, 0.22, arrowM, 5.18, 0.95, z, -Math.PI / 2); box(0.2, 0.06, 0.18, lam({ color: '#2a8cff', emissive: '#2a8cff', emissiveIntensity: 0.6 }), 6.5, 1.03, z); circ(6, z, 0.2, 1.1); circ(5.4, z, 0.16, 1.1); circ(6.6, z, 0.16, 1.1); }
   wall(5.2, -CD / 2, 6.8, -7.4, 1.1); wall(5.2, 7.4, 6.8, CD / 2, 1.1);
   // 발매기 · 교통카드 충전기 (벽 앞)
   const kioskT = tex(128, 192, (c) => { c.fillStyle = '#2f6fb7'; c.fillRect(0, 0, 128, 192); c.fillStyle = '#cfe8ff'; c.fillRect(16, 24, 96, 70); c.fillStyle = '#fff'; c.font = 'bold 16px sans-serif'; c.textAlign = 'center'; c.fillText('승차권 발매', 64, 120); c.fillStyle = '#ffd23f'; c.fillRect(40, 140, 48, 10); });
   const kioskM = lam({ map: kioskT, emissive: '#ffffff', emissiveMap: kioskT, emissiveIntensity: 0.3 });
   for (let i = 0; i < 4; i++) { const k = box(1.0, 1.8, 0.6, [darkM, darkM, darkM, darkM, kioskM, darkM], -0.5 + i * 1.3, 0.9, -CD / 2 + 0.4); void k; hg.addCircle(O.x - 0.5 + i * 1.3, -CD / 2 + 0.6, 0.55, 1.8); }
   // 기둥 (원형, 호선 색 띠)
-  for (const x of [-16, -8, 14, 20]) for (const z of [-4.5, 4.5]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 4.6, 16), wallM); c.position.set(x, 2.3, z); g.add(c); const b = new THREE.Mesh(new THREE.CylinderGeometry(0.43, 0.43, 0.3, 16), lineM); b.position.set(x, 2.75, z); g.add(b); hg.addCircle(O.x + x, z, 0.5, 4.6); }
+  for (const x of [-30, -16, -2, 36, 44]) for (const z of [-4.5, 4.5]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 4.6, 16), wallM); c.position.set(x, 2.3, z); g.add(c); const b = new THREE.Mesh(new THREE.CylinderGeometry(0.43, 0.43, 0.3, 16), lineM); b.position.set(x, 2.75, z); g.add(b); circ(x, z, 0.5, 4.6); }
   // 출구 계단 (서쪽 끝 · 출구마다 하나씩, 노란 번호판)
   const refs = exitRefs.length ? exitRefs : ['1'], n = refs.length, exitT = (ref) => tex(256, 96, (c) => { c.fillStyle = '#2b3039'; c.fillRect(0, 0, 256, 96); c.fillStyle = '#f6c400'; c.fillRect(10, 10, 76, 76); c.fillStyle = '#111'; c.font = 'bold 54px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(ref, 48, 50); c.fillStyle = '#fff'; c.font = 'bold 30px sans-serif'; c.fillText('나가는 곳', 168, 40); c.font = '18px sans-serif'; c.fillText('Exit', 168, 70); });
   refs.forEach((ref, i) => {
@@ -62,23 +80,35 @@ export function buildStation(hg, st, si, exitRefs) {
     const em = lam({ map: exitT(ref), emissive: '#ffffff', emissiveMap: exitT(ref), emissiveIntensity: 0.6 }); plane(2.6, 0.95, em, x, 3.3, z - side * 1.6, side > 0 ? Math.PI : 0); plane(2.6, 0.95, em, x, 3.3, z - side * 1.6 + side * 0.02, side > 0 ? 0 : Math.PI);
     zones.push({ kind: 'exit', ref, x: O.x + x, z: z + side * 0.6, r: 1.4 });
   });
-  // 승강장 가는 계단 (동쪽 · 호선마다)
+  // 승강장 가는 계단 · 에스컬레이터 (구멍 둘레 난간, 위에 '타는 곳' 판)
   lines.forEach((l, i) => {
-    const z = (i - (lines.length - 1) / 2) * 7, x = CW / 2 - 3.5, lc = LINE_COLOR2[l] || '#888';
-    for (let q = 0; q < 6; q++) box(0.5, 0.1, 3.4, lam({ color: '#a8a49c' }), x + q * 0.42, -0.05 - q * 0.0, z);
-    box(0.05, 1.0, 3.6, steelM, x + 1.2, 0.95, z - 1.8); box(0.05, 1.0, 3.6, steelM, x + 1.2, 0.95, z + 1.8);
+    const z = PZ(i), lc = LINE_COLOR2[l] || '#888';
+    for (const [x0, z0, x1, z1] of [holes[i]]) { box(x1 - x0, 1.0, 0.06, steelM, (x0 + x1) / 2, 0.5, z0 - 0.03); box(x1 - x0, 1.0, 0.06, steelM, (x0 + x1) / 2, 0.5, z1 + 0.03); box(0.06, 1.0, z1 - z0, steelM, x1 + 0.03, 0.5, (z0 + z1) / 2); wall(x0, z0 - 0.15, x1, z0, 1.1); wall(x0, z1, x1, z1 + 0.15, 1.1); wall(x1, z0, x1 + 0.15, z1, 1.1); }
     const t = tex(320, 96, (c) => { c.fillStyle = lc; c.fillRect(0, 0, 320, 96); c.fillStyle = '#fff'; c.font = 'bold 34px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(`${l}${String(l).length === 1 ? '호선' : '선'} 타는 곳`, 160, 36); c.font = '18px sans-serif'; c.fillText('To Platform  ↓', 160, 72); });
-    plane(3.2, 0.95, lam({ map: t, emissive: '#ffffff', emissiveMap: t, emissiveIntensity: 0.6 }), x - 1.6, 3.3, z, -Math.PI / 2);
-    zones.push({ kind: 'down', line: l, li: i, x: O.x + x + 0.8, z, r: 1.5 });
+    plane(3.2, 0.95, lam({ map: t, emissive: '#ffffff', emissiveMap: t, emissiveIntensity: 0.6 }), HX0 - 0.6, 3.3, z + 0.8, Math.PI / 2);
   });
   // 도착 안내판 (LED, 주황 글씨)
   const boardC = document.createElement('canvas'); boardC.width = 512; boardC.height = 96; const boardT = new THREE.CanvasTexture(boardC); boardT.colorSpace = THREE.SRGBColorSpace; const boardM = new THREE.MeshBasicMaterial({ map: boardT });
   box(5.4, 1.1, 0.2, darkM, 10, 3.3, 0); plane(5.2, 0.95, boardM, 9.89, 3.3, 0, -Math.PI / 2); plane(5.2, 0.95, boardM, 10.11, 3.3, 0, Math.PI / 2);
 
+  P = g; WL = 0;
+  // 계단(폭 2.8m) · 에스컬레이터(폭 1.2m, 오르는 쪽 · 내리는 쪽 판 하나): 대합실(x 14, 6m) ↔ 승강장(x 26, 0m)
+  const stepM = lam({ color: '#a8a49c' }), escM = lam({ color: '#3a3d42' }), railM = lam({ color: '#1d1f22' });
+  lines.forEach((l, li) => {
+    const z = PZ(li), sz = z - 0.2, ez = z + 2.4, n = 30, run = HX1 - HX0;
+    for (let q = 0; q < n; q++) { const x = HX0 + (q + 0.5) * run / n, y = LV * (1 - (q + 0.5) / n); box(run / n + 0.02, 0.2, 2.8, stepM, x, y - 0.1, sz); box(0.04, 0.02, 2.8, tactM, x - run / n / 2 + 0.03, y + 0.01, sz); }
+    const slope = Math.atan2(LV, run), len = Math.hypot(LV, run);
+    const esc = box(len, 0.25, 1.2, escM, (HX0 + HX1) / 2, LV / 2 - 0.1, ez); esc.rotation.z = -slope;
+    for (const sd of [-1, 1]) { const rl = box(len, 0.1, 0.12, railM, (HX0 + HX1) / 2, LV / 2 + 0.95, ez + sd * 0.7); rl.rotation.z = -slope; const sk = box(len, 0.9, 0.06, lam({ color: '#c9cdd2' }), (HX0 + HX1) / 2, LV / 2 + 0.45, ez + sd * 0.72); sk.rotation.z = -slope; }
+    for (const sd of [-1, 1]) { const hr = box(len, 0.05, 0.05, steelM, (HX0 + HX1) / 2, LV / 2 + 0.95, sz + sd * 1.45); hr.rotation.z = -slope; }
+    deck(HX0, sz, HX1, sz, 1.4, LV, 0); deck(HX0, ez, HX1, ez, 0.6, LV, 0);
+    // 계단 밑 (높이 1.8m 넘는 쪽)으로는 승강장에서 못 지나간다
+    wall(HX0, z - 1.8, HX0 + run * 0.68, z + 3.4, 1.7);
+  });
   // ---------- 승강장 (호선마다 하나: 섬식, 양쪽 선로) ----------
   const plats = lines.map((l, li) => {
-    const pz = 60 + li * 50, PL = 96, PW = 10, lc = LINE_COLOR2[l] || '#888', seq = LINE_SEQ[l] || [], at = seq.indexOf(st.name), prev = at > 0 ? seq[at - 1] : '', next = at >= 0 && at < seq.length - 1 ? seq[at + 1] : '';
-    ground(PL, PW, 0, pz);
+    const pz = PZ(li), PL = 96, PW = 10, lc = LINE_COLOR2[l] || '#888', seq = LINE_SEQ[l] || [], at = seq.indexOf(st.name), prev = at > 0 ? seq[at - 1] : '', next = at >= 0 && at < seq.length - 1 ? seq[at + 1] : '';
+    ground(PL, PW, 0, pz, false);
     // 선로 바닥 (어둡게) · 레일 · 벽 (터널 벽에 광고 상자)
     for (const sd of [-1, 1]) {
       const tz = pz + sd * (PW / 2 + 2.6), tb = plane(PL, 5.2, lam({ color: '#3b3a38' }), 0, -0.9, tz); tb.rotation.x = -Math.PI / 2;
@@ -100,32 +130,31 @@ export function buildStation(hg, st, si, exitRefs) {
     const signT = tex(1024, 200, (c, w, h) => { c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, h); c.fillStyle = lc; c.fillRect(0, h - 46, w, 46); c.fillStyle = '#1d1d1f'; c.font = 'bold 92px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(st.name, w / 2, 76); c.fillStyle = '#fff'; c.font = 'bold 30px sans-serif'; c.textAlign = 'left'; c.fillText(prev ? `← ${prev}` : '', 24, h - 22); c.textAlign = 'right'; c.fillText(next ? `${next} →` : '', w - 24, h - 22); });
     const signM = lam({ map: signT, emissive: '#ffffff', emissiveMap: signT, emissiveIntensity: 0.45 });
     for (let x = -PL / 2 + 12; x < PL / 2 - 6; x += 24) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 4.6, 16), wallM); c.position.set(x, 2.3, pz); g.add(c); hg.addCircle(O.x + x, pz, 0.48, 4.6); plane(3.6, 0.7, signM, x, 3.2, pz - 0.42, Math.PI); plane(3.6, 0.7, signM, x, 3.2, pz + 0.42); }
-    for (let x = -PL / 2 + 18; x < PL / 2 - 6; x += 24) for (const sd of [-1, 1]) { box(2.2, 0.08, 0.5, lam({ color: '#c9a77a' }), x, 0.45, pz + sd * 1.6); box(0.08, 0.45, 0.4, steelM, x - 0.9, 0.22, pz + sd * 1.6); box(0.08, 0.45, 0.4, steelM, x + 0.9, 0.22, pz + sd * 1.6); hg.addCircle(O.x + x, pz + sd * 1.6, 0.6, 0.5); }
-    // 대합실로 올라가는 계단 (서쪽 끝)
-    for (let q = 0; q < 6; q++) box(0.5, 0.1, 3.6, lam({ color: '#a8a49c' }), -PL / 2 + 2 + q * 0.42, 0.05 + q * 0.16, pz);
-    const upT = tex(320, 96, (c) => { c.fillStyle = '#2b3039'; c.fillRect(0, 0, 320, 96); c.fillStyle = '#fff'; c.font = 'bold 32px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('나가는 곳 ↑', 160, 36); c.font = '18px sans-serif'; c.fillText('Way Out', 160, 72); });
-    plane(3.2, 0.95, lam({ map: upT, emissive: '#ffffff', emissiveMap: upT, emissiveIntensity: 0.6 }), -PL / 2 + 4.5, 3.3, pz, Math.PI / 2);
-    zones.push({ kind: 'up', line: l, li, x: O.x - PL / 2 + 2.6, z: pz, r: 1.6 });
+    for (let x = -PL / 2 + 18; x < PL / 2 - 6; x += 24) for (const sd of [-1, 1]) { if (Math.abs(x - 20) < 10) continue; box(2.2, 0.08, 0.5, lam({ color: '#c9a77a' }), x, 0.45, pz + sd * 1.6); box(0.08, 0.45, 0.4, steelM, x - 0.9, 0.22, pz + sd * 1.6); box(0.08, 0.45, 0.4, steelM, x + 0.9, 0.22, pz + sd * 1.6); hg.addCircle(O.x + x, pz + sd * 1.6, 0.6, 0.5); }
     // 열차 두 대 (양쪽 방면): 들어와 서고 문 열고 떠난다
     const trains = [-1, 1].map((sd, k) => { const tr = makeTrain(l); tr.position.set(0, -0.9, pz + sd * (PW / 2 + 2.6)); tr.visible = false; g.add(tr); return { tr, sd, phase: 'gone', t: 20 + k * 70 + Math.random() * 40, to: sd < 0 ? seq[0] || '' : seq[seq.length - 1] || '' }; });
     return { l, pz, PL, trains, prev, next };
   });
 
   // 조명: 따뜻한 흰빛 (바깥 해 · 하늘빛은 들어가 있는 동안 꺼진다)
-  g.add(new THREE.HemisphereLight('#fff4e4', '#8f8578', 1.05)); const pl = new THREE.PointLight('#ffe9c8', 14, 40, 1.6); pl.position.set(0, 4, 0); g.add(pl);
+  g.add(new THREE.HemisphereLight('#fff4e4', '#8f8578', 1.05)); const pl = new THREE.PointLight('#ffe9c8', 14, 40, 1.6); pl.position.set(0, LV + 4, 0); g.add(pl);
   for (const p of plats) { const l2 = new THREE.PointLight('#ffe9c8', 14, 50, 1.6); l2.position.set(0, 4, p.pz); g.add(l2); }
 
-  const S = { g, O, zones, foots, plats, st, CD, CW,
-    spawnFromExit(ref) { const z = zones.find((q) => q.kind === 'exit' && q.ref === ref) || zones.find((q) => q.kind === 'exit'); const side = Math.sign(z.z) || 1; return { x: z.x, z: z.z - side * 3.2, face: side > 0 ? Math.PI : 0 }; },
-    spawnPlatform(li) { const p = plats[li] || plats[0]; return { x: O.x - p.PL / 2 + 6, z: p.pz, face: Math.PI / 2 }; },
-    spawnConcourse(li) { const z = zones.find((q) => q.kind === 'down' && q.li === li) || zones.find((q) => q.kind === 'down'); return { x: z.x - 3.5, z: z.z, face: -Math.PI / 2 }; },
-    zoneAt(x, z) { return zones.find((q) => Math.hypot(x - q.x, z - q.z) < q.r) || null; },
+  const S = { g, O, zones, foots, plats, st, CD, CW, LV,
+    spawnFromExit(ref) { const z = zones.find((q) => q.kind === 'exit' && q.ref === ref) || zones.find((q) => q.kind === 'exit'); const side = Math.sign(z.z) || 1; return { x: z.x, z: z.z - side * 3.2, face: side > 0 ? Math.PI : 0, y: LV }; },
+    spawnPlatform(li) { const p = plats[li] || plats[0]; return { x: O.x + HX1 + 4, z: p.pz - 3, face: Math.PI / 2, y: 0 }; },
+    spawnConcourse(li) { return { x: O.x + HX0 - 3, z: PZ(li) + 0.8, face: -Math.PI / 2, y: LV }; },
+    lineIndex(line) { const n = String(line || '').replace(/호선$/, '').replace(/선$/, ''); const i = lines.findIndex((l) => String(l) === n || String(l).replace(/선$/, '') === n); return Math.max(0, i); },
+    // 실제 열차(hangang-transit.js)에 맞춰: 들어오는 중이면 진입, 역에 서 있으면 정차 · 문 열림
+    liveArrive(li, sd, eta) { const p = plats[li] || plats[0], T = p.trains[sd > 0 ? 1 : 0]; if (T.phase === 'gone' || T.phase === 'out') { T.phase = 'in'; T.t = Math.max(3, Math.min(9, eta)); T.tr.visible = true; return true; } return false; },
+    liveStop(li, sd) { const p = plats[li] || plats[0], T = p.trains[sd > 0 ? 1 : 0]; if (T.phase !== 'stop' || T.t < 3) { const was = T.phase; T.phase = 'stop'; T.t = 22; T.tr.position.x = 0; T.tr.visible = true; setDoors(T.tr, 1); return was !== 'stop'; } return false; },
+    zoneAt(x, z, y = LV) { return y > LV - 1 ? zones.find((q) => Math.hypot(x - q.x, z - q.z) < q.r) || null : null; },
     tick(dt, arrivals, at) {
       for (const p of plats) for (const T of p.trains) {
         T.t -= dt; const half = p.PL / 2 + 120;
         // 실제 도착 정보: "○○방면" 이 다음 역이면 이쪽 선로, 이전 역이면 반대쪽. 남은 초에 맞춰 들어온다
         if (T.phase === 'gone' && arrivals?.length) { const want = T.sd > 0 ? p.next : p.prev, a = arrivals.find((q) => String(q.line).startsWith(String(p.l)) && new RegExp(`${want}\\s*방면`).test(`${q.to || ''} ${q.msg || ''}`)); if (a) { const rem = (a.sec || 0) - (Date.now() - (at || Date.now())) / 1000; if (/도착|진입/.test(a.msg || '') && !/전역|후/.test(a.msg || '')) T.t = Math.min(T.t, 0); else if (rem > 0) T.t = Math.max(0, rem - 9); } }
-        if (T.phase === 'gone' && T.t <= 0) { T.phase = 'in'; T.t = 9; T.tr.visible = true; }
+        if (T.phase === 'gone' && T.t <= 0 && !this.live) { T.phase = 'in'; T.t = 9; T.tr.visible = true; }
         if (T.phase === 'in') { const k = Math.max(0, T.t / 9); T.tr.position.x = -T.sd * half * k * k; if (T.t <= 0) { T.phase = 'stop'; T.t = 22; setDoors(T.tr, 1); } }
         else if (T.phase === 'stop') { if (T.t < 3) setDoors(T.tr, Math.max(0, T.t / 3)); if (T.t <= 0) { T.phase = 'out'; T.t = 9; setDoors(T.tr, 0); } }
         else if (T.phase === 'out') { const k = 1 - Math.max(0, T.t / 9); T.tr.position.x = T.sd * half * k * k; if (T.t <= 0) { T.phase = 'gone'; T.tr.visible = false; T.t = 120 + Math.random() * 120; } }

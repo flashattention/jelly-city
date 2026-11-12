@@ -93,6 +93,7 @@ export class LiveTransit {
   // ---------- 받아 오기 ----------
   async pollBus() {
     const hg = this.hg; if (!hg.api || hg.px == null) return;
+    if (hg.inside || hg.inShop || hg.inMall) return; // 실내(멀리 따로 지은 곳)에선 버스를 받지 않는다
     const wx = hg.px + this.cx, wz = hg.pz + this.cz, lat = LAT0 - wz / KZ, lon = LON0 + wx / KX;
     try { const j = await hg.api(`/api/seoul/bus/near?lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}&c=${this.cid}`); this.busOK = true; this.busSrc = j.src; this.ingestBus(j.buses || []); }
     catch { try { const j = await hg.api('/api/seoul/bus/pos'); this.busOK = true; this.busSrc = 'old'; this.ingestBus(j.buses || []); } catch { this.busOK = false; } }
@@ -100,7 +101,8 @@ export class LiveTransit {
   async pollSub(all = false) {
     const hg = this.hg; if (!hg.api || !this.sub || hg.px == null) return;
     // 곰 둘레 3km 안에 역이 있는 노선만 (큰 지도를 열면 모든 노선)
-    const wx = hg.px + this.cx, wz = hg.pz + this.cz, lines = Object.entries(this.sub.lines).filter(([, L]) => all || Object.values(L.st).some(([, x, z]) => Math.hypot(x - wx, z - wz) < 3000)).map(([n]) => n);
+    // 역 안에서는 그 역의 실제 자리 둘레로 (역 안 공간은 서울 밖 먼 곳에 지어 둔다)
+    const st = hg.inside?.st, wx = (st ? st.x : hg.px) + this.cx, wz = (st ? st.z : hg.pz) + this.cz, lines = Object.entries(this.sub.lines).filter(([, L]) => all || Object.values(L.st).some(([, x, z]) => Math.hypot(x - wx, z - wz) < 3000)).map(([n]) => n);
     for (let i = 0; i < lines.length; i += 8) { try { const j = await hg.api(`/api/seoul/subway/positions?lines=${encodeURIComponent(lines.slice(i, i + 8).join(','))}`); this.subOK = true; for (const [line, list] of Object.entries(j.lines || {})) this.ingestLine(line, list); } catch { if (!this.trains.size) this.subOK = false; } }
   }
   poll() { this.pollBus(); }
@@ -215,7 +217,7 @@ export class LiveTransit {
       // 역에 닿으면 20초 선다 (문 열림 · 타고 내리기)
       if (o.sttus === 1 && !T.hop && T.e === o.e && o.e.len - o.d < 1.5 && !o.dwellAt) o.dwellAt = now;
       if (o.dwellAt && (now - o.dwellAt > 20 || o.e.len - o.d > 30)) o.dwellAt = 0;
-      let v; if (o.dwellAt) v = 0; else if (remain > 0.5) v = clamp(remain / (T.hop ? 14 : 8), remain < 25 ? 1.5 : 3, 26); else if (o.sttus === 2 || o.sttus === 3) v = (T.e.len * 0.92 - o.d > 0 && !T.hop) ? 11 : 0; else if (o.sttus === 0) v = o.d < T.e.len - 0.5 ? 4 : 0; else { v = 0; if (now - o.at > 40 && o.next) { const ne = this.edge(o.line, T.e.b, o.next); if (ne) { o.tgt = { e: ne, d: ne.len * 0.25, hop: true }; o.sttus = 3; } } }
+      let v; if (o.dwellAt) v = 0; else if (remain > 0.5) v = clamp(remain / (T.hop ? 14 : 8), remain < 25 ? 1.5 : 3, 26); else if (o.sttus === 2 || o.sttus === 3) v = (T.e.len * 0.92 - o.d > 0 && !T.hop) ? 11 : 0; else if (o.sttus === 0) v = o.d < T.e.len - 0.5 ? 4 : 0; else if (o.sttus === 1 && !T.hop && o.e.len - o.d > 0.5) v = clamp((o.e.len - o.d) / 8, 1.5, 26); else { v = 0; if (now - o.at > 40 && o.next) { const ne = this.edge(o.line, T.e.b, o.next); if (ne) { o.tgt = { e: ne, d: ne.len * 0.25, hop: true }; o.sttus = 3; } } }
       o.v += (v - o.v) * Math.min(1, dt * 1.2); o.d += o.v * dt;
       if (o.d >= o.e.len && T.hop) { o.d -= o.e.len; o.e = T.e; T.hop = false; }
       o.d = clamp(o.d, 0, o.e.len);

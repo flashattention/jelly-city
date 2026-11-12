@@ -975,6 +975,8 @@ const hgTileAt = (x, z) => !!hgWorldIdx?.have?.some(([i, j]) => i === Math.floor
 async function hgRegionStart(id) { const S = await hgLoadSeoul(), R = S.regions.find((q) => q.id === id) || S.regions[0]; let k = 1; while (k < R.pts.length - 1 && R.acc[k] < 30) k++; const [ax, az] = R.pts[k - 1], [bx, bz] = R.pts[k]; return { x: bx, z: bz, face: Math.atan2(bx - ax, bz - az) }; }
 function hgUse(id) { if (!HG_REGIONS[id]) id = 'yeouido'; if (hgWorld) { if (!hgInst.seoul) { const n = new Hangang(); for (const k of Object.keys(hg)) if (/^on[A-Z]|^api$/.test(k) && typeof hg[k] === 'function') n[k] = hg[k]; hgInst.seoul = n; } hg = hgInst.seoul; hgRegion = id; return; } if (!hgInst[id]) { const n = new Hangang(); for (const k of Object.keys(hg)) if (/^on[A-Z]|^api$/.test(k) && typeof hg[k] === 'function') n[k] = hg[k]; hgInst[id] = n; } hg = hgInst[id]; hgRegion = id; }
 hg.api = (path) => account.api(path);
+// 역 출구 계단을 오르내릴 때 잠깐 어두워졌다 밝아진다
+hg.onFade = () => { let f = document.getElementById('hg-fade'); if (!f) { f = document.createElement('div'); f.id = 'hg-fade'; f.style.cssText = 'position:fixed;inset:0;background:#000;pointer-events:none;z-index:30;opacity:0;transition:opacity .5s ease-out'; document.body.appendChild(f); } f.style.transition = 'none'; f.style.opacity = '0.85'; requestAnimationFrame(() => requestAnimationFrame(() => { f.style.transition = 'opacity .5s ease-out'; f.style.opacity = '0'; })); };
 // 지하철 출입구 앞: 그 역 실시간 도착 (20초마다)
 const LCOL = { '1호선': '#0052A4', '2호선': '#00A84D', '5호선': '#996CAC', '6호선': '#CD7C2F', '9호선': '#BDB092', 경의중앙선: '#77C4A3', 공항철도: '#0090D2', 신림선: '#6789CA' };
 let hgSt = null, hgStT = null;
@@ -1154,6 +1156,8 @@ function hgSettings() {
   hgSeg('hg-time', [['auto', '🕐 흐르는 대로'], ...Object.entries(TIMES).map(([k, [n]]) => [k, n])], () => hg.opt.time, (v) => hg.setOpt('time', v));
   hgSeg('hg-flow', [[0, '⏸️ 멈춤'], [1, '🐢 1분 = 1시간'], [4, '🐇 4배']], () => hg.opt.flow, (v) => { hg.opt.flow = v; });
   hgSeg('hg-camseg', CAMS.map((n, i) => [i, n]), () => hg.opt.cam || 0, (v) => { hg.opt.cam = v; });
+  // 미니맵: 북쪽 위 고정(기본, 화살표만 돈다) · 보는 쪽이 위로 돌기
+  hgSeg('hg-miniseg', [[false, '🧭 북쪽 위 고정'], [true, '🔄 보는 쪽으로 회전']], () => !!hg.opt.miniRot, (v) => { hg.opt.miniRot = v; });
   hgSeg('hg-sound', [[false, '🔊 게임 소리'], [true, '🔇 끄기 (내 음악 듣기)']], () => sound.muted, (v) => { if (sound.muted !== v) { toggleMute(); syncSound(); } });
 }
 $('hg-set-btn').onclick = () => { hgSettings(); $('hg-set').classList.remove('hidden'); };
