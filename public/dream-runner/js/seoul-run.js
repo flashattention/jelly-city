@@ -141,8 +141,9 @@ export class SeoulRun {
   // 곧은 길 자리 점 → 세상 점
   world(p, dream, out = new THREE.Vector3()) { this.bendM(p.z, dream, this.R); return out.copy(p).applyMatrix4(this.R); }
   // 판정 자리 물체(트랙 · 곰 · 그림자 · 다른 사람)를 휘어 놓는다
-  bend(objs) {
-    for (const o of objs) { if (!o) continue; o.matrixAutoUpdate = false; o.updateMatrix(); this.bendM(o.position.z, undefined, this.R); o.matrix.premultiply(this.R); o.matrixWorldNeedsUpdate = true; }
+  //   dream 을 주면 모두 그 코스 길로 (다른 곰: 보는 사람 코스)
+  bend(objs, dream) {
+    for (const o of objs) { if (!o) continue; o.matrixAutoUpdate = false; o.updateMatrix(); this.bendM(o.position.z, dream, this.R); o.matrix.premultiply(this.R); o.matrixWorldNeedsUpdate = true; }
   }
   unbend(objs) { for (const o of objs) if (o) { o.matrixAutoUpdate = true; o.updateMatrix(); } }
   // 매 프레임: 하늘 · 빛 · 신호등 · 먼 나무 숨기기

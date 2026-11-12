@@ -884,10 +884,11 @@ function seoulFrame(dt) {
   seoulRun.tick(dt, runner.s);
   const objs = [...track.root.children, runner.bear.root, runner.shadow];
   boosterTo(runner.booster, seoulRun.hw.scene);
-  for (const g of game.ghosts.values()) { boosterTo(g.booster, seoulRun.hw.scene); if (g.bear.root.parent !== seoulRun.hw.scene) seoulRun.hw.scene.add(g.bear.root); objs.push(g.bear.root); if (g.tag) { if (g.tag.parent !== seoulRun.hw.scene) seoulRun.hw.scene.add(g.tag); objs.push(g.tag); } }
-  seoulRun.bend(objs);
+  // 다른 곰은 내 카메라가 있는 코스 길 위에 (문 너머로 먼저 간 곰은 문을 지나 그 길 끝을 곧게 이어 달리고, 내가 문을 지나는 순간 함께 다음 코스로)
+  const w = game.watch && game.mode === 'dead' && game.multi ? game.watch : null, d = track.dreamAt(w ? w.s : runner.s), gObjs = [];
+  for (const g of game.ghosts.values()) { boosterTo(g.booster, seoulRun.hw.scene); if (g.bear.root.parent !== seoulRun.hw.scene) seoulRun.hw.scene.add(g.bear.root); gObjs.push(g.bear.root); if (g.tag) { if (g.tag.parent !== seoulRun.hw.scene) seoulRun.hw.scene.add(g.tag); gObjs.push(g.tag); } }
+  seoulRun.bend(objs); seoulRun.bend(gObjs, d);
   // 카메라: 곧은 길 자리(seoulCam)에서 정한 것을 곰이 있는 코스 길 위로
-  const w = game.watch && game.mode === 'dead' && game.multi ? game.watch : null, d = track.dreamAt(w ? w.s : runner.s);
   seoulRun.world(seoulCam.position, d, camera.position); seoulRun.world(camLook, d, seoulP); camera.lookAt(seoulP);
   if (game.shake > 0) camera.rotation.z += (Math.random() - 0.5) * game.shake * 0.05;
   seoulRun.world(new THREE.Vector3(runner.x, 0, track.origin - runner.s), track.dreamAt(runner.s), seoulP);
