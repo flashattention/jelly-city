@@ -2436,12 +2436,22 @@ export class Hangang {
     for (const p of this.people) { const [x0, z0] = this.world(p.s, p.lat), x = c + (x0 - this.px) * m, y = c + (z0 - this.pz) * m; ctx.fillStyle = p.kind.startsWith('runner') ? '#ffffff' : '#ffd23f'; ctx.beginPath(); ctx.arc(x, y, 2.2, 0, 7); ctx.fill(); }
     this.attr?.drawMini(ctx, size, m, c);
     this.live?.drawMini(ctx, c, m, this.px, this.pz, size);
-    // 북쪽 표시 (지도와 같이 돈다)
-    { ctx.save(); ctx.font = `bold ${Math.round(size / 13)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.strokeText('N', c, size * 0.08); ctx.fillStyle = '#d0283c'; ctx.fillText('N', c, size * 0.08); ctx.restore(); }
+    // 동서남북 (지도와 같이 돈다): N 빨강 크게, E S W 작게
+    { ctx.save(); ctx.font = `bold ${Math.round(size / 13)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.strokeText('N', c, size * 0.08); ctx.fillStyle = '#d0283c'; ctx.fillText('N', c, size * 0.08);
+      ctx.font = `bold ${Math.round(size / 19)}px sans-serif`; ctx.lineWidth = 3; for (const [t, x, y] of [['E', size * 0.93, c], ['S', c, size * 0.93], ['W', size * 0.07, c]]) { ctx.strokeText(t, x, y); ctx.fillStyle = '#4a5266'; ctx.fillText(t, x, y); } ctx.restore(); }
     // 보는 쪽 부채꼴 · 나
     ctx.translate(c, c); ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.beginPath(); ctx.moveTo(0, 0); const ya = Math.atan2(Math.cos(this.camYaw), Math.sin(this.camYaw)); ctx.arc(0, 0, size * 0.32, ya - 0.5, ya + 0.5); ctx.closePath(); ctx.fill();
     ctx.rotate(-this.face + Math.PI); ctx.fillStyle = '#ff2d55'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6.5, 7); ctx.lineTo(0, 3.5); ctx.lineTo(-6.5, 7); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
+    // 가까운 큰길 이름 (아래쪽 띠, 지도가 돌아도 그대로)
+    const rn = this.inside || this.inShop || this.inMall || this.ride ? '' : this.nearRoadName(); if (rn) { ctx.save(); ctx.font = `bold ${Math.round(size / 15)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const w = ctx.measureText(rn).width + size * 0.08, y = size * 0.8; ctx.fillStyle = 'rgba(30,35,50,.72)'; ctx.beginPath(); ctx.roundRect?.(c - w / 2, y - size * 0.05, w, size * 0.1, size * 0.05); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillText(rn, c, y); ctx.restore(); }
+  }
+  // 곰 가까이(길 가장자리에서 25m 안) 이름 있는 길 중 가장 넓은 · 가까운 것 (1초마다)
+  nearRoadName() {
+    const now = performance.now(); if (this.rnAt && now - this.rnAt < 1000) return this.rnVal || ''; this.rnAt = now; let best = null;
+    const maps = this.chunks ? [...this.chunks.values()].filter((c) => { const T0 = this.world0.tile, [i, j] = c.chunkKey.split('_').map(Number); return Math.abs((i + 0.5) * T0 - this.px) < T0 && Math.abs((j + 0.5) * T0 - this.pz) < T0; }).map((c) => c.map) : [this.map];
+    for (const M of maps) { const S = M.scale; (M.roads || []).forEach((rd, ri) => { const nm = M.roadNames?.[ri]; if (!nm) return; for (let i = 4; i < rd.length; i += 2) { const ax = rd[i - 2] * S, az = rd[i - 1] * S, bx = rd[i] * S, bz = rd[i + 1] * S; if (Math.abs(ax - this.px) > 300 && Math.abs(bx - this.px) > 300) continue; const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, t = clamp(((this.px - ax) * dx + (this.pz - az) * dz) / L2, 0, 1), d = Math.hypot(ax + dx * t - this.px, az + dz * t - this.pz) - rd[0] / 2; if (d > 25) continue; const sc = d - rd[0] * 0.8; if (!best || sc < best.sc) best = { sc, nm }; } }); }
+    return (this.rnVal = best ? best.nm : '');
   }
   // 큰 지도: 코스 둘레를 보여 주고, 누른 곳 → 코스 안 가장 가까운 자리
   mapBounds() { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of this.rp) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } const pad = 260, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, half = Math.max(x1 - x0, z1 - z0) / 2 + pad; return { cx, cz, half }; }

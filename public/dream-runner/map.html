@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>젤리 서울 러너 · 지도</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<style>
+  html, body { margin: 0; height: 100%; background: #1b2030; overflow: hidden; font-family: 'Jua', sans-serif; color: #fff; }
+  #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  .bar { position: fixed; left: 10px; right: 10px; top: 10px; display: flex; gap: 8px; align-items: center; pointer-events: none; }
+  .bar b { font-weight: normal; background: rgba(18, 22, 36, .72); padding: 6px 12px; border-radius: 12px; font-size: 16px; }
+  #where { flex: 1; min-width: 0; background: rgba(18, 22, 36, .72); padding: 6px 12px; border-radius: 12px; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar button { pointer-events: auto; border: 0; border-radius: 10px; min-width: 34px; height: 34px; font-size: 16px; cursor: pointer; background: rgba(255, 255, 255, .9); color: #1d2333; font-family: 'Jua', sans-serif; }
+  #wait { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px; font-size: 18px; opacity: .85; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="bar"><b>🗺️ 젤리 서울 러너</b><span id="where"></span><button id="out" aria-label="작게">−</button><button id="in" aria-label="크게">+</button><button id="me" aria-label="내 위치로">◎</button></div>
+<div id="wait">게임 화면을 기다리는 중이에요…<br>젤리 서울 러너를 켜 두면 이 창에 지도가 따라와요</div>
+<script type="module">
+  // 게임 창(서울 산책)이 BroadcastChannel 로 보내는 지도 그림 · 곰 자리를 받아 그린다 (같은 그림 함수)
+  import { drawBigMap, MAP_CH } from './js/hangang-bigmap.js';
+  const cv = document.getElementById('c'), ch = new BroadcastChannel(MAP_CH), S = { span: 900, cx: null, cz: null, img: null, o: null, pos: null };
+  ch.onmessage = async (e) => { const d = e.data; if (d?.t === 'img' && d.blob) { S.img = await createImageBitmap(d.blob); S.o = d.o; draw(); } else if (d?.t === 'pos') { S.pos = d; if (d.o) S.o = S.o || d.o; document.getElementById('wait').style.display = 'none'; document.getElementById('where').textContent = d.where || ''; draw(); } };
+  const hello = () => ch.postMessage({ t: 'hello' }); hello(); setInterval(() => ch.postMessage({ t: S.pos ? 'alive' : 'hello' }), 2000);
+  function draw() {
+    if (!S.pos) return; const dpr = Math.min(2, devicePixelRatio || 1), W = innerWidth, H = innerHeight;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawBigMap(ctx, W, H, { ...S.pos, img: S.img, o: S.o, span: S.span, top: 46, cx: S.cx ?? undefined, cz: S.cz ?? undefined });
+  }
+  addEventListener('resize', draw);
+  document.getElementById('in').onclick = () => { S.span = Math.max(120, S.span / 1.5); draw(); };
+  document.getElementById('out').onclick = () => { S.span = Math.min(3000, S.span * 1.5); draw(); };
+  document.getElementById('me').onclick = () => { S.cx = S.cz = null; draw(); };
+  addEventListener('wheel', (e) => { S.span = Math.max(120, Math.min(3000, S.span * (e.deltaY > 0 ? 1.15 : 1 / 1.15))); draw(); });
+  let drag = null; cv.addEventListener('pointerdown', (e) => { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', (e) => { if (!drag || !S.pos) return; const k = Math.min(innerWidth, innerHeight) / 2 / S.span; S.cx = (S.cx ?? S.pos.x) - (e.clientX - drag[0]) / k; S.cz = (S.cz ?? S.pos.z) - (e.clientY - drag[1]) / k; drag = [e.clientX, e.clientY]; draw(); });
+  cv.addEventListener('pointerup', () => { drag = null; });
+</script>
+</body>
+</html>

@@ -24,6 +24,7 @@ import { openWardrobe, notifyNew, titleHtml, medalHtml, loadCos } from '../../sh
 import { starsEarned } from '../../shared/js/cos-items.js';
 import { Hangang, SEASONS, WEATHERS, TIMES, SPEEDS, V_MIN, V_MAX } from './hangang.js';
 import { mapPlaces, HOOD_SPOTS } from './hangang-attractions.js';
+import { setupMapWin } from './hangang-mapwin.js';
 
 const $ = (id) => document.getElementById(id);
 const MODE_KEY = 'dreamrunner.mode', DIFF_KEY = 'dreamrunner.diff', CAM_KEY = 'dreamrunner.cam', MAP_KEY = 'dreamrunner.map';
@@ -75,7 +76,8 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Space') input.jump = true; // 점프는 Space
   if (['KeyS', 'ArrowDown'].includes(e.code)) input.slide = true;
   if (['KeyE', 'ShiftLeft', 'ShiftRight'].includes(e.code)) input.shove = true;
-  if (e.code === 'KeyM') muteBtn();
+  // 서울 산책: M = 큰 지도 (그 밖에선 소리 끄기)
+  if (e.code === 'KeyM') { if (game.mode === 'hangang') hgMapWin?.toggle(); else muteBtn(); }
   if (e.code === 'KeyV') toggleCam();
   if (e.code === 'KeyQ') input.item = true;
   if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
@@ -1081,7 +1083,10 @@ $('hg-go').onclick = () => { if (!hgPick) return; $('hg-map').classList.add('hid
   if (hgPick.seoul) { if (!hgPick.region) return; const pos = { s: hgPick.s, lat: 0 }; if (game.mode === 'hangang' && hgPick.region === hgRegion) { hg.teleport(pos.s, pos.lat); toast(`📍 ${hgPick.name} · 새 위치로 왔어요`, 1600); } else { toast(`${hgPick.name}(으)로 가요…`, 2000); hgSwitchRegion(hgPick.region, pos); } return; }
   if (hgMapStart || game.mode !== 'hangang') startHangang({ s: hgPick.s, lat: hgPick.lat }); else { hg.teleport(hgPick.s, hgPick.lat); toast('📍 새 위치로 왔어요', 1400); } };
 $('hg-map-x').onclick = () => $('hg-map').classList.add('hidden');
-$('hg-mini').onclick = () => { if (game.mode === 'hangang') hgOpenMap(false); };
+// 큰 지도 창 (8-25): 미니맵 · 🗺️ 단추 · M 키. 창 안 📍 단추 = 다른 곳으로 가기(예전 지도 고르기)
+const hgMapWin = setupMapWin({ getHg: () => hg, openPicker: () => hgOpenMap(false) });
+$('hg-mini').onclick = () => { if (game.mode === 'hangang') hgMapWin.toggle(); };
+$('hg-map-btn').onclick = () => hgMapWin.toggle();
 async function startHangang(pos = null) {
   const b = $('hg-btn'); b.disabled = true;
   await hgCheckWorld(); if (hgWorld && hg !== hgInst.seoul) hgUse(hgRegion);
@@ -1121,6 +1126,7 @@ function hgReport(final = false) {
   account.api('/api/dream/hangang/run', { method: 'POST', body }).then((r) => { if (r?.fresh?.length && !document.body.classList.contains('solo')) setTimeout(notifyNew, 300); }).catch(() => {});
 }
 function leaveHangang() {
+  hgMapWin?.toggle(false);
   hgReport(true); if (document.pointerLockElement) document.exitPointerLock?.(); $('hg-labels').innerHTML = ''; hg.onStation(null); hg.exitInterior?.(); hg.onShop(null);
   hgKeepNow(); hg.leave(); document.body.classList.remove('hg'); $('t-shove').textContent = '🫸';
   $('hg-hud').classList.add('hidden'); $('hg-set').classList.add('hidden');
@@ -1172,6 +1178,7 @@ function hgFrame(dt) {
   const inp = { mx: (R ? 1 : 0) - (L ? 1 : 0) + joyX, mz: (U ? 1 : 0) - (D ? 1 : 0) + joyY, yaw: look.yaw, pitch: look.pitch, jump: input.jump, sprint: keys.has('ShiftLeft') || keys.has('ShiftRight') || touchHeld.has('shove'), slide: keys.has('KeyC') || keys.has('ControlLeft') || touchHeld.has('slide'), jumpHeld: keys.has('Space') || touchHeld.has('jump') };
   if (!$('hg-set').classList.contains('hidden')) { inp.mx = inp.mz = 0; inp.jump = false; }
   hg.update(dt, inp, camera);
+  hgMapWin.tick(dt);
   input.jump = input.slide = input.shove = input.item = false;
   if (hgPost) { hgPost.mood(hg.light); hgPost.render(); } else renderer.render(hg.scene, camera);
   if (hg.activeLabels?.length || $('hg-labels').childElementCount) hgLabels();
