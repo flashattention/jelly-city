@@ -11,7 +11,7 @@ export const FLOORS = {
   buffet: { n: 81, btn: '81', name: '81층 하늘 뷔페', alt: 328, sub: '창가 자리 · 음식 줄', soon: true },
   room: { n: 87, btn: '87', name: '87층 일반 객실', alt: 352, need: 'room' },
   suite: { n: 94, btn: '94', name: '94층 스위트', alt: 381, need: 'suite' },
-  ph: { n: 100, btn: '100', name: '100층 펜트하우스', alt: 405, need: 'ph', soon: true },
+  ph: { n: 100, btn: '100', name: '100층 펜트하우스', alt: 405, need: 'ph' },
   obs: { n: 118, btn: '118', name: '118층 전망대', alt: 478, sub: '유리 바닥 · 478m', soon: true },
   car: { n: 0, btn: '', name: '엘리베이터 안', alt: 0 },
 };
@@ -472,9 +472,9 @@ function room(C) {
   return F;
 }
 // 방 불빛: 등 자리마다 따뜻한 점 빛 (최대 3), 스위치 · 잠자기로 끄고 켠다
-function roomLights(F) { F.pl = (F.lampPts || []).slice(0, 3).map(([x, y, z]) => { const l = new THREE.PointLight('#ffcf98', 0, 7, 1.6); l.position.set(x, y + 0.1, z); F.g.add(l); return l; }); }
+function roomLights(F) { F.pl = (F.lampPts || []).slice(0, 3).map(([x, y, z]) => { const l = new THREE.PointLight('#ffcf98', 0, F.lightR || 7, 1.6); l.position.set(x, y + 0.1, z); F.g.add(l); return l; }); }
 function roomTick(F, C, dt, night) {
-  const on = F.lamps !== false; for (const l of F.pl) l.intensity += ((on ? 0.8 + night * 2.6 : 0) - l.intensity) * Math.min(1, dt * 5);
+  const on = F.lamps !== false; for (const l of F.pl) l.intensity += ((on ? (0.8 + night * 2.6) * (F.lightK || 1) : 0) - l.intensity) * Math.min(1, dt * 5);
   mats().glow.color.setScalar(on ? 1 : 0.12); C.shell.win.uniforms.uDim.value = F.dim ?? 1;
   for (const D of F.doors || []) D.tick(dt); for (const c of F.curt || []) c.tick(dt); F.tv?.tick(dt); F.rs?.tick(dt); F.drinkT?.(dt);
   if (F.tubWater) F.tubWater.position.y = 0.42 + Math.sin(C.hg.time * 1.3) * 0.004;
@@ -536,8 +536,8 @@ function suite(C) {
 // ============================================================
 function penthouse(C) {
   const F = floorBase('ph', C), k = F.kit, A = F.atlas, R = 20, H = 8.4, UP = 4.2, ZE = -4, SX0 = -7.2, SX1 = -5.8, SZ0 = 4.4;
-  towerFloor(F, C, { R, cr: 6.5, H, floor: 'marbleD', floorTile: 1.6, ceil: '#2a2420', step: 1.4, frame: '#1d1b19', sill: '#3a3028' });
-  F.sunK = 1; F.hemiD = 0.75; F.hemiN = 0.1; F.ambN = 0.3; F.floorTint = '#6a5440'; F.lampCol = '#ffd7a8'; F.near = false;
+  towerFloor(F, C, { R, cr: 6.5, H, floor: 'marble', floorTile: 1.8, ceil: '#8a7360', step: 1.4, frame: '#1d1b19', sill: '#3a3028' });
+  F.sunK = 1; F.hemiD = 1.0; F.hemiN = 0.2; F.ambN = 0.55; F.lightR = 16; F.lightK = 2.2; F.floorTint = '#6a5440'; F.lampCol = '#ffd7a8'; F.near = false;
   const lower = new Area(), upper = new Area();
   lower.fn((x, z, y, r) => inRSq(x, z, R - 0.45 - r, 6.05 - r)); upper.fn((x, z, y, r) => inRSq(x, z, R - 0.45 - r, 6.05 - r) && z < ZE - r);
   // 아래층 가구는 lower 에, 위층 가구는 높이 UP 로 올린 따로 묶음(Fu)에 짓는다
@@ -569,6 +569,7 @@ function penthouse(C) {
   F.ground = (x, z, y) => { if (onStair(x, z) && Math.abs(y - sy(z)) < 1.0) return sy(z); if (z < ZE + 0.05 && y > 3) return UP; return 0; };
   F.ceil = (x, z, y) => (z < ZE && y < 3 ? UP - 0.35 : H); F.box = () => [-R + 2.2, R - 2.2, -R + 2.2, R - 2.2];
   // 거실 (남쪽, 두 층 높이): 큰 소파 둘 · 낮은 탁자 · 러그 · 긴 샹들리에
+  { const P2 = rsqOutline(R - 1.1, 5.4); for (let i = 0; i < P2.length; i++) { const a2 = P2[i], b2 = P2[(i + 1) % P2.length], L2 = Math.hypot(b2[0] - a2[0], b2[1] - a2[1]); if (L2 < 0.2) continue; k.add(G.box(L2 + 0.3, 0.01, 0.7), '#ffffff', 'marbleD', T((a2[0] + b2[0]) / 2, 0.004, (a2[1] + b2[1]) / 2, Math.atan2(b2[1] - a2[1], -(b2[0] - a2[0])))); } }
   rug(F, -1, 11, 7.5, 5.5, '#d9cdb8');
   for (const s of sofa(F, C, -1, 13.3, Math.PI, { w: 3.4, col: '#2f3d52', seats: 3, camD: 3 })) void s; sofa(F, C, -4.7, 10.5, Math.PI / 2, { w: 2.4, col: '#2f3d52', seats: 2, camD: 3 }); sofa(F, C, 2.8, 9.2, -Math.PI / 2 - 0.3, { w: 1.0, col: '#8a3a36', mat: 'velvet', seats: 1, camD: 2.4 });
   F.lampPts.push([-1, 4.6, 10.6], [10.5, 2.4, 3]);
@@ -585,7 +586,7 @@ function penthouse(C) {
     const melody = [523.25, 659.25, 783.99, 659.25, 698.46, 880, 783.99, 659.25, 587.33, 523.25];
     const play = () => { melody.forEach((f, i) => setTimeout(() => C.SND.note(f), i * 330)); C.toast('🎹 ♪ 도 미 솔 미 파 라 솔…'); };
     const seat = [px + s * 0.75, pz + c * 0.75], out = [px + s * 1.5, pz + c * 1.5];
-    F.spots.push({ x: out[0], z: out[1], r: 1.0, label: '피아노 치기', act: () => { C.sit({ x: seat[0], y: 0.52, z: seat[1], yaw: ry + Math.PI, camD: 2.6, out, label: '한 곡 치기', act: play, onStand() {} }); setTimeout(play, 300); } }); }
+    F.spots.push({ x: out[0], z: out[1], r: 1.0, label: '피아노 치기', act: () => { C.sit({ x: seat[0], y: 0.52, z: seat[1], yaw: ry + Math.PI, camD: 2.8, out, label: '일어나기' }); setTimeout(play, 300); } }); }
   // 10인 식탁 (동쪽 창가): 긴 호두나무 식탁 · 의자 10 (인스턴스) · 촛대 둘
   { const tx = 12, tz = 3; k.add(G.box(1.2, 0.06, 4.4), '#ffffff', 'wood', T(tx, 0.72, tz)); for (const dz of [-1.6, 1.6]) k.add(G.box(0.5, 0.72, 0.12), '#2a1e16', 'satin', T(tx, 0, tz + dz)); lower.wall(tx - 0.6, tz - 2.2, tx + 0.6, tz + 2.2);
     for (const dz of [-1, 1]) { k.add(G.cyl(0.08, 0.1, 0.02, 12), '#d4af6e', 'metal', T(tx, 0.75, tz + dz)); k.add(G.cyl(0.015, 0.015, 0.4, 6), '#d4af6e', 'metal', T(tx, 0.75, tz + dz)); for (const o of [-0.12, 0, 0.12]) { k.add(G.cyl(0.015, 0.015, 0.18, 6), '#fbf3e4', 'gloss', T(tx, 1.15, tz + dz + o)); k.add(G.ball(0.02, 6), '#ffb24a', 'glow', T(tx, 1.36, tz + dz + o)); } }
