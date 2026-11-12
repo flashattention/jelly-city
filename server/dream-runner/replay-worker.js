@@ -27,7 +27,7 @@ const bear = { inner: { rotation: { set() {} } }, root: { scale: { setScalar() {
 const scene = new THREE.Scene();
 function replay({ seed, diff, map, dts, evs }, { Track, Runner, BOOST, DIFFS, diffOf }) {
   const k = DIFFS[diffOf(diff)].k, r = Object.create(Runner.prototype); r.bear = bear; r.shadow = { visible: true }; r.reset(0, 0); r.speedK = k; r.multi = false;
-  const t = new Track(scene, null, seed); t.reset(seed, false, { map: map === 'hell' || map === 'void' ? map : 'dream', K: k * (1 + BOOST) });
+  const t = new Track(scene, null, seed); t.reset(seed, false, { map: map === 'hell' || map === 'void' || map === 'seoul' ? map : 'dream', K: k * (1 + BOOST) });
   const input = { dir: 0, jump: false, slide: false, slideHeld: false }; let T = 0, ei = 0; t.update(0, 0, 0, 0);
   let i = 0;
   for (; i < dts.length; i++) {

@@ -81,6 +81,8 @@ export function makeBear(p = {}) {
   return r;
 }
 
+// 🗺️ 서울 맵에서 부딪힌 것 (다치는 말 없이 장난스럽게)
+const SEOUL_HIT = { car: '차랑 콩! 부딪혔어요', suv: '차랑 콩! 부딪혔어요', taxi: '택시랑 콩! 부딪혔어요', bus: '버스에 막혀 멈췄어요', moto: '배달 오토바이랑 콩!', bike: '자전거랑 꽝!', ped: '행인 젤리와 부딪혔어요 · 미안해요!', cones: '공사 고깔에 걸렸어요', barrier: '공사 가림막에 쿵!', banner: '현수막에 머리를 쿵!' };
 export class Runner {
   constructor(scene, profile) {
     this.scene = scene;
@@ -170,6 +172,7 @@ export class Runner {
     // 장애물
     const o = this.eff.ghost > 0 || this.invul > 0 ? null : track.hit(this.s, this.x, this.y, this.h);
     if (o && this.eff.shield > 0) { this.eff.shield = 0; track.breakOne(o); fx?.('shieldbreak'); }
+    else if (o && o.seoul) return this.die(SEOUL_HIT[o.seoul] || '부딪혔어요', track);
     else if (o) return this.die(o.kind === 'meteor' ? '운석에 맞았어요' : o.kind === 'laser' ? '빛줄기에 닿았어요' : o.kind === 'slam' ? '괴물의 일격에 맞았어요' : o.kind === 'bar' ? (track.hell ? '괴물의 팔에 머리를 쿵!' : '가로대에 머리를 쿵!') : '장애물에 부딪혔어요', track);
     // 별사탕
     // 아이템전: ? 상자 · 함정 · 자석

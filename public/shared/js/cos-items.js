@@ -127,7 +127,7 @@ export const HELL_MULT = 1.5, VOID_MULT = 1.8; // 이공간이 가장 어려워�
 export const starsEarned = (stars, diff, map) => Math.floor((Number(stars) || 0) * (STAR_MULT[diff] || 1) * (map === 'hell' ? HELL_MULT : map === 'void' ? VOID_MULT : 1));
 
 // ---------- 업적 ----------
-const DIFF_NAMES = { easy: '노멀', hard: '하드', extreme: '익스트림', lightspeed: '광속', beyond: '초월' }, MAPS = { dream: '꿈나라', hell: '지옥', void: '이공간' };
+const DIFF_NAMES = { easy: '노멀', hard: '하드', extreme: '익스트림', lightspeed: '광속', beyond: '초월' }, MAPS = { dream: '꿈나라', hell: '지옥', void: '이공간', seoul: '서울' };
 export const GAMES = {
   'dream-runner': { name: '드림 러너', emoji: '🌙', color: '#8f7bff' }, 'jelly-guard': { name: '젤리수호대', emoji: '🛡️', color: '#4cc3ff' }, 'jelly-arena': { name: '젤리 아레나', emoji: '⚔️', color: '#ff5c5c' },
   'jelly-tactical': { name: '젤리택티컬', emoji: '🎯', color: '#7ee081' }, 'jelly-drop': { name: '젤리드롭', emoji: '🪂', color: '#ffb347' }, 'jelly-drift': { name: '젤리드리프트', emoji: '🏎️', color: '#ff7ac6' },
@@ -177,7 +177,7 @@ const TOP1 = {
 export const TOP1_TRAILS = Object.entries(TOP1).map(([map, t]) => ({ id: `trail.top1.${map}`, slot: 'trail', name: `${t.name} 최정상의 길`, emoji: '👑', rarity: 'apex', top1: map,
   fx: { grand: 3, shape: t.shape, colors: t.colors, size: 0.52, life: 1.7, rate: 80, ribbon: { w: 1.75, life: 2.5, colors: t.rib } } }));
 export const liveTrailText = (it) => (it.top1 ? `👑 ${TOP1[it.top1].e} ${TOP1[it.top1].name} 초월 순위표에서 지금 1위인 동안만 쓸 수 있어요` : top3Text(it));
-const styleOf = (r) => { const d = r?.diff && DIFF_STYLE[r.diff]; return d ? { e: d.e, grad: r.map === 'hell' ? [...d.grad, '#ff3a1a'] : r.map === 'void' ? [...d.grad, '#7c4dff'] : d.grad } : null; };
+const styleOf = (r) => { const d = r?.diff && DIFF_STYLE[r.diff]; return d ? { e: d.e, grad: r.map === 'hell' ? [...d.grad, '#ff3a1a'] : r.map === 'void' ? [...d.grad, '#7c4dff'] : r.map === 'seoul' ? [...d.grad, '#29b6f6'] : d.grad } : null; };
 export const prestigeOf = (r) => (r?.kind === 'dream' ? 1 + Math.max(0, DIFF_ORDER.indexOf(r.diff)) + (r.map === 'hell' ? 0.5 : r.map === 'void' ? 0.7 : 0) : r?.kind === 'record' ? 1 : 0);
 const TIER_STEP = ['bronze', 'silver', 'gold', 'platinum', 'legend'];
 const ach = (id, game, name, desc, tier, rule) => ({ id, game, name, desc, tier, rule });

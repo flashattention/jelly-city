@@ -19,6 +19,8 @@ import { ITEMS } from './items.js';
 import { DIFFS, diffOf } from './diff.js';
 import { HELLS } from './hells.js';
 import { VOIDS } from './voids.js';
+import { SEOULS } from './seouls.js';
+import { makeSeoulMover, seoulNight, seoulTick } from './seoul-movers.js';
 import { openPatchNotes, showWhatsNew } from '../../shared/js/patchnotes.js';
 import { openWardrobe, notifyNew, titleHtml, medalHtml, loadCos } from '../../shared/js/wardrobe.js';
 import { starsEarned } from '../../shared/js/cos-items.js';
@@ -28,8 +30,8 @@ import { setupMapWin } from './hangang-mapwin.js';
 
 const $ = (id) => document.getElementById(id);
 const MODE_KEY = 'dreamrunner.mode', DIFF_KEY = 'dreamrunner.diff', CAM_KEY = 'dreamrunner.cam', MAP_KEY = 'dreamrunner.map';
-const mapOf = (m) => (m === 'hell' || m === 'void' ? m : 'dream'), mapName = (m) => (m === 'hell' ? '🔥 랜덤 지옥' : m === 'void' ? '🌌 랜덤 이공간' : '🌙 랜덤 꿈나라');
-const mapTag = (m) => (m === 'hell' ? '🔥 지옥 · ' : m === 'void' ? '🌌 이공간 · ' : ''); // 순위표 · 방 이름 앞에
+const mapOf = (m) => (m === 'hell' || m === 'void' || m === 'seoul' ? m : 'dream'), mapName = (m) => (m === 'hell' ? '🔥 랜덤 지옥' : m === 'void' ? '🌌 랜덤 이공간' : m === 'seoul' ? '🗺️ 서울' : '🌙 랜덤 꿈나라');
+const mapTag = (m) => (m === 'hell' ? '🔥 지옥 · ' : m === 'void' ? '🌌 이공간 · ' : m === 'seoul' ? '🗺️ 서울 · ' : ''); // 순위표 · 방 이름 앞에
 const CHAR_KEY = 'dreamrunner.char', NICK_KEY = 'dreamrunner.nick', ANON_KEY = 'dreamrunner.anon';
 // 비로그인: 이 브라우저의 임시 아이디 (순위표에서 내 기록을 찾는 데만 쓴다)
 function anonId() {
@@ -50,6 +52,8 @@ window.addEventListener('resize', resize); resize();
 
 const env = new Env(scene, renderer);
 const track = new Track(scene, env, (Math.random() * 2 ** 31) | 0);
+// 🗺️ 서울 맵: 길 위 차 · 버스 · 오토바이 · 자전거 · 행인 젤리 모양 (서버의 기록 다시 돌리기에선 모양 없이 판정만)
+track.makeMover = makeSeoulMover;
 env.originRef = track;
 const runner = new Runner(scene, {});
 env.setTheme(track.themeOf(0), true);
@@ -354,7 +358,7 @@ function newRun(seed, itemMode = false, diff = 'easy', map = 'dream') {
   env.clear();
   // 지옥 길은 난이도의 실제 빠르기(가속 포함)에 맞춰 만든다 · 빠를수록 멀리 보이게
   const K = DIFFS[game.diff].k * (1 + BOOST);
-  env.fogK = game.map !== 'dream' ? Math.max(1, (K / 1.9) ** 0.7) : 1;
+  env.fogK = game.map === 'hell' || game.map === 'void' ? Math.max(1, (K / 1.9) ** 0.7) : 1;
   track.reset(seed, itemMode, { map: game.map, K });
   game.camFall = 0; game.camG = null; game.rec = null; game.shake = 0; env.underY = undefined; game.underY = -13;
   game.rp = !itemMode && !game.multi ? { dts: [], evs: [], last: -1 } : null; game.dtCarry = 0;
@@ -452,7 +456,7 @@ async function showOver() {
   $('ov-why').textContent = `💤 ${game.why || '꿈에서 깼어요'}`;
   const fin = game.rec || { dist: Math.floor(runner.s), stars: runner.stars }; // 쓰러진 순간의 기록 (쓰러지는 동안 조금 더 미끄러진 거리는 넣지 않는다 · 순위표와 같은 값)
   $('ov-score').textContent = (fin.dist + fin.stars * 10).toLocaleString();
-  $('ov-detail').textContent = `${fin.dist.toLocaleString()}m 달림 · 별사탕 ${fin.stars}개 (⭐ +${starsEarned(fin.stars, game.diff, game.map).toLocaleString()}) · ${game.map === 'hell' ? '지옥' : game.map === 'void' ? '이공간' : '꿈'} ${game.dreamsSeen}개를 지났어요 · ${Math.floor(game.runT)}초`;
+  $('ov-detail').textContent = `${fin.dist.toLocaleString()}m 달림 · 별사탕 ${fin.stars}개 (⭐ +${starsEarned(fin.stars, game.diff, game.map).toLocaleString()}) · ${game.map === 'hell' ? '지옥' : game.map === 'void' ? '이공간' : game.map === 'seoul' ? '서울 코스' : '꿈'} ${game.dreamsSeen}개를 지났어요 · ${Math.floor(game.runT)}초`;
   const r = game.submitted;
   $('ov-save').classList.toggle('hidden', !r?.anonPending);
   if (r?.anonPending) { $('ov-nick').value = store.get(NICK_KEY) || game.profile.name; $('ov-save-btn').disabled = false; }
@@ -481,23 +485,37 @@ $('ov-save-btn').onclick = async () => {
 };
 $('ov-nick').onkeydown = (e) => { if (e.key === 'Enter') $('ov-save-btn').click(); };
 
+// 🗺️ 서울 맵: 차 · 버스 · 오토바이 · 자전거 · 행인을 아슬아슬하게 피하면 (스칠 듯 0.7m 안으로 지나가면) 한 번씩 알려 준다
+function nearMiss() {
+  const s = runner.s, x = runner.x, y = runner.y;
+  for (const m of track.movers) {
+    const o = m.ob; if (!o || o.s1 < -1e8 || o.x0 > 1e8 || (m.nearAt ?? -9) > game.runT - 1.2) continue;
+    if (s + 0.3 < o.s0 || s - 0.3 > o.s1) continue;
+    const gap = Math.max(o.x0 - (x + 0.3), (x - 0.3) - o.x1), over = y - o.y1;
+    if ((gap > 0 && gap < 0.7) || (gap <= 0 && over > 0 && over < 0.6)) { m.nearAt = game.runT; game.nearN = (game.nearN || 0) + 1; nearPop(); }
+  }
+}
+function nearPop() { let el = document.getElementById('near-pop'); if (!el) { el = document.createElement('div'); el.id = 'near-pop'; el.style.cssText = "position:fixed;left:50%;top:34%;transform:translate(-50%,0);font:900 30px 'Jua',sans-serif;color:#fff;text-shadow:0 3px 0 #ff4081,0 0 18px rgba(255,64,129,.7);pointer-events:none;z-index:20;transition:opacity .5s,transform .5s"; document.body.appendChild(el); }
+  el.textContent = ['아슬아슬!', '휴~ 살짝!', '간발의 차!'][game.nearN % 3]; el.style.transition = 'none'; el.style.opacity = '1'; el.style.transform = 'translate(-50%,0) scale(1.15)'; void el.offsetWidth; el.style.transition = 'opacity .7s .3s, transform .7s'; el.style.opacity = '0'; el.style.transform = 'translate(-50%,-30px) scale(1)'; }
 // ---------- 꿈이 바뀔 때 ----------
 function showDreamCard(d) {
   const th = track.themeOf(d);
   const el = $('dream-card');
   el.classList.add('hidden'); void el.offsetWidth;
-  el.querySelector('.dc-n').textContent = `${th.hell ? 'HELL' : th.void ? 'VOID' : 'DREAM'} ${d + 1}`;
-  el.querySelector('.dc-tip').textContent = th.tip || '';
+  el.querySelector('.dc-n').textContent = `${th.hell ? 'HELL' : th.void ? 'VOID' : th.seoul ? 'SEOUL' : 'DREAM'} ${d + 1}`;
+  // 서울 코스: 실제 길 (어디 → 어디 · km · 낮/노을/밤)
+  el.querySelector('.dc-tip').textContent = th.course ? `${th.course.from} → ${th.course.to} · ${th.course.km}km · ${th.course.time}` : th.tip || '';
   el.querySelector('.dc-e').textContent = th.emoji;
   el.querySelector('.dc-name').textContent = th.name;
   el.classList.remove('hidden');
-  $('h-dream-n').textContent = `${th.hell ? '지옥' : th.void ? '이공간' : '꿈'} #${d + 1}`;
+  $('h-dream-n').textContent = `${th.hell ? '지옥' : th.void ? '이공간' : th.seoul ? '코스' : '꿈'} #${d + 1}`;
   $('h-dream-name').textContent = `${th.emoji} ${th.name}`;
 }
 function enterDream(d) {
   game.dream = d; game.dreamsSeen = Math.max(game.dreamsSeen, d + 1);
   const th = track.themeOf(d);
   env.setTheme(th);
+  if (th.seoul) seoulNight(th.light < 0.7);
   setMusic(th.mus);
   sfx('portal');
   showDreamCard(d);
@@ -771,7 +789,7 @@ function frame() {
   if (game.mode === 'title') {
     // 처음 화면: 출발 발판에서 제자리 달리기 + 꿈이 6초마다 바뀌며 빙글 도는 카메라
     game.titleT += dt;
-    if (game.titleT > 6) { game.titleT = 0; const pool = game.pickMap === 'hell' ? HELLS : game.pickMap === 'void' ? VOIDS : THEMES, th = pool[Math.floor(Math.random() * pool.length)]; env.setTheme(th); }
+    if (game.titleT > 6) { game.titleT = 0; const pool = game.pickMap === 'hell' ? HELLS : game.pickMap === 'void' ? VOIDS : game.pickMap === 'seoul' ? SEOULS : THEMES, th = pool[Math.floor(Math.random() * pool.length)]; env.setTheme(th); }
     runner.bear.root.position.set(0, 0, z); runner.bear.root.rotation.y = Math.PI;
     runner.bear.update(dt, 8, { noCrawl: true });
     const a = t * 0.18;
@@ -812,6 +830,7 @@ function frame() {
       if (game.multi && game.deadT > 1.4) spectate();
     }
     track.update(game.runT, runner.s, game.mode === 'run' && runner.alive ? runner.v : 0, dt);
+    if (track.seoul) { seoulTick(game.runT); if (game.mode === 'run' && runner.alive) nearMiss(); }
     if (track.hell) { game.underY += (track.deathY(runner.s) + 3 - game.underY) * Math.min(1, dt * 2); env.underY = game.underY; }
     track.generate(Math.max(runner.s, game.multi ? maxGhostS() : 0));
     if (game.mode === 'run') {

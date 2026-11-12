@@ -258,7 +258,7 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 /* 드림 러너: 맨 윗줄을 통째로 쓰는 큰 카드 · 맵 4가지를 나란히 */
 .card.dream.wide { grid-column: span 2; min-height: 380px; }
 .card.dream.wide .art { bottom: 132px; }
-.card.dream.wide .art { display: grid; grid-template-columns: repeat(3, 1fr); background: #120a35; }
+.card.dream.wide .art { display: grid; grid-template-columns: repeat(4, 1fr); background: #120a35; }
 .dp { position: relative; overflow: hidden; border-right: 2px solid rgba(255,255,255,.12); background-size: cover; background-position: center; transition: transform .6s; }
 .card.dream.wide:hover .dp { transform: scale(1.04); }
 .dp:last-child { border-right: 0; }
@@ -297,7 +297,10 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
   .card.dream.wide .info { grid-template-columns: 1fr; }
   .card.dream.wide .info .play { grid-column: 1; grid-row: auto; justify-self: start; margin-top: 10px; }
   .card.dream.wide { grid-column: 1 / -1; }
-  .card.dream.wide .art { grid-template-columns: repeat(3, 1fr); }
+  /* 휴대폰: 네 칸을 2 × 2 로 (한 줄 넷은 너무 좁아 찌그러진다) */
+  .card.dream.wide .art { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr); }
+  .card.dream.wide .dp:nth-child(2) { border-right: 0; }
+  .card.dream.wide .dp:nth-child(-n+2) { border-bottom: 2px solid rgba(255,255,255,.12); }
   .card.dream.wide .info p { font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) { .dp-hell .fist, .dp-hg .jog, .dp-hg .river, .dp-void .vroad, .dp-hell .lava { animation: none; } }

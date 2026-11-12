@@ -215,13 +215,21 @@ export class Env {
       if (!o.userData.anim) { const baked = bakeStatic(g); baked.userData.baked = true; o = baked; } else { o.userData.anim0 = o.userData.anim; o = g; o.userData.anim = (q, t, dt) => q.children[0].userData.anim(q.children[0], t, dt); }
       o.rotation.y = r.range(-0.5, 0.5);
       if (th.upside) { o.rotation.x = Math.PI; py = y + r.range(12, 18); }
-    } else if (place === 'far') { px = x + side * r.range(45, 140); py = (th.hell ? y : Math.min(y, 0)) + UNDER_Y - 2; o.rotation.y = r.range(0, 6.28); }
+    } else if (place === 'far') {
+      py = (th.hell ? y : Math.min(y, 0)) + UNDER_Y - 2;
+      // 서울 맵: 길게 뻗은 것(다리 · 고가 · 빌딩 줄)은 길과 나란히, 큰 것은 그 크기(userData.rad · halfW)만큼 더 멀리 (길을 가로질러 덮지 않게)
+      if (o.userData.alongTrack) { o.rotation.y = R() < 0.5 ? 0 : Math.PI; px = x + side * ((o.userData.halfW || 12) + r.range(22, 90)); }
+      else if (th.seoul) { px = x + side * (Math.max(45, (o.userData.rad || 30) + 22) + r.range(0, 95)); o.rotation.y = r.range(0, 6.28); }
+      else { px = x + side * r.range(45, 140); o.rotation.y = r.range(0, 6.28); }
+    }
     else if (place === 'sky') { px = x + side * r.range(12, 90); py = y + r.range(14, 50); }
     else if (place === 'over') { px = x; py = y; }
+    // 서울 맵: 길과 같은 높이의 보도 위 (떠 있는 섬 없이)
+    else if (place === 'street') { px = x + side * (w / 2 + r.range(2.5, 9)); py = y; o.rotation.y = r.range(-0.15, 0.15); }
     else if (place === 'drift') { px = x + side * r.range(w / 2 + 2.5, w / 2 + 9); py = y + r.range(0.5, 5); }
     if (!o.userData.anim && !o.userData.baked) { const b = bakeStatic(o); b.userData.baked = true; o = b; }
     // 옆 풍경: 길과 겹치면 반대쪽 · 더 먼 곳으로 옮기고, 그래도 겹치면 놓지 않는다
-    if (place === 'side' || place === 'drift') {
+    if (place === 'side' || place === 'drift' || place === 'street') {
       const box = BOX.setFromObject(o), off = px - x, far = Math.max(box.max.x - box.min.x, 4);
       const spot = [off, -off, off + Math.sign(off) * far, -off - Math.sign(off) * far].find((d) => !this.blocks(track, box, s, x + d, py));
       if (spot === undefined) { this.dispose(o); return; }

@@ -25,7 +25,8 @@ const DAILY_KEEP = 120;
 // 서울 명소 도장: 명소 id → 체험에 걸리는 최소 시간(초, 실제 시간). 시작(begin)을 알리고 이 시간이 지나야 도장(done)이 찍힌다
 const HG_STAMPS = { gbg: 30, cable: 40, lock: 3, cruise: 60, bike: 45, obs63: 20, lwt: 20, lotteworld: 30 };
 const HG_TTL = 10 * 3600e3, HG_MO = ['sunset', 'sunrise', 'night', 'rain', 'snow', 'spring', 'summer', 'autumn', 'winter']; // 한강 러닝: 한 번에 10시간까지 · 순간들 // 이 날수보다 오래된 하루 기록은 지운다
-const MAPS = ['dream', 'hell', 'void'], mapOf = (m) => (m === 'hell' || m === 'void' ? m : 'dream'); // 꿈나라 · 지옥 · 이공간
+const MAPS = ['dream', 'hell', 'void', 'seoul'], mapOf = (m) => (m === 'hell' || m === 'void' || m === 'seoul' ? m : 'dream'); // 꿈나라 · 지옥 · 이공간 · 서울
+const SEP = new Set(['hell', 'void', 'seoul']); // 난이도마다 따로 쓰는 맵 (꿈나라 노멀만 예전 표)
 const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n);
 
 export class DreamBoard {
@@ -58,7 +59,7 @@ export class DreamBoard {
     try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ best: this.best, bestItem: this.bestItem, boards: this.boards, stats: this.stats, daily: this.daily, first: this.first, hg: this.hg, hgSess: this.hgSess, runs: this.runs, reports: this.reports, secret: this.secret, used: this.tickets.dump(TICKET_TTL) })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('드림 러너 저장 실패', e); }
   }
   // map: 'hell' 은 난이도마다 따로 (꿈나라 노멀은 예전 표 그대로)
-  table(mode, diff, map = 'dream') { if (map === 'hell' || map === 'void') return (this.boards[`${map}:${mode}:${diff}`] ||= {}); if (diff !== 'easy') return (this.boards[`${mode}:${diff}`] ||= {}); return mode === 'item' ? this.bestItem : this.best; }
+  table(mode, diff, map = 'dream') { if (SEP.has(map)) return (this.boards[`${map}:${mode}:${diff}`] ||= {}); if (diff !== 'easy') return (this.boards[`${mode}:${diff}`] ||= {}); return mode === 'item' ? this.bestItem : this.best; }
   sorted(mode, diff, map) { return Object.entries(this.table(mode, diff, map)).sort((a, b) => b[1].score - a[1].score || a[1].at - b[1].at); }
   // 메달: 드림러너 모든 순위표(난이도 × 꿈나라 · 지옥)의 지금 1 ~ 3위 메달. 익스트림 이상 먼저(1위 → 2위 → 3위, 같은 순위면 높은 난이도 · 지옥 먼저), 그다음 익스트림 아래
   podium() {
@@ -235,7 +236,7 @@ export class DreamBoard {
   // 비상 리포트: 조작(AI) 의심 기록. 순위표에는 바로 올라가고, 운영자가 접속하면 크게 뜬다
   //   red = 서버가 다시 돌려 본 결과와 다름 · 시간이 맞지 않음 · 입력 기록 없음 (상위권)
   report(lvl, sub, mode, diff, map, why, e, r, extra) { this.reports.push({ id: crypto.randomBytes(5).toString('hex'), lvl, sub, mode, diff, map, why, name: e.name, score: e.score, dist: e.dist, stars: e.stars, time: e.time, eat: e.at, r: r ? { dist: r.dist, stars: r.stars } : null, ...extra, at: Date.now(), open: true }); if (this.reports.length > 300) this.reports.splice(0, this.reports.length - 300); this.dirty = true; console.warn(`드림 러너 비상 리포트(${lvl}): ${e.name} ${e.score}점 ${map} ${diff} (${why})`); }
-  tkey(mode, diff, map) { return map === 'hell' || map === 'void' ? `${map}:${mode}:${diff}` : `${mode}:${diff}`; }
+  tkey(mode, diff, map) { return SEP.has(map) ? `${map}:${mode}:${diff}` : `${mode}:${diff}`; }
   adminList() { const flagged = []; for (const k of ['best', 'bestItem']) for (const [sub, e] of Object.entries(this[k])) if (e.u) flagged.push({ sub, t: k === 'best' ? 'speed:easy' : 'item:easy', ...e }); for (const [t, T] of Object.entries(this.boards)) for (const [sub, e] of Object.entries(T)) if (e.u) flagged.push({ sub, t, ...e }); for (const f of flagged) { f.name = nameOf(f.sub, f); delete f.char; } return { reports: this.reports.filter((x) => x.open).reverse().map((x) => ({ ...x, name: nameOf(x.sub, { name: x.name }), t: this.tkey(x.mode, x.diff, x.map), live: this.table(x.mode, x.diff, x.map)[x.sub]?.at === x.eat })), flagged: flagged.sort((a, b) => b.score - a.score).slice(0, 100), stat: this.vstat }; }
   // 정상으로 인정: 확인 안 됨 표시를 지워 업적 · 왕관도 받게 / 삭제: 기록을 지우고 별 · 업적을 거둔다 / 넘기기: 그대로 두고 리포트만 닫는다
   resolve(id, act) {
@@ -246,8 +247,8 @@ export class DreamBoard {
     for (const q of this.reports) if (q.open && q.sub === x.sub && act === 'del') q.open = false; // 지운 사람의 다른 리포트도 닫는다
   }
   verifyRecord(sub, t) { const e = this.tableOf(t)?.[sub]; if (!e) throw new Error('없어요'); delete e.u; e.v = 1; this.dirty = true; for (const q of this.reports) if (q.open && q.sub === sub && this.tkey(q.mode, q.diff, q.map) === t) { q.open = false; q.act = 'ok'; } getCos()?.refresh(sub); }
-  tableOf(t) { const [a, b] = String(t).split(':'); return a === 'hell' || a === 'void' ? this.boards[t] : b === 'easy' ? (a === 'item' ? this.bestItem : this.best) : this.boards[`${a}:${b}`]; }
-  removeRecord(sub, t) { const [a, b, c] = String(t).split(':'), T = a === 'hell' || a === 'void' ? this.boards[t] : b === 'easy' ? (a === 'item' ? this.bestItem : this.best) : this.boards[`${a}:${b}`]; if (T?.[sub]) { delete T[sub]; this.dirty = true; } getCos()?.punish(sub, 'dr.'); void c; }
+  tableOf(t) { const [a, b] = String(t).split(':'); return SEP.has(a) ? this.boards[t] : b === 'easy' ? (a === 'item' ? this.bestItem : this.best) : this.boards[`${a}:${b}`]; }
+  removeRecord(sub, t) { const [a, b, c] = String(t).split(':'), T = SEP.has(a) ? this.boards[t] : b === 'easy' ? (a === 'item' ? this.bestItem : this.best) : this.boards[`${a}:${b}`]; if (T?.[sub]) { delete T[sub]; this.dirty = true; } getCos()?.punish(sub, 'dr.'); void c; }
   // 한 판 끝: 말이 안 되는 기록은 거르고, 점수는 서버가 다시 계산한다
   // 한 판 끝: 출발표와 플레이 기록을 서버가 확인한 뒤에만 순위표에 올린다
   async submit(who, b) {

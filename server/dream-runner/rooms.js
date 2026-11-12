@@ -62,7 +62,7 @@ export class DreamRooms {
       case 'list': return this.send(c, { t: 'rooms', rooms: this.list() });
       case 'create': {
         this.leave(c);
-        const r = { id: this.newCode(), name: clean(m.name, 20) || `${c.name}의 꿈`, players: [], host: c, state: 'wait', seed: 0, startAt: 0, mode: m.mode === 'item' ? 'item' : 'speed', diff: diffOf(m.diff), map: m.map === 'hell' || m.map === 'void' ? m.map : 'dream', team: false };
+        const r = { id: this.newCode(), name: clean(m.name, 20) || `${c.name}의 꿈`, players: [], host: c, state: 'wait', seed: 0, startAt: 0, mode: m.mode === 'item' ? 'item' : 'speed', diff: diffOf(m.diff), map: m.map === 'hell' || m.map === 'void' || m.map === 'seoul' ? m.map : 'dream', team: false };
         this.rooms.set(r.id, r);
         return this.join(c, r);
       }
@@ -135,7 +135,7 @@ export class DreamRooms {
       case 'map': {
         const r = c.room;
         if (!r || r.host !== c || r.state !== 'wait') return;
-        r.map = m.map === 'hell' || m.map === 'void' ? m.map : 'dream';
+        r.map = m.map === 'hell' || m.map === 'void' || m.map === 'seoul' ? m.map : 'dream';
         this.roomUpdate(r); this.broadcastList();
         return;
       }

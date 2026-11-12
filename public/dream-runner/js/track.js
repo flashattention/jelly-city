@@ -7,6 +7,7 @@ import { RNG } from '../../shared/js/utils.js';
 import { THEMES } from './themes.js';
 import { HELLS } from './hells.js';
 import { VOIDS } from './voids.js';
+import { SEOULS, seoulAt } from './seouls.js';
 import { glow, starG } from './kits.js';
 import { buildMonster, buildFist } from './hellkits.js';
 import { G } from '../../shared/js/utils.js';
@@ -108,7 +109,7 @@ export class Track {
   }
   // opt.map: 'hell' 이면 랜덤 지옥 · 'void' 면 랜덤 이공간 · opt.K: 난이도 빠르기 (지옥 · 이공간 길은 시간 기준이라 빠를수록 길어진다)
   reset(seed, itemMode = false, opt = {}) {
-    this.itemMode = itemMode; this.hell = opt.map === 'hell'; this.void = opt.map === 'void'; this.K = opt.K || 1; this.time = 0; this.meteors = []; this.strikes = []; this.nextStrike = 0; this.lastFloor = 0; this.trend = 0; this.lastPat = '';
+    this.itemMode = itemMode; this.hell = opt.map === 'hell'; this.void = opt.map === 'void'; this.seoul = opt.map === 'seoul'; this.movers = []; this.decos = []; this.gateN = 0; this.K = opt.K || 1; this.time = 0; this.meteors = []; this.strikes = []; this.nextStrike = 0; this.lastFloor = 0; this.trend = 0; this.lastPat = '';
     this.irng = new RNG(seed ^ 0x2545f491); // 아이템 상자 자리 (길 모양과 따로라서 스피드전 길이 바뀌지 않는다)
     this.nextBox = 120;
     for (const c of [...this.root.children]) this.drop(c);
@@ -118,6 +119,8 @@ export class Track {
     this.order = new RNG(seed ^ 0x5bd1e995).shuffle([...THEMES.keys()]);
     // 지옥 순서: 올라가는 지옥과 떨어지는 지옥을 번갈아
     if (this.void) this.order = new RNG(seed ^ 0x6a09e667).shuffle([...VOIDS.keys()]);
+    // 서울 코스 순서: 20곳을 섞어서 차례로
+    if (this.seoul) this.order = new RNG(seed ^ 0x1f83d9ab).shuffle([...SEOULS.keys()]);
     if (this.hell) { const q = new RNG(seed ^ 0x3c6ef372), keys = (l) => q.shuffle([...HELLS.keys()].filter((i) => HELLS[i].layout === l)), a = keys('climb'), b = keys('plunge'); this.order = []; for (let i = 0; i < Math.max(a.length, b.length); i++) this.order.push(a[i % a.length], b[i % b.length]); }
     this.plats = []; this.obs = []; this.stars = []; this.portals = []; this.boxes = []; this.traps = [];
     this.origin = 0;
@@ -130,7 +133,7 @@ export class Track {
     this.gs = 70;
     this.generate(0);
   }
-  themeOf(dream) { return this.hell || this.void ? (this.void ? VOIDS : HELLS)[this.order[dream % this.order.length]] : THEMES[this.order[dream % THEMES.length]]; }
+  themeOf(dream) { if (this.seoul) return seoulAt(this.order[dream % this.order.length], this.seoulFlip ?? Math.floor(dream / 5) % 2 === 1); return this.hell || this.void ? (this.void ? VOIDS : HELLS)[this.order[dream % this.order.length]] : THEMES[this.order[dream % THEMES.length]]; }
   // 이 아래로 떨어지면 탈락 (지옥은 높이가 계속 바뀌니 눈앞 발판을 기준으로)
   deathY(s) {
     if (this.void) return -9; // 이공간: 한 번 떨어지면 금방 끝
@@ -233,7 +236,7 @@ export class Track {
     const ahead = this.hell || this.void ? Math.max(AHEAD, speedAt(playerS) * this.K * 2.4) : AHEAD; // 내리치기 예고가 보일 만큼 앞을 만든다
     while (this.gs < playerS + ahead) {
       if (this.gs >= this.nextB) { this.newDream(); continue; }
-      if (this.hell) this.hellPattern(); else if (this.void) this.voidPattern(); else this.pattern();
+      if (this.hell) this.hellPattern(); else if (this.void) this.voidPattern(); else if (this.seoul) this.seoulPattern(); else this.pattern();
     }
     // 지나간 것 치우기
     const cut = playerS - BEHIND;
@@ -243,6 +246,8 @@ export class Track {
     this.portals = this.portals.filter((o) => { if (o.s < cut - 30) { this.drop(o.mesh); return false; } return true; });
     this.boxes = this.boxes.filter((o) => { if (o.s < cut) { this.root.remove(o.mesh); return false; } return true; });
     this.traps = this.traps.filter((o) => { if (o.s < cut) { this.root.remove(o.mesh); return false; } return true; });
+    this.decos = this.decos.filter((o) => { if (o.userData.s < cut - 20) { this.drop(o); return false; } return true; });
+    this.movers = this.movers.filter((o) => o.sEnd >= cut);
     this.strikes = this.strikes.filter((o) => { if (o.s < cut) { this.root.remove(o.g); return false; } return true; });
     this.meteors = this.meteors.filter((o) => { if (o.s < cut) { this.root.remove(o.g); return false; } return true; });
   }
@@ -259,7 +264,7 @@ export class Track {
     this.cx *= 0.5; if (this.void) this.cy = 0;
     const len = this.hell || this.void ? Math.max(34, v * 0.8) : 34; // 빠른 난이도의 지옥은 숨 돌릴 자리도 같은 시간만큼
     this.plat(s0, s0 + len, this.cx, 10, this.cy);
-    this.portal(s0 + 14, this.cx, this.cy, 10);
+    if (this.seoul) this.seoulGate(s0 + 14, this.cx, this.cy, 10); else this.portal(s0 + 14, this.cx, this.cy, 10);
     this.starLine(s0 + 20, s0 + 32, this.cx, this.cy, 5);
     this.gs = s0 + len;
   }
@@ -753,6 +758,112 @@ export class Track {
     }
   }
 
+  // ---------- 🗺️ 서울 맵 (러너-개선 6) ----------
+  //   찻길 · 보도 위를 달린다. 행인 젤리 · 자전거는 건널목을 건너고, 차는 교차로를 가로지르고, 차 · 버스 · 오토바이는 마주 온다
+  //   움직임은 모두 같은 시계 t 로만 정해서(곰 위치와 상관없이) 같은 방 사람 · 기록 다시 돌리기에서 똑같다
+  //   모양은 브라우저가 this.makeMover(kind, n) 로 넣는다 (서버의 기록 다시 돌리기에선 빈 묶음)
+  mover(kind, o) {
+    const g = this.makeMover?.(kind, o.n ?? 0) || new THREE.Group();
+    this.root.add(g); g.userData.s = o.sEnd ?? o.s ?? 0;
+    const ob = { kind: o.hitKind || 'mover', s0: -1e9, s1: -1e9, x0: 1e9, x1: 1e9, y0: o.y, y1: o.y + o.h, mesh: g, seoul: kind };
+    this.obs.push(ob);
+    const mv = { kind, ob, g, ...o }; this.movers.push(mv); this.placeMover(mv, this.time || 0); return mv;
+  }
+  placeMover(m, t) {
+    const ob = m.ob, g = m.g;
+    if (m.type === 'cross') {
+      // 건너기: 길 한쪽 밖 → 반대쪽 밖, 그다음 쉬었다가 다시 (방향은 정해진 대로)
+      const run = (m.xR - m.xL) / m.v, cyc = run + m.rest, tau = (((t + m.ph * cyc) % cyc) + cyc) % cyc;
+      if (tau > run) { ob.x0 = ob.x1 = 1e9; g.visible = false; return; }
+      const xc = m.dir > 0 ? m.xL + m.v * tau : m.xR - m.v * tau;
+      ob.x0 = xc - m.lx / 2; ob.x1 = xc + m.lx / 2; ob.s0 = m.s - m.ls / 2; ob.s1 = m.s + m.ls / 2; g.visible = true;
+      g.position.set(xc, m.y, this.z(m.s)); g.rotation.y = m.dir > 0 ? Math.PI / 2 : -Math.PI / 2; g.userData.walk = tau;
+    } else {
+      // 마주 오기: sFar(길 끝 너머 40m)에서 나타나 sNear 까지, 쉬었다가 다시. 오토바이는 좌우로 흔들며
+      const span = m.sFar - m.sNear, run = span / m.v, cyc = run + m.rest, tau = (((t + m.ph * cyc) % cyc) + cyc) % cyc;
+      if (tau > run) { ob.s0 = ob.s1 = -1e9; g.visible = false; return; }
+      const sc = m.sFar - m.v * tau, xc = m.x + (m.weave ? Math.sin(t * 1.7 + m.ph * 6) * m.weave : 0);
+      // 부딪힘은 그 길 구간 안에서만 (나타나는 곳은 늘 40m 앞)
+      if (sc < m.sEnd + 2) { ob.s0 = sc - m.ls / 2; ob.s1 = sc + m.ls / 2; ob.x0 = xc - m.lx / 2; ob.x1 = xc + m.lx / 2; } else { ob.s0 = ob.s1 = -1e9; }
+      g.visible = true; g.position.set(xc, m.y, this.z(sc)); g.rotation.y = m.weave ? Math.cos(t * 1.7 + m.ph * 6) * 0.25 : 0; g.userData.walk = tau;
+    }
+    g.userData.anim?.(g, t);
+  }
+  updateMovers(t) { for (const m of this.movers) this.placeMover(m, t); }
+  // 길 위 장식 (건널목 줄무늬 · 정지선 · 중앙선): 발판 윗면에 얇게
+  deco(s0, s1, x, w, y, kind) {
+    const g = new THREE.Group(), white = glow('#f4f4f2'), yel = glow('#ffcf33');
+    if (kind === 'zebra') for (let i = 0; i < Math.floor(w / 0.9); i++) { const m = new THREE.Mesh(G_BOX, white); m.scale.set(0.5, 0.03, s1 - s0); m.position.set(-w / 2 + 0.45 + i * 0.9, 0.02, 0); g.add(m); }
+    if (kind === 'stop') { const m = new THREE.Mesh(G_BOX, white); m.scale.set(w * 0.9, 0.03, 0.35); m.position.y = 0.02; g.add(m); }
+    if (kind === 'center') { for (const sx of [-0.12, 0.12]) { const m = new THREE.Mesh(G_BOX, yel); m.scale.set(0.12, 0.03, s1 - s0); m.position.set(sx, 0.02, 0); g.add(m); } }
+    g.position.set(x, y, this.z((s0 + s1) / 2)); g.userData.s = (s0 + s1) / 2; this.root.add(g); this.decos.push(g); return g;
+  }
+  // 코스가 바뀌는 곳: 터널 · 다리 · 빛 문을 번갈아 (지나면 다음 코스)
+  seoulGate(s, x, y, w) {
+    const kind = ['tunnel', 'bridge', 'light'][this.gateN++ % 3], g = new THREE.Group(), th = this.themeOf(this.dream), lit = glow(th.edge || '#ffd54f');
+    if (kind === 'tunnel') {
+      const shell = new THREE.Mesh(new THREE.CylinderGeometry(w / 2 + 1.6, w / 2 + 1.6, 18, 20, 1, true, -Math.PI / 2, Math.PI), new THREE.MeshToonMaterial({ color: '#8a8f96', side: THREE.DoubleSide }));
+      shell.rotation.x = Math.PI / 2; shell.position.y = 0.2; g.add(shell);
+      for (let i = 0; i < 6; i++) for (const sx of [-1, 1]) { const l = new THREE.Mesh(G_BOX, glow('#ffcf8a')); l.scale.set(0.3, 0.12, 1.2); l.position.set(sx * (w / 2 + 0.9), 4.6, -7.5 + i * 3); g.add(l); }
+      const face = new THREE.Mesh(new THREE.RingGeometry(w / 2 + 1.6, w / 2 + 3.4, 24, 1, 0, Math.PI), new THREE.MeshToonMaterial({ color: '#b0a89a', side: THREE.DoubleSide })); face.position.set(0, 0.2, 9); g.add(face);
+    } else if (kind === 'bridge') {
+      for (const sx of [-1, 1]) { const a = new THREE.Mesh(new THREE.TorusGeometry(9, 0.35, 6, 24, Math.PI), new THREE.MeshToonMaterial({ color: '#eceff1' })); a.position.set(sx * (w / 2 + 0.3), 0, 0); a.rotation.y = Math.PI / 2; g.add(a);
+        for (let i = -3; i <= 3; i++) { const c = new THREE.Mesh(G_BOX, glow('#eceff1')); const z = i * 2.4, hh = Math.sqrt(Math.max(0, 81 - z * z)); c.scale.set(0.06, hh, 0.06); c.position.set(sx * (w / 2 + 0.3), hh / 2, z); g.add(c); } }
+      for (let i = -8; i <= 8; i += 2) for (const sx of [-1, 1]) { const b = new THREE.Mesh(G_BOX, lit); b.scale.set(0.15, 0.15, 0.15); b.position.set(sx * (w / 2 + 0.3), 0.9, i); g.add(b); }
+    } else {
+      for (let i = 0; i < 5; i++) { const ring = new THREE.Mesh(new THREE.TorusGeometry(w / 2 + 1.2, 0.18, 6, 32, Math.PI), glow(['#ff4081', '#40c4ff', '#ffd740', '#69f0ae', '#e040fb'][i])); ring.position.set(0, 0.3, -6 + i * 3); g.add(ring); }
+    }
+    g.position.set(x, y, this.z(s)); g.userData.s = s;
+    g.userData.anim = (o, t) => { if (kind === 'light') o.children.forEach((c, i) => { c.scale.setScalar(1 + Math.sin(t * 4 + i) * 0.04); }); };
+    this.root.add(g); this.portals.push({ s, mesh: g, dream: this.dream });
+  }
+  seoulPattern() {
+    const r = this.rng, s = this.gs, v = speedAt(s), th = this.themeOf(this.dream);
+    const d = Math.min(1, s / 3000), water = th.under === 'water';
+    const W = () => Math.max(6.4, 10 - d * 3 + r.range(-0.6, 0.6));
+    const pick = r.weighted([
+      ['street', 3], ['crosswalk', 2.4], ['intersection', d > 0.03 ? 2 : 0.6], ['busstop', d > 0.06 ? 1.6 : 0.4], ['delivery', d > 0.1 ? 1.6 : 0.3],
+      ['construction', 1.6], ['bikepath', 1.6], ['curb', 1.2], ['gap', water ? 1.6 : 0], ['rush', d > 0.3 ? 1.4 : 0],
+    ], (x) => x[1])[0];
+    let at = s;
+    const flat = (len, w = W(), gap = 0) => { at += gap; const p = this.plat(at, at + len, this.cx, w, this.cy); at += len; return p; };
+    const lanes = (w) => (w >= 7 ? [-w / 3, 0, w / 3] : [-w / 4, w / 4]).map((q) => this.cx + q);
+    const VEH = { car: [1.86, 4.8, 1.45], suv: [1.9, 4.7, 1.72], taxi: [1.86, 4.9, 1.6], bus: [2.5, 11, 3.25], moto: [0.75, 2.0, 1.4], bike: [0.6, 1.8, 1.2], ped: [0.6, 0.6, 1.25] };
+    // 마주 오는 것: 그 구간의 한 차로, 40m 앞에서 나타난다
+    const oncoming = (p, kind, lane, speed, ph, extra = {}) => { const [wx, ls, h] = VEH[kind]; return this.mover(kind, { type: 'on', x: lane, y: this.cy, h, lx: wx, ls, sNear: p.s0 - 12, sFar: p.s1 + 40, sEnd: p.s1, v: speed, rest: r.range(0.6, 2.2), ph, n: r.int(0, 1e6), ...extra }); };
+    // 건너는 것: 길 밖 4m → 반대쪽 밖 4m
+    const cross = (p, kind, sAt, dir, speed, ph, rest) => { const [wx, ls, h] = VEH[kind], half = p.w / 2 + 4; return this.mover(kind, { type: 'cross', s: sAt, sEnd: sAt + 4, y: this.cy, h, lx: ls, ls: wx, xL: this.cx - half, xR: this.cx + half, dir, v: speed, rest, ph, n: r.int(0, 1e6) }); };
+    const carKind = () => r.pick(['car', 'car', 'suv', 'taxi']);
+    switch (pick) {
+      case 'street': { const p = flat(r.range(34, 52) * (1 + v / 40)); this.deco(p.s0, p.s1, this.cx, p.w, this.cy, 'center'); const L = lanes(p.w); const n = r.int(1, 2) + Math.round(d * 3); for (let i = 0; i < n; i++) oncoming(p, carKind(), L[(i + r.int(0, 2)) % L.length], r.range(8, 12), r.next(), { rest: r.range(0.3, 1.2) }); this.starLine(p.s0 + 6, p.s1 - 6, r.pick(L), this.cy, r.int(3, 6)); break; }
+      case 'crosswalk': { const p = flat(r.range(26, 34)), zs = p.s0 + (p.s1 - p.s0) * 0.55; this.deco(zs - 2.2, zs + 2.2, this.cx, p.w, this.cy, 'zebra'); this.deco(zs - 4, zs - 3.6, this.cx, p.w, this.cy, 'stop');
+        const n = r.int(2, 3) + Math.round(d * 2); for (let i = 0; i < n; i++) cross(p, r.chance(0.25) ? 'bike' : 'ped', zs + r.range(-1.6, 1.6), r.chance(0.5) ? 1 : -1, r.chance(0.25) ? 4.2 : r.range(1.3, 1.9), r.next(), r.range(0.2, 1.5));
+        this.starLine(p.s0 + 3, zs - 5, this.cx, this.cy, 3); break; }
+      case 'intersection': { const p = flat(r.range(30, 38)), cs = p.s0 + (p.s1 - p.s0) * 0.5; this.deco(cs - 9, cs - 8.6, this.cx, p.w, this.cy, 'stop'); this.deco(cs - 8, cs - 4.5, this.cx, p.w, this.cy, 'zebra');
+        const n = d > 0.15 ? 3 : d > 0.05 ? 2 : 1; for (let i = 0; i < n; i++) cross(p, carKind(), cs - 1 + i * 3, i % 2 ? -1 : 1, r.range(8, 11), r.next(), r.range(0.8, 1.8));
+        this.starArc(cs - 5, cs + 5, this.cx, this.cy, this.cy); break; }
+      case 'busstop': { const p = flat(r.range(42, 56)), L = lanes(p.w); oncoming(p, 'bus', L[L.length - 1], r.range(6, 8.5), r.next()); if (r.chance(0.6)) oncoming(p, carKind(), L[0], r.range(8, 11), r.next()); this.starLine(p.s0 + 4, p.s1 - 4, L[0], this.cy, 5); break; }
+      case 'delivery': { const p = flat(r.range(36, 46)), L = lanes(p.w); for (let i = 0; i < r.int(3, 4); i++) oncoming(p, 'moto', L[i % L.length], r.range(10, 14), r.next(), { weave: r.range(0.6, 1.4), rest: r.range(0.3, 1) }); break; }
+      case 'construction': { const p = flat(r.range(30, 40)), w = p.w, at2 = p.s0 + (p.s1 - p.s0) * 0.35, side = r.chance(0.5) ? 1 : -1, half = w * r.range(0.45, 0.6);
+        const x0 = side > 0 ? this.cx + w / 2 - half : this.cx - w / 2, x1 = x0 + half; this.seoulStatic('barrier', at2, x0, x1, this.cy, this.cy + 1.4, 1.4);
+        this.seoulStatic('cones', at2 + v * 0.75, this.cx - w / 2, this.cx + w / 2, this.cy, this.cy + 0.6, 0.6);
+        if (d > 0.05) this.seoulStatic('banner', at2 + v * 1.5, this.cx - w / 2, this.cx + w / 2, this.cy + 1.0, this.cy + 2.2, 0.5);
+        this.starLine(p.s0 + 2, at2 - 2, side > 0 ? x0 - 1 : x1 + 1, this.cy, 4); break; }
+      case 'bikepath': { const p = flat(r.range(34, 44)), L = lanes(p.w); for (let i = 0; i < r.int(3, 4); i++) oncoming(p, r.chance(0.5) ? 'bike' : 'ped', L[i % L.length], r.range(2.5, 5), r.next(), { rest: r.range(0.2, 0.8) }); const zs = p.s0 + (p.s1 - p.s0) * 0.7; cross(p, 'ped', zs, r.chance(0.5) ? 1 : -1, 1.5, r.next(), 1); break; }
+      case 'curb': { const up = r.chance(0.5) && this.cy < 3; this.cy = Math.max(-1.5, Math.min(4, this.cy + (up ? 1 : -1) * r.range(0.5, 1.0))); const p = flat(r.range(18, 26), W(), up ? v * 0.08 : v * 0.12); this.starLine(p.s0 + 2, p.s1 - 2, this.cx, this.cy, 4); break; }
+      case 'gap': { const g = v * r.range(0.22, 0.32), a0 = at, x0 = this.cx; this.cx = Math.max(-6, Math.min(6, this.cx + r.range(-2, 2))); flat(r.range(18, 26), W(), g); this.starArc(a0 - 1, a0 + g + 1, x0, this.cy, this.cy, this.cx); break; }
+      case 'rush': { const p = flat(r.range(46, 60)), L = lanes(p.w); for (let i = 0; i < 4; i++) oncoming(p, i === 0 && r.chance(0.5) ? 'bus' : carKind(), L[i % L.length], r.range(8, 12), r.next()); break; }
+    }
+    this.gs = at;
+  }
+  // 서 있는 장애물 (공사 가림막 · 고깔 줄 · 머리 위 현수막): 판정은 기존 장애물과 같고 모양만 서울
+  seoulStatic(kind, sAt, x0, x1, y0, y1, depth) {
+    if (!this.makeMover) return this.obstacle(kind === 'banner' ? 'bar' : kind === 'barrier' ? 'wall' : 'hurdle', sAt, x0, x1, y0, y1, depth);
+    const g = this.makeMover(kind, Math.round((x1 - x0) * 100)) || new THREE.Group(); g.userData.w = x1 - x0;
+    g.position.set((x0 + x1) / 2, y0, this.z(sAt)); g.userData.s = sAt; g.userData.fit?.(g, x1 - x0, y1 - y0); this.root.add(g);
+    const o = { kind: kind === 'banner' ? 'bar' : kind === 'barrier' ? 'wall' : 'hurdle', s0: sAt - depth / 2, s1: sAt + depth / 2, x0, x1, y0, y1, mesh: g, seoul: kind }; this.obs.push(o); return o;
+  }
+
   // ---------- 판정 ----------
   // 움직이는 발판 위치 갱신 (모두 같은 시계 t 로 움직여서 모두에게 같은 자리)
   update(t, playerS, v = 0, dt = 0) {
@@ -766,6 +877,7 @@ export class Track {
     }
     for (const st of this.stars) if (!st.got) { st.mesh.rotation.y = t * 2.5 + st.s; }
     for (const po of this.portals) po.mesh.userData.anim(po.mesh, t);
+    if (this.seoul) this.updateMovers(t);
     for (const b of this.boxes) if (!b.got) { b.mesh.children[0].rotation.set(t * 1.3, t * 1.8, 0); b.mesh.position.y = b.y + Math.sin(t * 2.5 + b.s) * 0.15; }
     // 아주 멀리 달리면 숫자가 커져서 떨리지 않게 원점을 옮긴다
     if (playerS - this.origin > 1500) this.shift(1500);
