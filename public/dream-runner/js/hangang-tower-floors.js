@@ -9,8 +9,8 @@ export const FLOORS = {
   lobby: { n: 1, btn: '1', name: '1층 로비', alt: 0, sub: '안내 데스크 · 밖으로 나가는 문' },
   hlobby: { n: 79, btn: '79', name: '79층 하늘 호텔 로비', alt: 320, sub: '프론트 · 체크인' },
   buffet: { n: 81, btn: '81', name: '81층 하늘 뷔페', alt: 328, sub: '창가 자리 · 음식 줄', soon: true },
-  room: { n: 87, btn: '87', name: '87층 일반 객실', alt: 352, need: 'room', soon: true },
-  suite: { n: 94, btn: '94', name: '94층 스위트', alt: 381, need: 'suite', soon: true },
+  room: { n: 87, btn: '87', name: '87층 일반 객실', alt: 352, need: 'room' },
+  suite: { n: 94, btn: '94', name: '94층 스위트', alt: 381, need: 'suite' },
   ph: { n: 100, btn: '100', name: '100층 펜트하우스', alt: 405, need: 'ph', soon: true },
   obs: { n: 118, btn: '118', name: '118층 전망대', alt: 478, sub: '유리 바닥 · 478m', soon: true },
   car: { n: 0, btn: '', name: '엘리베이터 안', alt: 0 },
@@ -369,7 +369,7 @@ function bathtub(F, C, x, z, ry, { L = 1.75, W = 0.85, label = '욕조에 들어
   const wg = new THREE.ShapeGeometry(inner, 24); wg.rotateX(-Math.PI / 2); const wm = mats().water.clone(); wm.userData.own = true; const water = new THREE.Mesh(wg, wm); water.position.set(x, 0.42, z); water.rotation.y = ry; F.g.add(water);
   k.add(G.cyl(0.02, 0.02, 0.9, 8), '#d4af6e', 'metal', T(x + Math.sin(ry) * (L / 2 + 0.12), 0, z + Math.cos(ry) * (L / 2 + 0.12))); { const sp = new THREE.CylinderGeometry(0.018, 0.018, 0.25, 8); sp.rotateX(Math.PI / 2); k.add(sp, '#d4af6e', 'metal', T(x + Math.sin(ry) * (L / 2 + 0.02), 0.88, z + Math.cos(ry) * (L / 2 + 0.02), ry)); }
   const c = Math.cos(ry), sn = Math.sin(ry), hx = Math.abs(c) * W / 2 + Math.abs(sn) * L / 2, hz = Math.abs(sn) * W / 2 + Math.abs(c) * L / 2; F.area.wall(x - hx, z - hz, x + hx, z + hz);
-  const side = [x + c * (W / 2 + 0.55), z - sn * (W / 2 + 0.55)];
+  const side = [x - c * (W / 2 + 0.55), z + sn * (W / 2 + 0.55)];
   F.spots.push({ x: side[0], z: side[1], r: 0.95, label, act: () => { C.SND.pour(); C.sit({ kind: 'bath', x: x - sn * 0.25, y: 0.2, z: z - c * 0.25, yaw: ry + Math.PI, camD: 2.2, out: side, label: '욕조에서 나오기' }); C.S.pose.kind = 'bath'; } });
   return water;
 }
