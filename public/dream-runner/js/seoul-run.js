@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { Hangang } from './hangang.js';
 import { ROUTES } from './seoul-routes.js';
-import { SEOUL_U0, seoulCourseOf } from './seouls.js';
+import { SEOUL_U0, seoulCourseOf, seoulLaneW } from './seouls.js';
 import { DREAM_SEC, speedAt } from './track.js';
 import { isPhone } from '../../shared/js/perf.js';
 
@@ -42,6 +42,16 @@ class RoutePath {
   }
 }
 const PATHS = ROUTES.map((R) => new RoutePath(R));
+// 달리는 길 띠 무늬: 아스팔트 결 · 흰 가장자리 · 노란 가운데 점선 (8m 한 번)
+let PATH_M = null;
+function pathTex() {
+  const cv = document.createElement('canvas'); cv.width = 64; cv.height = 256; const g = cv.getContext('2d');
+  g.fillStyle = '#5a5d61'; g.fillRect(0, 0, 64, 256);
+  for (let i = 0; i < 900; i++) { const v = 70 + Math.floor(Math.random() * 40); g.fillStyle = `rgba(${v},${v},${v + 4},0.35)`; g.fillRect(Math.random() * 64, Math.random() * 256, 1.5, 1.5); }
+  g.fillStyle = '#e9e6dc'; g.fillRect(2, 0, 2, 256); g.fillRect(60, 0, 2, 256);
+  g.fillStyle = '#f2c53d'; g.fillRect(31, 0, 2.4, 128);
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+}
 
 export class SeoulRun {
   constructor(renderer, camera) {
@@ -79,7 +89,9 @@ export class SeoulRun {
     const tr = this.track, d = tr.dreamAt(runnerS), u = this.uOf(runnerS, d), cNow = seoulCourseOf(tr, d), cNext = seoulCourseOf(tr, d + 1);
     const now = this.tilesOf(cNow, u - 60, this.endU(cNow, d), RT).map((t) => ({ t, c: cNow, u1: this.endU(cNow, d) }));
     const next = this.tilesOf(cNext, 0, Math.min(this.endU(cNext, d + 1), 420), RT).map((t) => ({ t, c: cNext, u1: this.endU(cNext, d + 1) }));
-    this.wantNow = now; this.want = [...now, ...next.filter((w) => !now.some((n) => n.t === w.t && n.c === w.c))]; return this.want;
+    this.wantNow = now; this.want = [...now, ...next.filter((w) => !now.some((n) => n.t === w.t && n.c === w.c))];
+    this.paths(new Set([cNow, cNext]));
+    return this.want;
   }
   // 첫 코스 칸이 다 지어졌나 (카운트다운이 기다린다)
   firstReady() { return !!this.wantNow && this.wantNow.every((w) => this.hw.chunks.has(`${w.t}_${w.c}`) || this.hw.chunkFail?.has(`${w.t}_${w.c}`)); }
@@ -87,13 +99,13 @@ export class SeoulRun {
     const hw = this.hw; if (!this.ready || !this.track) return;
     this.planT = (this.planT || 0) - dt; if (this.planT <= 0 || force) { this.planT = 0.5; this.plan(runnerS); }
     if (hw.chunkLoading) return;
-    // 내리기: 그 칸을 바라는 코스가 하나도 없을 때 그 칸의 조각을 모두 (한 프레임에 하나씩). 한 칸에 코스 조각이 여럿이면 함께 내린다(서로 겹치는 건물을 나눠 가졌다)
-    const tilesWanted = new Set(this.want.map((w) => w.t));
-    for (const key of hw.chunks.keys()) { const t = key.split('_').slice(0, 2).join('_'); if (!tilesWanted.has(t)) { hw.unloadChunk(key); this.onChunk?.(); return; } }
+    // 내리기: 바라지 않는 코스 조각을 하나씩. 다만 지금 바라는 조각이 지을 때 빼 둔(이 조각이 먼저 지은) 건물이 있으면 남긴다 (내리면 구멍이 난다)
+    const keys = new Set(this.want.map((w) => `${w.t}_${w.c}`)), live = [...hw.chunks.entries()].filter(([k2]) => keys.has(k2)).map(([, c2]) => c2);
+    for (const [key, c] of hw.chunks) if (!keys.has(key) && !live.some((c2) => c2.deps?.includes(c))) { hw.unloadChunk(key); this.onChunk?.(); return; }
     const w = this.want.find((q) => !hw.chunks.has(`${q.t}_${q.c}`) && !hw.chunkFail?.has(`${q.t}_${q.c}`)); if (!w) return;
     const key = `${w.t}_${w.c}`, same = [...hw.chunks.entries()].filter(([k2]) => k2.startsWith(`${w.t}_`)).map(([, c2]) => c2);
     hw.chunkLoading = key;
-    hw.loadChunk(key, () => this.pick(w.t, w.c, w.u1, same)).then((c) => { c.kept = c.map.__kept; hw.chunks.set(key, c); for (const P of PATHS) if (P.R.tiles.includes(w.t)) P.sampleH(hw); this.onChunk?.(); })
+    hw.loadChunk(key, () => this.pick(w.t, w.c, w.u1, same)).then((c) => { c.kept = c.map.__kept; c.deps = same; hw.chunks.set(key, c); for (const c2 of hw.chunks.values()) if (c2.chunkKey.startsWith(`${w.t}_`)) this.cullRoute(c2, w.c); for (const P of PATHS) if (P.R.tiles.includes(w.t)) P.sampleH(hw); this.onChunk?.(); })
       .catch((e) => { console.warn('서울 칸', key, e); (hw.chunkFail ||= new Set()).add(key); }).finally(() => { hw.chunkLoading = null; });
   }
   // 칸 지도에서 코스 길 둘레(건물 RB · 길 · 녹지 RR)만 남긴다 (seoul-run-worker.js, 따로 스레드에서)
@@ -132,5 +144,30 @@ export class SeoulRun {
   }
   // 코스가 바뀌는 순간 시간은 바로 (빛 문으로 하얗게 덮인 동안)
   jumpHour() { this.hourJump = true; this.hourTo = null; }
-  dispose() { const hw = this.hw; if (!hw) return; for (const key of [...hw.chunks.keys()]) hw.unloadChunk(key); }
+  dispose() { const hw = this.hw; if (!hw) return; for (const key of [...hw.chunks.keys()]) hw.unloadChunk(key); this.paths(new Set()); }
+  // 코스 길 위(레인 + 숲은 나무 갓 만큼 더)에 선 나무는 숨긴다 (숲 속 길에서 화면이 나무 갓으로 덮였다)
+  cullRoute(chunk, c) {
+    const P = PATHS[c], G = new Map(), GS = 20, q = { x: 0, z: 0 }; for (let u = 0; u <= P.len; u += 4) { P.pos(u, q); const k = `${Math.floor(q.x / GS)},${Math.floor(q.z / GS)}`; if (!G.has(k)) G.set(k, []); G.get(k).push([q.x, q.z]); }
+    const half = seoulLaneW(c) / 2, near = (x, z, R) => { const gx = Math.floor(x / GS), gz = Math.floor(z / GS), R2 = R * R; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const [px, pz] of G.get(`${gx + a},${gz + b}`) || []) if ((px - x) ** 2 + (pz - z) ** 2 < R2) return true; return false; };
+    const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+    for (const T of chunk.treeGroups || []) { const A = T.arr === 'f' ? chunk.forestFill || [] : chunk.trees || [], R = T.arr === 'f' ? half + 4.5 : half + 1.2; let hit = false;
+      T.idx.forEach((si, k) => { const p = A[si]; if (!p || !near(p[0], p[1], R)) return; for (const m of T.ms) m?.setMatrixAt(k, zero); hit = true; }); if (hit) for (const m of T.ms) if (m) m.instanceMatrix.needsUpdate = true; }
+  }
+  // 달리는 길 띠: 코스 길이 찻길 · 골목 위가 아닌 곳(한강 공원 산책로 · 광장 · 잔디)에 짙은 아스팔트 띠 + 노란 가운데 점선 + 흰 가장자리 (한강 자전거길처럼)
+  //   서울 산책은 지역 지도에서 이 띠를 깔았다. 서울 전체 칸에는 없어 러너가 그 코스 길 위에 깐다
+  paths(want) {
+    this.pathMs ||= new Map();
+    for (const [c, m] of this.pathMs) if (!want.has(c)) { if (m) { this.hw.scene.remove(m); m.geometry.dispose(); } this.pathMs.delete(c); }
+    for (const c of want) if (!this.pathMs.has(c)) { const m = this.pathMesh(c); this.pathMs.set(c, m); if (m) this.hw.scene.add(m); }
+  }
+  pathMesh(c) {
+    const P = PATHS[c], sf = P.R.sf || '', hw = this.hw, W = 6.2, pos = [], uv = [], idx = [], a = { x: 0, z: 0 };
+    const on = (u) => { const ch = sf[Math.max(0, Math.min(sf.length - 1, Math.floor(u / 20)))]; return ch === 'p' || ch === '-'; };
+    let run = null; const flush = () => { if (run && run.length > 1) { const base = pos.length / 3; run.forEach(([x, z, nx, nz, u], k) => { for (const sd of [-1, 1]) { const px = x + nx * sd * W / 2, pz = z + nz * sd * W / 2; pos.push(px, hw.terrAt(px, pz) + 0.07, pz); uv.push(sd < 0 ? 0 : 1, u / 8); } if (k) { const q = base + k * 2; idx.push(q - 2, q - 1, q, q - 1, q + 1, q); } }); } run = null; };
+    for (let u = 0; u <= P.len; u += 4) { if (!on(u)) { flush(); continue; } const F = P.frame(u, a); (run ||= []).push([F.x, F.z, -F.tz, F.tx, u]); }
+    flush(); if (!pos.length) return null;
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+    PATH_M ||= new THREE.MeshLambertMaterial({ map: pathTex(), polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
+    const m = new THREE.Mesh(g, PATH_M); m.receiveShadow = true; m.userData.noDrape = true; return m;
+  }
 }

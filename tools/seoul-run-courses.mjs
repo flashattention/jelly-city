@@ -24,12 +24,12 @@ const COURSES = [
   ['yunjung', '윤중로', [[37.53340, 126.91250], [37.53020, 126.91240], [37.52520, 126.91640]]],
   ['hongdae', '홍대 걷고싶은거리', [['R', 'hongdae', 0, 770], [37.55720, 126.92450]]],
   ['yeonnam', '경의선숲길', [[37.55780, 126.92480], [37.56150, 126.92160], [37.56600, 126.91700]]],
-  ['myeongdong', '명동', [['R', 'myeongdong', 0, 521], [37.56380, 126.98880], [37.56620, 126.98300]]],
+  ['myeongdong', '명동', [['R', 'myeongdong', 0, 521], [37.56600, 126.98870], [37.56650, 126.99350]]],
   ['insadong', '인사동', [['R', 'insadong', 0, 638], [37.57040, 126.99300]]],
   ['cheonggye', '청계천', [[37.56930, 126.97900], [37.56940, 126.98800], [37.56970, 126.99800]]],
   ['gwanghwamun', '광화문 광장', [[37.56620, 126.97790], [37.57100, 126.97690], [37.57560, 126.97690]]],
   ['bukchon', '북촌', [['R', 'bukchon', 0, 1346]]],
-  ['namsan', '남산', [[37.55250, 127.00000], [37.55100, 126.99300], [37.55130, 126.98850]]],
+  ['namsan', '남산 소월길', [[37.55700, 126.97640], [37.55501, 126.97706], [37.55340, 126.97891], [37.55224, 126.98142], [37.55041, 126.98356], [37.54840, 126.98438], [37.54654, 126.98530], [37.54603, 126.98739], [37.54617, 126.98917], [37.54442, 126.99097], [37.54267, 126.99187], [37.54232, 126.99425]]],
   ['seokchon', '석촌호수', [['R', 'jamsil', 0, 1286]]],
   ['jamsil', '롯데월드타워', [[37.51370, 127.09900], [37.51480, 127.10500], [37.51650, 127.11300]]],
   ['seongsu', '성수 카페거리', [['R', 'seongsu', 0, 1264]]],
@@ -87,6 +87,8 @@ function build(idx) {
     if (!q.via) { if (cells.length) { const seg = astar(snap(cells[cells.length - 1]), snap(q.pts[0])); cells.push(...seg.slice(1, -1)); } cells.push(...q.pts); continue; }
     if (!cells.length) { cells.push(q.pts[0]); continue; }
     const seg = astar(snap(cells[cells.length - 1]), snap(q.pts[0])); cells.push(...seg.slice(1)); }
+  // 되돌아가는 곳 없애기: 지나는 곳을 조금 지나쳤다 돌아오면(갔다 오기 · 작은 고리) 그 사이를 잘라낸다
+  for (let i = 0; i < cells.length; i++) { let cut = -1; for (let j = Math.min(cells.length - 1, i + 120); j > i + 2; j--) if (Math.hypot(cells[j][0] - cells[i][0], cells[j][1] - cells[i][1]) < 3) { cut = j; break; } if (cut > 0) cells.splice(i + 1, cut - i - 1); }
   // 매끈하게: 점 줄이기 → 모서리 다듬기(3번) → 4m 간격
   const dp = (pts, eps) => { if (pts.length < 3) return pts; let md = 0, mi = 0; const [ax, az] = pts[0], [bx, bz] = pts[pts.length - 1], dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz) || 1; for (let i = 1; i < pts.length - 1; i++) { const d = Math.abs((pts[i][0] - ax) * dz - (pts[i][1] - az) * dx) / L; if (d > md) { md = d; mi = i; } } return md > eps ? [...dp(pts.slice(0, mi + 1), eps).slice(0, -1), ...dp(pts.slice(mi), eps)] : [pts[0], pts[pts.length - 1]]; };
   let pts = dp(cells, 2.2);
@@ -97,6 +99,9 @@ function build(idx) {
   const racc = [0]; for (let i = 1; i < R.length; i++) racc.push(racc[i - 1] + Math.hypot(R[i][0] - R[i - 1][0], R[i][1] - R[i - 1][1]));
   // 달리는 길(가장 가까운 찻길)의 이름 · 폭
   const near = (p) => { let best = null, bd = Infinity; for (const L of roads) for (let k = 1; k < L.pts.length; k++) { const [ax, az] = L.pts[k - 1], [bx, bz] = L.pts[k], dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((p[0] - ax) * dx + (p[1] - az) * dz) / (dx * dx + dz * dz || 1))), d = Math.hypot(ax + dx * t - p[0], az + dz * t - p[1]); if (d < bd) { bd = d; best = L; } } return bd <= (best?.w || 0) / 2 + 1 ? best : null; };
+  // 길바닥 종류 (20m 마다): r 찻길 · a 골목 · p 산책길 · - 아무것도 없음(잔디 · 광장 위, 러너가 길을 깐다)
+  const onOther = (p) => { let best = null, bd = Infinity; for (const L of others) for (let k = 1; k < L.pts.length; k++) { const [ax, az] = L.pts[k - 1], [bx, bz] = L.pts[k], dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((p[0] - ax) * dx + (p[1] - az) * dz) / (dx * dx + dz * dz || 1))), d = Math.hypot(ax + dx * t - p[0], az + dz * t - p[1]); if (d < bd) { bd = d; best = L; } } return bd <= (best?.w || 0) / 2 + 1 ? best : null; };
+  const sf = []; for (let i = 0; i < R.length; i += 5) { const o = near(R[i]) ? null : onOther(R[i]); sf.push(near(R[i]) ? 'r' : o ? (o.kind === 'path' ? 'p' : 'a') : '-'); }
   const onRoad = R.map(near), w = []; for (let i = 0; i < R.length; i += 5) w.push(onRoad[i] ? Math.round(onRoad[i].w) : 0);
   const names = []; for (const L of onRoad) { const n = L?.name || ''; if (n && names[names.length - 1] !== n) names.push(n); }
   // 가로지르는 길: 경로 선분과 다른 찻길 선분이 만나는 곳 (달리는 길과 같은 이름은 빼고), 15m 안은 하나로
@@ -115,7 +120,7 @@ function build(idx) {
   // 급히 꺾이는 곳 (앞뒤 10m 방향이 100° 넘게 바뀜): 달리기엔 어색하다
   const sharp = []; for (let i = 3; i < R.length - 3; i++) { const a = Math.atan2(R[i][0] - R[i - 3][0], R[i][1] - R[i - 3][1]), b = Math.atan2(R[i + 3][0] - R[i][0], R[i + 3][1] - R[i][1]); let dA = Math.abs(b - a); if (dA > Math.PI) dA = 2 * Math.PI - dA; if (dA > 1.75 && (!sharp.length || i * 4 - sharp[sharp.length - 1] > 30)) sharp.push(i * 4); }
   if (sharp.length) console.warn(`  ⚠ ${name}: 급히 꺾임 ${sharp.join(', ')}m`);
-  return { id, name, len: Math.round(len), names, pts: R.flatMap(([x, z]) => [Math.round(x * 10), Math.round(z * 10)]), xs, bus, w, tiles: [...tiles] };
+  return { id, name, len: Math.round(len), names, pts: R.flatMap(([x, z]) => [Math.round(x * 10), Math.round(z * 10)]), xs, bus, w, sf: sf.join(''), tiles: [...tiles] };
 }
 
 const only = process.argv[2] != null ? [+process.argv[2]] : COURSES.map((_, i) => i);
@@ -123,6 +128,6 @@ const out = [];
 for (const i of only) { const t0 = Date.now(), R = build(i); out[i] = R; console.log(`${i} ${R.name} ${R.len}m · 교차 ${R.xs.length} · 정류장 ${R.bus.length} · 칸 ${R.tiles.join(' ')} · ${R.names.slice(0, 6).join(' → ')} (${Date.now() - t0}ms)`); }
 if (only.length === COURSES.length) {
   const body = out.map((R) => `  ${JSON.stringify(R)},`).join('\n');
-  fs.writeFileSync(path.join(ROOT, 'public/dream-runner/js/seoul-routes.js'), `// 🗺️ 서울 맵 코스 길 (러너-개선 6-7): tools/seoul-run-courses.mjs 가 서울 칸 지도에서 만든다. 손으로 고치지 않는다\n//   pts: 4m 간격 경로 선 (서울 좌표 0.1m 정수) · xs: [거리, 가로지르는 길 폭] · bus: 정류장 거리 · w: 20m 마다 길 폭 · tiles: 지나는 칸\n//   © OpenStreetMap contributors\nexport const ROUTES = [\n${body}\n];\n`);
+  fs.writeFileSync(path.join(ROOT, 'public/dream-runner/js/seoul-routes.js'), `// 🗺️ 서울 맵 코스 길 (러너-개선 6-7): tools/seoul-run-courses.mjs 가 서울 칸 지도에서 만든다. 손으로 고치지 않는다\n//   pts: 4m 간격 경로 선 (서울 좌표 0.1m 정수) · xs: [거리, 가로지르는 길 폭] · bus: 정류장 거리 · w: 20m 마다 길 폭 · sf: 20m 마다 길바닥(r 찻길 · a 골목 · p 산책길 · - 없음) · tiles: 지나는 칸\n//   © OpenStreetMap contributors\nexport const ROUTES = [\n${body}\n];\n`);
   console.log('→ public/dream-runner/js/seoul-routes.js');
 }

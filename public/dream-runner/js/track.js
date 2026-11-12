@@ -7,7 +7,7 @@ import { RNG } from '../../shared/js/utils.js';
 import { THEMES } from './themes.js';
 import { HELLS } from './hells.js';
 import { VOIDS } from './voids.js';
-import { SEOULS, seoulAt, SEOUL_U0, seoulCourseOf, ROUTES } from './seouls.js';
+import { SEOULS, seoulAt, SEOUL_U0, seoulCourseOf, seoulLaneW, ROUTES } from './seouls.js';
 import { glow, starG } from './kits.js';
 import { buildMonster, buildFist } from './hellkits.js';
 import { G } from '../../shared/js/utils.js';
@@ -17,9 +17,7 @@ export const V0 = 13, VMAX = 30;
 export const speedAt = (s) => Math.min(VMAX, V0 + Math.max(0, s) / 220); // 달릴수록 빨라진다
 export const DREAM_SEC = 20;
 export const DEATH_Y = -16;       // 이 아래로 떨어지면 탈락
-const AHEAD = isPhone ? 190 : 280, BEHIND = 40;
-// 서울 맵 길 폭 (레인 3개) · 좌우 끝 (곰은 길 밖으로 못 나간다)
-const SEOUL_W = 9, SEOUL_XLIM = 4.3; // 휴대폰은 앞을 덜 만들어 그리기 횟수를 줄인다
+const AHEAD = isPhone ? 190 : 280, BEHIND = 40; // 휴대폰은 앞을 덜 만들어 그리기 횟수를 줄인다
 
 // ---------- 발판 무늬 (윗면 텍스처) ----------
 const texCache = new Map();
@@ -111,7 +109,7 @@ export class Track {
   }
   // opt.map: 'hell' 이면 랜덤 지옥 · 'void' 면 랜덤 이공간 · opt.K: 난이도 빠르기 (지옥 · 이공간 길은 시간 기준이라 빠를수록 길어진다)
   reset(seed, itemMode = false, opt = {}) {
-    this.itemMode = itemMode; this.hell = opt.map === 'hell'; this.void = opt.map === 'void'; this.seoul = opt.map === 'seoul'; this.xLim = this.seoul ? SEOUL_XLIM : null; this.movers = []; this.decos = []; this.gateN = 0; this.K = opt.K || 1; this.time = 0; this.meteors = []; this.strikes = []; this.nextStrike = 0; this.lastFloor = 0; this.trend = 0; this.lastPat = '';
+    this.itemMode = itemMode; this.hell = opt.map === 'hell'; this.void = opt.map === 'void'; this.seoul = opt.map === 'seoul'; this.xLim = null; this.movers = []; this.decos = []; this.gateN = 0; this.K = opt.K || 1; this.time = 0; this.meteors = []; this.strikes = []; this.nextStrike = 0; this.lastFloor = 0; this.trend = 0; this.lastPat = '';
     this.irng = new RNG(seed ^ 0x2545f491); // 아이템 상자 자리 (길 모양과 따로라서 스피드전 길이 바뀌지 않는다)
     this.nextBox = 120;
     for (const c of [...this.root.children]) this.drop(c);
@@ -122,7 +120,7 @@ export class Track {
     // 지옥 순서: 올라가는 지옥과 떨어지는 지옥을 번갈아
     if (this.void) this.order = new RNG(seed ^ 0x6a09e667).shuffle([...VOIDS.keys()]);
     // 서울 코스 순서: 20곳을 섞어서 차례로
-    if (this.seoul) this.order = new RNG(seed ^ 0x1f83d9ab).shuffle([...SEOULS.keys()]);
+    if (this.seoul) { this.order = new RNG(seed ^ 0x1f83d9ab).shuffle([...SEOULS.keys()]); this.xLim = seoulLaneW(this.order[0]) / 2 - 0.2; }
     if (this.hell) { const q = new RNG(seed ^ 0x3c6ef372), keys = (l) => q.shuffle([...HELLS.keys()].filter((i) => HELLS[i].layout === l)), a = keys('climb'), b = keys('plunge'); this.order = []; for (let i = 0; i < Math.max(a.length, b.length); i++) this.order.push(a[i % a.length], b[i % b.length]); }
     this.plats = []; this.obs = []; this.stars = []; this.portals = []; this.boxes = []; this.traps = [];
     this.origin = 0;
@@ -832,7 +830,7 @@ export class Track {
   //   교차로 앞: 넓은 길이면 교차로를 가로지르는 차 + 횡단보도 행인, 좁은 길 · 골목이면 건너는 행인 · 자전거
   //   정류장 앞: 정류장으로 들어오는 버스. 그 밖은 길 폭에 맞게 (큰길 = 차 · 버스, 골목 · 산책길 = 자전거 · 행인 · 배달 오토바이)
   seoulPattern() {
-    const r = this.rng, s = this.gs, v = speedAt(s), d = Math.min(1, s / 3000), W = SEOUL_W;
+    const r = this.rng, s = this.gs, v = speedAt(s), d = Math.min(1, s / 3000), W = seoulLaneW(seoulCourseOf(this, this.dream));
     this.cx = 0; this.cy = 0;
     const R = ROUTES[seoulCourseOf(this, this.dream)], base = this.bounds[this.dream] - SEOUL_U0, u = s - base;
     const roadW = R.w[Math.max(0, Math.min(R.w.length - 1, Math.floor((u + 20) / 20)))] || 0, big = roadW >= 14;
@@ -901,7 +899,7 @@ export class Track {
     }
     for (const st of this.stars) if (!st.got) { st.mesh.rotation.y = t * 2.5 + st.s; }
     for (const po of this.portals) po.mesh.userData.anim(po.mesh, t);
-    if (this.seoul) this.updateMovers(t);
+    if (this.seoul) { this.updateMovers(t); this.xLim = seoulLaneW(seoulCourseOf(this, this.dreamAt(playerS))) / 2 - 0.2; }
     for (const b of this.boxes) if (!b.got) { b.mesh.children[0].rotation.set(t * 1.3, t * 1.8, 0); b.mesh.position.y = b.y + Math.sin(t * 2.5 + b.s) * 0.15; }
     // 아주 멀리 달리면 숫자가 커져서 떨리지 않게 원점을 옮긴다
     if (playerS - this.origin > 1500) this.shift(1500);
