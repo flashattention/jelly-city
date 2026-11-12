@@ -16,9 +16,11 @@ $('sens-open').onclick = () => openSens();
 $('pn-open').onclick = () => openPatchNotes(null);
 $('cos-open').onclick = () => openWardrobe('look', null, { onLook: () => renderChars() });
 // 출석체크: 오늘 아직이면 단추에 분홍 점. 뽑은 치장은 옷장에서 바로 입어 보기
-const attDot = () => attendPending().then((p) => { $('att-dot').style.display = p ? 'block' : 'none'; });
-$('att-open').onclick = () => openAttend({ onClose: attDot, onTry: () => openWardrobe('closet', null, { onLook: () => renderChars() }) });
-setTimeout(attDot, 800);
+const attDot = () => attendPending().then((p) => { $('att-dot').style.display = p ? 'block' : 'none'; return p; });
+const attOpen = () => openAttend({ onClose: attDot, onTry: () => openWardrobe('closet', null, { onLook: () => renderChars() }) });
+$('att-open').onclick = attOpen;
+// 들어오면: 오늘 아직 출석 안 했으면 출석 창을 저절로 (그날 한 번만 · 닫으면 다시 안 뜬다)
+setTimeout(() => attDot().then((today) => { if (!today || store.get('jelly.attAuto') === today || document.querySelector('.at-wrap')) return; store.set('jelly.attAuto', today); attOpen(); }), 800);
 const q = new URLSearchParams(location.search);
 // 다른 게임에서 '새 캐릭터 만들기'로 왔으면 만든 뒤 그 게임으로 돌아간다
 const back = /^\/[a-z-]+\/$/.test(q.get('back') || '') ? q.get('back') : null;

@@ -9,6 +9,16 @@ const ANON = /^[a-f0-9]{16,40}$/, MAX_STARS_RUN = 6000;
 // 출석 · 뽑기 (2026-11-12): 한국 날짜, 뽑기 확률 · 물건 모음 (조건 없는 소품샵 물건만)
 const kstDay = (t) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);
 export const GACHA = { item: 0.25, tiers: [0.8, 0.18, 0.02], stars: [30, 80] };
+// 연속 출석 등급 뽑기 (2026-11-12 허브 5): 연속 일수가 길수록 치장 확률 · 좋은 등급 · 별이 오른다 (전설 이상은 기록으로만 얻는 물건이라 넣지 않는다)
+export const GACHA_TIERS = [
+  { id: 'basic', from: 1, name: '기본 뽑기', emoji: '🎟️', item: 0.25, tiers: [0.8, 0.18, 0.02], stars: [30, 80] },
+  { id: 'silver', from: 7, name: '은빛 뽑기', emoji: '🥈', item: 0.45, tiers: [0.55, 0.38, 0.07], stars: [60, 150] },
+  { id: 'gold', from: 14, name: '금빛 뽑기', emoji: '🥇', item: 0.7, tiers: [0.3, 0.5, 0.2], stars: [120, 300] },
+  { id: 'rainbow', from: 30, name: '무지개 뽑기', emoji: '🌈', item: 1, tiers: [0, 0.6, 0.4], stars: [200, 400] },
+];
+// 화면용 출석 정보: would = 오늘 출석하면 몇 일 연속이 되는지 (이미 했으면 지금 연속)
+const attPub = (A) => { const now = Date.now(), today = kstDay(now), last = A?.last || '', streak = A?.streak || 0; const would = last === today ? streak : last === kstDay(now - 864e5) ? streak + 1 : 1; return { last, streak: last === today || last === kstDay(now - 864e5) ? streak : 0, days: A?.days || 0, log: A?.log || [], today, would }; };
+export const tierOfStreak = (n) => [...GACHA_TIERS].reverse().find((t) => n >= t.from) || GACHA_TIERS[0];
 const GACHA_POOL = { common: SHOP.filter((i) => !i.req && i.rarity === 'common'), rare: SHOP.filter((i) => !i.req && i.rarity === 'rare'), epic: SHOP.filter((i) => !i.req && i.rarity === 'epic') };
 // 순위 업적은 겨룬 사람이 있어야 인정한다 (빈 순위표의 1위는 왕관이 아니다)
 const MIN_FIELD = { 1: 5, 2: 10, 3: 10, 10: 20 };
@@ -110,12 +120,12 @@ export class Cosmetics {
   // 조작이 확인된 계정: 해당 업적을 거두고 별을 비운다 (남은 정상 기록으로 다시 계산)
   punish(sub, prefix) { const u = this.users[sub]; if (!u) return; for (const id of Object.keys(u.ach)) if (id.startsWith(prefix) || id.startsWith('all.')) delete u.ach[id]; u.stars = 0; u.fresh = []; for (const [s, id] of Object.entries(u.equip)) if (!this.owns(sub, id)) delete u.equip[s]; this.dirty = true; this.refresh(sub); }
   pub(sub) {
-    if (!sub) return { tickets: 0, att: { last: '', streak: 0, days: 0, log: [], today: kstDay(Date.now()) }, stars: 0, total: 0, owned: [], live: [], equip: {}, ach: {}, plays: {}, wins: {}, pvp: {}, fresh: [], best: {} };
+    if (!sub) return { tickets: 0, att: attPub(null), gtiers: GACHA_TIERS, stars: 0, total: 0, owned: [], live: [], equip: {}, ach: {}, plays: {}, wins: {}, pvp: {}, fresh: [], best: {} };
     this.refresh(sub);
     const u = this.u(sub), best = {};
     for (const s of SHOP) if (s.req) { const k = `${s.req.map}:${s.req.diff}`; if (!(k in best)) best[k] = this.dreamOf(sub)?.table('speed', s.req.diff, s.req.map)?.[sub]?.dist || 0; }
     const live = []; const cache = new Map(); for (const it of itemById.values()) if (this.live(it) && this.holdsNow(sub, it, cache)) live.push(it.id);
-    return { tickets: u.tickets || 0, att: { last: u.att?.last || '', streak: u.att?.streak || 0, days: u.att?.days || 0, log: u.att?.log || [], today: kstDay(Date.now()) }, stars: u.stars, total: u.total, owned: u.owned, live, equip: this.equipOf(sub) || {}, ach: u.ach, plays: u.plays, wins: u.wins, pvp: u.pvp, fresh: u.fresh || [], best };
+    return { tickets: u.tickets || 0, att: attPub(u.att), gtiers: GACHA_TIERS, stars: u.stars, total: u.total, owned: u.owned, live, equip: this.equipOf(sub) || {}, ach: u.ach, plays: u.plays, wins: u.wins, pvp: u.pvp, fresh: u.fresh || [], best };
   }
   buy(sub, id) {
     const it = itemById.get(id); if (!it?.shop) throw new Error('살 수 없는 물건이에요');
@@ -130,24 +140,30 @@ export class Cosmetics {
     u.equip[slot] = id; this.dirty = true;
   }
   // 사이트 출석체크: 한국 날짜로 하루 한 번, 뽑기권 1장 (7일 연속마다 1장 더)
-  attend(sub, now = Date.now()) {
+  attend(sub, now = Date.now(), rnd = Math.random) {
     const u = this.u(sub), A = (u.att ||= { last: '', streak: 0, days: 0, log: [] }), d = kstDay(now);
     if (A.last === d) throw new Error('오늘은 이미 출석했어요');
     A.streak = A.last === kstDay(now - 864e5) ? A.streak + 1 : 1; A.last = d; A.days++; A.log = [...(A.log || []), d].slice(-14);
-    const got = A.streak % 7 === 0 ? 2 : 1; u.tickets = (u.tickets || 0) + got; this.dirty = true;
-    return { got, streak: A.streak };
+    // 그 자리에서 뽑는다 (7일 연속마다 두 번). 뽑기권을 따로 쌓지 않는다
+    const T = tierOfStreak(A.streak), n = A.streak % 7 === 0 ? 2 : 1, draws = []; for (let k = 0; k < n; k++) draws.push(this.draw(u, T, rnd));
+    this.dirty = true;
+    return { streak: A.streak, tier: T.id, draws };
+  }
+  // 등급표 T 로 한 번 뽑기: 치장(조건 없는 별 상점 물건) 또는 별. 이미 가진 치장은 값의 절반을 별로
+  draw(u, T, rnd = Math.random) {
+    if (rnd() < T.item) {
+      const t = rnd(), tier = t < T.tiers[0] ? 'common' : t < T.tiers[0] + T.tiers[1] ? 'rare' : 'epic';
+      const pool = GACHA_POOL[tier], it = pool[Math.floor(rnd() * pool.length)];
+      if (!u.owned.includes(it.id)) { u.owned.push(it.id); return { kind: 'item', id: it.id, tier }; }
+      const n = Math.max(10, Math.round(it.price / 2)); u.stars += n; u.total += n; return { kind: 'item', id: it.id, tier, dup: true, stars: n };
+    }
+    const [a, b] = T.stars, n = a + Math.floor(rnd() * (b - a + 1)); u.stars += n; u.total += n; return { kind: 'stars', stars: n };
   }
   // 기본 치장 뽑기: 서버가 정한다. 치장 25% (일반 80 · 희귀 18 · 영웅 2) · 별 75% (30 ~ 80개). 이미 가진 물건은 값의 절반을 별로
   gacha(sub, rnd = Math.random) {
     const u = this.u(sub); if (!(u.tickets > 0)) throw new Error('뽑기권이 없어요');
     u.tickets--; this.dirty = true;
-    if (rnd() < GACHA.item) {
-      const t = rnd(), tier = t < GACHA.tiers[0] ? 'common' : t < GACHA.tiers[0] + GACHA.tiers[1] ? 'rare' : 'epic';
-      const pool = GACHA_POOL[tier], it = pool[Math.floor(rnd() * pool.length)];
-      if (!u.owned.includes(it.id)) { u.owned.push(it.id); return { kind: 'item', id: it.id, tier }; }
-      const n = Math.max(10, Math.round(it.price / 2)); u.stars += n; u.total += n; return { kind: 'item', id: it.id, tier, dup: true, stars: n };
-    }
-    const n = 30 + Math.floor(rnd() * 51); u.stars += n; u.total += n; return { kind: 'stars', stars: n };
+    return this.draw(u, GACHA_TIERS[0], rnd);
   }
 }
 // 방 경기 결과에서 이긴 사람 찾기 (게임마다 결과 모양이 조금씩 다르다)
