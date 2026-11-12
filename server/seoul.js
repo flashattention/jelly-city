@@ -41,7 +41,7 @@ let dirty = false; setInterval(() => { if (!dirty) return; dirty = false; try { 
 function roll() { const d = dayKey(), h = kst().getUTCHours(); if (st.day !== d) { st.day = d; st.used = {}; st.off = {}; dirty = true; } if (st.hour !== h) { st.hour = h; st.usedH = {}; } return h; }
 // 부를 수 있나: 오늘 예산 안 · 이번 시간 몫(남은 예산 ÷ 남은 시간 × 2.5) 안 · 쉬는 중이 아님
 function canCall(op) {
-  const h = roll(), used = st.used[op] || 0, left = LIMIT[op] - used; if (st.off[op] || left <= 0) return false;
+  const h = roll(), used = st.used[op] || 0, left = LIMIT[op] - used; if (st.off[op] === 'key' && Date.now() - (st.offAt?.[op] || 0) > 3600e3) { delete st.off[op]; dirty = true; } if (st.off[op] || left <= 0) return false;
   return (st.usedH[op] || 0) < Math.max(12, (left / (24 - h)) * 2.5);
 }
 function spend(op) { st.used[op] = (st.used[op] || 0) + 1; st.usedH[op] = (st.usedH[op] || 0) + 1; dirty = true; }
@@ -52,7 +52,7 @@ async function busCall(op, api, q) {
   let j = null; try { j = JSON.parse(t); } catch { /* XML 오류 */ }
   const head = j?.msgHeader || j?.comMsgHeader || {}, msg = String(head.headerMsg || head.errMsg || (j ? `cd=${head.headerCd ?? '?'} ${t.slice(0, 160)}` : t.slice(0, 300)));
   if (j && (head.headerCd === '0' || head.headerCd === '4' || head.headerCd === 4 || head.headerCd === 0)) { delete lastErr[op]; return j.msgBody?.itemList || []; }
-  if (/LIMITED|초과/i.test(msg)) st.off[op] = 'limit'; else if (/KEY|등록|DENIED|인증|권한/i.test(msg)) st.off[op] = 'key';
+  if (/LIMITED|초과/i.test(msg)) st.off[op] = 'limit'; else if (/KEY|등록|DENIED|인증|권한/i.test(msg)) { st.off[op] = 'key'; (st.offAt ||= {})[op] = Date.now(); }
   lastErr[op] = { at: Date.now(), msg: msg.replace(/serviceKey=[^&\s]+/g, '').slice(0, 120) }; dirty = true;
   throw new Error('버스 정보 오류');
 }
