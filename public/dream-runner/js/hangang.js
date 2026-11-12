@@ -618,7 +618,38 @@ export class Hangang {
     if (this.inside) { const S = this.inside.S, O = S.O, list = [box(O.x, O.z, S.CW / 2, S.CD / 2), ...S.plats.map((p) => box(O.x, p.pz, p.PL / 2, 5 + 5.2))]; return list.find(inBox) || list[0]; }
     return null;
   }
-  placeAt(x, z, face) { this.px = x; this.pz = z; this.y = 0; this.vy = 0; this.climb = null; this.flying = false; this.face = face; this.camYaw = face; this.camInit = false; this.mdx = null; this.onRoof = null; }
+  placeAt(x, z, face) { this.px = x; this.pz = z; this.y = 0; this.vy = 0; this.climb = null; this.flying = false; this.face = face; this.camYaw = face; this.camInit = false; this.mdx = null; this.onRoof = null; this.spawnFix = 8; this.spawnAt = [x, z]; }
+  // 순간이동 · 처음 시작한 자리가 건물 · 벽 · 나무 속이면 가까운 빈 땅으로 옮긴다
+  // 건물은 칸을 불러온 뒤에야 생기므로 몇 초 동안 매 프레임 살핀다
+  inFootAt(x, z) {
+    for (const fi of this.footGrid?.get(`${Math.floor(x / 40)},${Math.floor(z / 40)}`) || []) {
+      const f = this.foot[fi]; if (f.deck || f.deckWall || (f.mh && f.mh > 2.5) || x < f.x0 - 0.4 || x > f.x1 + 0.4 || z < f.z0 - 0.4 || z > f.z1 + 0.4) continue;
+      const fh = f.base === undefined ? f.h : f.h + f.base - this.terrAt(x, z); if (fh < 1.2) continue;
+      if (inRing(x, z, f.ring)) return true;
+      const q = this.pushOut(x, z, 0, 0.4); if (q.hit && Math.hypot(q.x - x, q.z - z) > 0.05) return true;
+    }
+    for (const c of this.circlesNear(x, z)) if (!c.mh && Math.hypot(x - c.x, z - c.z) < c.r + 0.4) return true;
+    return false;
+  }
+  // out: 건물에서 밖으로 나온 방향. 카메라(곰 뒤 4m)가 건물 속에 들지 않는 쪽으로 벽을 따라 본다
+  faceAlong(out) {
+    const ok = (f) => !this.inFootAt(this.px - Math.sin(f) * 4, this.pz - Math.cos(f) * 4);
+    const f = [out + Math.PI / 2, out - Math.PI / 2, out].find(ok); this.face = this.camYaw = f ?? out; this.camInit = false;
+  }
+  fixSpawn(dt) {
+    // 서울 칸 지도: 곰이 선 칸을 다 불러오기 전에는 시간을 세지 않는다
+    const T0 = this.world0?.tile; if (this.chunks && T0 && !this.chunks.has(`${Math.floor(this.px / T0)}_${Math.floor(this.pz / T0)}`)) return;
+    this.spawnFix -= dt;
+    if (this.inside || this.inShop || this.inMall || this.ride || this.attr?.exp || this.flying || this.climb || this.y > 3 || !this.footGrid) return;
+    // 벽 밀어내기가 이미 밖으로 꺼냈으면, 벽을 마주 보지 않게 벽을 따라 보게 한다
+    if (!this.inFootAt(this.px, this.pz)) { const S0 = this.spawnAt; if (S0 && Math.hypot(this.px - S0[0], this.pz - S0[1]) > 0.5) { this.spawnAt = null; this.faceAlong(Math.atan2(this.px - S0[0], this.pz - S0[1])); } return; }
+    for (let r = 1.5; r <= 80; r += 1.5) {
+      const n = Math.max(8, Math.round(r * 2));
+      for (let i = 0; i < n; i++) { const a = this.face + (i / n) * Math.PI * 2, x = this.px + Math.sin(a) * r, z = this.pz + Math.cos(a) * r;
+        if (this.terr && (x < this.terr.x0 + 50 || z < this.terr.z0 + 50)) continue;
+        if (!this.inFootAt(x, z) && this.groundAt(x, z, 0) < 0.5) { this.spawnAt = null; this.px = x; this.pz = z; this.faceAlong(a); this.y = 0; this.vy = 0; this.camInit = false; this.spawnFix = 0; return; } }
+    }
+  }
   // 열차 타기: 열린 문 앞에 서면 탄다 → 열차 안에서 잠깐 달리고 → 다음 역 승강장에 내린다 (그 역이 지도 밖이면 같은 역 반대편으로)
   startRide(p, T) {
     const I = this.inside, line = p.l, destName = T.sd < 0 ? p.prev : p.next, dest = this.stations.find((q) => q.name === destName && this.entrances.some((e) => e.st === q));
@@ -2043,7 +2074,7 @@ export class Hangang {
   enter(bear, opt = {}) {
     this.bear = bear; this.prevParent = bear.root.parent; this.scene.add(bear.root);
     this.s = opt.s ?? 30; this.dir = 1; this.lat = -4.3; this.v = 0; this.target = 6.4; this.y = 0; this.vy = 0; this.dist = 0; this.time = 0; this.moments = {}; this.turnT = 0;
-    const p0 = this.at(this.s); [this.px, this.pz] = this.world(this.s, this.lat); this.face = Math.atan2(p0.dx, p0.dz); this.camYaw = this.face; this.ri = Math.round(this.s / this.step); this.dragT = 0; this.camInit = false; this.mdx = null;
+    const p0 = this.at(this.s); [this.px, this.pz] = this.world(this.s, this.lat); this.face = Math.atan2(p0.dx, p0.dz); this.camYaw = this.face; this.ri = Math.round(this.s / this.step); this.dragT = 0; this.camInit = false; this.mdx = null; this.spawnFix = 8;
     bear.root.scale.setScalar(BEAR); bear.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     const r = rnd((Date.now() / 1000) | 0), K = opt.keep;
     // 다른 지역에서 옮겨 왔으면 시각 · 계절 · 날씨를 그대로 (무작위는 처음 시작할 때만)
@@ -2184,6 +2215,7 @@ export class Hangang {
     this.lodT = (this.lodT || 0) - dt; if (this.lodT <= 0) { this.lodT = 0.5; const v = new THREE.Vector3(); for (const o of this.lodObjs || []) { const bs = o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere); v.copy(bs.center).applyMatrix4(o.matrixWorld); o.visible = Math.hypot(v.x - bx, v.z - bz) - bs.radius < 400; }
       // 곰(사람)은 70m 밖이면 숨긴다 (곰 하나가 부품 수십 개라 무겁다)
       for (const c of this.scene.children) if (c.userData.npc) c.visible = Math.hypot(c.position.x - bx, c.position.z - bz) < 70; }
+    if (this.spawnFix > 0) this.fixSpawn(dt);
     this.tickPeople(dt, bx, bz); this.tickGroups(dt, bx, bz); this.tickCity(dt, bx, bz); this.tickTransit(dt, bx, bz); this.tickLabels(dt, camera, bx, bz);
     if (this.inside) { this.tickInside(dt); }
     if (this.inShop) this.tickShop(dt); else if (this.inMall) this.tickMall(dt);
@@ -2485,7 +2517,7 @@ export class Hangang {
   teleport(s, lat) {
     this.flying = false; this.y = 0; this.vy = 0;
     this.s = clamp(s, 4, this.L - 4); this.lat = clamp(lat, LAT_MIN, LAT_MAX); [this.px, this.pz] = this.world(this.s, this.lat); this.ri = Math.round(this.s / this.step);
-    const p = this.at(this.s); this.face = Math.atan2(p.dx, p.dz); this.camYaw = this.face; this.camInit = false; this.v = 0; this.mdx = null;
+    const p = this.at(this.s); this.face = Math.atan2(p.dx, p.dz); this.camYaw = this.face; this.camInit = false; this.v = 0; this.mdx = null; this.spawnFix = 8;
     for (const q of this.people) this.removePerson(q); this.people = []; for (const gd of this.groups) this.removeGroup(gd); this.groups = []; this.regionName = null;
   }
   // 지금 위치 설명: 다음 이정표까지
