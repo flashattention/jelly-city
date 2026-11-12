@@ -60,6 +60,8 @@ const CSS = `
 #at-pop b{font-size:17px;margin-top:2px}
 #at-pop small{font-size:11px;opacity:.8}
 body.touch #at-card{bottom:150px}
+/* 체험 띠가 떠 있을 땐 알림(토스트)을 띠 아래로 (겹쳐 가렸다) */
+body.at-on #toast{top:128px}
 `;
 
 class Attractions {
@@ -141,7 +143,7 @@ class Attractions {
     C.querySelector('button').onclick = () => this.act(); C.classList.remove('hidden');
   }
   drawBar() {
-    const E = this.exp, B = this.el.bar; if (!E) { B.classList.add('hidden'); return; }
+    const E = this.exp, B = this.el.bar; document.body.classList.toggle('at-on', !!E); if (!E) { B.classList.add('hidden'); return; }
     const s = typeof E.status === 'function' ? E.status() : E.status || '', a = E.actLabel ? (typeof E.actLabel === 'function' ? E.actLabel() : E.actLabel) : '';
     const html = `<div><span class="t">${E.spot.icon} ${E.title}</span><span class="s">${s}</span></div>${a ? `<button class="a">${a} <kbd>E</kbd></button>` : ''}<button class="x">그만하기</button>`;
     if (B.dataset.h !== html) { B.dataset.h = html; B.innerHTML = html; B.querySelector('.x').onclick = () => this.finish(this.exp, true); const ab = B.querySelector('.a'); if (ab) ab.onclick = () => this.act(); }
@@ -159,7 +161,7 @@ class Attractions {
   finish(E, quit = false) {
     if (!E || this.exp !== E) return; this.exp = null;
     try { E.end?.(quit); } catch (e) { console.warn(e); }
-    this.el.bar.classList.add('hidden'); this.el.bar.dataset.h = '';
+    this.el.bar.classList.add('hidden'); this.el.bar.dataset.h = ''; document.body.classList.remove('at-on');
     if (!quit && !E.noStamp) this.stamp(E.stampId || E.spot.id, E.stampLabel);
     this.near = null; this.scanT = 0;
   }

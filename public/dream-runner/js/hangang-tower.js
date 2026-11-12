@@ -7,6 +7,7 @@ import { registerAttraction } from './hangang-attractions.js';
 import { isPhone } from '../../shared/js/perf.js';
 import { windowMat, clamp, lerp, tone, noise, ac, TKit, G, T, canvasTex, txt, mats } from './hangang-tower-lib.js';
 import { FLOORS, buildFloor } from './hangang-tower-floors.js';
+import { loadSkyline, buildSkyline } from './hangang-tower-sky.js';
 
 // 탑 가운데 (OSM 외곽선 가운데) · 1층 출입구 (남쪽 광장 쪽 유리문) · 실내를 짓는 먼 곳
 export const TW = { x: 10829, z: 1931 };
@@ -21,15 +22,23 @@ export const towerR = (alt) => 43 * (1 - 0.7 * Math.min(1, alt / 555));
 function drawOutdoor(hg, shell, pos, draw) {
   const R = globalThis.dream?.renderer, sc = hg.scene; if (!R) return 0;
   const on = []; for (const o of hg.hidden || []) if (!o.visible) { o.visible = true; on.push(o); }
+  // 불러온 칸 밖 먼 서울(빌딩 숲 · 밤 불빛 · 찻길 불빛 · 지평선 도시 노을)은 창밖을 그릴 때만 켠다
+  const night = hg.skyU?.night.value || 0, sky = S.sky; if (sky) { sky.g.visible = true; sky.prepare(night, hg.time); }
+  // 밤엔 하늘빛(반구 빛)을 낮춰 건물 벽은 어둡고 창 불빛이 또렷하게
+  const hemiI = hg.hemi?.intensity, sunI = hg.sun?.intensity; if (hg.hemi) hg.hemi.intensity = hemiI * (1 - 0.8 * night); if (hg.sun) hg.sun.intensity = sunI * (1 - 0.75 * night);
+  // 창 불빛은 조금 더 밝게 (멀리서 보면 창 하나하나가 작아 흐려진다)
+  const bms = []; if (night > 0.05) for (const c of hg.chunks?.values() || []) for (const m of Object.values(c.bldByType || {})) { bms.push([m, m.emissiveIntensity]); m.emissiveIntensity *= 1 + 0.4 * night; }
   shell.g.visible = false; const bv = hg.bear?.root.visible, sv = hg.shadow?.visible; if (hg.bear) hg.bear.root.visible = false; if (hg.shadow) hg.shadow.visible = false;
   const fog = sc.fog, fc = fog.color.getHex(), fdv = fog.density, wt = hg.state.weather, fd = (wt === 'rain' ? 0.00095 : wt === 'snow' ? 0.0012 : wt === 'cloudy' ? 0.00055 : 0.00042) * (wt === 'clear' ? 0.2 : wt === 'cloudy' ? 0.4 : 0.6);
-  if (hg.fogOutC) fog.color.copy(hg.fogOutC); fog.density = fd; const wf = hg.waterU?.fogD.value; if (hg.waterU) hg.waterU.fogD.value = fd;
+  if (hg.fogOutC) fog.color.copy(hg.fogOutC); fog.density = fd;
+  // 밤 먼 곳 공기는 어둡게, 도시 불빛에 물든 주황빛으로 (밝은 보랏빛 안개에 먼 빌딩이 하얗게 떠 보였다)
+  { const n = hg.skyU?.night.value || 0; if (n > 0.05) fog.color.multiplyScalar(1 - 0.72 * n).lerp(new THREE.Color('#3a2418'), 0.35 * n); } const wf = hg.waterU?.fogD.value; if (hg.waterU) hg.waterU.fogD.value = fd;
   const skyP = hg.sky?.position.clone(); if (hg.sky) hg.sky.position.set(pos.x, 0, pos.z);
   const au = R.shadowMap.autoUpdate, prev = R.getRenderTarget(), ai = R.info.autoReset; R.shadowMap.autoUpdate = false; R.info.autoReset = false; const c0 = R.info.render.calls;
   try { draw(R, sc); } finally {
     R.info.autoReset = ai; R.setRenderTarget(prev); R.shadowMap.autoUpdate = au;
     if (hg.sky) hg.sky.position.copy(skyP); fog.color.setHex(fc); fog.density = fdv; if (hg.waterU) hg.waterU.fogD.value = wf;
-    for (const o of on) o.visible = false; shell.g.visible = true; if (hg.bear) hg.bear.root.visible = bv; if (hg.shadow) hg.shadow.visible = sv;
+    for (const o of on) o.visible = false; shell.g.visible = true; if (sky) sky.g.visible = false; if (hg.hemi) hg.hemi.intensity = hemiI; if (hg.sun) hg.sun.intensity = sunI; for (const [m, v] of bms) m.emissiveIntensity = v; if (hg.bear) hg.bear.root.visible = bv; if (hg.shadow) hg.shadow.visible = sv;
   }
   return R.info.render.calls - c0;
 }
@@ -308,6 +317,8 @@ registerAttraction({
     S.shell ||= buildShell(hg); (hg.mallInt ||= {})[D.name] = S.shell;
     // 바깥이 아직 보일 때 1층을 짓고 창밖을 그린 뒤 들어간다 (enterMall 이 바깥을 숨기고 출입구 자리에 세운다)
     setFloor('lobby', 'door'); hg.enterMall(D);
+    // 먼 서울은 한 번만 불러와 짓는다 (다 되면 창밖을 다시 그린다)
+    if (!S.sky && !S.skyLoading) { S.skyLoading = true; loadSkyline().then((d) => { S.skyLoading = false; if (!d || S.sky) return; const t0 = performance.now(); S.sky = buildSkyline(hg, d, [TW.x, TW.z]); S.skyMs = Math.round(performance.now() - t0); if (S.F && !S.F.noView) S.shell.view.all(); }); }
     const E = {
       title: '롯데월드타워', stampId: 'lwt', stampLabel: '롯데월드타워 · 118층',
       get lock() { return !!(S.pose || S.elev); },
