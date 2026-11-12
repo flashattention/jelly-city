@@ -89,7 +89,7 @@ export class Traffic {
     let lane = Math.floor(r() * lanes);
     if (t.cat === 'bus') lane = L.w >= 30 ? 0 : lanes - 1;
     let off = dir * (1.8 + lane * 3.3);
-    if (t.cat === 'bike') off += dir * (r() < 0.6 ? 0.9 : -0.6);
+    if (t.cat === 'bike' && L.w >= 14) off += dir * (r() < 0.6 ? 0.9 : -0.6);
     const base = t.cat === 'bus' ? 9 : t.cat === 'truck' ? 9.5 + r() * 2.5 : t.cat === 'bike' ? 11 + r() * 4 : 10 + r() * 5;
     const v = { key, t, L, d, dir, off, vMax: base * (this.hg.jamSpeed || 1), cur: 0, x: 0, z: 0, yaw: 0, roll: 0, pitch: 0, y: 0, init: false,
       col: new THREE.Color(pickColor(t, r)), plate: Math.floor(r() * 32) + (t.commercial ? 32 : 0), route: Math.floor(r() * ROUTES.length),
@@ -125,14 +125,15 @@ export class Traffic {
       if (pk && pk.L.w < 20 && r() < 0.5) pk = hg.pickNear(hg.driveGrid, hg.driveLines, px, pz, 55, 300, r);
       // 폭 10m 아래 좁은 길(북촌 같은 동네 길)엔 드문드문, 큰 차는 안 들어간다
       if (pk && pk.L.w < 10 && r() < 0.6) pk = null;
-      if (pk) this.spawn(pk.L, pk.d, r() < 0.5 ? 1 : -1, r);
+      // 8-31: 생길 자리 차로에 건물 · 기둥 · 나무가 있으면 만들지 않는다
+      if (pk) { const v = this.spawn(pk.L, pk.d, r() < 0.5 ? 1 : -1, r), q = hg.lineAt(v.L, v.d, v.off); if (hg.solidAt?.(q.x, q.z, v.hw, q.y || 0)) this.list.pop(); }
     }
     // 세워 둔 차: 좁은 길 가장자리에 (골목마다 차가 서 있다), 겹치거나 건물에 닿으면 안 만든다
     this.parkT = (this.parkT || 0) - dt;
     if (this.parkT <= 0 && hg.driveLines?.length) {
       this.parkT = 0.4; let np = 0; for (const v of this.list) if (v.parked && !v.player) np++;
       const pk = np < (isPhone ? 4 : 12) ? hg.pickNear(hg.driveGrid, hg.driveLines, px, pz, 25, 160, r) : null;
-      if (pk && pk.L.w >= 8 && pk.L.w < 22 && pk.d > 10 && pk.d < pk.L.len - 10) {
+      if (pk && !pk.L.deck && pk.L.w >= 8 && pk.L.w < 22 && pk.d > 10 && pk.d < pk.L.len - 10) {
         const sg = r() < 0.5 ? 1 : -1, key = PARK[Math.floor(r() * PARK.length)], off = sg * (pk.L.w / 2 - (TYPES[key].W / 2 + 0.35)), q = hg.lineAt(pk.L, pk.d, off);
         const clash = this.list.some((o) => Math.hypot(o.x - q.x, o.z - q.z) < 6.5) || hg.pushOut(q.x, q.z, 0.4, TYPES[key].W / 2).hit || !hg.walkable(q.x, q.z, 0);
         if (!clash) { const v = this.spawn(pk.L, pk.d, sg, r, { key, extra: { parked: true, empty: true } }); v.off = off; v.x = q.x; v.z = q.z; v.yaw = Math.atan2(q.dx * sg, q.dz * sg); v.init = true; v.cur = 0; v.siren = 0; }
@@ -153,6 +154,11 @@ export class Traffic {
         else if (o.player || o.parked) { const dx = o.x - q.x, dz = o.z - q.z, fa = dx * fx + dz * fz, sd = Math.abs(dx * -fz + dz * fx); if (fa > 0 && fa < (o.len + v.len) / 2 + 7 && sd < o.hw + v.hw + 0.4) { blocked = true; want = Math.min(want, Math.max(0, (fa - (o.len + v.len) / 2 - 1.5) / 1.3)); if (o.player && fa < (o.len + v.len) / 2 + 4 && (v.honkT || 0) <= 0) { v.honkT = 4; hg.drive?.honked?.(v); } } }
       }
       v.honkT = Math.max(0, (v.honkT || 0) - dt);
+      // 8-31: 내 차로 앞 3 · 9m 에 건물 · 기둥 · 나무 · 가로등이 있으면 옆 차로로, 옆 차로도 막혔으면 선다 (0.25초마다)
+      v.lookT = (v.lookT ?? Math.random() * 0.25) - dt;
+      if (v.lookT <= 0) { v.lookT = 0.25; v.obst = false; const hit = (off) => [3, 9].some((a) => { const q3 = hg.lineAt(v.L, v.d + v.dir * (v.len / 2 + a), off); return hg.solidAt?.(q3.x, q3.z, v.hw, q3.y || 0); });
+        if (hit(v.off)) { const a = v.off + v.dir * 3.3, b = v.off - v.dir * 3.3, ok = (o2) => Math.sign(o2) === v.dir && Math.abs(o2) < v.L.w / 2 - 0.9 && !hit(o2); if (ok(a)) v.off = a; else if (ok(b)) v.off = b; else v.obst = true; } }
+      if (v.obst) { blocked = true; want = 0; v.obstT = (v.obstT || 0) + dt; } else v.obstT = 0;
       // 세워 둔 차 · 내 차에 3초 넘게 막히면 옆 차로로 (없으면 돌아서)
       v.stuck = blocked && v.cur < 0.6 ? (v.stuck || 0) + dt : 0;
       if (v.stuck > 3) { v.stuck = 0; const a = v.off + v.dir * 3.3, b = v.off - v.dir * 3.3, ok = (o2) => Math.sign(o2) === v.dir && Math.abs(o2) < v.L.w / 2 - 1; if (ok(a)) v.off = a; else if (ok(b)) v.off = b; else { v.dir *= -1; v.off = -v.off; } }
@@ -169,6 +175,9 @@ export class Traffic {
       }
       // 자리 · 방향은 부드럽게 따라간다 (길을 갈아탈 때 순간이동 대신 미끄러지듯)
       const q2 = hg.lineAt(v.L, v.d, v.off), tyaw = Math.atan2(q2.dx * v.dir, q2.dz * v.dir);
+      // 8-31: 다리 위 길이면 다리 바닥 높이를 따라 오르내리고 앞뒤로 기운다
+      v.lift = v.init ? lerp(v.lift || 0, q2.y || 0, Math.min(1, dt * 6)) : q2.y || 0;
+      if (v.L.ys) { const hl = v.len * 0.4, qa = hg.lineAt(v.L, v.d + v.dir * hl, 0), qb = hg.lineAt(v.L, v.d - v.dir * hl, 0); v.dpitch = -Math.atan2((qa.y || 0) - (qb.y || 0), hl * 2); } else v.dpitch = 0;
       if (!v.init) { v.x = q2.x; v.z = q2.z; v.yaw = tyaw; v.init = true; }
       const k = Math.min(1, dt * 5); v.x += (q2.x - v.x) * k; v.z += (q2.z - v.z) * k;
       const dy = wrapA(tyaw - v.yaw); v.yaw += dy * Math.min(1, dt * 4);
@@ -176,7 +185,8 @@ export class Traffic {
       v.head = headOn;
     }
     // 멀어지면 치운다
-    for (let i = this.list.length - 1; i >= 0; i--) { const v = this.list[i]; if (!v.player && !v.keep && Math.hypot(v.x - px, v.z - pz) > (v.parked ? 260 : 360)) this.list.splice(i, 1); }
+    // 길이 막혀 6초 넘게 못 가는 차는 (보이지 않는 곳이면) 치운다
+    for (let i = this.list.length - 1; i >= 0; i--) { const v = this.list[i]; if (!v.player && !v.keep && (Math.hypot(v.x - px, v.z - pz) > (v.parked ? 260 : 360) || (v.obstT > 6 && (v.dist ?? 99) > 30))) this.list.splice(i, 1); }
     this.draw(px, pz, night);
   }
   // 인스턴스 쓰기: 지형 높이 · 앞뒤 기울기 · 오토바이 기울기
@@ -196,10 +206,10 @@ export class Traffic {
         const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw), hl = v.len * 0.4;
         let y = 0, pitch = 0; if (terr) { const a = hg.terrAt(v.x + fx * hl, v.z + fz * hl), b = hg.terrAt(v.x - fx * hl, v.z - fz * hl); y = (a + b) / 2; pitch = -Math.atan2(a - b, hl * 2); }
         v.y = y; v.pitch = pitch;
-        EE.set(pitch + (v.bob || 0), v.yaw, v.roll); QQ.setFromEuler(EE); M4.compose(PV.set(v.x, y + (v.lift || 0), v.z), QQ, SV); m.setMatrixAt(i, M4); m.setColorAt(i, v.col);
+        EE.set(pitch + (v.dpitch || 0) + (v.bob || 0), v.yaw, v.roll); QQ.setFromEuler(EE); M4.compose(PV.set(v.x, y + (v.lift || 0), v.z), QQ, SV); m.setMatrixAt(i, M4); m.setColorAt(i, v.col);
         st.setXYZW(i, v.head, v.brake, v.blink, v.siren); ce.setXY(i, v.plate, v.route);
-        if (nb < sh.instanceMatrix.count) { M4.compose(PV.set(v.x, y + 0.04, v.z), QQ.setFromEuler(EE.set(0, v.yaw, 0)), SV.set(v.t.W + 0.5, 1, v.len + 0.6)); sh.setMatrixAt(nb++, M4); SV.set(1, 1, 1); }
-        if (v.head && v.dist < 140 && nl < bm.instanceMatrix.count && v.t.cat !== 'bike') { M4.compose(PV.set(v.x + fx * v.len / 2, y + 0.05, v.z + fz * v.len / 2), QQ, SV.set(v.t.W * 2.3, 1, 13)); bm.setMatrixAt(nl++, M4); SV.set(1, 1, 1); }
+        if (nb < sh.instanceMatrix.count) { M4.compose(PV.set(v.x, y + (v.lift || 0) + 0.04, v.z), QQ.setFromEuler(EE.set(0, v.yaw, 0)), SV.set(v.t.W + 0.5, 1, v.len + 0.6)); sh.setMatrixAt(nb++, M4); SV.set(1, 1, 1); }
+        if (v.head && v.dist < 140 && nl < bm.instanceMatrix.count && v.t.cat !== 'bike') { M4.compose(PV.set(v.x + fx * v.len / 2, y + (v.lift || 0) + 0.05, v.z + fz * v.len / 2), QQ, SV.set(v.t.W * 2.3, 1, 13)); bm.setMatrixAt(nl++, M4); SV.set(1, 1, 1); }
       });
       m.count = G.list.length; m.visible = m.count > 0; m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; st.needsUpdate = true; ce.needsUpdate = true;
     }

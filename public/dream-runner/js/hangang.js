@@ -745,7 +745,7 @@ export class Hangang {
     void roofF; return { x, z, wall, hit };
   }
   // 둥근 물체: 고정된 것(격자) + 움직이는 사람 · 차
-  addCircle(x, z, r, h = 99) { this.circGrid ||= new Map(); const k = `${Math.floor(x / 20)},${Math.floor(z / 20)}`; if (!this.circGrid.has(k)) this.circGrid.set(k, []); this.circGrid.get(k).push({ x, z, r, h, key: this.chunkKey }); }
+  addCircle(x, z, r, h = 99) { this.circGrid ||= new Map(); const k = `${Math.floor(x / 20)},${Math.floor(z / 20)}`; if (!this.circGrid.has(k)) this.circGrid.set(k, []); const c = { x, z, r, h, key: this.chunkKey }; this.circGrid.get(k).push(c); return c; }
   circlesNear(x, z) {
     const out = []; const gx = Math.floor(x / 20), gz = Math.floor(z / 20);
     for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const c = this.circGrid?.get(`${gx + a},${gz + b}`); if (c) out.push(...c); }
@@ -1280,13 +1280,21 @@ export class Hangang {
   // 다리: 물 위는 14m 높이로 띄우고, 교각 · 난간 · 밤 조명. 서강대교는 밤섬 위에 붉은 아치
   buildBridges(P2, inWater) {
     const deck = { P: [], I: [] }, side = { P: [], I: [] }, piers = [], lamps = [];
+    // 8-31: 땅의 찻길(다리 아닌 폭 8m 넘는 길) 조각을 30m 칸에 — 다리 바닥 높이 · 기둥 자리를 찻길에 맞추는 데 쓴다
+    const RG = new Map(); for (const rd of this.map.roads || []) { if (rd[1] || rd[0] < 8) continue; const pts = P2(rd.slice(2)); for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], c = pts[i], sg = [a[0], a[1], c[0], c[1], rd[0]]; for (let gx = Math.floor((Math.min(a[0], c[0]) - 12) / 30); gx <= Math.floor((Math.max(a[0], c[0]) + 12) / 30); gx++) for (let gz = Math.floor((Math.min(a[1], c[1]) - 12) / 30); gz <= Math.floor((Math.max(a[1], c[1]) + 12) / 30); gz++) { const k = gx + ',' + gz; if (!RG.has(k)) RG.set(k, []); RG.get(k).push(sg); } } }
+    // 가장 가까운 찻길 조각: { d 가운데선까지, px pz 가운데선 위 점, ux uz 길 방향, w 폭 }
+    const nearRoad = (x, z) => { let best = null; for (const [ax, az, cx, cz, w] of RG.get(Math.floor(x / 30) + ',' + Math.floor(z / 30)) || []) { const ex = cx - ax, ez = cz - az, L2 = ex * ex + ez * ez || 1, t = clamp(((x - ax) * ex + (z - az) * ez) / L2, 0, 1), px = ax + ex * t, pz = az + ez * t, d = Math.hypot(x - px, z - pz); if (d - w / 2 < (best ? best.d - best.w / 2 : Infinity)) { const l = Math.sqrt(L2); best = { d, px, pz, ux: ex / l, uz: ez / l, w }; } } return best; };
     const rails = [], rails2 = [];
     // 다리 높이: 서로 이어진 고가끼리 묶어서, 다른 고가와 이어지지 않은 끝(땅의 길과 만나는 곳)은 땅까지 비스듬히 내려온다
     const ways = this.map.bridges.map((b) => ({ b, pts: P2(b.p) })).filter((w) => w.pts.length > 1);
     for (const w of ways) w.wet = w.pts.some(([x, z]) => inWater(x, z));
     const nearAny = (p, self) => ways.some((w) => w !== self && w.pts.some((q) => Math.abs(q[0] - p[0]) < 2.5 && Math.abs(q[1] - p[1]) < 2.5));
     const linkedWet = (self) => ways.some((w) => w !== self && w.wet && (w.pts.some((q) => Math.hypot(q[0] - self.pts[0][0], q[1] - self.pts[0][1]) < 2.5 || Math.hypot(q[0] - self.pts[self.pts.length - 1][0], q[1] - self.pts[self.pts.length - 1][1]) < 2.5)));
-    for (const w of ways) { w.free0 = !nearAny(w.pts[0], w); w.free1 = !nearAny(w.pts[w.pts.length - 1], w); w.top = w.wet || linkedWet(w) ? 14 : 7.5; }
+    // 물 위 다리 높이: 한강처럼 물 위 구간이 긴(150m 넘는) 다리만 14m, 호수 · 개천을 잠깐 건너는 다리는 5.2m (석촌호수 송파대로 다리가 14m 산처럼 솟아 차가 넘어 다녔다)
+    const wetLen = (w) => { let n = 0; for (let i = 1; i < w.pts.length; i++) { const a = w.pts[i - 1], c = w.pts[i], L = Math.hypot(c[0] - a[0], c[1] - a[1]), k = Math.max(1, Math.ceil(L / 10)); for (let j = 0; j < k; j++) if (inWater(a[0] + (c[0] - a[0]) * (j + 0.5) / k, a[1] + (c[1] - a[1]) * (j + 0.5) / k)) n += L / k; } return n; };
+    for (const w of ways) w.big = w.wet && wetLen(w) > 150;
+    const linkedBig = (self) => ways.some((w) => w !== self && w.big && (w.pts.some((q) => Math.hypot(q[0] - self.pts[0][0], q[1] - self.pts[0][1]) < 2.5 || Math.hypot(q[0] - self.pts[self.pts.length - 1][0], q[1] - self.pts[self.pts.length - 1][1]) < 2.5)));
+    for (const w of ways) { w.free0 = !nearAny(w.pts[0], w); w.free1 = !nearAny(w.pts[w.pts.length - 1], w); w.top = w.big || linkedBig(w) ? 14 : w.wet || linkedWet(w) ? 5.2 : 7.5; }
     for (const w of ways) {
       const b = w.b, pts = w.pts;
       const fine = []; for (let i = 1; i < pts.length; i++) { const [a, c] = [pts[i - 1], pts[i]], L = Math.hypot(c[0] - a[0], c[1] - a[1]), n = Math.max(1, Math.ceil(L / 15)); for (let k = 0; k < n; k++) fine.push([lerp(a[0], c[0], k / n), lerp(a[1], c[1], k / n)]); } fine.push(pts[pts.length - 1]);
@@ -1294,13 +1302,24 @@ export class Hangang {
       const acc = [0]; for (let i = 1; i < fine.length; i++) acc.push(acc[i - 1] + Math.hypot(fine[i][0] - fine[i - 1][0], fine[i][1] - fine[i - 1][1]));
       const total = acc[acc.length - 1];
       const ys = fine.map((_, i) => { if (wet[i]) return top; const d0 = w.free0 ? acc[i] : Infinity, d1 = w.free1 ? total - acc[i] : Infinity; return Math.min(top, 0.25 + Math.min(d0, d1) * 0.07); });
+      // 8-31: 철도 고가는 역에서 끊긴 끝(350m 안에 다른 철도 고가 끝이 있으면)에선 땅으로 내려오지 않는다 (역마다 고가가 찻길 위로 내려앉아 차가 뚫고 지났다)
+      if (b.rail) { const near2 = (p) => ways.some((o) => o !== w && o.b.rail && [o.pts[0], o.pts[o.pts.length - 1]].some((q) => Math.hypot(q[0] - p[0], q[1] - p[1]) < 350)), k0 = w.free0 && !near2(pts[0]), k1 = w.free1 && !near2(pts[pts.length - 1]); for (let i = 0; i < ys.length; i++) if (!wet[i]) ys[i] = Math.min(top, 0.25 + Math.min(k0 ? acc[i] : Infinity, k1 ? total - acc[i] : Infinity) * 0.07); }
+      // 8-31: 땅의 찻길을 가로지르는 곳은 바닥 위 5.2m 이상(바닥 두께 1.6m 아래로 버스가 지난다), 그 앞뒤는 완만하게(1m 에 12cm) 이어 올린다
+      else {
+        let raised = false;
+        for (let i = 0; i < fine.length; i++) { if (wet[i] || ys[i] >= 5.2) continue; const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], dl = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1, q = nearRoad(fine[i][0], fine[i][1]); if (q && q.d < q.w / 2 + 1.5 && Math.abs(((c[0] - a[0]) * q.ux + (c[1] - a[1]) * q.uz) / dl) < 0.85) { ys[i] = 5.2; raised = true; } }
+        if (raised) { for (let i = 1; i < ys.length; i++) ys[i] = Math.max(ys[i], ys[i - 1] - 0.12 * (acc[i] - acc[i - 1])); for (let i = ys.length - 2; i >= 0; i--) ys[i] = Math.max(ys[i], ys[i + 1] - 0.12 * (acc[i + 1] - acc[i])); }
+      }
+      // 차가 다리 위를 달릴 수 있게 (hangang.js citySetup → hangang-vehicles.js): 세상 좌표 점 · 높이
+      b.fine = fine; b.ys = ys;
       ribbonInto(deck.P, deck.I, fine, b.w, (i) => ys[i]);
       // 밟을 수 있는 다리 바닥 (경사로 포함): 조각마다 40m 칸에 기억
       for (let i = 1; i < fine.length; i++) { const sg = { ax: fine[i - 1][0], az: fine[i - 1][1], cx: fine[i][0], cz: fine[i][1], ya: ys[i - 1], yc: ys[i], hw: b.w / 2 }, si = (this.decks ||= []).push(sg) - 1; this.deckGrid ||= new Map(); for (let gx = Math.floor((Math.min(sg.ax, sg.cx) - sg.hw) / 40); gx <= Math.floor((Math.max(sg.ax, sg.cx) + sg.hw) / 40); gx++) for (let gz = Math.floor((Math.min(sg.az, sg.cz) - sg.hw) / 40); gz <= Math.floor((Math.max(sg.az, sg.cz) + sg.hw) / 40); gz++) { const k = `${gx},${gz}`; if (!this.deckGrid.has(k)) this.deckGrid.set(k, []); this.deckGrid.get(k).push(si); } }
       ribbonInto(side.P, side.I, fine, b.w + 0.4, (i) => ys[i] - 1.6);
       // 난간 (양쪽 낮은 벽)
       for (const sgn of [-1, 1]) { const off = fine.map((p, i) => { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1; return [p[0] - dz / L * (b.w / 2) * sgn, p[1] + dx / L * (b.w / 2) * sgn]; }); rails2.push({ off, ys }); }
-      if (b.rail) rails.push({ fine, ys, w: b.w, n: b.n || '' });
+      // 철교 트러스는 물 위(와 그 바로 옆)에만 — 땅 위 지하철 고가는 콘크리트 상판이라 트러스가 없다
+      if (b.rail) rails.push({ fine, ys, w: b.w, n: b.n || '', wetR: fine.map((_, i) => wet[i] || wet[i - 1] || wet[i + 1] || wet[i - 2] || wet[i + 2]) });
       for (let i = 0; i < fine.length; i += 2) { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], ang = Math.atan2(c[1] - a[1], c[0] - a[0]) + Math.PI / 2; if (ys[i] < 3) continue; if (wet[i]) { if (i % 4 === 0) piers.push([fine[i][0], fine[i][1], ys[i], b.w, ang]); } else piers.push([fine[i][0], fine[i][1], ys[i], b.w * 0.6, ang]); }
       if (anyWet) for (let i = 0; i < fine.length; i += 3) { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1; for (const sgn of [-1, 1]) lamps.push(fine[i][0] - dz / L * b.w / 2 * sgn, ys[i] + 1.2, fine[i][1] + dx / L * b.w / 2 * sgn); }
     }
@@ -1315,10 +1334,22 @@ export class Hangang {
     const colG = new THREE.CylinderGeometry(0.5, 0.5, 1, 10); colG.translate(0, 0.5, 0);
     const capG = new THREE.BoxGeometry(1, 1.4, 2.4);
     const pm = new THREE.MeshLambertMaterial({ color: '#c9c2b6' }), cols = new THREE.InstancedMesh(colG, pm, piers.length * 2), caps = new THREE.InstancedMesh(capG, pm, piers.length), o = new THREE.Object3D();
-    piers.forEach(([x, z, y, w, ang], i) => { const half = Math.min(w * 0.3, 6); for (const sgn of [-1, 1]) { this.addCircle(x + Math.cos(ang || 0) * half * sgn, z + Math.sin(ang || 0) * half * sgn, w > 12 ? 0.95 : 0.65, y - 1.6); o.position.set(x + Math.cos(ang || 0) * half * sgn, -1, z + Math.sin(ang || 0) * half * sgn); o.rotation.set(0, 0, 0); o.scale.set(w > 12 ? 1.8 : 1.2, y - 1.4 + 1, w > 12 ? 1.8 : 1.2); o.updateMatrix(); cols.setMatrixAt(i * 2 + (sgn > 0 ? 1 : 0), o.matrix); } o.position.set(x, y - 2.4, z); o.rotation.set(0, -(ang || 0), 0); o.scale.set(Math.min(w * 0.75, 16), 1, 1); o.updateMatrix(); caps.setMatrixAt(i, o.matrix); });
+    // 8-31: 기둥이 땅의 찻길 차로 위에 서면 → 넓은 길(14m+)은 가운데 분리대로, 아니면 길 가장자리 밖으로 (다리 바닥 아래일 때만), 둘 다 안 되면 세우지 않는다
+    const H0 = this.host || this; this.pierMoved = (this.pierMoved || 0); this.pierDropped = (this.pierDropped || 0);
+    const place = (cx, cz, x, z, hw) => { const q = nearRoad(cx, cz); if (!q || q.d >= q.w / 2 - 0.3 || (q.w >= 14 && q.d < 0.8)) return [cx, cz, false];
+      if (q.w >= 14 && Math.hypot(q.px - x, q.pz - z) <= hw) return [q.px, q.pz, true];
+      const nx = (cx - q.px) / (q.d || 1), nz = (cz - q.pz) / (q.d || 1), ex = q.px + nx * (q.w / 2 + 0.9), ez = q.pz + nz * (q.w / 2 + 0.9); if (Math.hypot(ex - x, ez - z) <= hw + 0.5) { const q2 = nearRoad(ex, ez); if (!q2 || q2.d >= q2.w / 2 - 0.3) return [ex, ez, true]; }
+      // 다리 가운데 밑이 차로가 아니면 가운데 기둥 하나로
+      const q3 = nearRoad(x, z); if (!q3 || q3.d >= q3.w / 2 - 0.3 || (q3.w >= 14 && q3.d < 0.8)) return [x, z, true]; return null; };
+    piers.forEach(([x, z, y, w, ang], i) => { const half = Math.min(w * 0.3, 6), seen = []; for (const sgn of [-1, 1]) { const k = i * 2 + (sgn > 0 ? 1 : 0), pl = place(x + Math.cos(ang || 0) * half * sgn, z + Math.sin(ang || 0) * half * sgn, x, z, w / 2);
+        if (!pl || seen.some((p) => Math.hypot(p[0] - pl[0], p[1] - pl[1]) < 1.5)) { this.pierDropped++; o.position.set(x, -50, z); o.scale.set(0.001, 0.001, 0.001); o.updateMatrix(); cols.setMatrixAt(k, o.matrix); continue; }
+        if (pl[2]) this.pierMoved++; seen.push(pl); const thin = pl[2] || w <= 12;
+        const pc = this.addCircle(pl[0], pl[1], thin ? 0.65 : 0.95, y - 1.6); pc.col = { m: cols, i: k }; (H0.pierCircles ||= new Set()).add(pc); o.position.set(pl[0], -1, pl[1]); o.rotation.set(0, 0, 0); o.scale.set(thin ? 1.2 : 1.8, y - 1.4 + 1, thin ? 1.2 : 1.8); o.updateMatrix(); cols.setMatrixAt(k, o.matrix); }
+      // 머리보: 그 밑이 3.6m 넘을 때만 (낮은 고가에선 버스 지붕에 닿았다)
+      if (y - 1.6 - 1.4 >= 3.6) { o.position.set(x, y - 2.4, z); o.rotation.set(0, -(ang || 0), 0); o.scale.set(Math.min(w * 0.75, 16), 1, 1); } else { o.position.set(x, -50, z); o.scale.set(0.001, 0.001, 0.001); } o.updateMatrix(); caps.setMatrixAt(i, o.matrix); });
     this.scene.add(cols, caps);
     // 철교: 트러스 (선)
-    const tP = []; for (const { fine, ys, w } of rails) for (let i = 1; i < fine.length; i++) { const a = fine[i - 1], c = fine[i], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1, nx = -dz / L * w / 2, nz = dx / L * w / 2; for (const sgn of [-1, 1]) { const ax = a[0] + nx * sgn, az = a[1] + nz * sgn, cx = c[0] + nx * sgn, cz = c[1] + nz * sgn, y0 = ys[i - 1], y1 = ys[i]; tP.push(ax, y0, az, cx, y1 + 7, cz, ax, y0 + 7, az, cx, y1 + 7, cz, ax, y0, az, ax, y0 + 7, az); } }
+    const tP = []; for (const { fine, ys, w, wetR } of rails) for (let i = 1; i < fine.length; i++) { if (wetR && !wetR[i] && !wetR[i - 1]) continue; const a = fine[i - 1], c = fine[i], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1, nx = -dz / L * w / 2, nz = dx / L * w / 2; for (const sgn of [-1, 1]) { const ax = a[0] + nx * sgn, az = a[1] + nz * sgn, cx = c[0] + nx * sgn, cz = c[1] + nz * sgn, y0 = ys[i - 1], y1 = ys[i]; tP.push(ax, y0, az, cx, y1 + 7, cz, ax, y0 + 7, az, cx, y1 + 7, cz, ax, y0, az, ax, y0 + 7, az); } }
     this.railPaths = rails;
     if (tP.length) { const beams = []; for (let i = 0; i < tP.length; i += 6) beams.push([tP[i], tP[i + 1], tP[i + 2], tP[i + 3], tP[i + 4], tP[i + 5]]); const bg = new THREE.BoxGeometry(0.5, 0.5, 1); bg.translate(0, 0, 0.5); const bm = new THREE.InstancedMesh(bg, new THREE.MeshLambertMaterial({ color: '#5b6672' }), beams.length), o2 = new THREE.Object3D(), A = new THREE.Vector3(), B = new THREE.Vector3(); beams.forEach(([x1, y1, z1, x2, y2, z2], i) => { A.set(x1, y1, z1); B.set(x2, y2, z2); o2.position.copy(A); o2.lookAt(B); o2.scale.set(1, 1, A.distanceTo(B)); o2.updateMatrix(); bm.setMatrixAt(i, o2.matrix); }); this.scene.add(bm); }
     // 아치 (서강대교)
@@ -1851,12 +1882,39 @@ export class Hangang {
     const mk = (pts, w, kind) => { const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); return { pts, cum, len: cum[cum.length - 1], w, kind }; };
     for (const Mx of maps) { const S = Mx.scale;
       for (const rd of Mx.roads) { if (rd[1]) continue; const pts = unpack(rd.slice(2), S); if (pts.length < 2) continue; const L = mk(pts, rd[0], 'road'); if (L.len > 40) { lines.push(L); if (rd[0] >= 8) drives.push(L); } }
-      for (const pa of Mx.paths) { if (pa[0]) continue; const pts = unpack(pa.slice(2), S); if (pts.length < 2) continue; const L = mk(pts, pa[1], 'path'); if (L.len > 25) lines.push(L); } }
+      for (const pa of Mx.paths) { if (pa[0]) continue; const pts = unpack(pa.slice(2), S); if (pts.length < 2) continue; const L = mk(pts, pa[1], 'path'); if (L.len > 25) lines.push(L); }
+      // 8-31: 다리 · 고가 위 찻길도 차가 달린다 (높이 = 다리 바닥, buildBridges 가 b.fine · b.ys 를 남긴다)
+      for (const b of Mx.bridges || []) { if (b.rail || b.w < 8 || !b.fine || b.fine.length < 2) continue; const L = mk(b.fine, b.w, 'road'); L.ys = b.ys; L.deck = true; if (L.len > 30) drives.push(L); } }
+    // 8-31: 땅의 찻길이 건물 외곽선 안을 지나거나(가운데선) 낮은 다리 바닥(위 4.9m 아래) 밑을 지나는 구간은 잘라 낸다 → 차가 그곳에 생기지도, 들어가지도 않는다
+    { const cut = { foot: 0, deck: 0 }, out = [];
+      const deckTop = (x, z) => { let top = -1; for (const si of this.deckGrid?.get(`${Math.floor(x / 40)},${Math.floor(z / 40)}`) || []) { const d = this.decks[si], ex = d.cx - d.ax, ez = d.cz - d.az, L2 = ex * ex + ez * ez || 1, t = clamp(((x - d.ax) * ex + (z - d.az) * ez) / L2, 0, 1); if (Math.hypot(x - d.ax - ex * t, z - d.az - ez * t) <= d.hw) top = Math.max(top, d.ya + (d.yc - d.ya) * t); } return top; };
+      for (const L of drives) {
+        if (L.deck) { out.push(L); continue; }
+        const bad = []; for (let d = 0; d <= L.len; d += 3) { const q = this.lineAt(L, d, 0), dt = deckTop(q.x, q.z), f = this.solidAt(q.x, q.z, 0, 0, true); if (f === 'foot') { bad.push(d); cut.foot++; } else if (dt > 0.3 && dt < 4.9) { bad.push(d); cut.deck++; } }
+        if (!bad.length) { out.push(L); continue; }
+        let a = 0; for (const d of [...bad, Infinity]) { const b0 = Math.min(L.len, d - 4); if (b0 - a >= 30) { const pts = []; for (let s2 = a; s2 < b0; s2 += 6) { const q = this.lineAt(L, s2, 0); pts.push([q.x, q.z]); } const q = this.lineAt(L, b0, 0); pts.push([q.x, q.z]); out.push(mk(pts, L.w, 'road')); } a = Math.max(a, d + 4); }
+      }
+      drives.length = 0; drives.push(...out); this.driveCut = cut;
+      // 이웃 칸의 찻길 차로 위에 선 기둥(칸을 지을 땐 그 길을 몰랐다)은 치운다
+      const g2 = new Map(); for (const L of drives) { if (L.deck) continue; for (let i = 1; i < L.pts.length; i++) { const a = L.pts[i - 1], c = L.pts[i]; for (let gx = Math.floor((Math.min(a[0], c[0]) - 12) / 30); gx <= Math.floor((Math.max(a[0], c[0]) + 12) / 30); gx++) for (let gz = Math.floor((Math.min(a[1], c[1]) - 12) / 30); gz <= Math.floor((Math.max(a[1], c[1]) + 12) / 30); gz++) { const k = gx + ',' + gz; if (!g2.has(k)) g2.set(k, []); g2.get(k).push([a, c, L.w]); } } }
+      let pr = 0; const O = new THREE.Object3D(); O.scale.setScalar(0.001); O.position.set(0, -50, 0); O.updateMatrix();
+      for (const c of this.pierCircles || []) { if (!c.r || !c.col) continue; for (const [a, b, w] of g2.get(Math.floor(c.x / 30) + ',' + Math.floor(c.z / 30)) || []) { const ex = b[0] - a[0], ez = b[1] - a[1], L2 = ex * ex + ez * ez || 1, t = clamp(((c.x - a[0]) * ex + (c.z - a[1]) * ez) / L2, 0, 1), d = Math.hypot(c.x - a[0] - ex * t, c.z - a[1] - ez * t); if (d < w / 2 - 0.3 && !(w >= 14 && d < 0.8)) { c.r = 0; c.h = -1; c.col.m.setMatrixAt(c.col.i, O.matrix); c.col.m.instanceMatrix.needsUpdate = true; pr++; break; } } }
+      this.pierRemoved = (this.pierRemoved || 0) + pr; }
     const grid = (arr) => { const g = new Map(); arr.forEach((L, li) => { for (let i = 0; i < L.pts.length; i++) { const k = `${Math.floor(L.pts[i][0] / 50)},${Math.floor(L.pts[i][1] / 50)}`; if (!g.has(k)) g.set(k, []); g.get(k).push([li, i]); } }); return g; };
     this.walkLines = lines; this.walkGrid = grid(lines); this.driveLines = drives; this.driveGrid = grid(drives);
     this.walkers ||= []; this.cityT ||= 0; this.cityDirty = false;
   }
-  lineAt(L, d, off) { d = clamp(d, 0, L.len); let i = 1; while (i < L.cum.length - 1 && L.cum[i] < d) i++; const a = L.pts[i - 1], b = L.pts[i], seg = L.cum[i] - L.cum[i - 1] || 1, t = (d - L.cum[i - 1]) / seg, dx = (b[0] - a[0]) / seg, dz = (b[1] - a[1]) / seg; return { x: lerp(a[0], b[0], t) - dz * off, z: lerp(a[1], b[1], t) + dx * off, dx, dz }; }
+  lineAt(L, d, off) { d = clamp(d, 0, L.len); let i = 1; while (i < L.cum.length - 1 && L.cum[i] < d) i++; const a = L.pts[i - 1], b = L.pts[i], seg = L.cum[i] - L.cum[i - 1] || 1, t = (d - L.cum[i - 1]) / seg, dx = (b[0] - a[0]) / seg, dz = (b[1] - a[1]) / seg; return { x: lerp(a[0], b[0], t) - dz * off, z: lerp(a[1], b[1], t) + dx * off, dx, dz, y: L.ys ? lerp(L.ys[i - 1], L.ys[i], t) : 0 }; }
+  // 8-31: 차가 못 지나가는 것: 'foot' 건물 외곽선 안 · 'circ' 기둥 · 나무 · 가로등 (r = 차 반폭, y = 차 바닥 높이, footOnly = 외곽선만)
+  solidAt(x, z, r = 0.9, y = 0, footOnly = false) {
+    for (const fi of this.footGrid?.get(`${Math.floor(x / 40)},${Math.floor(z / 40)}`) || []) { const f = this.foot[fi]; if (f.deck || f.deckWall || x < f.x0 || x > f.x1 || z < f.z0 || z > f.z1) continue; const fh = f.base === undefined ? f.h : f.h + f.base - this.terrAt(x, z); if (!(fh > 1.2) || y >= fh - 0.3 || (f.mh && f.mh > y + 3.6)) continue; if (inRing(x, z, ringAtY(f, Math.max(y, f.mh || 0) + 0.5))) return 'foot'; }
+    if (footOnly) return null;
+    // 다리 바닥이 차 지붕 높이(바닥 두께 1.6m 포함 4.9m) 안에 걸리면
+    for (const si of this.deckGrid?.get(`${Math.floor(x / 40)},${Math.floor(z / 40)}`) || []) { const d = this.decks[si], ex = d.cx - d.ax, ez = d.cz - d.az, L2 = ex * ex + ez * ez || 1, t = clamp(((x - d.ax) * ex + (z - d.az) * ez) / L2, 0, 1); if (Math.hypot(x - d.ax - ex * t, z - d.az - ez * t) > d.hw) continue; const top = d.ya + (d.yc - d.ya) * t - y; if (top > 0.4 && top < 4.9) return 'deck'; }
+    const gx = Math.floor(x / 20), gz = Math.floor(z / 20);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const c of this.circGrid?.get(`${gx + a},${gz + b}`) || []) { if (c.r < 0.1 || y >= (c.h ?? 99)) continue; if (Math.hypot(c.x - x, c.z - z) < c.r + r) return 'circ'; }
+    return null;
+  }
   pickNear(grid, lines, px, pz, minD, maxD, r) {
     for (let tries = 0; tries < 12; tries++) {
       const a = r() * 6.28, d = minD + r() * (maxD - minD), x = px + Math.cos(a) * d, z = pz + Math.sin(a) * d, cell = grid.get(`${Math.floor(x / 50)},${Math.floor(z / 50)}`); if (!cell) continue;
