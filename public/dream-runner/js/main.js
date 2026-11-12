@@ -63,8 +63,11 @@ seoulRun.api = (path) => account.api(path);
 let seoulPost = null, seoulWas = false, seoulWaitT = 0;
 const seoulOn = () => track.seoul && seoulRun.ready && game.mode !== 'title';
 // 서울 맵 판에 들어가고 나올 때: 곰 · 길 · 그림자를 서울 장면으로 옮기고, 화면 설정(색 · 그림자 · 먼 거리)을 서울 산책처럼
+// 부스터 가루(뒤로 흩날리는 빛)는 부스터가 정한 장면에 따로 붙는다: 서울 맵에선 서울 장면으로 (불꽃 자체는 곰에 붙어 있다)
+function boosterTo(b, sc) { if (!b || b.scene === sc) return; for (const p of b.sparks || []) { sc.add(p.m); p.life = 0; p.m.visible = false; } b.scene = sc; }
 function seoulSwap(on) {
   const to = on ? seoulRun.hw.scene : scene;
+  boosterTo(runner.booster, to); for (const g of game.ghosts.values()) boosterTo(g.booster, to);
   for (const o of [track.root, runner.bear.root, runner.shadow]) to.add(o);
   for (const g of game.ghosts.values()) { to.add(g.bear.root); if (g.tag) to.add(g.tag); }
   if (on) {
@@ -880,7 +883,8 @@ const seoulP = new THREE.Vector3();
 function seoulFrame(dt) {
   seoulRun.tick(dt, runner.s);
   const objs = [...track.root.children, runner.bear.root, runner.shadow];
-  for (const g of game.ghosts.values()) { if (g.bear.root.parent !== seoulRun.hw.scene) seoulRun.hw.scene.add(g.bear.root); objs.push(g.bear.root); if (g.tag) { if (g.tag.parent !== seoulRun.hw.scene) seoulRun.hw.scene.add(g.tag); objs.push(g.tag); } }
+  boosterTo(runner.booster, seoulRun.hw.scene);
+  for (const g of game.ghosts.values()) { boosterTo(g.booster, seoulRun.hw.scene); if (g.bear.root.parent !== seoulRun.hw.scene) seoulRun.hw.scene.add(g.bear.root); objs.push(g.bear.root); if (g.tag) { if (g.tag.parent !== seoulRun.hw.scene) seoulRun.hw.scene.add(g.tag); objs.push(g.tag); } }
   seoulRun.bend(objs);
   // 카메라: 곧은 길 자리(seoulCam)에서 정한 것을 곰이 있는 코스 길 위로
   const w = game.watch && game.mode === 'dead' && game.multi ? game.watch : null, d = track.dreamAt(w ? w.s : runner.s);
