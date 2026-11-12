@@ -127,6 +127,8 @@ export class Runner {
     this.vx += ((input.dir || 0) * inv * SIDE * (M?.side || 1) - this.vx) * Math.min(1, dt * (M?.ice || 14));
     this.knock *= Math.exp(-dt * 2.6);
     this.x += (this.vx + this.knock + (M?.wind || 0)) * dt;
+    // 서울 맵: 길 밖(건물 · 보도 끝)으로는 못 나간다
+    if (track.xLim != null && Math.abs(this.x) > track.xLim) { this.x = Math.sign(this.x) * track.xLim; this.vx = 0; this.knock = 0; }
     // 점프 (땅에서 떨어진 직후 0.1초 · 누른 직후 0.12초는 봐준다)
     if (input.jump) this.jbuf = 0.12;
     this.jbuf -= dt; this.coyote -= dt;

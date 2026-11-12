@@ -21,6 +21,7 @@ import { HELLS } from './hells.js';
 import { VOIDS } from './voids.js';
 import { SEOULS } from './seouls.js';
 import { makeSeoulMover, seoulNight, seoulTick } from './seoul-movers.js';
+import { SeoulRun } from './seoul-run.js';
 import { openPatchNotes, showWhatsNew } from '../../shared/js/patchnotes.js';
 import { openWardrobe, notifyNew, titleHtml, medalHtml, loadCos } from '../../shared/js/wardrobe.js';
 import { starsEarned } from '../../shared/js/cos-items.js';
@@ -56,6 +57,24 @@ const track = new Track(scene, env, (Math.random() * 2 ** 31) | 0);
 track.makeMover = makeSeoulMover;
 env.originRef = track;
 const runner = new Runner(scene, {});
+// 🗺️ 서울 맵 그리기 (6-7): 서울 산책 엔진으로 실제 서울을, 판정 자리 물체는 실제 길 위로 휘어서
+const seoulRun = new SeoulRun(renderer, camera), seoulCam = new THREE.PerspectiveCamera();
+let seoulPost = null, seoulWas = false, seoulWaitT = 0;
+const seoulOn = () => track.seoul && seoulRun.ready && game.mode !== 'title';
+// 서울 맵 판에 들어가고 나올 때: 곰 · 길 · 그림자를 서울 장면으로 옮기고, 화면 설정(색 · 그림자 · 먼 거리)을 서울 산책처럼
+function seoulSwap(on) {
+  const to = on ? seoulRun.hw.scene : scene;
+  for (const o of [track.root, runner.bear.root, runner.shadow]) to.add(o);
+  for (const g of game.ghosts.values()) { to.add(g.bear.root); if (g.tag) to.add(g.tag); }
+  if (on) {
+    renderer.shadowMap.enabled = !isPhone; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15; renderer.domElement.style.filter = '';
+    camera.far = 24000; camera.updateProjectionMatrix();
+    if (!isPhone && !seoulPost) import('./hangang-post.js').then(({ makePost }) => { if (!seoulPost) seoulPost = makePost(renderer, seoulRun.hw.scene, camera); }).catch(() => {});
+  } else {
+    seoulRun.unbend([...track.root.children, runner.bear.root, runner.shadow, ...[...game.ghosts.values()].flatMap((g) => [g.bear.root, g.tag])]);
+    renderer.shadowMap.enabled = false; renderer.toneMapping = THREE.NoToneMapping; renderer.toneMappingExposure = 1; camera.far = 1600; camera.updateProjectionMatrix();
+  }
+}
 env.setTheme(track.themeOf(0), true);
 
 const game = window.dream = {
@@ -65,7 +84,7 @@ const game = window.dream = {
   profile: { name: '꿈꾸는 곰돌이', color: '#8a5634' },
   titleT: 0, deadT: 0, submitted: null, sendT: 0, bumpT: 0,
 };
-game.runner = runner; game.track = track; game.env = env; game.scene = scene; game.renderer = renderer; window.__THEMES = THEMES; // 점검용 (콘솔에서 dream.runner 등)
+game.runner = runner; game.seoulRun = seoulRun; game.track = track; game.env = env; game.scene = scene; game.renderer = renderer; window.__THEMES = THEMES; // 점검용 (콘솔에서 dream.runner 등)
 
 // ---------- 입력 ----------
 const keys = new Set();
@@ -360,6 +379,9 @@ function newRun(seed, itemMode = false, diff = 'easy', map = 'dream') {
   const K = DIFFS[game.diff].k * (1 + BOOST);
   env.fogK = game.map === 'hell' || game.map === 'void' ? Math.max(1, (K / 1.9) ** 0.7) : 1;
   track.reset(seed, itemMode, { map: game.map, K });
+  // 서울 맵: 서울 산책 엔진을 준비하고 첫 코스 칸부터 만든다 (다른 맵이면 만들어 둔 칸을 내린다)
+  if (game.map === 'seoul') { seoulWaitT = 0; seoulRun.init().then(() => { if (track.seoul && track.seed === seed) seoulRun.start(track); }).catch((e) => console.warn('서울 지도 없이', e)); }
+  else if (seoulRun.hw?.chunks?.size) seoulRun.dispose();
   game.camFall = 0; game.camG = null; game.rec = null; game.shake = 0; env.underY = undefined; game.underY = -13;
   game.rp = !itemMode && !game.multi ? { dts: [], evs: [], last: -1 } : null; game.dtCarry = 0;
   game.tkP = game.mode === 'title' && !game.starting ? null : getTicket(seed, itemMode, game.diff, game.map);
@@ -515,7 +537,7 @@ function enterDream(d) {
   game.dream = d; game.dreamsSeen = Math.max(game.dreamsSeen, d + 1);
   const th = track.themeOf(d);
   env.setTheme(th);
-  if (th.seoul) seoulNight(th.light < 0.7);
+  if (th.seoul) { seoulNight(th.light < 0.7); seoulRun.jumpHour(); }
   setMusic(th.mus);
   sfx('portal');
   showDreamCard(d);
@@ -799,6 +821,9 @@ function frame() {
     hud(); // 서버 점검: 그 자리에서 멈춰 있는다
   } else {
     if (game.mode === 'count') {
+      // 서울 맵 혼자 달리기: 첫 코스의 서울이 다 지어질 때까지 3에서 기다린다 (최대 25초, 같이 달리기는 기다리지 않는다)
+      const wait = track.seoul && !game.multi && !seoulRun.failed && !(seoulRun.ready && seoulRun.track === track && seoulRun.firstReady()) && (seoulWaitT += dt) < 25;
+      if (wait) { game.countT = Math.max(game.countT, 2.999); if (!game.seoulToast) { game.seoulToast = true; toast('🗺️ 서울을 펼치는 중…', 2500); } } else game.seoulToast = false;
       game.countT -= dt;
       const n = Math.max(0, Math.ceil(game.countT));
       if (n !== game.countN) {
@@ -844,8 +869,25 @@ function frame() {
     hud();
   }
   input.jump = input.slide = input.shove = input.item = false;
+  const sOn = seoulOn(); if (sOn !== seoulWas) { seoulWas = sOn; seoulSwap(sOn); }
+  if (sOn) { seoulFrame(dt); return; }
   env.update(dt, t, camera, runner.s, runner.x, runner.y);
   renderer.render(scene, camera);
+}
+// 서울 맵 한 프레임: 칸 불러오기 · 판정 자리 물체 휘기 · 카메라 · 하늘 · 그리기
+const seoulP = new THREE.Vector3();
+function seoulFrame(dt) {
+  seoulRun.tick(dt, runner.s);
+  const objs = [...track.root.children, runner.bear.root, runner.shadow];
+  for (const g of game.ghosts.values()) { if (g.bear.root.parent !== seoulRun.hw.scene) seoulRun.hw.scene.add(g.bear.root); objs.push(g.bear.root); if (g.tag) { if (g.tag.parent !== seoulRun.hw.scene) seoulRun.hw.scene.add(g.tag); objs.push(g.tag); } }
+  seoulRun.bend(objs);
+  // 카메라: 곧은 길 자리(seoulCam)에서 정한 것을 곰이 있는 코스 길 위로
+  const w = game.watch && game.mode === 'dead' && game.multi ? game.watch : null, d = track.dreamAt(w ? w.s : runner.s);
+  seoulRun.world(seoulCam.position, d, camera.position); seoulRun.world(camLook, d, seoulP); camera.lookAt(seoulP);
+  if (game.shake > 0) camera.rotation.z += (Math.random() - 0.5) * game.shake * 0.05;
+  seoulRun.world(new THREE.Vector3(runner.x, 0, track.origin - runner.s), track.dreamAt(runner.s), seoulP);
+  seoulRun.frame(dt, camera, seoulP.x, seoulP.z, track.themeOf(game.dream));
+  if (seoulPost) { seoulPost.mood(seoulRun.hw.light); seoulPost.render(); } else renderer.render(seoulRun.hw.scene, camera);
 }
 $('spectate').onclick = () => cycleWatch();
 function teamDown(why) {
@@ -896,11 +938,13 @@ function followCamera(dt) {
     yc = game.camR;
   } else game.camG = null;
   const cx = x * 0.85, cy = Math.max(yc, fl) + up + game.camFall * 5;
-  camera.position.x += (cx - camera.position.x) * k;
-  camera.position.y += (cy - camera.position.y) * (dead ? k * 0.3 : hell ? Math.min(1, k * 1.5) : k);
-  camera.position.z = dead ? camera.position.z : z + back;
+  // 서울 맵: 곧은 길 자리에서 정하고, 그리기 전에 실제 길 위로 옮긴다 (seoulFrame)
+  const cam = seoulOn() ? seoulCam : camera;
+  cam.position.x += (cx - cam.position.x) * k;
+  cam.position.y += (cy - cam.position.y) * (dead ? k * 0.3 : hell ? Math.min(1, k * 1.5) : k);
+  cam.position.z = dead ? cam.position.z : z + back;
   camLook.set(x, Math.max(yc, fl - 2) + look - game.camFall * 9, z - ahead);
-  camera.lookAt(camLook);
+  cam.lookAt(camLook);
   if (game.shake > 0) { game.shake = Math.max(0, game.shake - dt * 2.4); camera.rotation.z += (Math.random() - 0.5) * game.shake * 0.05; camera.position.y += (Math.random() - 0.5) * game.shake * 0.3; }
   const fov = Math.min(88, 60 + (v - V0) * 0.55); // 아주 빠른 난이도에서 화면이 지나치게 벌어지지 않게
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * k; camera.updateProjectionMatrix(); }

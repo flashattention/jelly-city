@@ -379,8 +379,10 @@ export class Hangang {
   }
   // ---------- 서울 전체: 칸 불러오기 · 내리기 ----------
   //   칸 = 같은 Hangang 을 '칸 모드'로 지은 것. 부딪힘 · 바닥 · 가게 · 출구 목록은 주인(host)의 것을 함께 써서, 주인의 모든 검사가 그대로 서울 전체에 통한다
-  async loadChunk(key) {
-    const res = await fetch(new URL(`../seoul/t_${key}.json`, import.meta.url)); if (!res.ok) throw new Error('칸 없음'); const M = await res.json();
+  //   드림 러너 서울 맵(seoul-run.js)은 칸의 일부(코스 길 둘레)만 짓는다: key = 'i_j_코스', getMap() = 그 일부만 남긴 지도 (일꾼 스레드가 고른다)
+  async loadChunk(key, getMap = null) {
+    const [ki, kj] = key.split('_');
+    let M; if (getMap) M = await getMap(); else { const res = await fetch(new URL(`../seoul/t_${ki}_${kj}.json`, import.meta.url)); if (!res.ok) throw new Error('칸 없음'); M = await res.json(); }
     const tb0 = performance.now();
     const c = new Hangang(); c.host = this; c.isChunk = true; c.chunkKey = key; c.map = M; c.id = 'seoul'; c.scene = new THREE.Group(); c.state = this.state; c.opt = this.opt;
     for (const k of ['skyU', 'windU', 'waterU', 'grassTex', 'dot', 'waterSets']) c[k] = this[k];
