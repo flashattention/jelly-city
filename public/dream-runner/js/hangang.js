@@ -2205,6 +2205,8 @@ export class Hangang {
     this.tickCamera(dt, camera, bx, bz, Math.sin(this.camYaw), Math.cos(this.camYaw));
     this.attr?.cam(camera, dt);
     this.rideL?.cam(camera, dt);
+    // 차 그물 가까운 것 · 먼 것 고르기에 쓰는 카메라 자리
+    this.camPos = camera.position;
   }
   // 사람 수 · 구성: 계절 · 날씨 · 시간에 따라 (벚꽃 철엔 연인이 가득, 비 · 추위 · 한밤엔 드문드문 러너만)
   crowd() {
