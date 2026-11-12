@@ -231,13 +231,14 @@ function carLoft(P, lod) {
 }
 // 몸통 삼각형 색: 유리 · 기둥 · 바퀴 집 · 아래 · 도색
 function carPaint(P) {
-  const glass = '#18222c';
+  // 앞 문 유리는 앞 유리 기둥(A) 밑까지 이어진다
+  const glass = '#18222c', dloF = Math.max(P.dlo[1], P.ws[1] - 0.22);
   return (c, n) => {
     if (n.y < -0.55) return ['#1b1c1f', 0];
     const side = Math.abs(n.x) > 0.55, top = topAt(P, c.z);
     if (P.clad && side && c.y < botAt(P, c.z) + 0.16) return ['#2b2d31', 0];
-    if (c.y > P.belt + 0.03 && c.y < top - (side ? 0.055 : 0.012)) {
-      if (side) { if (c.z > P.dlo[0] && c.z < P.dlo[1] && !(P.pillars || []).some((pz) => Math.abs(c.z - pz) < (P.pw ?? 0.065))) return [glass, VK.glass]; if (P.blackPillar && c.z > P.dlo[0] - 0.3 && c.z < P.dlo[1]) return ['#121316', 0]; }
+    if (c.y > P.belt + 0.03 && (!side || c.y < top - 0.04)) {
+      if (side) { if (c.z > P.dlo[0] && c.z < dloF && !(P.pillars || []).some((pz) => Math.abs(c.z - pz) < (P.pw ?? 0.065))) return [glass, VK.glass]; if (P.blackPillar && c.z > P.dlo[0] - 0.3 && c.z < dloF) return ['#121316', 0]; }
       else if (n.y < 0.93) { const hwTop = halfW(P, c.z) * (P.tumble ?? 0.8); if (c.z > P.ws[0] - 0.02 && c.z < P.ws[1] && Math.abs(c.x) < hwTop * 0.86) return [glass, VK.glass]; if (c.z > P.rg[0] && c.z < P.rg[1] + 0.02 && Math.abs(c.x) < hwTop * 0.8) return [glass, VK.glass]; }
       else if (P.roofBlack) return ['#15161a', 0];
     }
@@ -276,7 +277,7 @@ function buildCar(P, lod) {
   if (lod) B.add(new THREE.BoxGeometry(0.34, 0.025, 0.02), '#ff2a1a', VK.tail, T(0, P.hmsl ?? (topAt(P, P.rg[0]) + 0.02), P.rg[0] - 0.01, -0.5));
   if (lod) { B.plate(T(0, yb + (P.plateYF ?? 0.26), zF + 0.012)); B.plate(T(0, P.plateYR ?? tlY - 0.24, zR - 0.012, 0, Math.PI)); }
   // 옆 거울 (도색 + 아래 깜빡이) · 문 손잡이 (크롬)
-  const mz = P.dlo[1] - 0.06, my = P.belt + 0.07, mw = halfW(P, mz);
+  const mz = Math.max(P.dlo[1], P.ws[1] - 0.22) - 0.08, my = P.belt + 0.07, mw = halfW(P, mz);
   for (const s of [-1, 1]) {
     B.add(new RoundedBoxGeometry(0.2, 0.12, 0.09, 1, 0.03), '#ffffff', VK.paint, T(s * (mw + 0.12), my, mz, 0, s * 0.15, 0));
     if (lod) { B.add(new THREE.BoxGeometry(0.14, 0.025, 0.06), '#1a1a1c', 0, T(s * (mw + 0.04), my - 0.04, mz)); B.add(new THREE.BoxGeometry(0.1, 0.015, 0.02), '#ffb020', s > 0 ? VK.blinkL : VK.blinkR, T(s * (mw + 0.15), my - 0.055, mz + 0.02)); B.add(new THREE.PlaneGeometry(0.15, 0.09), '#2e3a45', VK.glass, T(s * (mw + 0.13), my, mz - 0.046, 0, Math.PI)); }
