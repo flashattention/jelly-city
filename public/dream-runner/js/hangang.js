@@ -867,11 +867,13 @@ export class Hangang {
     const RX = M.kind === 'tile' ? [M.terrain.x0, M.terrain.x0 + (M.terrain.nx - 1) * M.terrain.step, M.terrain.z0, M.terrain.z0 + (M.terrain.nz - 1) * M.terrain.step] : [-3200, 3200, -3200, 3200];
     const inside = (x, z) => x > RX[0] + 5 && x < RX[1] - 5 && z > RX[2] + 5 && z < RX[3] - 5 && (M.kind === 'tile' || (Math.abs(Math.abs(x) - 7000) > 5 && Math.abs(Math.abs(z) - 7000) > 5));
     // 물은 공원 위에 (OSM 한강공원 영역이 물까지 덮고 있다)
-    const wMesh = new THREE.Mesh(fillGeo(rivers), (this.host || this).waterM); wMesh.renderOrder = -47; sc.add(wMesh);
-    if (lakes.length) { const lm = new THREE.Mesh(fillGeo(lakes.map((L) => L.poly)), (this.host || this).waterM); lm.renderOrder = -47; lm.userData.drapeWater = true; sc.add(lm); }
+    // 6-9 9-4: 서울 전체 칸은 물 · 섬을 길 아래로 (여의도처럼 섬 위 찻길 · 골목이 섬 잔디에 덮여 차가 풀밭을 달렸다). 녹지보다는 위
+    const WO = this.isChunk ? -50.9 : -47, IO = this.isChunk ? -50.8 : -46.9;
+    const wMesh = new THREE.Mesh(fillGeo(rivers), (this.host || this).waterM); wMesh.renderOrder = WO; sc.add(wMesh);
+    if (lakes.length) { const lm = new THREE.Mesh(fillGeo(lakes.map((L) => L.poly)), (this.host || this).waterM); lm.renderOrder = WO; lm.userData.drapeWater = true; sc.add(lm); }
     yield;
     // 섬 · 녹지 (계절마다 색이 바뀐다)
-    this.islandM = flatMat('#7fa860', -46.9, { map: this.grassTex ||= groundTex('grass') }); patchy(this.islandM); const isl = new THREE.Mesh(fillGeo(this.islands, 0, 7), this.islandM); isl.renderOrder = -46.9; sc.add(isl);
+    this.islandM = flatMat('#7fa860', IO, { map: this.grassTex ||= groundTex('grass') }); patchy(this.islandM); const isl = new THREE.Mesh(fillGeo(this.islands, 0, 7), this.islandM); isl.renderOrder = IO; sc.add(isl);
     const greens = { grass: [], wood: [], wild: [], pitch: [], sand: [] };
     for (const g of M.green) (greens[g[0]] || greens.grass).push(g.slice(1).map(P2));
     this.greenPolys = [...greens.grass, ...greens.wood, ...greens.wild];
