@@ -3,7 +3,7 @@
 //   + 좌석(차마다 실제 배치) · 대시보드 · 계기판(속도 바늘 · 밤 조명) · 운전대 · 기어 · 백미러 · 해 가리개 · 버스 손잡이 기둥
 //   좌표는 차와 같다 (앞 +z, 운전석 +x, 바닥 0)
 import * as THREE from 'three';
-import { TYPES, vehicleGeo, vehicleMat, VK, Build, T, topAt, halfW } from './hangang-vehicle-models.js';
+import { TYPES, vehicleGeo, vehicleMat, VK, Build, T, topAt, halfW, gridBox } from './hangang-vehicle-models.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 // 창 아랫선 높이 (승용은 belt, 상자형은 운전석 눈높이에서)
@@ -20,7 +20,7 @@ function split(src) {
 function liner(body, t) {
   const g = body.clone(), P = g.attributes.position, N = g.attributes.normal, n = P.count, C = new Float32Array(n * 3), col = new THREE.Color(), belt = beltOf(t);
   for (let i = 0; i < n; i++) { P.setXYZ(i, P.getX(i) - N.getX(i) * 0.025, P.getY(i) - N.getY(i) * 0.025, P.getZ(i) - N.getZ(i) * 0.025); N.setXYZ(i, -N.getX(i), -N.getY(i), -N.getZ(i)); }
-  for (let tr = 0; tr < n; tr += 3) { const y = (P.getY(tr) + P.getY(tr + 1) + P.getY(tr + 2)) / 3; const ny = (N.getY(tr) + N.getY(tr + 1) + N.getY(tr + 2)) / 3; col.set(y > belt + 0.06 ? (ny < -0.6 ? '#d6d2ca' : '#6f6c66') : y > belt - 0.07 ? '#56595f' : y > 0.4 ? '#34363b' : '#242527'); for (let j = 0; j < 3; j++) col.toArray(C, (tr + j) * 3); const a = P.array, b = tr * 3; for (let c = 0; c < 3; c++) { const s = a[b + 3 + c]; a[b + 3 + c] = a[b + 6 + c]; a[b + 6 + c] = s; } const na = N.array; for (let c = 0; c < 3; c++) { const s = na[b + 3 + c]; na[b + 3 + c] = na[b + 6 + c]; na[b + 6 + c] = s; } }
+  for (let tr = 0; tr < n; tr += 3) { const y = (P.getY(tr) + P.getY(tr + 1) + P.getY(tr + 2)) / 3; const ny = (N.getY(tr) + N.getY(tr + 1) + N.getY(tr + 2)) / 3; col.set(y > belt + 0.06 ? (ny < -0.6 ? '#d6d2ca' : '#4a4845') : y > belt - 0.07 ? '#56595f' : y > 0.4 ? '#34363b' : '#242527'); for (let j = 0; j < 3; j++) col.toArray(C, (tr + j) * 3); const a = P.array, b = tr * 3; for (let c = 0; c < 3; c++) { const s = a[b + 3 + c]; a[b + 3 + c] = a[b + 6 + c]; a[b + 6 + c] = s; } const na = N.array; for (let c = 0; c < 3; c++) { const s = na[b + 3 + c]; na[b + 3 + c] = na[b + 6 + c]; na[b + 6 + c] = s; } }
   for (const k of Object.keys(g.attributes)) if (!['position', 'normal'].includes(k)) g.deleteAttribute(k);
   g.setAttribute('color', new THREE.BufferAttribute(C, 3)); return g;
 }
@@ -55,6 +55,8 @@ function seatMesh(B, s, w, col, opt = {}) {
 }
 
 const CACHE = new Map();
+// 결 그림: 작은 점무늬 + 가는 줄 (가죽 · 플라스틱 느낌)
+let GRAIN = null; function grainTex() { if (GRAIN) return GRAIN; const N = 128, cv = document.createElement('canvas'); cv.width = cv.height = N; const c = cv.getContext('2d'), im = c.createImageData(N, N); let sd = 7; const r = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; }; for (let i = 0; i < N * N; i++) { const v = 200 + r() * 55 - (i % N % 9 === 0 ? 18 : 0); im.data[i * 4] = im.data[i * 4 + 1] = im.data[i * 4 + 2] = v; im.data[i * 4 + 3] = 255; } c.putImageData(im, 0, 0); GRAIN = new THREE.CanvasTexture(cv); GRAIN.wrapS = GRAIN.wrapT = THREE.RepeatWrapping; GRAIN.colorSpace = THREE.SRGBColorSpace; return GRAIN; }
 // 차 안 만들기: key 차 종류. 돌려주는 것 { g, shell(바깥 몸통 인스턴스 1), wheel(운전대), gauge, seats, eye }
 export function buildInterior(key) {
   if (CACHE.has(key)) return CACHE.get(key);
@@ -69,7 +71,7 @@ export function buildInterior(key) {
   const inM = new THREE.MeshLambertMaterial({ vertexColors: true }); g.add(new THREE.Mesh(liner(body, t), inM));
   const gm = new THREE.MeshBasicMaterial({ color: '#a9c2d6', transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide }); const gl = new THREE.Mesh(glass, gm); gl.renderOrder = 5; g.add(gl);
   // 가구
-  const B = new Build(), drv = t.seats.find((s) => s[4]) || t.seats[0], car = !!t.top, bus = t.cat === 'bus';
+  const B = new Build(), drv = t.seats.find((s) => s[4]) || t.seats[0], car = !!t.top, bus = t.cat === 'bus', dashParts = [];
   const cloth = key === 'sedanL' || key === 'taxiB' ? '#b5a88f' : key.startsWith('taxi') || key === 'police' ? '#2a2b2e' : bus ? '#3f5f9e' : t.cat === 'truck' ? '#4a4d52' : '#34363b';
   // 바닥 · 앞 칸막이(엔진 쪽)
   const L2 = t.L / 2, Wd = t.W - 0.14, floorY = car ? 0.3 : bus ? 0.45 : drv[2] - 0.45;
@@ -85,12 +87,19 @@ export function buildInterior(key) {
   // 대시보드: 운전석 앞 0.62m 부터 앞 유리 밑까지, 위는 부드러운 검은 판 · 앞면 회색
   //   dy = 대시보드 윗면 높이 (창 아랫선 조금 아래), 앞면은 운전석 앞 0.75m
   const dz = drv[3] + (bus ? 0.8 : 0.75), dl = car ? clamp(t.ws[1] - 0.02 - dz, 0.3, 0.8) : 0.45, dw = car ? halfW(t, dz + dl / 2) * 1.92 : Wd, dy = belt - 0.05;
-  B.add(new THREE.BoxGeometry(dw, 0.24, dl), '#26272b', 0, T(0, dy - 0.12, dz + dl / 2));
-  B.add(new THREE.BoxGeometry(dw * 0.98, 0.26, 0.22), '#33353a', 0, T(0, dy - 0.36, dz + 0.08, -0.35));
+  // 대시보드 몸통은 둥근 상자 + 가죽 · 플라스틱 결 그림(따로 그물, 아래)
+  dashParts.push([dw, 0.24, dl, 0.1, 0, dy - 0.12, dz + dl / 2, 0], [dw * 0.98, 0.26, 0.24, 0.08, 0, dy - 0.36, dz + 0.1, -0.35]);
   // 송풍구 (양 끝 · 가운데)
   for (const x of car ? [-dw * 0.42, -0.1, 0.1, dw * 0.42] : [-dw * 0.4, dw * 0.4]) B.add(new THREE.BoxGeometry(0.11, 0.05, 0.02), '#5a5d63', 0, T(x, dy - 0.05, dz - 0.008));
-  // 계기판 덮개 (운전석 앞, 얇게)
-  B.add(new THREE.BoxGeometry(0.44, 0.035, 0.13), '#1d1e21', 0, T(drv[1], dy + 0.012, dz + 0.04));
+  // 계기판 덮개: 반원통 차양 (운전석 앞)
+  { const hood = new THREE.CylinderGeometry(0.12, 0.12, 0.46, 16, 1, false, -Math.PI / 2, Math.PI); hood.rotateZ(Math.PI / 2); B.add(hood, '#1d1e21', 0, T(drv[1], dy - 0.02, dz + 0.02, 0, 0, 0, 1, 0.55, 1)); }
+  // 문 안쪽 판 (앞문 · 뒷문): 위 밝은 판 · 아래 어두운 판 · 팔걸이 · 크롬 손잡이 · 스피커
+  if (car || t.cat === 'truck') for (const sd of [-1, 1]) for (const [z0, z1] of car ? [[drv[3] - 0.55, dz + 0.05], [t.seats.find((q) => !q[4] && q[3] < drv[3] - 0.3)?.[3] - 0.5, drv[3] - 0.6]] : [[drv[3] - 0.5, dz + 0.1]]) {
+    if (!(z1 - z0 > 0.3)) continue; const zc = (z0 + z1) / 2, hw = (car ? halfW(t, zc) : t.W / 2) - 0.07, x = sd * hw;
+    B.add(new THREE.BoxGeometry(0.04, 0.2, z1 - z0), '#4b4d52', 0, T(x, belt - 0.12, zc)); B.add(new THREE.BoxGeometry(0.05, 0.3, z1 - z0), '#2c2d31', 0, T(x, belt - 0.37, zc));
+    B.add(new THREE.BoxGeometry(0.09, 0.05, (z1 - z0) * 0.55), '#3a3c40', 0, T(x - sd * 0.05, belt - 0.24, zc - 0.05)); B.add(new THREE.BoxGeometry(0.02, 0.03, 0.12), '#c9cdd2', 0, T(x - sd * 0.03, belt - 0.12, z1 - 0.18));
+    if (z1 - z0 > 0.6) { const sp = new THREE.CircleGeometry(0.07, 14); B.add(sp, '#1a1b1e', 0, T(x - sd * 0.028, belt - 0.42, z1 - 0.2, 0, -sd * Math.PI / 2)); }
+  }
   // 가운데 받침 · 기어 (승용 · 승합)
   if (!bus) {
     if (t.cat !== 'truck') { B.add(new THREE.BoxGeometry(0.22, 0.12, 0.42), '#2c2d31', 0, T(0, floorY + 0.28, drv[3] + 0.05)); B.add(new THREE.CylinderGeometry(0.012, 0.012, 0.12, 6), '#8a8f95', 0, T(0, floorY + 0.4, drv[3] + 0.2, -0.3)); B.add(new THREE.SphereGeometry(0.035, 10, 8), '#1a1a1c', 0, T(0, floorY + 0.47, drv[3] + 0.22)); }
@@ -103,9 +112,16 @@ export function buildInterior(key) {
   // 버스: 노란 손잡이 기둥 · 앞문 계단
   if (bus) { for (let z = L2 - 2.6; z > -L2 + 1; z -= 1.65) for (const x of [-0.25, 0.25]) B.add(new THREE.CylinderGeometry(0.02, 0.02, t.H - floorY - 0.3, 8), '#e8b51e', 0, T(x, (t.H + floorY - 0.3) / 2, z)); B.add(new THREE.CylinderGeometry(0.018, 0.018, t.L - 2, 8).rotateX(Math.PI / 2), '#c9cdd2', 0, T(0, t.H - 0.55, -0.4)); }
   const fm = new THREE.Mesh(B.done(), new THREE.MeshLambertMaterial({ vertexColors: true })); g.add(fm);
+  // 대시보드: 둥근 상자들, 위치로 uv 를 만들어 결 그림을 입힌다
+  { const parts = dashParts.map(([w, h, d, r, x, y, z, rx]) => { const q = gridBox(w, h, d, r, {}, true); q.applyMatrix4(T(x, y, z, rx)); return q; }), P2 = [], N2 = [], U2 = [];
+    for (const q of parts) { const pa = q.attributes.position.array, na = q.attributes.normal.array; for (let i = 0; i < pa.length; i += 3) { P2.push(pa[i], pa[i + 1], pa[i + 2]); N2.push(na[i], na[i + 1], na[i + 2]); U2.push(pa[i] * 3 + pa[i + 1] * 1.3, pa[i + 2] * 3 + pa[i + 1] * 2); } }
+    const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.Float32BufferAttribute(P2, 3)); dg.setAttribute('normal', new THREE.Float32BufferAttribute(N2, 3)); dg.setAttribute('uv', new THREE.Float32BufferAttribute(U2, 2));
+    g.add(new THREE.Mesh(dg, new THREE.MeshLambertMaterial({ color: key === 'sedanL' || key === 'taxiB' ? '#4a3b30' : '#2e2f33', map: grainTex() }))); }
   // 계기판 화면 (그림을 다시 그려 바늘을 움직인다): 밤엔 은은히 빛난다
   const G = gaugeCanvas(); drawGauge(G, 0, 0.8, 0); out.gauge = G;
   const gp = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.15), new THREE.MeshBasicMaterial({ map: G.tex, toneMapped: false }));
+  // 계기판 테두리 불빛 (밤에 더 밝게: 차 안 그림을 그릴 때 hangang-drive.js 가 밝기를 맞춘다)
+  { const rim = new THREE.Mesh(new THREE.RingGeometry(0.205, 0.218, 40, 1).scale(1, 0.4, 1), new THREE.MeshBasicMaterial({ color: '#7cc8ff', transparent: true, opacity: 0.55, toneMapped: false })); rim.position.set(drv[1], dy - 0.08, dz - 0.008); rim.rotation.set(0.12, Math.PI, 0, 'YXZ'); g.add(rim); out.rim = rim; }
   gp.position.set(drv[1], dy - 0.08, dz - 0.006); gp.rotation.set(0.12, Math.PI, 0, 'YXZ'); g.add(gp);
   // 가운데 화면 (지도 비슷한 파란 화면)
   if (!bus) { const sc = document.createElement('canvas'); sc.width = 128; sc.height = 80; const c = sc.getContext('2d'); c.fillStyle = '#0e1a26'; c.fillRect(0, 0, 128, 80); c.strokeStyle = '#3a6a9a'; c.lineWidth = 3; c.beginPath(); c.moveTo(10, 70); c.lineTo(50, 40); c.lineTo(80, 45); c.lineTo(120, 10); c.stroke(); c.fillStyle = '#ff6a3a'; c.beginPath(); c.arc(50, 40, 5, 0, 7); c.fill(); const st = new THREE.CanvasTexture(sc); st.colorSpace = THREE.SRGBColorSpace; const sp = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.15), new THREE.MeshBasicMaterial({ map: st, toneMapped: false })); sp.position.set(0, dy - 0.1, dz - 0.006); sp.rotation.set(0.1, Math.PI, 0, 'YXZ'); g.add(sp); }

@@ -1341,13 +1341,20 @@ export class Hangang {
       const nx = (cx - q.px) / (q.d || 1), nz = (cz - q.pz) / (q.d || 1), ex = q.px + nx * (q.w / 2 + 0.9), ez = q.pz + nz * (q.w / 2 + 0.9); if (Math.hypot(ex - x, ez - z) <= hw + 0.5) { const q2 = nearRoad(ex, ez); if (!q2 || q2.d >= q2.w / 2 - 0.3) return [ex, ez, true]; }
       // 다리 가운데 밑이 차로가 아니면 가운데 기둥 하나로
       const q3 = nearRoad(x, z); if (!q3 || q3.d >= q3.w / 2 - 0.3 || (q3.w >= 14 && q3.d < 0.8)) return [x, z, true]; return null; };
+    const portals = [];
     piers.forEach(([x, z, y, w, ang], i) => { const half = Math.min(w * 0.3, 6), seen = []; for (const sgn of [-1, 1]) { const k = i * 2 + (sgn > 0 ? 1 : 0), pl = place(x + Math.cos(ang || 0) * half * sgn, z + Math.sin(ang || 0) * half * sgn, x, z, w / 2);
         if (!pl || seen.some((p) => Math.hypot(p[0] - pl[0], p[1] - pl[1]) < 1.5)) { this.pierDropped++; o.position.set(x, -50, z); o.scale.set(0.001, 0.001, 0.001); o.updateMatrix(); cols.setMatrixAt(k, o.matrix); continue; }
         if (pl[2]) this.pierMoved++; seen.push(pl); const thin = pl[2] || w <= 12;
         const pc = this.addCircle(pl[0], pl[1], thin ? 0.65 : 0.95, y - 1.6); pc.col = { m: cols, i: k }; (H0.pierCircles ||= new Set()).add(pc); o.position.set(pl[0], -1, pl[1]); o.rotation.set(0, 0, 0); o.scale.set(thin ? 1.2 : 1.8, y - 1.4 + 1, thin ? 1.2 : 1.8); o.updateMatrix(); cols.setMatrixAt(k, o.matrix); }
+      // 8-27-6: 기둥을 하나도 못 세우면(분리대 없는 길 위 고가) 길 양쪽 가장자리 밖에 기둥 둘 + 다리 밑 가로보 (떠 보이지 않게)
+      if (!seen.length) { const q = nearRoad(x, z); if (q && y - 1.6 - 0.8 >= 3.9) { const nx = -q.uz, nz = q.ux, k = q.w / 2 + 1.0, A = [q.px + nx * k, q.pz + nz * k], Bp = [q.px - nx * k, q.pz - nz * k], free = (p) => { const r2 = nearRoad(p[0], p[1]); return !r2 || r2.d >= r2.w / 2 - 0.3; }; if (free(A) && free(Bp) && Math.hypot(A[0] - Bp[0], A[1] - Bp[1]) < 24) portals.push([A, Bp, y]); } }
       // 머리보: 그 밑이 3.6m 넘을 때만 (낮은 고가에선 버스 지붕에 닿았다)
       if (y - 1.6 - 1.4 >= 3.6) { o.position.set(x, y - 2.4, z); o.rotation.set(0, -(ang || 0), 0); o.scale.set(Math.min(w * 0.75, 16), 1, 1); } else { o.position.set(x, -50, z); o.scale.set(0.001, 0.001, 0.001); } o.updateMatrix(); caps.setMatrixAt(i, o.matrix); });
     this.scene.add(cols, caps);
+    if (portals.length) { const pc2 = new THREE.InstancedMesh(colG, pm, portals.length * 2), pb = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.8, 1.1), pm, portals.length), o4 = new THREE.Object3D();
+      portals.forEach(([A, Bp, y], i) => { [A, Bp].forEach((p, j) => { const c = this.addCircle(p[0], p[1], 0.6, y - 1.6); c.col = { m: pc2, i: i * 2 + j }; (H0.pierCircles ||= new Set()).add(c); o4.position.set(p[0], -1, p[1]); o4.rotation.set(0, 0, 0); o4.scale.set(1.2, y - 1.6 + 1, 1.2); o4.updateMatrix(); pc2.setMatrixAt(i * 2 + j, o4.matrix); });
+        o4.position.set((A[0] + Bp[0]) / 2, y - 2.0, (A[1] + Bp[1]) / 2); o4.rotation.set(0, -Math.atan2(Bp[1] - A[1], Bp[0] - A[0]), 0); o4.scale.set(Math.hypot(Bp[0] - A[0], Bp[1] - A[1]) + 1.2, 1, 1); o4.updateMatrix(); pb.setMatrixAt(i, o4.matrix); });
+      this.scene.add(pc2, pb); this.pierPortal = (this.pierPortal || 0) + portals.length; }
     // 철교: 트러스 (선)
     const tP = []; for (const { fine, ys, w, wetR } of rails) for (let i = 1; i < fine.length; i++) { if (wetR && !wetR[i] && !wetR[i - 1]) continue; const a = fine[i - 1], c = fine[i], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1, nx = -dz / L * w / 2, nz = dx / L * w / 2; for (const sgn of [-1, 1]) { const ax = a[0] + nx * sgn, az = a[1] + nz * sgn, cx = c[0] + nx * sgn, cz = c[1] + nz * sgn, y0 = ys[i - 1], y1 = ys[i]; tP.push(ax, y0, az, cx, y1 + 7, cz, ax, y0 + 7, az, cx, y1 + 7, cz, ax, y0, az, ax, y0 + 7, az); } }
     this.railPaths = rails;
