@@ -5,16 +5,55 @@
 import * as THREE from 'three';
 import { registerAttraction } from './hangang-attractions.js';
 import { isPhone } from '../../shared/js/perf.js';
-import { windowMat, clamp, lerp, tone, noise, ac, TKit, G, T, canvasTex, txt } from './hangang-tower-lib.js';
+import { windowMat, clamp, lerp, tone, noise, ac, TKit, G, T, canvasTex, txt, mats } from './hangang-tower-lib.js';
 import { FLOORS, buildFloor } from './hangang-tower-floors.js';
 
 // 탑 가운데 (OSM 외곽선 가운데) · 1층 출입구 (남쪽 광장 쪽 유리문) · 실내를 짓는 먼 곳
 export const TW = { x: 10829, z: 1931 };
-const ENT = { x: 10826, z: 1978, nx: 0, nz: 1 };
+const ENT = { x: 10826, z: 1980.5, nx: 0, nz: 1 };
 const O = new THREE.Vector3(126000, 0, 8000);
 const BEAR = 0.42;
 // 그 높이의 탑 반지름 (밑 반지름 약 43m, 위로 갈수록 0.3배까지 가늘어진다: LANDMARKS 의 taper 와 같게)
 export const towerR = (alt) => 43 * (1 - 0.7 * Math.min(1, alt / 555));
+
+// ---------- 바깥(숨겨 둔 서울)을 잠깐 켜고 실내 · 곰을 끈 채로 그린다 ----------
+//   안개는 바깥 그대로(높은 곳이라 맑은 날은 옅게), 하늘 공은 그 카메라 자리로. 돌려주는 값 = 그리기 호출 수
+function drawOutdoor(hg, shell, pos, draw) {
+  const R = globalThis.dream?.renderer, sc = hg.scene; if (!R) return 0;
+  const on = []; for (const o of hg.hidden || []) if (!o.visible) { o.visible = true; on.push(o); }
+  shell.g.visible = false; const bv = hg.bear?.root.visible, sv = hg.shadow?.visible; if (hg.bear) hg.bear.root.visible = false; if (hg.shadow) hg.shadow.visible = false;
+  const fog = sc.fog, fc = fog.color.getHex(), fdv = fog.density, wt = hg.state.weather, fd = (wt === 'rain' ? 0.00095 : wt === 'snow' ? 0.0012 : wt === 'cloudy' ? 0.00055 : 0.00042) * (wt === 'clear' ? 0.32 : 0.6);
+  if (hg.fogOutC) fog.color.copy(hg.fogOutC); fog.density = fd; const wf = hg.waterU?.fogD.value; if (hg.waterU) hg.waterU.fogD.value = fd;
+  const skyP = hg.sky?.position.clone(); if (hg.sky) hg.sky.position.set(pos.x, 0, pos.z);
+  const au = R.shadowMap.autoUpdate, prev = R.getRenderTarget(), ai = R.info.autoReset; R.shadowMap.autoUpdate = false; R.info.autoReset = false; const c0 = R.info.render.calls;
+  try { draw(R, sc); } finally {
+    R.info.autoReset = ai; R.setRenderTarget(prev); R.shadowMap.autoUpdate = au;
+    if (hg.sky) hg.sky.position.copy(skyP); fog.color.setHex(fc); fog.density = fdv; if (hg.waterU) hg.waterU.fogD.value = wf;
+    for (const o of on) o.visible = false; shell.g.visible = true; if (hg.bear) hg.bear.root.visible = bv; if (hg.shadow) hg.shadow.visible = sv;
+  }
+  return R.info.render.calls - c0;
+}
+// ---------- 유리 바닥 아래 (118층): 탑 바깥벽 바로 바깥, 그 높이에서 똑바로 내려다본 그림 ----------
+class DownView {
+  constructor(hg) { this.hg = hg; const res = isPhone ? 512 : 1024; this.rt = new THREE.WebGLRenderTarget(res, res, { type: THREE.HalfFloatType }); this.cam = new THREE.PerspectiveCamera(128, 1, 2, 26000); this.t = 9; this.PV = new THREE.Matrix4(); this.pos = new THREE.Vector3(); }
+  place(F) { const g = F.glass, cx = (g.x0 + g.x1) / 2, cz = (g.z0 + g.z1) / 2, L = Math.hypot(cx, cz) || 1, r = towerR(F.alt) + 3; this.pos.set(TW.x + (cx / L) * r, S.hg.terrAt(TW.x, TW.z, true) + F.alt, TW.z + (cz / L) * r); this.cam.position.copy(this.pos); this.cam.up.set(0, 0, -1); this.cam.lookAt(this.pos.x, this.pos.y - 100, this.pos.z); this.cam.updateMatrixWorld(true); this.PV.multiplyMatrices(this.cam.projectionMatrix, this.cam.matrixWorldInverse); this.t = 9; }
+  tick(dt, shell, F) { this.t += dt; if (this.t < (isPhone ? 2 : 1)) return; this.t = 0; this.calls = drawOutdoor(this.hg, shell, this.pos, (R, sc) => { R.setRenderTarget(this.rt); R.render(sc, this.cam); }); const U = shell.glass?.uniforms; if (U) { U.uPV.value.copy(this.PV); U.uPos.value.copy(this.pos); } }
+}
+// 유리 바닥 재질: 내려다본 그림을 보는 방향대로 (방 안 카메라 → 유리 → 아래)
+function glassFloorMat(down) {
+  const u = { map: { value: down.rt.texture }, uPV: { value: new THREE.Matrix4() }, uPos: { value: new THREE.Vector3() }, uNight: { value: 0 } };
+  const m = new THREE.ShaderMaterial({ uniforms: u, fog: false,
+    vertexShader: 'varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }',
+    fragmentShader: `uniform sampler2D map; uniform mat4 uPV; uniform vec3 uPos; uniform float uNight; varying vec3 vW;
+      void main(){ vec3 d = normalize(vW - cameraPosition); vec4 c = uPV * vec4(uPos + d * 200.0, 1.0); vec2 uv = c.xy / c.w * 0.5 + 0.5; vec3 col = vec3(0.02, 0.03, 0.05);
+        if (c.w > 0.0 && uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0) col = texture2D(map, uv).rgb * vec3(0.9, 0.95, 1.0);
+        float f = pow(1.0 - abs(d.y), 4.0); col += vec3(0.7, 0.85, 1.0) * f * 0.12 + vec3(0.6, 0.75, 1.0) * 0.015 * (0.3 + uNight);
+        gl_FragColor = vec4(col, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }` });
+  m.userData.noCast = true; return m;
+}
 
 // ---------- 창밖 6면 그림 ----------
 class SkyView {
@@ -25,20 +64,10 @@ class SkyView {
   }
   place(x, y, z, near) { this.cam.position.set(x, y, z); for (const c of this.cam.children) { c.near = near; c.far = 26000; c.updateProjectionMatrix(); } this.cam.updateMatrixWorld(true); this.ready = false; }
   all() { this.queue = [0, 1, 2, 3, 4, 5]; }
-  // 바깥(숨겨 둔 서울)을 잠깐 켜고 실내 · 곰을 끈 채로 면을 그린다. 안개는 바깥 그대로(높은 곳이라 조금 옅게)
   render(faces, shell) {
-    const hg = this.hg, R = globalThis.dream?.renderer, sc = hg.scene; if (!R || !faces.length) return;
+    const R = globalThis.dream?.renderer; if (!R || !faces.length) return;
     if (this.cam.coordinateSystem !== R.coordinateSystem) { this.cam.coordinateSystem = R.coordinateSystem; this.cam.updateCoordinateSystem(); this.place(this.cam.position.x, this.cam.position.y, this.cam.position.z, this.cam.children[0].near); }
-    const on = []; for (const o of hg.hidden || []) if (!o.visible) { o.visible = true; on.push(o); }
-    shell.g.visible = false; const bv = hg.bear?.root.visible, sv = hg.shadow?.visible; if (hg.bear) hg.bear.root.visible = false; if (hg.shadow) hg.shadow.visible = false;
-    const fog = sc.fog, fc = fog.color.getHex(), fdv = fog.density, wt = hg.state.weather, fd = (wt === 'rain' ? 0.00095 : wt === 'snow' ? 0.0012 : wt === 'cloudy' ? 0.00055 : 0.00042) * (wt === 'clear' ? 0.32 : 0.6);
-    if (hg.fogOutC) fog.color.copy(hg.fogOutC); fog.density = fd; const wf = hg.waterU?.fogD.value; if (hg.waterU) hg.waterU.fogD.value = fd;
-    const skyP = hg.sky?.position.clone(); if (hg.sky) hg.sky.position.set(this.cam.position.x, 0, this.cam.position.z);
-    const au = R.shadowMap.autoUpdate, prev = R.getRenderTarget(), ai = R.info.autoReset; R.shadowMap.autoUpdate = false; R.info.autoReset = false; const c0 = R.info.render.calls;
-    for (const i of faces) { R.setRenderTarget(this.rt, i); R.render(sc, this.cam.children[i]); }
-    this.calls = R.info.render.calls - c0; R.info.autoReset = ai; R.setRenderTarget(prev); R.shadowMap.autoUpdate = au;
-    if (hg.sky) hg.sky.position.copy(skyP); fog.color.setHex(fc); fog.density = fdv; if (hg.waterU) hg.waterU.fogD.value = wf;
-    for (const o of on) o.visible = false; shell.g.visible = true; if (hg.bear) hg.bear.root.visible = bv; if (hg.shadow) hg.shadow.visible = sv;
+    this.calls = drawOutdoor(this.hg, shell, this.cam.position, (R2, sc) => { for (const i of faces) { R2.setRenderTarget(this.rt, i); R2.render(sc, this.cam.children[i]); } });
     if (faces.length === 6) this.ready = true;
   }
   // 한 면씩 천천히 새로 (휴대폰은 더 드물게). 시간 · 날씨가 확 바뀌면 여섯 면을 한 프레임에 하나씩
@@ -111,8 +140,10 @@ function buildShell(hg) {
   if (!isPhone) { sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); const c = sun.shadow.camera; c.left = c.bottom = -34; c.right = c.top = 34; c.near = 1; c.far = 160; sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03; }
   g.add(hemi, sun, sun.target, amb);
   const view = new SkyView(hg), win = windowMat(); win.uniforms.env.value = view.rt.texture;
+  const down = new DownView(hg);
   const I = {
     g, O, fronts: [], door: { x: 1e9, z: 1e9 }, isTower: true, F: null, win, view, sun, hemi, amb, fog: 0.0004,
+    down, glass: null, glassMat() { I.glass ||= glassFloorMat(down); return I.glass; },
     get spawn() { const s = I.F?.spawn?.door || { x: 0, z: 0, face: Math.PI }; return { x: O.x + s.x, z: O.z + s.z, face: s.face }; },
     get box() { const F = I.F; if (!F?.box) return [O.x - 30, O.x + 30, O.z - 30, O.z + 30]; const b = F.box(hg.px - O.x, hg.pz - O.z, hg.y); return [O.x + b[0], O.x + b[1], O.z + b[2], O.z + b[3]]; },
     get near() { return !!I.F?.near; },
@@ -150,9 +181,10 @@ function placeView(F) {
 }
 function ctx() { return { hg: S.hg, shell: S.shell, S, O, BEAR, sit, lie, stand, choose, SND, setFloor, enterCar, toast: (t) => S.hg.onToast?.(t), finish: leaveByDoor }; }
 function setFloor(key, spawn = 'elev') {
-  const sh = S.shell; disposeFloor(S.F); S.pose = null; S.near = null;
+  const sh = S.shell; disposeFloor(S.F); S.pose = null; S.near = null; mats().glow.color.setScalar(1); sh.win.uniforms.uDim.value = 1;
   const F = buildFloor(key, ctx()); F.key = key; F.alt = FLOORS[key]?.alt ?? 0; sh.g.add(F.g); S.F = F; sh.F = F; S.key = key; S.visited[key] = true;
   placeView(F); if (!F.noView) { sh.view.render([0, 1, 2, 3, 4, 5], sh); }
+  if (F.onView) { F.onView(); sh.down.tick(9, sh, F); }
   const sp = F.spawn?.[spawn] || F.spawn?.elev || F.spawn?.door; if (sp) { S.hg.placeAt(O.x + sp.x, O.z + sp.z, sp.face); S.hg.y = sp.y || 0; }
   S.last = [S.hg.px, S.hg.pz]; S.hg.camInit = false;
   if (FLOORS[key]?.toast) S.hg.onToast?.(FLOORS[key].toast);
@@ -242,26 +274,35 @@ function camExp(camera, dt) {
 
 // ---------- 바깥 출입구 ----------
 function buildEntrance(hg) {
-  const g = new THREE.Group(), y0 = hg.terrAt(ENT.x, ENT.z - 2.5, true), k = new TKit(); g.position.set(ENT.x, y0, ENT.z - 2.5); g.userData.noDrape = true;
-  // 차양: 얇은 유리판 + 금속 테 · 기둥 둘
-  k.add(G.box(9, 0.08, 4.4), '#ffffff', 'glass', T(0, 4.6, 2.2)); k.add(G.box(9.1, 0.18, 0.12), '#3c3f44', 'metal', T(0, 4.52, 4.4)); for (const s of [-1, 1]) { k.add(G.box(0.12, 0.18, 4.4), '#3c3f44', 'metal', T(s * 4.5, 4.52, 2.2)); k.add(G.cyl(0.09, 0.09, 4.6, 10), '#3c3f44', 'metal', T(s * 4.3, 0, 4.25)); }
-  // 문틀 · 양옆 유리 · 바닥 매트
-  k.add(G.box(5.2, 3.4, 0.2), '#ffffff', 'glass', T(0, 0, 0)); for (const s of [-1, 1]) k.add(G.box(0.16, 3.6, 0.3), '#8a6a45', 'metal', T(s * 2.6, 0, 0)); k.add(G.box(5.4, 0.2, 0.3), '#8a6a45', 'metal', T(0, 3.5, 0)); k.add(G.box(3.6, 0.02, 2.2), '#3a3633', 'std', T(0, 0.01, 1.4));
-  k.add(G.cyl(1.55, 1.55, 0.16, 28), '#3c3f44', 'metal', T(0, 2.75, 0.2));
+  // 탑 남쪽 벽(실제 외곽선 z ≈ 1975.2)에 딱 붙는다: 문틀 뒷면 = 벽면
+  const g = new THREE.Group(), y0 = hg.terrAt(ENT.x, 1977, true), k = new TKit(); g.position.set(ENT.x, y0, 1975.35); g.userData.noDrape = true;
+  // 밝은 돌 문틀 (벽에서 조금 나온 큰 틀) · 청동 안쪽 틀
+  k.add(G.box(7.4, 0.5, 0.5), '#e9e4da', 'stone', T(0, 4.0, 0.2)); for (const s2 of [-1, 1]) k.add(G.box(0.7, 4.5, 0.5), '#e9e4da', 'stone', T(s2 * 3.35, 0, 0.2));
+  for (const s2 of [-1, 1]) k.add(G.box(0.14, 3.6, 0.34), '#8a6a45', 'metal', T(s2 * 2.62, 0, 0.32)); k.add(G.box(5.4, 0.2, 0.34), '#8a6a45', 'metal', T(0, 3.5, 0.32));
+  // 문 유리 (양옆 고정 유리 · 가운데 회전문 통)
+  for (const s2 of [-1, 1]) k.add(G.box(1.0, 3.4, 0.06), '#ffffff', 'glass', T(s2 * 2.0, 0, 0.3)); k.add(G.cyl(1.55, 1.55, 3.4, 28, true), '#ffffff', 'glass', T(0, 0, 1.62)); k.add(G.cyl(1.6, 1.6, 0.2, 28), '#3c3f44', 'metal', T(0, 3.4, 1.62)); k.add(G.cyl(1.6, 1.6, 0.04, 28), '#3a3633', 'std', T(0, 0.07, 1.62));
+  // 차양: 유리판 · 앞 청동 띠(글씨) · 기둥 둘 · 아래 등 여섯
+  k.add(G.box(9, 0.08, 4.6), '#ffffff', 'glass', T(0, 4.6, 2.5)); k.add(G.box(9.2, 0.5, 0.16), '#4a3a2a', 'metal', T(0, 4.35, 4.8)); for (const s2 of [-1, 1]) { k.add(G.box(0.14, 0.3, 4.6), '#3c3f44', 'metal', T(s2 * 4.5, 4.4, 2.5)); k.add(G.cyl(0.11, 0.11, 4.6, 12), '#3c3f44', 'metal', T(s2 * 4.2, 0, 4.55)); }
+  for (const x of [-3, 0, 3]) for (const z of [1.6, 3.6]) k.add(G.cyl(0.12, 0.12, 0.03, 14), '#fff2d8', 'glow', T(x, 4.55, z));
+  // 바닥: 짙은 돌 디딤 · 매트 · 양옆 낮은 화분
+  k.add(G.box(9, 0.06, 4.8), '#ffffff', 'marbleD', T(0, 0, 2.6)); k.add(G.box(3.4, 0.02, 1.4), '#2c2826', 'std', T(0, 0.06, 4.0));
+  for (const s2 of [-1, 1]) { k.add(G.box(1.2, 0.6, 1.2), '#d8d2c8', 'stone', T(s2 * 5.4, 0, 1.2)); for (let i = 0; i < 5; i++) k.add(new THREE.IcosahedronGeometry(0.35 + (i % 2) * 0.12, 1), ['#4f7d3e', '#5e8f48'][i % 2], 'std', T(s2 * 5.4 + Math.cos(i * 1.3) * 0.25, 0.85 + (i % 3) * 0.15, 1.2 + Math.sin(i * 1.3) * 0.25)); }
   k.build(g);
-  const wing = new THREE.Group(); wing.position.set(0, 0, 0.2); g.add(wing); { const kk = new TKit(); for (let i = 0; i < 4; i++) { const a = (i * Math.PI) / 2; kk.add(G.box(1.45, 2.6, 0.04), '#ffffff', 'glass', T(Math.sin(a) * 0.74, 0.08, Math.cos(a) * 0.74, a + Math.PI / 2)); } kk.add(G.cyl(0.07, 0.07, 2.7, 10), '#3c3f44', 'metal', T(0, 0, 0)); kk.build(wing); }
-  // 안내 글씨 (차양 앞) · 문 안 따뜻한 불빛
-  const tx = canvasTex(512, 96, (c, w, h) => { c.clearRect(0, 0, w, h); txt(c, '전망대 · 하늘 호텔 입구', w / 2, h / 2, 46, '#f3dcae'); }, false), m = new THREE.MeshBasicMaterial({ map: tx, transparent: true, color: '#ffffff' }); const p = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 0.8), m); p.position.set(0, 5.1, 4.42); g.add(p);
-  const glow = new THREE.MeshBasicMaterial({ color: '#ffe2b0' }), pg = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 3.2), glow); pg.position.set(0, 1.6, -0.4); g.add(pg);
-  g.userData.glow = glow; g.userData.wing = wing; return g;
+  const wing = new THREE.Group(); wing.position.set(0, 0, 1.62); g.add(wing); { const kk = new TKit(); for (let i = 0; i < 4; i++) { const a = (i * Math.PI) / 2; kk.add(G.box(1.45, 2.8, 0.04), '#ffffff', 'glass', T(Math.sin(a) * 0.74, 0.1, Math.cos(a) * 0.74, a + Math.PI / 2)); kk.add(G.box(0.05, 2.8, 0.05), '#8a6a45', 'metal', T(Math.sin(a) * 1.5, 0.1, Math.cos(a) * 1.5)); } kk.add(G.cyl(0.07, 0.07, 3.0, 10), '#3c3f44', 'metal', T(0, 0, 0)); kk.build(wing); }
+  // 글씨: 차양 앞 청동 띠에 금빛 글씨 · 문 위 작은 글씨
+  const tx = canvasTex(1024, 64, (c, w, h) => { c.clearRect(0, 0, w, h); txt(c, '롯데월드타워  ·  전망대 · 하늘 호텔 입구', w / 2, h / 2 + 2, 40, '#f3d9a4'); }, false), m = new THREE.MeshBasicMaterial({ map: tx, transparent: true }); const p = new THREE.Mesh(new THREE.PlaneGeometry(8.6, 0.54), m); p.position.set(0, 4.35, 4.89); g.add(p);
+  // 문 안 따뜻한 불빛 (벽면 바로 앞, 유리 너머로 보인다) · 밤 차양 아래 빛
+  const glow = new THREE.MeshBasicMaterial({ color: '#ffe2b0' }), pg = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 3.4), glow); pg.position.set(0, 1.7, 0.02); g.add(pg);
+  const lamp = new THREE.PointLight('#ffd9a0', 0, 12, 1.5); lamp.position.set(0, 4.2, 2.6); g.add(lamp);
+  g.userData.glow = glow; g.userData.wing = wing; g.userData.lamp = lamp; g.userData.sign = m; return g;
 }
 
 // ---------- 명소 등록 ----------
 registerAttraction({
-  id: 'lwt', name: '롯데월드타워', seal: '123층', icon: '🏙️', verb: '타워로 들어가기', x: ENT.x, z: ENT.z, r: 7, face: Math.PI, go: [ENT.x, ENT.z + 14, Math.PI],
+  id: 'lwt', name: '롯데월드타워', seal: '123층', icon: '🏙️', verb: '타워로 들어가기', x: ENT.x, z: ENT.z, r: 4.2, face: Math.PI, go: [ENT.x, ENT.z + 14, Math.PI],
   intro: '1층 로비 · 79층 하늘 호텔 · 81층 하늘 뷔페 · 118층 전망대(유리 바닥)',
   // 바깥 출입구: 유리 차양 · 청동 문틀 · 회전문 · 안내 글씨 (남쪽 광장 쪽)
-  build(A) { const g = buildEntrance(A.hg); A.root.add(g); return { group: g, tick() { const n = A.hg.light?.night ?? A.hg.skyU?.night.value ?? 0; g.userData.glow.color.setScalar(0.55 + n * 0.6); g.userData.wing.rotation.y += 0.006; } }; },
+  build(A) { const g = buildEntrance(A.hg); A.root.add(g); return { group: g, tick() { const n = A.hg.skyU?.night.value ?? 0; g.userData.glow.color.setScalar(0.6 + n * 0.55); g.userData.lamp.intensity = n * 6; g.userData.sign.color.setScalar(0.8 + n * 0.5); g.userData.wing.rotation.y += 0.006; } }; },
   start(A) {
     const hg = A.hg; S.hg = hg; S.A = A; S.visited = {}; ui(); hg.towerS = S; S.go = go;
     S.shell ||= buildShell(hg); (hg.mallInt ||= {})[D.name] = S.shell;
