@@ -323,3 +323,28 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .card.seoul .new { position: absolute; left: 14px; top: 12px; z-index: 1; padding: 4px 12px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-family: 'Jua', sans-serif; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
 @media (max-width: 720px) { .card.seoul.wide { grid-column: 1 / -1; } }
 .card.seoul .dp > span { top: 48px; }
+/* 게시판: 내 글 추천 단추 · 안내 · 신고 사유 (2026-11-12) */
+.bd-votes.mine button { opacity: .5; cursor: default; }
+.bd-hint { margin: 4px 2px 0; font-size: 12px; color: var(--soft); }
+.bd-why { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 10px 0; }
+.bd-why label { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.06); cursor: pointer; }
+.bd-why label:has(input:checked) { background: rgba(255,92,138,.18); outline: 1px solid rgba(255,92,138,.6); }
+.bd-rep textarea { width: 100%; box-sizing: border-box; }
+.bd-reps { width: 100%; margin-top: 4px; font-size: 12px; color: #ff9b9b; }
+/* 게시판 목록: 제목만 말줄임, 댓글 수는 언제나 보이게 · 제목 글자 수 */
+.bd-t { display: flex; align-items: baseline; gap: 5px; }
+.bd-tt { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.bd-t b { flex: none; }
+.bd-tline { position: relative; } .bd-tline input { width: 100%; box-sizing: border-box; padding-right: 52px; }
+.bd-cnt { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--soft); pointer-events: none; }
+/* 게시판 칸 높이 줄이기: 한 쪽 5개 · 줄 간격 촘촘히 */
+.bd-row { padding: 6px 14px; font-size: 14px; }
+#board-sec .bd-list { min-height: 0; }
+/* 답글 (대댓글) */
+.bd-re { margin-left: 22px; padding-left: 12px; border-left: 2px solid rgba(255,255,255,.12); }
+.bd-arrow { font-style: normal; color: var(--soft); margin-right: 4px; }
+.bd-rbtn { padding: 3px 10px; border: 0; border-radius: 999px; background: none; color: var(--soft); font: inherit; font-size: 12px; cursor: pointer; }
+.bd-rbtn:hover { color: var(--ink); }
+.bd-rform { margin: 6px 0 8px 22px; }
+.bd-why label { justify-content: flex-start; white-space: nowrap; }
+.bd-why input[type=radio] { width: auto; height: auto; flex: none; margin: 0; padding: 0; accent-color: #ff5c8a; }
