@@ -5,6 +5,7 @@ import { localChars, addLocal, updateLocal, removeLocal, LOCAL_MAX } from '/shar
 import { openSens } from '/shared/js/sens.js';
 import { openPatchNotes, showWhatsNew } from '/shared/js/patchnotes.js';
 import { openWardrobe } from '/shared/js/wardrobe.js';
+import { openAttend, attendPending } from '/shared/js/attend.js';
 import { refreshBoard } from '/hub/board.js';
 
 const $ = (id) => document.getElementById(id);
@@ -14,6 +15,10 @@ const MAX_CHARS = 4;
 $('sens-open').onclick = () => openSens();
 $('pn-open').onclick = () => openPatchNotes(null);
 $('cos-open').onclick = () => openWardrobe('look', null, { onLook: () => renderChars() });
+// 출석체크: 오늘 아직이면 단추에 분홍 점. 뽑은 치장은 옷장에서 바로 입어 보기
+const attDot = () => attendPending().then((p) => { $('att-dot').style.display = p ? 'block' : 'none'; });
+$('att-open').onclick = () => openAttend({ onClose: attDot, onTry: () => openWardrobe('closet', null, { onLook: () => renderChars() }) });
+setTimeout(attDot, 800);
 const q = new URLSearchParams(location.search);
 // 다른 게임에서 '새 캐릭터 만들기'로 왔으면 만든 뒤 그 게임으로 돌아간다
 const back = /^\/[a-z-]+\/$/.test(q.get('back') || '') ? q.get('back') : null;
