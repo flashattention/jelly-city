@@ -36,8 +36,8 @@ function drawOutdoor(hg, shell, pos, draw) {
 // ---------- 유리 바닥 아래 (118층): 탑 바깥벽 바로 바깥, 그 높이에서 똑바로 내려다본 그림 ----------
 class DownView {
   constructor(hg) { this.hg = hg; const res = isPhone ? 512 : 1024; this.rt = new THREE.WebGLRenderTarget(res, res, { type: THREE.HalfFloatType }); this.cam = new THREE.PerspectiveCamera(128, 1, 2, 26000); this.t = 9; this.PV = new THREE.Matrix4(); this.pos = new THREE.Vector3(); }
-  place(F) { const g = F.glass, cx = (g.x0 + g.x1) / 2, cz = (g.z0 + g.z1) / 2, L = Math.hypot(cx, cz) || 1, r = towerR(F.alt) + 3; this.pos.set(TW.x + (cx / L) * r, S.hg.terrAt(TW.x, TW.z, true) + F.alt, TW.z + (cz / L) * r); this.cam.position.copy(this.pos); this.cam.up.set(0, 0, -1); this.cam.lookAt(this.pos.x, this.pos.y - 100, this.pos.z); this.cam.updateMatrixWorld(true); this.PV.multiplyMatrices(this.cam.projectionMatrix, this.cam.matrixWorldInverse); this.t = 9; }
-  tick(dt, shell, F) { this.t += dt; if (this.t < (isPhone ? 2 : 1)) return; this.t = 0; this.calls = drawOutdoor(this.hg, shell, this.pos, (R, sc) => { R.setRenderTarget(this.rt); R.render(sc, this.cam); }); const U = shell.glass?.uniforms; if (U) { U.uPV.value.copy(this.PV); U.uPos.value.copy(this.pos); } }
+  place(F) { const g = F.glass, cx = (g.x0 + g.x1) / 2, cz = (g.z0 + g.z1) / 2, L = Math.hypot(cx, cz) || 1, r = towerR(F.alt) + 16; this.pos.set(TW.x + (cx / L) * r, S.hg.terrAt(TW.x, TW.z, true) + F.alt, TW.z + (cz / L) * r); this.cam.position.copy(this.pos); this.cam.up.set(0, 0, -1); this.cam.lookAt(this.pos.x, this.pos.y - 100, this.pos.z); this.cam.updateMatrixWorld(true); this.PV.multiplyMatrices(this.cam.projectionMatrix, this.cam.matrixWorldInverse); this.t = 9; }
+  tick(dt, shell, F) { this.t += dt; if (this.t < (isPhone ? 5 : 2.5)) return; this.t = 0; this.calls = drawOutdoor(this.hg, shell, this.pos, (R, sc) => { R.setRenderTarget(this.rt); R.render(sc, this.cam); }); const U = shell.glass?.uniforms; if (U) { U.uPV.value.copy(this.PV); U.uPos.value.copy(this.pos); } }
 }
 // 유리 바닥 재질: 내려다본 그림을 보는 방향대로 (방 안 카메라 → 유리 → 아래)
 function glassFloorMat(down) {

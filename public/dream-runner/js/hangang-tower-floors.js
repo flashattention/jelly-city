@@ -12,7 +12,7 @@ export const FLOORS = {
   room: { n: 87, btn: '87', name: '87층 일반 객실', alt: 352, need: 'room' },
   suite: { n: 94, btn: '94', name: '94층 스위트', alt: 381, need: 'suite' },
   ph: { n: 100, btn: '100', name: '100층 펜트하우스', alt: 405, need: 'ph' },
-  obs: { n: 118, btn: '118', name: '118층 전망대', alt: 478, sub: '유리 바닥 · 478m', soon: true },
+  obs: { n: 118, btn: '118', name: '118층 전망대', alt: 478, sub: '유리 바닥 · 478m' },
   car: { n: 0, btn: '', name: '엘리베이터 안', alt: 0 },
 };
 export function buildFloor(key, C) { return (BUILD[key] || BUILD.lobby)(C); }
@@ -176,9 +176,11 @@ function car(C) {
 }
 
 // ---------- 탑 층 바탕: 둥근 네모 바닥 · 천장 · 둘레 통유리 · 창턱 ----------
-function towerFloor(F, C, { R, cr = 7, H = 4, floor = 'marble', floorTile = 1.2, ceil = '#efe9e0', sill = '#d8d0c4', frame = '#2f3236', step = 1.6 }) {
+function towerFloor(F, C, { R, cr = 7, H = 4, floor = 'marble', floorTile = 1.2, ceil = '#efe9e0', sill = '#d8d0c4', frame = '#2f3236', step = 1.6, hole = null }) {
   const k = F.kit; F.R = R; F.cr = cr; F.H = H; F.center = [0, 0];
-  { const sh = new THREE.Shape(rsqOutline(R + 0.4, cr + 0.4).map(([x, z]) => new THREE.Vector2(x, -z))); const g = new THREE.ShapeGeometry(sh, 6); g.rotateX(-Math.PI / 2); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / floorTile, uv.getY(i) / floorTile); k.add(g, '#ffffff', floor, T(0, 0, 0)); const c = g.clone(); c.rotateX(Math.PI); k.add(c, ceil, 'ceil', T(0, H, 0)); }
+  { const sh = new THREE.Shape(rsqOutline(R + 0.4, cr + 0.4).map(([x, z]) => new THREE.Vector2(x, -z)));
+    // 유리 바닥 자리는 바닥판을 비운다 (두 면이 겹치면 바닥이 유리를 가렸다)
+    if (hole) { const [x0, z0, x1, z1] = hole, hp = new THREE.Path(); hp.moveTo(x0, -z0); hp.lineTo(x0, -z1); hp.lineTo(x1, -z1); hp.lineTo(x1, -z0); hp.lineTo(x0, -z0); sh.holes.push(hp); } const g = new THREE.ShapeGeometry(sh, 6); g.rotateX(-Math.PI / 2); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / floorTile, uv.getY(i) / floorTile); k.add(g, '#ffffff', floor, T(0, 0, 0)); const c = g.clone(); c.rotateX(Math.PI); k.add(c, ceil, 'ceil', T(0, H, 0)); }
   const P = rsqOutline(R, cr); for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.2) continue; glassWall(F, a[0], a[1], b[0], b[1], H, { step, frame }); const L = Math.hypot(b[0] - a[0], b[1] - a[1]), ry = Math.atan2(b[1] - a[1], -(b[0] - a[0])); k.add(G.box(L + 0.05, 0.12, 0.32), sill, 'satin', T((a[0] + b[0]) / 2 + Math.sin(ry) * 0.16, 0, (a[1] + b[1]) / 2 + Math.cos(ry) * 0.16, ry)); }
   F.area.fn((x, z, y, r) => inRSq(x, z, R - 0.45 - r, Math.max(0.5, cr - 0.45 - r)));
   const m = R - 2.4; F.box = () => [-m, m, -m, m]; F.ceil = () => H;
@@ -695,8 +697,8 @@ function sitEat(C, F, s, tb) {
 // ============================================================
 function obs(C) {
   const F = floorBase('obs', C), k = F.kit, A = F.atlas, R = 16.5, H = 7;
-  towerFloor(F, C, { R, cr: 5.5, H, floor: 'marbleD', floorTile: 1.5, ceil: '#22252b', step: 1.3, frame: '#1f2226', sill: '#2a2d33' });
-  F.sunK = 1; F.hemiD = 0.7; F.hemiN = 0.06; F.ambN = 0.15; F.floorTint = '#5a5550'; F.lampCol = '#dfe8ff';
+  towerFloor(F, C, { R, cr: 5.5, H, floor: 'stone', floorTile: 1.5, ceil: '#4a4f58', step: 1.3, frame: '#1f2226', sill: '#2a2d33', hole: [-16, -1.8, -12, 1.8] });
+  F.sunK = 1; F.hemiD = 1.05; F.hemiN = 0.12; F.ambN = 0.3; F.floorTint = '#5a5550'; F.lampCol = '#dfe8ff';
   core(F, C, { hw: 4.5, hd: 4.5, H, doors: [-1.4, 1.4], face: 'stone', label: '118층 · 478m' });
   F.spawn.door = F.spawn.elev;
   // 유리 바닥 (서쪽 창가, 4 × 3.6m): 발아래 478m 가 보인다 (아래를 따로 그린 그림) · 강철 격자 · 가장자리 빛
