@@ -127,6 +127,8 @@ class Attractions {
       if (!this.exp) {
         let best = null, bd = Infinity; for (const s of SPOTS) { if (s.hidden || !s.start) continue; for (const [x, z] of s.pts || [[s.x, s.z]]) { const d = Math.hypot(px - x, pz - z); if (d < (s.r || 30) && d < bd) { bd = d; best = s; } } }
         if (best && hg.y > 30 && !best.high) best = null;
+        // 차를 운전하는 동안엔 명소 카드를 띄우지 않는다
+        if (hg.drive?.on) best = null;
         if (best !== this.near) { this.near = best; this.showCard(best); }
         // 같은 명소 안에서 옆 기구로 옮겨 가면 소개 문구도 그 기구 것으로 (롯데월드처럼 체험 자리가 여럿인 곳)
         else if (best?.introNow && best.introNow(this) !== this.cardTxt) this.showCard(best);

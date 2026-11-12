@@ -239,7 +239,7 @@ function carPaint(P) {
     if (P.clad && side && c.y < botAt(P, c.z) + 0.16) return ['#2b2d31', 0];
     if (c.y > P.belt + 0.03 && (!side || c.y < top - 0.04)) {
       if (side) { if (c.z > P.dlo[0] && c.z < dloF && !(P.pillars || []).some((pz) => Math.abs(c.z - pz) < (P.pw ?? 0.065))) return [glass, VK.glass]; if (P.blackPillar && c.z > P.dlo[0] - 0.3 && c.z < dloF) return ['#121316', 0]; }
-      else if (n.y < 0.93) { const hwTop = halfW(P, c.z) * (P.tumble ?? 0.8); if (c.z > P.ws[0] - 0.02 && c.z < P.ws[1] && Math.abs(c.x) < hwTop * 0.86) return [glass, VK.glass]; if (c.z > P.rg[0] && c.z < P.rg[1] + 0.02 && Math.abs(c.x) < hwTop * 0.8) return [glass, VK.glass]; }
+      else if (n.y < 0.93) { const hwTop = halfW(P, c.z) * (P.tumble ?? 0.8); if (c.z > P.ws[0] - 0.02 && c.z < P.ws[1] && Math.abs(c.x) < hwTop * 0.9) return [glass, VK.glass]; if (c.z > P.rg[0] && c.z < P.rg[1] + 0.02 && Math.abs(c.x) < hwTop * 0.8) return [glass, VK.glass]; }
       else if (P.roofBlack) return ['#15161a', 0];
     }
     if (P.roofRails && n.y > 0.9 && c.y > top - 0.02 && Math.abs(Math.abs(c.x) - halfW(P, c.z) * 0.62) < 0.05) return ['#2a2b2f', 0];

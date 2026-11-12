@@ -17,6 +17,7 @@ import { setupAttractions, ATTR_SKIP } from './hangang-attractions.js';
 import { LiveTransit } from './hangang-transit.js';
 import { LiveRide } from './hangang-ride.js';
 import { Traffic } from './hangang-vehicles.js';
+import { Drive } from './hangang-drive.js';
 // 롯데월드 (8-17): 섬 · 어드벤처 건물은 지도 상자 건물 대신 hangang-park.js 가 실제 모습으로. 놀이기구는 명소 체험(registerAttraction)으로 붙는다
 import { parkSkip } from './hangang-park.js';
 import './hangang-park-in.js';
@@ -2059,7 +2060,7 @@ export class Hangang {
     if (!K && this.opt.weather === 'auto') this.state.weather = this.randWeather(r);
     if (!K && this.opt.time === 'auto') this.state.hour = [5.9, 6.4, 9.5, 15.8, 16.6, 17.2, 17.7, 18.1, 18.4, 19.2, 21, 13][Math.floor(r() * 12)]; // 감성적인 시간(늦은 오후 · 노을 · 해 뜰 녘)이 더 자주
     this.applySeason(); this.weatherT = K?.weatherT ?? 240 + r() * 360; this.r = r;
-    for (const p of this.people) this.removePerson(p); this.people = []; for (const gd of this.groups) this.removeGroup(gd); this.groups = []; for (const w of this.walkers || []) this.removePerson(w); this.walkers = []; for (const w of this.shoppers || []) this.removePerson(w); this.shoppers = []; this.traffic?.clear(); this.seenLabel = new Set(); this.activeLabels = []; this.regionName = null; this.regionSeen = new Map(); this.jumps = 0; this.flipT = 0;
+    for (const p of this.people) this.removePerson(p); this.people = []; for (const gd of this.groups) this.removeGroup(gd); this.groups = []; for (const w of this.walkers || []) this.removePerson(w); this.walkers = []; for (const w of this.shoppers || []) this.removePerson(w); this.shoppers = []; this.traffic?.clear(); this.drive?.dispose(); this.seenLabel = new Set(); this.activeLabels = []; this.regionName = null; this.regionSeen = new Map(); this.jumps = 0; this.flipT = 0;
   }
   leave() { if (this.bear) { this.bear.root.traverse((o) => { if (o.isMesh) o.castShadow = false; }); this.bear.root.scale.setScalar(1); this.bear.inner.rotation.set(0, 0, 0); this.bear.inner.position.set(0, 0, 0); } if (this.bear && this.prevParent) this.prevParent.add(this.bear.root); for (const p of this.people) this.removePerson(p); this.people = []; for (const gd of this.groups) this.removeGroup(gd); this.groups = []; this.bear = null; }
   randWeather(r) { const s = this.state.season, x = r(); if (s === 'winter') return x < 0.45 ? 'clear' : x < 0.75 ? 'cloudy' : 'snow'; return x < 0.55 ? 'clear' : x < 0.82 ? 'cloudy' : 'rain'; }
@@ -2102,6 +2103,9 @@ export class Hangang {
     // 서울 명소 체험 (hangang-attractions.js): 타고 있는 동안은 움직임 잠금
     if (this.chunks) { this.attr ||= setupAttractions(this); if (this.attr.lock) inp = this.attr.lockInput(inp); }
     if (this.rideL?.lock) inp = this.rideL.lockInput(inp);
+    // 차 운전 (hangang-drive.js): 운전하는 동안 곰 움직임은 잠그고, 입력은 차로
+    this.drive ||= new Drive(this);
+    { const raw = inp; if (this.drive.lock) inp = this.drive.lockInput(inp); this.drive.tick(dt, raw); }
     // 시간 흐름 (기본: 게임 속 1시간 = 1분)
     if (this.opt.time === 'auto' || this.opt.flow > 0) st.hour = (st.hour + (dt / 60) * (this.opt.flow ?? 1)) % 24;
     // 날씨는 가끔 바뀐다
@@ -2184,6 +2188,7 @@ export class Hangang {
     this.bear.update(dt, Math.min(16, this.v * 1.7), { noCrawl: true });
     this.bear.climbing = !!this.climb;
     if (!this.climb) poseBear(this.bear, { ground: this.y <= this.groundAt(bx, bz, this.y) + 0.001, slide: this.slide, flip: this.flipT > 0 ? 1 - this.flipT / FLIP_T : null, vy: this.vy, alive: true }, dt);
+    this.drive?.post();
     this.shadow.position.set(bx, this.groundAt(bx, bz, this.y) + tb + 0.02, bz); this.shadow.scale.setScalar(BEAR * (1 - Math.min(0.5, this.y * 0.2)));
     this.tickSignals(this.time);
     this.worldT = (this.worldT || 0) - dt; if (this.worldT <= 0) { this.worldT = 0.5; this.tickWorld(bx, bz); }
@@ -2205,6 +2210,7 @@ export class Hangang {
     this.tickCamera(dt, camera, bx, bz, Math.sin(this.camYaw), Math.cos(this.camYaw));
     this.attr?.cam(camera, dt);
     this.rideL?.cam(camera, dt);
+    this.drive?.cam(camera, dt);
     // 차 그물 가까운 것 · 먼 것 고르기에 쓰는 카메라 자리
     this.camPos = camera.position;
   }
@@ -2497,6 +2503,7 @@ export class Hangang {
   }
   // 지금 위치 설명: 다음 이정표까지
   where() {
+    if (this.drive?.on) return this.drive.where();
     if (this.ride) return `${this.ride.line}${String(this.ride.line).length === 1 ? '호선' : '선'} 열차 안 · 다음 ${this.ride.dest.name}`;
     if (this.inside) return `${this.inside.st.name}역 안`;
     if (this.inShop) return `${SHOP_KIND[this.inShop.F.kind].emoji} ${this.inShop.F.name}`;

@@ -1148,10 +1148,12 @@ const CAMS = ['🎥 뒤에서', '🌊 강 쪽 옆에서', '🚁 높이서'];
 $('hg-cam').onclick = () => { hg.opt.cam = ((hg.opt.cam || 0) + 1) % 3; hgSave(); toast(CAMS[hg.opt.cam], 1200); };
 addEventListener('keydown', (e) => {
   if (game.mode !== 'hangang' || isTyping()) return;
+  // 운전 중: V 시점 · H 경적 · Z X 깜빡이 · L 전조등 (hangang-drive.js)
+  if (hg.drive?.on && ['KeyV', 'KeyH', 'KeyZ', 'KeyX', 'KeyL'].includes(e.code)) { if (!e.repeat) hg.drive.key(e.code); return; }
   if (e.code === 'KeyV') $('hg-cam').onclick();
   if (e.code === 'Escape' && !$('hg-set').classList.contains('hidden')) $('hg-set').classList.add('hidden'); // Esc 로는 나가지 않는다: 나가기는 오른쪽 위 ✕ 로만
   if (e.code === 'KeyB' && !e.repeat) hg.rideL?.bell(); // 버스 하차벨
-  if (e.code === 'KeyE' && !e.repeat && !hg.rideL?.act() && !hg.attr?.act()) hgStep(1); // 명소 가까이 · 체험 중이면 E = 체험하기
+  if (e.code === 'KeyE' && !e.repeat && !hg.drive?.act() && !hg.rideL?.act() && !hg.attr?.act()) hgStep(1); // 명소 가까이 · 체험 중이면 E = 체험하기
   if (e.code === 'KeyQ' && !e.repeat) hgStep(-1);
 });
 // 설정: 계절 · 날씨 · 시간 · 시간 흐름 · 시점 · 소리

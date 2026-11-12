@@ -19,6 +19,8 @@ const MIX = [
   ['police', 0.6], ['ambul', 0.35], ['fire', 0.15], ['mixer', 0.5], ['dump', 0.5],
   ['busCity', 4.5, 'wide'], ['busTown', 1.4, 'narrow'], ['busTour', 0.5, 'wide'], ['scooter', 4.5], ['moto', 1.2],
 ];
+// 세워 둔 차 종류
+const PARK = ['sedanM', 'sedanM', 'hatch', 'light', 'light', 'suvS', 'suvM', 'sedanL', 'minivan', 'van', 'truckS', 'truckBox', 'scooter', 'scooter'];
 // 가까운 차만 자세한 그물 (m)
 const NEAR_D = isPhone ? 38 : 60;
 const M4 = new THREE.Matrix4(), QQ = new THREE.Quaternion(), EE = new THREE.Euler(0, 0, 0, 'YXZ'), PV = new THREE.Vector3(), SV = new THREE.Vector3(1, 1, 1);
@@ -115,11 +117,22 @@ export class Traffic {
     // 차: 오른쪽 차로로, 출퇴근 시간엔 많고 밤엔 적게 · 앞에 곰돌이가 있으면 멈춘다
     const rush = (h >= 7 && h < 9.5) || (h >= 17 && h < 20), jam = { 원활: 1, 서행: 1.35, 정체: 1.7 }[hg.city?.road] || (rush ? 1.3 : 1), maxC = Math.round((isPhone ? 14 : 56) * jam * (h >= 23 || h < 6 ? 0.35 : 0.9)); hg.jamSpeed = hg.city?.roadSpd ? clamp(hg.city.roadSpd / 40, 0.25, 1.1) : 1;
     this.spawnT -= dt;
-    if (this.spawnT <= 0 && this.list.length < maxC && hg.driveLines?.length) {
+    if (this.spawnT <= 0 && this.list.filter((v) => !v.parked).length < maxC && hg.driveLines?.length) {
       // 큰길(폭 20m 넘게)에 더 많이: 좁은 길이 뽑히면 반은 다시 뽑는다
       this.spawnT = 0.15 + r() * 0.25; let pk = hg.pickNear(hg.driveGrid, hg.driveLines, px, pz, 55, 300, r);
       if (pk && pk.L.w < 20 && r() < 0.5) pk = hg.pickNear(hg.driveGrid, hg.driveLines, px, pz, 55, 300, r);
       if (pk) this.spawn(pk.L, pk.d, r() < 0.5 ? 1 : -1, r);
+    }
+    // 세워 둔 차: 좁은 길 가장자리에 (골목마다 차가 서 있다), 겹치거나 건물에 닿으면 안 만든다
+    this.parkT = (this.parkT || 0) - dt;
+    if (this.parkT <= 0 && hg.driveLines?.length) {
+      this.parkT = 0.4; let np = 0; for (const v of this.list) if (v.parked && !v.player) np++;
+      const pk = np < (isPhone ? 4 : 12) ? hg.pickNear(hg.driveGrid, hg.driveLines, px, pz, 25, 160, r) : null;
+      if (pk && pk.L.w >= 8 && pk.L.w < 22 && pk.d > 10 && pk.d < pk.L.len - 10) {
+        const sg = r() < 0.5 ? 1 : -1, key = PARK[Math.floor(r() * PARK.length)], off = sg * (pk.L.w / 2 - (TYPES[key].W / 2 + 0.35)), q = hg.lineAt(pk.L, pk.d, off);
+        const clash = this.list.some((o) => Math.hypot(o.x - q.x, o.z - q.z) < 6.5) || hg.pushOut(q.x, q.z, 0.4, TYPES[key].W / 2).hit || !hg.walkable(q.x, q.z, 0);
+        if (!clash) { const v = this.spawn(pk.L, pk.d, sg, r, { key, extra: { parked: true, empty: true } }); v.off = off; v.x = q.x; v.z = q.z; v.yaw = Math.atan2(q.dx * sg, q.dz * sg); v.init = true; v.cur = 0; v.siren = 0; }
+      }
     }
     const night = hg.light?.night || 0, headOn = night > 0.3 || hg.state.weather === 'rain' ? 1 : 0;
     VU.uTime.value = hg.t; VU.uNight.value = clamp(night * 1.3, 0, 1);
@@ -127,15 +140,18 @@ export class Traffic {
       if (v.player || v.parked) continue;
       // 앞차 · 곰돌이 앞에서 선다
       const q = hg.lineAt(v.L, v.d, v.off), fx = q.dx * v.dir, fz = q.dz * v.dir;
-      let want = v.vMax;
+      let want = v.vMax, blocked = false;
       const ax = px - q.x, az = pz - q.z, ahead = ax * fx + az * fz, sideD = Math.abs(ax * -fz + az * fx);
       if (ahead > 0 && ahead < 6 + v.len / 2 && sideD < v.hw + 0.9 && hg.y < 2 && !hg.drive?.on) want = 0;
       for (const o of this.list) {
         if (o === v) continue;
         if (o.L === v.L && o.dir === v.dir && Math.abs(o.off - v.off) < 1.6) { const gap = (o.d - v.d) * v.dir - (o.len + v.len) / 2; if (gap > -1 && gap < 30) want = Math.min(want, Math.max(0, (gap - 2.2) / 1.3)); }
-        else if (o.player || o.parked) { const dx = o.x - q.x, dz = o.z - q.z, fa = dx * fx + dz * fz, sd = Math.abs(dx * -fz + dz * fx); if (fa > 0 && fa < (o.len + v.len) / 2 + 7 && sd < o.hw + v.hw + 0.4) { want = Math.min(want, Math.max(0, (fa - (o.len + v.len) / 2 - 1.5) / 1.3)); if (o.player && fa < (o.len + v.len) / 2 + 4 && (v.honkT || 0) <= 0) { v.honkT = 4; hg.drive?.honked?.(v); } } }
+        else if (o.player || o.parked) { const dx = o.x - q.x, dz = o.z - q.z, fa = dx * fx + dz * fz, sd = Math.abs(dx * -fz + dz * fx); if (fa > 0 && fa < (o.len + v.len) / 2 + 7 && sd < o.hw + v.hw + 0.4) { blocked = true; want = Math.min(want, Math.max(0, (fa - (o.len + v.len) / 2 - 1.5) / 1.3)); if (o.player && fa < (o.len + v.len) / 2 + 4 && (v.honkT || 0) <= 0) { v.honkT = 4; hg.drive?.honked?.(v); } } }
       }
       v.honkT = Math.max(0, (v.honkT || 0) - dt);
+      // 세워 둔 차 · 내 차에 3초 넘게 막히면 옆 차로로 (없으면 돌아서)
+      v.stuck = blocked && v.cur < 0.6 ? (v.stuck || 0) + dt : 0;
+      if (v.stuck > 3) { v.stuck = 0; const a = v.off + v.dir * 3.3, b = v.off - v.dir * 3.3, ok = (o2) => Math.sign(o2) === v.dir && Math.abs(o2) < v.L.w / 2 - 1; if (ok(a)) v.off = a; else if (ok(b)) v.off = b; else { v.dir *= -1; v.off = -v.off; } }
       v.brake = want < v.cur - 0.4 || v.cur < 0.3 ? 1 : 0;
       v.cur += (want - v.cur) * Math.min(1, dt * (want < v.cur ? 3.5 : 1.2));
       v.d += v.dir * v.cur * dt;
@@ -156,7 +172,7 @@ export class Traffic {
       v.head = headOn;
     }
     // 멀어지면 치운다
-    for (let i = this.list.length - 1; i >= 0; i--) { const v = this.list[i]; if (!v.player && !v.keep && Math.hypot(v.x - px, v.z - pz) > 360) this.list.splice(i, 1); }
+    for (let i = this.list.length - 1; i >= 0; i--) { const v = this.list[i]; if (!v.player && !v.keep && Math.hypot(v.x - px, v.z - pz) > (v.parked ? 260 : 360)) this.list.splice(i, 1); }
     this.draw(px, pz, night);
   }
   // 인스턴스 쓰기: 지형 높이 · 앞뒤 기울기 · 오토바이 기울기
@@ -189,7 +205,7 @@ export class Traffic {
   // 부딪힘 동그라미 (곰 둘레): 긴 차는 앞뒤로 여러 개
   circles(x, z, out) {
     for (const v of this.list) {
-      if (!v.init || v.hidden || Math.abs(v.x - x) > 14 || Math.abs(v.z - z) > 14) continue;
+      if (!v.init || v.hidden || v.player || Math.abs(v.x - x) > 14 || Math.abs(v.z - z) > 14) continue;
       const n = Math.max(1, Math.round(v.len / (v.hw * 2.2))), fx = Math.sin(v.yaw), fz = Math.cos(v.yaw);
       for (let i = 0; i < n; i++) { const k = n === 1 ? 0 : (i / (n - 1) - 0.5) * (v.len - v.hw * 2); out.push({ x: v.x + fx * k, z: v.z + fz * k, r: v.hw + 0.1, h: v.t.H }); }
     }

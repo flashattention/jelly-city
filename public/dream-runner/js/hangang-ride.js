@@ -166,7 +166,7 @@ export class LiveRide {
   lockInput(inp) { return { ...inp, mx: 0, mz: 0, lat: 0, jump: false, jumpHeld: false, slide: false }; }
   // ---------- 탈 수 있는 것 찾기 ----------
   findCand() {
-    const hg = this.hg, L = hg.live; if (!L) return null; let best = null;
+    const hg = this.hg, L = hg.live; if (!L || hg.drive?.on) return null; let best = null;
     if (!hg.inside && !hg.inShop && !hg.inMall) for (const o of L.buses.values()) { if (!o.mesh || !o.L) continue; const d = Math.hypot(o.x - hg.px, o.z - hg.pz), still = (o.cur ?? 0) < 0.4; if (d < 7 && still && (!best || d < best.d)) best = { kind: 'bus', o, d }; }
     if (best || !L.sub) return best;
     // 지하철: 역 안이거나 출구 8m 안 → 그 역에 진입 · 도착한 실제 열차

@@ -20,7 +20,7 @@ function split(src) {
 function liner(body, t) {
   const g = body.clone(), P = g.attributes.position, N = g.attributes.normal, n = P.count, C = new Float32Array(n * 3), col = new THREE.Color(), belt = beltOf(t);
   for (let i = 0; i < n; i++) { P.setXYZ(i, P.getX(i) - N.getX(i) * 0.025, P.getY(i) - N.getY(i) * 0.025, P.getZ(i) - N.getZ(i) * 0.025); N.setXYZ(i, -N.getX(i), -N.getY(i), -N.getZ(i)); }
-  for (let tr = 0; tr < n; tr += 3) { const y = (P.getY(tr) + P.getY(tr + 1) + P.getY(tr + 2)) / 3; col.set(y > belt + 0.06 ? '#d6d2ca' : y > belt - 0.07 ? '#56595f' : y > 0.4 ? '#34363b' : '#242527'); for (let j = 0; j < 3; j++) col.toArray(C, (tr + j) * 3); const a = P.array, b = tr * 3; for (let c = 0; c < 3; c++) { const s = a[b + 3 + c]; a[b + 3 + c] = a[b + 6 + c]; a[b + 6 + c] = s; } const na = N.array; for (let c = 0; c < 3; c++) { const s = na[b + 3 + c]; na[b + 3 + c] = na[b + 6 + c]; na[b + 6 + c] = s; } }
+  for (let tr = 0; tr < n; tr += 3) { const y = (P.getY(tr) + P.getY(tr + 1) + P.getY(tr + 2)) / 3; const ny = (N.getY(tr) + N.getY(tr + 1) + N.getY(tr + 2)) / 3; col.set(y > belt + 0.06 ? (ny < -0.6 ? '#d6d2ca' : '#6f6c66') : y > belt - 0.07 ? '#56595f' : y > 0.4 ? '#34363b' : '#242527'); for (let j = 0; j < 3; j++) col.toArray(C, (tr + j) * 3); const a = P.array, b = tr * 3; for (let c = 0; c < 3; c++) { const s = a[b + 3 + c]; a[b + 3 + c] = a[b + 6 + c]; a[b + 6 + c] = s; } const na = N.array; for (let c = 0; c < 3; c++) { const s = na[b + 3 + c]; na[b + 3 + c] = na[b + 6 + c]; na[b + 6 + c] = s; } }
   for (const k of Object.keys(g.attributes)) if (!['position', 'normal'].includes(k)) g.deleteAttribute(k);
   g.setAttribute('color', new THREE.BufferAttribute(C, 3)); return g;
 }
@@ -114,8 +114,10 @@ export function buildInterior(key) {
   wheel.add(new THREE.Mesh(new THREE.TorusGeometry(wr, 0.022, 8, 28), wm));
   const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.05, 14).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: '#2a2b2f' })); wheel.add(hub);
   for (const a of [0, 2.2, -2.2]) { const sp = new THREE.Mesh(new THREE.BoxGeometry(0.03, wr, 0.015), wm); sp.position.set(Math.sin(a) * wr / 2, -Math.cos(a) * wr / 2, 0); sp.rotation.z = a; wheel.add(sp); }
-  const col = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.3, 8).rotateX(Math.PI / 2), wm); col.position.z = 0.17; wheel.add(col);
-  const wp = new THREE.Group(); wp.position.set(drv[1], drv[2] + (bus ? 0.45 : 0.32), drv[3] + (bus ? 0.55 : 0.45)); wp.rotation.x = bus ? -0.9 : -0.42; wp.add(wheel); g.add(wp); out.wheel = wheel;
+  const col = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.3, 8).rotateX(Math.PI / 2), wm); col.position.z = 0.17; if (!bus) wheel.add(col);
+  const wp = new THREE.Group(); wp.position.set(drv[1], drv[2] + (bus ? 0.3 : 0.32), drv[3] + (bus ? 0.5 : 0.45)); wp.rotation.x = bus ? -1.15 : -0.42; wp.add(wheel); g.add(wp); out.wheel = wheel;
+  // 버스 운전대 기둥은 바닥에서 비스듬히 올라온다
+  if (bus) { const bc = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, wp.position.y - floorY, 8), wm); bc.position.set(drv[1], (wp.position.y + floorY) / 2, wp.position.z + 0.12); bc.rotation.x = 0.25; g.add(bc); }
   g.traverse((o) => { if (o.isMesh) o.castShadow = false; });
   CACHE.set(key, out); return out;
 }
