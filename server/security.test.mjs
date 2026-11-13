@@ -41,6 +41,35 @@ test('급한 버그: 깨진 주소 · 이상한 요청 줄에도 서버가 죽�
   assert.equal((await fetch(S.base + '/healthz')).status, 200);
 });
 
+test('2-3 큰 본문은 읽지 않고 끊는다', async () => {
+  const big = 'x'.repeat(40 * 1024);
+  const r = await fetch(S.base + '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dev: big }) });
+  assert.ok(r.status >= 400 && r.status < 500);
+  // 길이를 속이고 천천히 많이 보내도 한도에서 끊긴다
+  const out = await raw(S.port, `POST /api/board/write HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n${(40000).toString(16)}\r\n${'a'.repeat(40000)}\r\n`);
+  assert.ok(!/200 OK/.test(out));
+  assert.equal((await fetch(S.base + '/healthz')).status, 200);
+});
+
+test('2-3 천천히 보내는 머리글(slowloris)은 끊긴다', { timeout: 40000 }, async () => {
+  const t0 = Date.now();
+  const closed = await new Promise((ok) => {
+    const c = net.connect(S.port, '127.0.0.1', () => c.write('GET / HTTP/1.1\r\nHost: x\r\n'));
+    const iv = setInterval(() => { try { c.write('X-a: b\r\n'); } catch { /* 끊김 */ } }, 3000);
+    c.on('close', () => { clearInterval(iv); ok(true); }); c.on('error', () => {});
+    setTimeout(() => { clearInterval(iv); c.destroy(); ok(false); }, 35000);
+  });
+  assert.ok(closed, '35초 안에 끊겨야 한다');
+  assert.ok(Date.now() - t0 < 30000);
+});
+
+test('2-4 __proto__ 가 든 본문은 버린다', async () => {
+  for (const body of ['{"__proto__":{"admin":true},"dev":"x"}', '{"dev":"y","a":{"constructor":{"prototype":{"admin":1}}}}']) {
+    const r = await fetch(S.base + '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+    assert.equal(r.status, 400);
+  }
+});
+
 test('2-2 정적 파일: public 밖 · 숨김 파일을 읽을 수 없다', async () => {
   const bad = ['/..%2f..%2f.env', '/..%2fpackage.json', '/%2e%2e/%2e%2e/.env', '/..%5c..%5cserver%5cindex.js', '/dream-runner/..%2f..%2fserver/index.js', '/.env', '/.git/config', '/%2egit/config', '/shared/%00.js', '/x.js%00.html', '/..%2f..%2fserver/index.js?w=1', '/.well-known/../../.env'];
   for (const p of bad) {

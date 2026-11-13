@@ -382,7 +382,12 @@ export class World {
         this.dirty = true;
         break;
       }
-      case 'stats': this.accounts[p.token].stats = msg.stats; this.dirty = true; break;
+      case 'stats': {
+        // 생활 능력치는 이 화면이 정해 보낸다: 꼴(평범한 객체 · 16KB 이하)만 확인해 그대로 둔다
+        const st = msg.stats;
+        if (!st || typeof st !== 'object' || Array.isArray(st) || JSON.stringify(st).length > 16384) break;
+        this.accounts[p.token].stats = st; this.dirty = true; break;
+      }
       case 'say': {
         const text = String(msg.text || '').slice(0, 120).trim();
         if (!text) break;

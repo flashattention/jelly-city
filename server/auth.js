@@ -1,4 +1,5 @@
 // 구글 로그인: 브라우저가 받은 ID 토큰(JWT)을 구글 tokeninfo 엔드포인트로 검증한다
+import { parseSafe, sec, clientIp } from './shared/guard.js';
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 // 구글 클라이언트 ID가 없으면 (로컬 개발) 이름만으로 로그인하는 개발용 모드
 export const DEV_LOGIN = !GOOGLE_CLIENT_ID && (process.env.NODE_ENV !== 'production' || process.env.ALLOW_DEV_LOGIN === '1');
@@ -17,13 +18,22 @@ export async function verifyGoogle(credential) {
   return { sub: `g:${t.sub}`, email: t.email || '', name: t.name || t.email?.split('@')[0] || '젤리', picture: t.picture || '' };
 }
 
-// JSON 본문 읽기 (작은 요청만)
+// JSON 본문 읽기 (작은 요청만). 모든 POST 가 여기를 거친다
+//   크기: Content-Length 가 한도를 넘으면 읽지도 않고, 실제로 넘치면 끊는다
+//   오염: __proto__ · constructor · prototype 키가 든 본문은 버린다 (보안 사건으로 센다)
+//   꼴: 객체가 아니면(null · 숫자 · 배열) 빈 객체로
 export function readJson(req, limit = 16 * 1024) {
   return new Promise((resolve, reject) => {
-    let size = 0;
+    const tooBig = () => { reject(Object.assign(new Error('too large'), { status: 413 })); req.resume(); }; // 답은 보내고, 남은 본문은 버린다 (요청 시간 제한 60초)
+    if (Number(req.headers?.['content-length']) > limit) return tooBig();
+    let size = 0, done = false;
     const chunks = [];
-    req.on('data', (c) => { size += c.length; if (size > limit) { reject(new Error('too large')); req.destroy(); } else chunks.push(c); });
-    req.on('end', () => { try { resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {}); } catch { reject(new Error('bad json')); } });
+    req.on('data', (c) => { if (done) return; size += c.length; if (size > limit) { done = true; reject(Object.assign(new Error('too large'), { status: 413 })); req.destroy(); } else chunks.push(c); });
+    req.on('end', () => {
+      if (done) return;
+      try { const v = chunks.length ? parseSafe(Buffer.concat(chunks).toString('utf8')) : {}; resolve(v && typeof v === 'object' && !Array.isArray(v) ? v : {}); }
+      catch (e) { if (e.poison) sec.note('json', { ip: clientIp(req), where: String(req.url || '').split('?')[0].slice(0, 40), detail: 'proto key' }); reject(new Error('bad json')); }
+    });
     req.on('error', reject);
   });
 }

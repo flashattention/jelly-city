@@ -295,7 +295,8 @@ async function api(req, res, url) {
 }
 
 // 요청 하나가 이상해도(깨진 주소 · 이상한 글자) 서버 전체가 죽지 않게: 오류는 그 요청만 400 으로 끝낸다
-const server = http.createServer((req, res) => {
+//   천천히 보내는 공격(slowloris): 머리글은 20초 · 요청 전체는 60초 안에 와야 한다 (5초마다 검사)
+const server = http.createServer({ headersTimeout: 20000, requestTimeout: 60000, connectionsCheckingInterval: 5000, maxHeaderSize: 16 * 1024 }, (req, res) => {
   try { handle(req, res); } catch (e) {
     console.warn('요청 처리 오류:', e.message);
     if (!res.headersSent) { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('bad request'); } else res.destroy();
@@ -399,6 +400,8 @@ function handle(req, res) {
     res.end(data);
   });
 }
+server.timeout = 120000; // 아무것도 오가지 않는 연결은 2분 뒤 끊는다 (웹소켓은 업그레이드 뒤 따로)
+server.maxHeadersCount = 100;
 const GZ = new Map(); let gzBytes = 0;
 const WMOD = new Map(); // 워커용으로 바꾼 모듈 (파일이 바뀌면 다시)
 
