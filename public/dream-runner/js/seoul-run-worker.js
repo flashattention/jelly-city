@@ -11,8 +11,23 @@ function mask(pts, R) {
     for (let a = -n; a <= n; a++) for (let b = -n; b <= n; b++) { const X = cx + a, Z = cz + b; if (X < 0 || Z < 0 || X >= nx || Z >= nz) continue; const mx = (X + gx0 + 0.5) * GS - px, mz = (Z + gz0 + 0.5) * GS - pz; if (mx * mx + mz * mz < R2) g[Z * nx + X] = 1; } }
   return (x, z) => { const X = Math.floor(x / GS) - gx0, Z = Math.floor(z / GS) - gz0; return X >= 0 && Z >= 0 && X < nx && Z < nz && g[Z * nx + X] === 1; };
 }
+// 코스 길 차로 위 점(8m 마다 + 사이 4m, 옆으로 -h · 0 · +h)이 다각형(f, o부터 x z ...) 안에 있는지
+function laneTest(pts, h) {
+  const Q = [];
+  if (h > 0) for (let i = 0; i + 3 < pts.length; i += 2) { const x = pts[i], z = pts[i + 1], dx = pts[i + 2] - x, dz = pts[i + 3] - z, L = Math.hypot(dx, dz) || 1, nx = -dz / L, nz = dx / L;
+    for (const k of [0, 0.5]) for (const o of [-h, -h / 2, 0, h / 2, h]) Q.push(x + dx * k + nx * o, z + dz * k + nz * o); }
+  return (f, o, S) => {
+    if (!Q.length) return false;
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; const n = (f.length - o) >> 1;
+    for (let i = 0; i < n; i++) { const x = f[o + i * 2] * S, z = f[o + i * 2 + 1] * S; if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+    for (let q = 0; q < Q.length; q += 2) { const px = Q[q], pz = Q[q + 1]; if (px < x0 || px > x1 || pz < z0 || pz > z1) continue;
+      let c = false; for (let i = 0, j = n - 1; i < n; j = i++) { const xi = f[o + i * 2] * S, zi = f[o + i * 2 + 1] * S, xj = f[o + j * 2] * S, zj = f[o + j * 2 + 1] * S; if ((zi > pz) !== (zj > pz) && px < ((xj - xi) * (pz - zi)) / (zj - zi) + xi) c = !c; }
+      if (c) return true; }
+    return false;
+  };
+}
 self.onmessage = async (e) => {
-  const { id, url, pts, RB, RR, taken = {} } = e.data;
+  const { id, url, pts, RB, RR, taken = {}, half = 0 } = e.data;
   try {
     const res = await fetch(url); if (!res.ok) throw new Error('칸 없음'); const M = await res.json(), S = M.scale || 0.1;
     const nearB = mask(pts, RB), nearR = mask(pts, RR);
@@ -27,7 +42,9 @@ self.onmessage = async (e) => {
     [N.alleys] = sel('alleys', (a) => flatNear(a, 1, nearR)); [N.paths] = sel('paths', (a) => flatNear(a, 2, nearR)); [N.rails] = sel('rails', (a) => flatNear(a, 0, nearR));
     [N.bridges] = sel('bridges', (b) => flatNear(b.p, 0, nearR));
     // 건물: 가게 간판(shops2)은 건물 번호로 이어져 있어 번호를 새로 매긴다
-    { const [b, idx] = sel('buildings', (bd) => flatNear(bd, 7, nearB)), map = new Map(idx.map((i, k) => [i, k])); N.buildings = b; N.binfo = idx.map((i) => M.binfo?.[i] || null); N.shops2 = (M.shops2 || []).filter((s2) => map.has(s2[2])).map((s2) => { const t = [...s2]; t[2] = map.get(s2[2]); return t; }); }
+    // 6-10: 곰이 달리는 차로(바깥 레인 가운데 + 0.2m) 안으로 들어온 건물은 뺀다 (지도 외곽선이 길 위로 나와 곰이 건물을 뚫고 달렸다)
+    const lane = laneTest(pts, (half * 2) / 3 + 0.2);
+    { const [b, idx] = sel('buildings', (bd) => flatNear(bd, 7, nearB) && !lane(bd, 7, S)), map = new Map(idx.map((i, k) => [i, k])); N.buildings = b; N.binfo = idx.map((i) => M.binfo?.[i] || null); N.shops2 = (M.shops2 || []).filter((s2) => map.has(s2[2])).map((s2) => { const t = [...s2]; t[2] = map.get(s2[2]); return t; }); }
     [N.shops] = sel('shops', (s2) => nearB(s2[2] * S, s2[3] * S)); [N.stations] = sel('stations', (s2) => nearB(s2[1] * S, s2[2] * S)); [N.entrances] = sel('entrances', (en) => nearB(en[0] * S, en[1] * S));
     self.postMessage({ id, M: N, kept });
   } catch (err) { self.postMessage({ id, error: String(err?.message || err) }); }

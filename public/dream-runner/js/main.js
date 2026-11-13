@@ -400,6 +400,8 @@ function newRun(seed, itemMode = false, diff = 'easy', map = 'dream') {
   renderItems(true);
   game.dream = 0; game.dreamsSeen = 1; game.runT = 0; game.submitted = null; game.playSent = false; $('ad-btn').classList.add('hidden');
   env.setTheme(track.themeOf(0), true);
+  // 첫 코스도 밤이면 차 불빛 · 밤 표시를 켠다 (enterDream 을 거치지 않아 첫 밤 코스는 전조등이 꺼진 채였다 · 6-10)
+  { const th0 = track.themeOf(0); if (th0.seoul) seoulNight(th0.light < 0.7); }
   setMusic(track.themeOf(0).mus);
   $('h-alive').classList.toggle('hidden', !game.multi);
   $('t-shove').classList.toggle('hidden', !game.multi);
@@ -923,7 +925,7 @@ function spectate() {
   game.watch = best;
   if (best) {
     const d = track.dreamAt(best.s);
-    if (d !== game.dream) { game.dream = d; env.setTheme(track.themeOf(d)); setMusic(track.themeOf(d).mus); }
+    if (d !== game.dream) { game.dream = d; const th = track.themeOf(d); env.setTheme(th); if (th.seoul) seoulNight(th.light < 0.7); setMusic(th.mus); }
   }
 }
 function followCamera(dt) {

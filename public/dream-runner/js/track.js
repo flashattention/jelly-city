@@ -244,7 +244,7 @@ export class Track {
     // 지나간 것 치우기
     const cut = playerS - BEHIND;
     this.plats = this.plats.filter((p) => { if (p.s1 < cut) { this.drop(p.mesh); return false; } return true; });
-    this.obs = this.obs.filter((o) => { if (o.s1 < cut) { this.drop(o.mesh); return false; } return true; });
+    this.obs = this.obs.filter((o) => { if ((o.sEnd ?? o.s1) < cut) { this.drop(o.mesh); return false; } return true; });
     this.stars = this.stars.filter((o) => { if (o.s < cut) { this.drop(o.mesh); return false; } return true; });
     this.portals = this.portals.filter((o) => { if (o.s < cut - 30) { this.drop(o.mesh); return false; } return true; });
     this.boxes = this.boxes.filter((o) => { if (o.s < cut) { this.root.remove(o.mesh); return false; } return true; });
@@ -768,7 +768,8 @@ export class Track {
   mover(kind, o) {
     const g = this.makeMover?.(kind, o.n ?? 0) || new THREE.Group();
     this.root.add(g); g.userData.s = o.sEnd ?? o.s ?? 0;
-    const ob = { kind: o.hitKind || 'mover', s0: -1e9, s1: -1e9, x0: 1e9, x1: 1e9, y0: o.y, y1: o.y + o.h, mesh: g, seoul: kind };
+    // sEnd: 치우는 기준 (판정이 잠깐 꺼진 동안 s1 = -1e9 라서 그걸로 치우면 앞에 있는 차 · 행인이 화면 · 판정에서 사라졌다 · 6-10)
+    const ob = { kind: o.hitKind || 'mover', s0: -1e9, s1: -1e9, x0: 1e9, x1: 1e9, y0: o.y, y1: o.y + o.h, mesh: g, seoul: kind, sEnd: (o.sEnd ?? o.s ?? 0) + 2 };
     this.obs.push(ob);
     const mv = { kind, ob, g, ...o }; this.movers.push(mv); this.placeMover(mv, this.time || 0); return mv;
   }

@@ -35,15 +35,21 @@ class RoutePath {
   }
   hAt(u) { const f = Math.max(0, Math.min(this.n - 1.001, u / 4)), i = Math.floor(f), k = f - i; return this.h[i] * (1 - k) + this.h[Math.min(this.n - 1, i + 1)] * k; }
   // 지형 높이를 경로 점마다 (앞뒤 12m 평균: 50m 격자 지형이라 그대로 쓰면 꺾인다)
-  sampleH(hw) {
-    const raw = new Float32Array(this.n); for (let i = 0; i < this.n; i++) raw[i] = hw.terrAt(this.x[i], this.z[i]);
+  //   6-10: 평균만 쓰면 볼록한 곳 · 옆으로 기운 길에서 곰이 땅에 묻혔다 → 레인 폭 양끝 · 가운데 지형 중 가장 높은 것보다는 내려가지 않게
+  sampleH(hw, half = 4.5) {
+    const raw = new Float32Array(this.n), top = new Float32Array(this.n);
+    for (let i = 0; i < this.n; i++) { const a = Math.max(0, i - 1), b = Math.min(this.n - 1, i + 1), dx = this.x[b] - this.x[a], dz = this.z[b] - this.z[a], L = Math.hypot(dx, dz) || 1, nx = -dz / L, nz = dx / L;
+      raw[i] = hw.terrAt(this.x[i], this.z[i]); top[i] = Math.max(raw[i], hw.terrAt(this.x[i] + nx * half, this.z[i] + nz * half), hw.terrAt(this.x[i] - nx * half, this.z[i] - nz * half)); }
     const h = new Float32Array(this.n); for (let i = 0; i < this.n; i++) { let s = 0, c = 0; for (let j = -3; j <= 3; j++) { const q = i + j; if (q < 0 || q >= this.n) continue; s += raw[q]; c++; } h[i] = s / c; }
-    this.h = h;
+    // 높은 쪽으로 올린 뒤 앞뒤 4m 만 한 번 더 고르게 (계단처럼 튀지 않게, 그래도 땅 위)
+    for (let i = 0; i < this.n; i++) h[i] = Math.max(h[i], top[i]);
+    const h2 = new Float32Array(this.n); for (let i = 0; i < this.n; i++) h2[i] = Math.max(top[i], (h[Math.max(0, i - 1)] + h[i] * 2 + h[Math.min(this.n - 1, i + 1)]) / 4);
+    this.h = h2;
   }
 }
 const PATHS = ROUTES.map((R) => new RoutePath(R));
 // 달리는 길 띠 무늬: 아스팔트 결 · 흰 가장자리 · 노란 가운데 점선 (8m 한 번)
-let PATH_M = null;
+let PATH_M = null, LANE_M = null;
 function pathTex() {
   const cv = document.createElement('canvas'); cv.width = 64; cv.height = 256; const g = cv.getContext('2d');
   g.fillStyle = '#5a5d61'; g.fillRect(0, 0, 64, 256);
@@ -66,7 +72,7 @@ export class SeoulRun {
     this.initP = hw.load('seoul').then(() => {
       hw.opt = { ...hw.opt, season: 'fixed', weather: 'fixed', time: 'fixed', flow: 0 }; hw.state.season = SEASON(); hw.state.weather = 'clear'; hw.state.hour = 13; hw.applySeason();
       hw.lat = 999; if (hw.shadow) hw.shadow.visible = false;
-      for (const P of PATHS) P.sampleH(hw);
+      PATHS.forEach((P, c) => P.sampleH(hw, seoulLaneW(c) / 2));
       this.ready = true;
     }).catch((e) => { this.failed = true; throw e; });
     return this.initP;
@@ -130,7 +136,7 @@ export class SeoulRun {
     const P = PATHS[c], pts = [], q = { x: 0, z: 0 }; for (let u = 0; u <= Math.min(P.len, u1); u += 8) { P.pos(u, q); pts.push(q.x, q.z); }
     const taken = {}; for (const c2 of same) for (const [f, idx] of Object.entries(c2.kept || {})) (taken[f] ||= []).push(...idx);
     const id = (this.wid = (this.wid || 0) + 1), [ti, tj] = tile.split('_'), url = new URL(`../seoul/t_${ti}_${tj}.json`, import.meta.url).href;
-    return new Promise((ok, no) => { this.wq.set(id, (d) => (d.error ? no(new Error(d.error)) : ok({ ...d.M, __kept: d.kept }))); this.worker.postMessage({ id, url, pts, RB, RR, taken }); });
+    return new Promise((ok, no) => { this.wq.set(id, (d) => (d.error ? no(new Error(d.error)) : ok({ ...d.M, __kept: d.kept }))); this.worker.postMessage({ id, url, pts, RB, RR, taken, half: seoulLaneW(c) / 2 }); });
   }
   // 판정 좌표 → 세상 좌표 행렬: 곧은 길의 (0, 0, z) 를 그 코스 길 위 점으로, -z 를 길 방향으로
   //   dream 을 주면 그 코스 길로 (카메라: 곰이 있는 코스)
@@ -214,11 +220,28 @@ export class SeoulRun {
   //   서울 산책은 지역 지도에서 이 띠를 깔았다. 서울 전체 칸에는 없어 러너가 그 코스 길 위에 깐다
   paths(want) {
     this.pathMs ||= new Map();
-    for (const [c, m] of this.pathMs) if (!want.has(c)) { if (m) { this.hw.scene.remove(m); m.geometry.dispose(); } this.pathMs.delete(c); }
+    for (const [c, m] of this.pathMs) if (!want.has(c)) { if (m) { this.hw.scene.remove(m); m.traverse((o) => o.geometry?.dispose()); } this.pathMs.delete(c); }
     for (const c of want) if (!this.pathMs.has(c)) { const m = this.pathMesh(c); this.pathMs.set(c, m); if (m) this.hw.scene.add(m); }
   }
   pathMesh(c) {
-    const P = PATHS[c], sf = P.R.sf || '', hw = this.hw, W = 6.2, pos = [], uv = [], idx = [], a = { x: 0, z: 0 };
+    const g = new THREE.Group(), rib = this.ribbon(c), ln = this.laneLines(c); if (rib) g.add(rib); if (ln) g.add(ln); g.userData.noDrape = true; return g;
+  }
+  // 6-10: 달리는 길(레인 3개)이 어디까지인지 늘 보이게 양쪽 끝선 · 레인 점선 (넓은 공원 · 광장에서 길과 배경이 헷갈렸다)
+  //   빛을 받지 않는 재질이라 밤에도 은은하게 보인다. 코스 하나에 그리기 1번
+  laneLines(c) {
+    const P = PATHS[c], hw = this.hw, half = seoulLaneW(c) / 2, pos = [], col = [], idx = [], a = { x: 0, z: 0 };
+    const strip = (off, w, u0, u1, r, g2, b) => { const base = pos.length / 3; let k = 0;
+      for (let u = u0; u <= u1 + 0.01; u += Math.min(2, u1 - u0) || 2) { const F = P.frame(u, a), nx = -F.tz, nz = F.tx;
+        for (const sd of [-1, 1]) { const px = F.x + nx * (off + (sd * w) / 2), pz = F.z + nz * (off + (sd * w) / 2); pos.push(px, Math.max(hw.terrAt(px, pz), F.y) + 0.1, pz); col.push(r, g2, b); }
+        if (k) { const q = base + k * 2; idx.push(q - 2, q - 1, q, q - 1, q + 1, q); } k++; } };
+    for (const sd of [-1, 1]) strip(sd * half, 0.24, 0, P.len, 1, 0.93, 0.72);
+    for (const sd of [-1, 1]) for (let u = 0; u < P.len - 2; u += 6) strip((sd * half) / 3, 0.12, u, u + 2.6, 0.95, 0.95, 0.95);
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.setIndex(idx);
+    LANE_M ||= new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.78, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8, fog: true });
+    const m = new THREE.Mesh(geo, LANE_M); m.renderOrder = 2; m.userData.noDrape = true; return m;
+  }
+  ribbon(c) {
+    const P = PATHS[c], sf = P.R.sf || '', hw = this.hw, W = seoulLaneW(c) + 0.6, pos = [], uv = [], idx = [], a = { x: 0, z: 0 };
     const on = (u) => { const ch = sf[Math.max(0, Math.min(sf.length - 1, Math.floor(u / 20)))]; return ch === 'p' || ch === '-'; };
     let run = null; const flush = () => { if (run && run.length > 1) { const base = pos.length / 3; run.forEach(([x, z, nx, nz, u], k) => { for (const sd of [-1, 1]) { const px = x + nx * sd * W / 2, pz = z + nz * sd * W / 2; pos.push(px, hw.terrAt(px, pz) + 0.07, pz); uv.push(sd < 0 ? 0 : 1, u / 8); } if (k) { const q = base + k * 2; idx.push(q - 2, q - 1, q, q - 1, q + 1, q); } }); } run = null; };
     for (let u = 0; u <= P.len; u += 4) { if (!on(u)) { flush(); continue; } const F = P.frame(u, a); (run ||= []).push([F.x, F.z, -F.tz, F.tx, u]); }

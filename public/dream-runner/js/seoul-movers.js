@@ -15,7 +15,20 @@ function geoOf(key) {
   shared.set(key, g); return g;
 }
 // 밤 코스: 전조등 · 후미등을 켠다 (모든 차가 같은 그물이라 한 번에)
-export function seoulNight(on) { night = on ? 1 : 0; VU.uNight.value = night; for (const g of shared.values()) { g.attributes.iSt.setX(0, night); g.attributes.iSt.needsUpdate = true; } }
+// 6-10: 밤 코스에서도 장애물이 잘 보이게 — 발밑 빛 웅덩이(더하기 섞기) · 행인 손전등 · 자전거 앞뒤 등. 낮엔 투명
+let HALO = null; const NIGHT_MS = [];
+function haloMat() {
+  if (HALO) return HALO; const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d'), gr = c.createRadialGradient(32, 32, 2, 32, 32, 31);
+  gr.addColorStop(0, 'rgba(255,240,200,1)'); gr.addColorStop(0.35, 'rgba(255,220,160,0.8)'); gr.addColorStop(0.7, 'rgba(255,205,140,0.3)'); gr.addColorStop(1, 'rgba(255,200,130,0)'); c.fillStyle = gr; c.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+  HALO = new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 }); HALO.visible = !!night; NIGHT_MS.push([HALO, 1]); return HALO;
+}
+const lampMat = (col, k) => { const m = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: k, depthWrite: false }); m.visible = !!night; NIGHT_MS.push([m, k]); return m; };
+let LAMP_W = null, LAMP_R = null, WHEEL = null, SHADOW_M = null;
+// 서울 찻길 그림은 땅보다 조금 위(약 0.1m)라서 그보다 위에 깐다
+function halo(p, w, l, y = 0.17) { const m = new THREE.Mesh(G_PLANE, haloMat()); m.rotation.x = -Math.PI / 2; m.scale.set(w, l, 1); m.position.y = y; m.renderOrder = 3; p.add(m); return m; }
+const G_PLANE = new THREE.PlaneGeometry(1, 1);
+export function seoulNight(on) { night = on ? 1 : 0; VU.uNight.value = night; for (const [m, k] of NIGHT_MS) { m.opacity = k; m.visible = !!night; } for (const g of shared.values()) { g.attributes.iSt.setX(0, night); g.attributes.iSt.needsUpdate = true; } }
 export function seoulTick(t) { VU.uTime.value = t; }
 const M = (c) => (typeof c === 'object' ? c : toon(c));
 function add(p, g, mat, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0) { const m = new THREE.Mesh(g, M(mat)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.set(rx, ry, rz); p.add(m); return m; }
@@ -30,14 +43,17 @@ function jelly(r, s = 1) {
   const legs = [-1, 1].map((sx) => add(g, G.sphereLow(), '#37474f', sx * 0.13 * s, 0.22 * s, 0, 0.1 * s, 0.24 * s, 0.1 * s));
   if (r() < 0.3) add(body, G.box(), pick(r, ['#6d4c41', '#212121', '#c62828']), 0, 0.7 * s, -0.3 * s, 0.4 * s, 0.4 * s, 0.16 * s);
   if (r() < 0.25) { add(body, G.cylLow(), '#455a64', 0.45 * s, 1.1 * s, 0, 0.02, 0.9 * s, 0.02); add(body, G.hemi(), pick(r, ['#e53935', '#1e88e5', '#fdd835', '#212121']), 0.45 * s, 1.55 * s, 0, 0.6 * s, 0.35 * s, 0.6 * s); }
+  { LAMP_W ||= lampMat('#fff6d0', 1); const l = new THREE.Mesh(G.sphereLow(), LAMP_W); l.position.set(0.3 * s, 0.75 * s, 0.25 * s); l.scale.setScalar(0.1 * s); body.add(l); }
   g.userData.anim = (o, t) => { const w = (o.userData.walk || 0) * 9; body.position.y = Math.abs(Math.sin(w)) * 0.06; legs[0].position.z = Math.sin(w) * 0.12; legs[1].position.z = -Math.sin(w) * 0.12; };
   return g;
 }
 // 자전거 + 탄 젤리: 두 바퀴 · 삼각 틀 · 핸들, 페달 돌리며
 function bicycle(r) {
-  const g = new THREE.Group(), fr = pick(r, ['#e53935', '#1e88e5', '#212121', '#43a047', '#fafafa']), wheel = new THREE.TorusGeometry(0.33, 0.035, 6, 18);
+  const g = new THREE.Group(), fr = pick(r, ['#e53935', '#1e88e5', '#212121', '#43a047', '#fafafa']), wheel = (WHEEL ||= new THREE.TorusGeometry(0.33, 0.035, 6, 18));
   const wh = [0.55, -0.55].map((z) => { const m = new THREE.Mesh(wheel, M('#1a1a1a')); m.position.set(0, 0.36, z); m.rotation.y = Math.PI / 2; g.add(m); return m; });
   add(g, G.box(), fr, 0, 0.62, 0, 0.05, 0.05, 0.9, -0.15); add(g, G.box(), fr, 0, 0.5, 0.25, 0.05, 0.5, 0.05, 0.5); add(g, G.box(), fr, 0, 0.55, -0.25, 0.05, 0.45, 0.05, -0.3); add(g, G.box(), '#212121', 0, 0.92, -0.33, 0.18, 0.06, 0.26); add(g, G.box(), '#9e9e9e', 0, 0.98, 0.5, 0.5, 0.04, 0.04);
+  LAMP_W ||= lampMat('#fff6d0', 1); LAMP_R ||= lampMat('#ff3b3b', 1);
+  { const f = new THREE.Mesh(G.sphereLow(), LAMP_W); f.position.set(0, 0.9, 0.62); f.scale.setScalar(0.08); g.add(f); const b2 = new THREE.Mesh(G.sphereLow(), LAMP_R); b2.position.set(0, 0.7, -0.66); b2.scale.setScalar(0.07); g.add(b2); }
   const rider = jelly(r, 0.85); rider.position.set(0, 0.45, -0.15); rider.rotation.x = 0.25; g.add(rider);
   g.userData.anim = (o, t) => { for (const w of wh) w.rotation.x = (o.userData.walk || 0) * 9; rider.userData.walk = (o.userData.walk || 0) * 0.4; rider.userData.anim(rider, t); };
   return g;
@@ -45,19 +61,24 @@ function bicycle(r) {
 // 공사 고깔 줄 · 가림막 · 현수막: 판정 크기에 맞춰 (fit)
 function cones(n) { const g = new THREE.Group(); g.userData.fit = (o, w) => { const k = Math.max(2, Math.round(w / 1.1)); for (let i = 0; i < k; i++) { const x = -w / 2 + (i + 0.5) * (w / k); add(o, G.cone(), '#ff6d00', x, 0.33, 0, 0.26, 0.62, 0.26); add(o, G.cylLow(), glow('#ffffff'), x, 0.36, 0, 0.17, 0.08, 0.17); add(o, G.box(), '#263238', x, 0.02, 0, 0.5, 0.04, 0.5); } }; return g; }
 function barrier() { const g = new THREE.Group(); g.userData.fit = (o, w, h) => { const k = Math.max(1, Math.round(w / 1.6)); for (let i = 0; i < k; i++) { const x = -w / 2 + (i + 0.5) * (w / k); for (let j = 0; j < 4; j++) add(o, G.box(), j % 2 ? '#fafafa' : '#ff6d00', x, 0.2 + j * (h - 0.3) / 4, 0, w / k - 0.08, (h - 0.3) / 4, 0.08); add(o, G.box(), '#424242', x - w / k / 2 + 0.05, 0, 0, 0.08, h, 0.6); } add(o, G.sphereLow(), glow('#ffb300'), 0, h + 0.1, 0, 0.12); }; return g; }
-function banner(n) { const g = new THREE.Group(); g.userData.fit = (o, w, h) => { for (const sx of [-1, 1]) add(o, G.cylLow(), '#455a64', sx * (w / 2 + 0.1), -1.0 + (h + 1.2) / 2, 0, 0.07, h + 1.2, 0.07); const cv = document.createElement('canvas'); cv.width = 512; cv.height = 96; const c = cv.getContext('2d'); c.fillStyle = ['#fdd835', '#1e88e5', '#e53935'][n % 3]; c.fillRect(0, 0, 512, 96); c.fillStyle = n % 3 === 0 ? '#212121' : '#ffffff'; c.font = 'bold 54px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(['공사 중 · 조심히 지나가세요', '서울 걷기 축제', '어린이 보호구역'][n % 3], 256, 52, 490); const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; add(o, G.box(), new THREE.MeshBasicMaterial({ map: t }), 0, h / 2, 0, w, h * 0.9, 0.08); }; return g; }
+const BANNER = [];
+function banner(n) { const g = new THREE.Group(); g.userData.fit = (o, w, h) => { for (const sx of [-1, 1]) add(o, G.cylLow(), '#455a64', sx * (w / 2 + 0.1), -1.0 + (h + 1.2) / 2, 0, 0.07, h + 1.2, 0.07); const bm = (BANNER[n % 3] ||= (() => { const cv = document.createElement('canvas'); cv.width = 512; cv.height = 96; const c = cv.getContext('2d'); c.fillStyle = ['#fdd835', '#1e88e5', '#e53935'][n % 3]; c.fillRect(0, 0, 512, 96); c.fillStyle = n % 3 === 0 ? '#212121' : '#ffffff'; c.font = 'bold 54px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(['공사 중 · 조심히 지나가세요', '서울 걷기 축제', '어린이 보호구역'][n % 3], 256, 52, 490); const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return new THREE.MeshBasicMaterial({ map: t }); })()); add(o, G.box(), bm, 0, h / 2, 0, w, h * 0.9, 0.08); }; return g; }
 
-export function makeSeoulMover(kind, n) {
+// 그물은 모두 나눠 쓰므로 치울 때 지우지 않는다 (track.drop 이 keepGeo 를 본다 · 지우면 남은 차가 매번 다시 올라갔다)
+export function makeSeoulMover(kind, n) { const g = makeMover0(kind, n); if (g) g.userData.keepGeo = true; return g; }
+function makeMover0(kind, n) {
   const r = rnd(n + 7);
-  if (kind === 'ped') return jelly(r);
-  if (kind === 'bike') return bicycle(r);
-  if (kind === 'cones') return cones(n);
-  if (kind === 'barrier') return barrier(n);
-  if (kind === 'banner') return banner(n);
+  if (kind === 'ped') { const g = jelly(r); halo(g, 2.8, 2.8); return g; }
+  if (kind === 'bike') { const g = bicycle(r); halo(g, 2.6, 3.6); return g; }
+  // 서 있는 장애물은 판정 폭에 맞춰 빛 웅덩이도 늘린다 (fit 이 폭을 알려 준다)
+  const fitHalo = (g, d) => { const f = g.userData.fit; g.userData.fit = (o, w, h) => { f(o, w, h); halo(o, w + 2.4, d + 1, 0.17 - (kind === 'banner' ? 1.0 : 0)); }; return g; };
+  if (kind === 'cones') return fitHalo(cones(n), 2.2);
+  if (kind === 'barrier') return fitHalo(barrier(n), 2.6);
+  if (kind === 'banner') return fitHalo(banner(n), 2.2);
   const key = pick(r, KEYS[kind] || KEYS.car), m = new THREE.InstancedMesh(geoOf(key), vehicleMat(), 1);
   m.setMatrixAt(0, new THREE.Matrix4()); m.setColorAt(0, new THREE.Color(pickColor(TYPES[key], r))); m.frustumCulled = false;
   const g = new THREE.Group(); g.add(m);
   // 오토바이는 탄 젤리가 모델에 있다. 바닥 그림자
-  const sh = new THREE.Mesh(new THREE.PlaneGeometry(TYPES[key].W + 0.4, TYPES[key].L + 0.5), new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.25, depthWrite: false })); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.03; g.add(sh);
+  SHADOW_M ||= new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.25, depthWrite: false }); const sh = new THREE.Mesh(G_PLANE, SHADOW_M); sh.scale.set(TYPES[key].W + 0.4, TYPES[key].L + 0.5, 1); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.14; g.add(sh); halo(g, TYPES[key].W + 2.6, TYPES[key].L + 3.4);
   return g;
 }
