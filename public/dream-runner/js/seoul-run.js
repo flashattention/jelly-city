@@ -6,8 +6,8 @@
 import * as THREE from 'three';
 import { Hangang } from './hangang.js';
 import { ROUTES } from './seoul-routes.js';
-import { SEOUL_U0, seoulCourseOf, seoulLaneW } from './seouls.js';
-import { DREAM_SEC, speedAt } from './track.js';
+import { SEOUL_U0, seoulCourseOf, seoulLaneW, seoulSpan } from './seouls.js';
+import { speedAt } from './track.js';
 import { isPhone } from '../../shared/js/perf.js';
 
 // 코스 길 둘레: 건물은 RB m, 길 · 녹지 · 물은 RR m 안만 짓는다 (휴대폰은 더 좁게). RT = 칸 고르는 반지름
@@ -87,8 +87,8 @@ export class SeoulRun {
     for (let u = Math.max(0, u0); u <= Math.min(P.len, u1); u += 20) { P.pos(u, q); for (const a of [-r, 0, r]) for (const b of [-r, 0, r]) { const key = `${Math.floor((q.x + a) / T)}_${Math.floor((q.z + b) / T)}`; if (!this.hw.tileHave.has(key)) continue; const d = u - u0 + Math.hypot(a, b); if (!out.has(key) || out.get(key) > d) out.set(key, d); } }
     return [...out.entries()].sort((a, b) => a[1] - b[1]).map((e) => e[0]);
   }
-  // 그 코스가 달릴 길 끝(u): 코스 길이 = 시작 빠르기 × DREAM_SEC + 문 자리
-  endU(c, d) { const tr = this.track, s0 = tr.bounds[d] ?? tr.nextB, s1 = tr.bounds[d + 1]; return s1 != null ? this.uOf(s1, d) + 40 : SEOUL_U0 + 14 + DREAM_SEC * speedAt(s0) + 60; }
+  // 그 코스가 달릴 길 끝(u): 코스 길이 = seoulSpan(시작 빠르기 × 60초, 길 끝까지) + 문 자리
+  endU(c, d) { const tr = this.track, s0 = tr.bounds[d] ?? tr.nextB, s1 = tr.bounds[d + 1]; return s1 != null ? this.uOf(s1, d) + 40 : SEOUL_U0 + 14 + seoulSpan(c, speedAt(s0)) + 60; }
   // 불러올 것: 지금 코스 남은 길 · 다음 코스 앞부분이 지나는 칸 (코스마다 따로, 그 코스 길 둘레만)
   plan(runnerS) {
     const tr = this.track, d = tr.dreamAt(runnerS), u = this.uOf(runnerS, d), cNow = seoulCourseOf(tr, d), cNext = seoulCourseOf(tr, d + 1);

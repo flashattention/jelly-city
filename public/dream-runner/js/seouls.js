@@ -10,6 +10,10 @@ export const SEOUL_U0 = 40;
 export const seoulCourseOf = (track, dream) => track.order[dream % track.order.length];
 // 그 코스 길 폭 (레인 3개): 앞 700m 가 거의 찻길(8m 넘게)이면 9m, 골목 · 산책길이면 7m (건물 · 잔디로 들어가지 않게)
 export const seoulLaneW = (c) => { const w = ROUTES[c].w.slice(0, 36); return w.filter((q) => q >= 8).length >= w.length / 2 ? 9 : 7; };
+// 코스 하나를 달리는 시간 (2026-11-13: 20초 → 60초, 너무 자주 바뀐다는 건의). 다른 맵의 꿈 20초와 따로
+export const SEOUL_SEC = 60;
+// 그 코스 판정 길이(m): 빠르기 × 60초, 단 실제 길 끝(문 너머 보이는 길 100m 남김)을 넘지 않게
+export const seoulSpan = (c, v) => Math.max(300, Math.min(SEOUL_SEC * v, ROUTES[c].len - SEOUL_U0 - 14 - 100));
 export { ROUTES };
 
 const s = (name, emoji, course, o) => { const t = { name, emoji, course, seoul: true, fog: [40, 320], stars: 0, light: 1, fx: 'none', under: 'grass', underC: '#5a5a58', style: 'road', edge: '#ffd54f', ...o }; delete t.kits; delete t.P; return t; };

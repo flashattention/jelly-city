@@ -7,7 +7,7 @@ import { RNG } from '../../shared/js/utils.js';
 import { THEMES } from './themes.js';
 import { HELLS } from './hells.js';
 import { VOIDS } from './voids.js';
-import { SEOULS, seoulAt, SEOUL_U0, seoulCourseOf, seoulLaneW, ROUTES } from './seouls.js';
+import { SEOULS, seoulAt, SEOUL_U0, seoulCourseOf, seoulLaneW, seoulSpan, ROUTES } from './seouls.js';
 import { glow, starG } from './kits.js';
 import { buildMonster, buildFist } from './hellkits.js';
 import { G } from '../../shared/js/utils.js';
@@ -128,12 +128,13 @@ export class Track {
     this.dream = 0;                 // 지금 만들고 있는 꿈 번호
     this.bounds = [0];              // 꿈이 시작하는 거리들
     this.nextB = DREAM_SEC * speedAt(0) * (this.hell || this.void ? this.K : 1) + 20;
+    if (this.seoul) this.nextB = seoulSpan(this.order[0], speedAt(0)) + 20;
     // 출발 발판
     this.plat(-40, 70, 0, 10, 0);
     this.gs = 70;
     this.generate(0);
   }
-  themeOf(dream) { if (this.seoul) return seoulAt(this.order[dream % this.order.length], this.seoulFlip ?? Math.floor(dream / 5) % 2 === 1); return this.hell || this.void ? (this.void ? VOIDS : HELLS)[this.order[dream % this.order.length]] : THEMES[this.order[dream % THEMES.length]]; }
+  themeOf(dream) { if (this.seoul) return seoulAt(this.order[dream % this.order.length], this.seoulFlip ?? Math.floor(dream / 2) % 2 === 1); return this.hell || this.void ? (this.void ? VOIDS : HELLS)[this.order[dream % this.order.length]] : THEMES[this.order[dream % THEMES.length]]; }
   // 이 아래로 떨어지면 탈락 (지옥은 높이가 계속 바뀌니 눈앞 발판을 기준으로)
   deathY(s) {
     if (this.void) return -9; // 이공간: 한 번 떨어지면 금방 끝
@@ -262,7 +263,7 @@ export class Track {
     const s0 = this.gs + gap;
     this.dream++;
     this.bounds.push(s0 + 14); this.trend = 0;
-    this.nextB = s0 + 14 + DREAM_SEC * v;
+    this.nextB = s0 + 14 + (this.seoul ? seoulSpan(seoulCourseOf(this, this.dream), v) : DREAM_SEC * v);
     this.cx *= 0.5; if (this.void) this.cy = 0;
     const len = this.hell || this.void ? Math.max(34, v * 0.8) : 34; // 빠른 난이도의 지옥은 숨 돌릴 자리도 같은 시간만큼
     this.plat(s0, s0 + len, this.cx, 10, this.cy);
