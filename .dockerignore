@@ -1,6 +1,23 @@
 node_modules
 data
 .env
+**/.env
+**/.env.*
 .git
+.github
+.cache
 *.md
 server.py
+# 비밀 값 파일 (Fly secrets 로만 넣는다)
+**/*.pem
+**/*.key
+**/*.crt
+**/*.p12
+**/*.pfx
+# 시험 · 도구 · 문서 (운영 이미지에 필요 없음)
+**/*.test.mjs
+server/test-server.mjs
+public/**/_*.html
+docs
+tools
+toss
