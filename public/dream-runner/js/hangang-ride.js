@@ -464,6 +464,8 @@ export class LiveRide {
     // 높이: 운전실 자리(뒤 24m = 6번째)에서 앞뒤로 이어 가며, 겹친 고가 중 이어지는 쪽 · 4m 에 35cm 넘게 꺾이지 않게
     const i0 = Math.min(6, pts.length - 1), fill = (i, prev) => { const q = pts[i]; if (!q) return null; const y = L.trackY(q[0], q[2], q[3], prev == null || q[3] !== 2 ? null : prev + 0.3) - 0.3; q[1] = prev == null ? y : clamp(y, prev - 0.35, prev + 0.35); return q[1]; };
     if (pts[i0]) pts[i0][1] = R.y; let py = pts[i0] ? R.y : null; for (let i = i0 + 1; i < pts.length; i++) py = fill(i, py); py = pts[i0] ? R.y : null; for (let i = i0 - 1; i >= 0; i--) py = fill(i, py);
+    // 8-43-2: 내 선로 실제 자리(4m 마다, 높이 포함)를 남긴다 — hangang-transit.js drawTrains 가 가까운 같은 노선 열차를 이 선로 · 옆 선로에 얹는다
+    K.path = pts;
     // 철교 · 고가는 OSM 에서 선로마다 따로 그어진 폭 7m 바닥이라, 내 선로 한 줄만 (옆 선로는 옆 바닥 위에 따로 있다)
     const o3 = new THREE.Object3D(), A = new THREE.Vector3(), B = new THREE.Vector3(); let nb = 0, nr = 0, ns = 0;
     for (let i = 1; i < pts.length; i++) {

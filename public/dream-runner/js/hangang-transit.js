@@ -239,7 +239,7 @@ export class LiveTransit {
     // 8-42-3: 운전실에선 실제 열차 자료가 선로 한 줄(상 · 하행 같은 선)이라, 내 운전실 · 승강장과 겹쳤다(동작역)
     //   → 내 둘레 450m 안 같은 노선 열차는 내 운전실 축에 맞춘다: 같은 방향은 내 선로 위, 반대 방향은 승강장 반대쪽 옆 선로(4m)
     const R = hg.rideL?.on, C = R?.cab; let cv = null;
-    if (C && !R.under && R.x != null) { const pC = this.edgeAt(C.e, C.d), fx = pC.dx * C.dir, fz = pC.dz * C.dir, P = hg.rideL.plat; if (P?.g.visible) C.oppR = P.flip ? 1 : -1; cv = { line: R.o.line, x: R.x, z: R.z, fx, fz, lat0: (R.x - (pC.x - this.cx)) * -fz + (R.z - (pC.z - this.cz)) * fx, opp: (C.oppR ?? -1) * 4 }; }
+    if (C && !R.under && R.x != null) { const pC = this.edgeAt(C.e, C.d), fx = pC.dx * C.dir, fz = pC.dz * C.dir, P = hg.rideL.plat; if (P?.g.visible) C.oppR = P.flip ? 1 : -1; cv = { line: R.o.line, x: R.x, z: R.z, fx, fz, lat0: (R.x - (pC.x - this.cx)) * -fz + (R.z - (pC.z - this.cz)) * fx, opp: (C.oppR ?? -1) * 4, path: hg.rideL.cabRail?.g.visible ? hg.rideL.cabRail.path : null }; }
     for (const o of this.trains.values()) {
       // 타고 있는 열차는 바깥 껍데기를 그리지 않는다 (안에서 보면 껍데기가 창을 가린다)
       if (!o.show || o.id === this.rideId) continue; const L = this.sub.lines[o.line], [n, clen] = L.cars || [8, 20]; let im = this.lineMesh.get(o.line);
@@ -248,8 +248,15 @@ export class LiveTransit {
       for (let c = 0; c < n; c++) {
         let d = o.d - clen * (c + 0.5), e = o.e; if (d < 0 && prevE) { e = prevE; d += prevE.len; } if (d < 0) continue;
         const p = this.edgeAt(e, d); if (p.k === 1) continue; let x = p.x - this.cx, z = p.z - this.cz; if (im.body.count >= 120) break;
-        if (cv && o.line === cv.line && (x - cv.x) ** 2 + (z - cv.z) ** 2 < 450 * 450) { const same = p.dx * cv.fx + p.dz * cv.fz > 0, mfx = same ? p.dx : -p.dx, mfz = same ? p.dz : -p.dz, off = cv.lat0 + (same ? 0 : cv.opp); x -= mfz * off; z += mfx * off; }
-        pos.set(x, this.trackY(x, z, p.k), z); q.setFromAxisAngle(up, Math.atan2(p.dx, p.dz)); mat.compose(pos, q, one);
+        let y = null, yaw = Math.atan2(p.dx, p.dz);
+        if (cv && o.line === cv.line && (x - cv.x) ** 2 + (z - cv.z) ** 2 < 450 * 450) {
+          const same = p.dx * cv.fx + p.dz * cv.fz > 0, mfx = same ? p.dx : -p.dx, mfz = same ? p.dz : -p.dz, off = cv.lat0 + (same ? 0 : cv.opp); x -= mfz * off; z += mfx * off;
+          // 8-43-2: 실제 열차 자료 선과 OSM 선로가 역 둘레에서 몇 m 씩 어긋나 있어, 운전실 자리에서 잰 옆 거리로만 옮기면 앞쪽 칸이 내 선로 위에 겹쳤다
+          //   (동작역: 반대 방향 열차 앞 칸들이 내 선로 위로 줄지어 서 맨 앞 칸 끝만 보였다) → 내 앞 선로(운전실 레일 자리)에 얹고, 반대 방향은 그 옆 선로로
+          const S = cv.path; if (S) { let bd = 144, bi = -1, bt = 0; for (let i = 1; i < S.length; i++) { const a = S[i - 1], c = S[i]; if (!a || !c) continue; const ex = c[0] - a[0], ez = c[2] - a[2], l2 = ex * ex + ez * ez || 1, t = clamp(((x - a[0]) * ex + (z - a[2]) * ez) / l2, 0, 1), dd = (x - a[0] - ex * t) ** 2 + (z - a[2] - ez * t) ** 2; if (dd < bd) { bd = dd; bi = i; bt = t; } }
+            if (bi > 0) { const a = S[bi - 1], c = S[bi], l = Math.hypot(c[0] - a[0], c[2] - a[2]) || 1, sx = (c[0] - a[0]) / l, sz = (c[2] - a[2]) / l, side = same ? 0 : cv.opp; x = a[0] + (c[0] - a[0]) * bt - sz * side; z = a[2] + (c[2] - a[2]) * bt + sx * side; y = a[1] + (c[1] - a[1]) * bt + 0.3; yaw = Math.atan2(same ? sx : -sx, same ? sz : -sz); } }
+        }
+        pos.set(x, y ?? this.trackY(x, z, p.k), z); q.setFromAxisAngle(up, yaw); mat.compose(pos, q, one);
         im.body.setMatrixAt(im.body.count++, mat); im.win.setMatrixAt(im.win.count++, mat);
       }
       cnt.set(o.line, 1);
