@@ -74,7 +74,7 @@ function cellRoutes(k) {
       const pick = []; const rest = sts.sort((a, b) => meters(lat, lon, a.lat, a.lon) - meters(lat, lon, b.lat, b.lon));
       while (pick.length < 8 && rest.length) { let bi = 0, bd = -1; if (pick.length) rest.forEach((s, i) => { const d = Math.min(...pick.map((q) => meters(q.lat, q.lon, s.lat, s.lon))); if (d > bd) { bd = d; bi = i; } }); pick.push(rest.splice(bi, 1)[0]); }
       const cnt = new Map();
-      for (const s of pick) { if (!canCall('route')) break; try { for (const r of await busCall('route', 'stationinfo/getRouteByStation', `arsId=${s.ars}`)) { const ty = +r.busRouteType; if (!r.busRouteId || ty === 9) continue; const o = cnt.get(r.busRouteId) || [r.busRouteId, String(r.busRouteAbrv || r.busRouteNm || '').slice(0, 10), ty, 0]; o[3]++; cnt.set(r.busRouteId, o); } } catch { break; } }
+      for (const s of pick) { if (!canCall('route')) break; try { for (const r of await busCall('route', 'stationinfo/getRouteByStation', `arsId=${s.ars}`)) { const ty = +r.busRouteType; if (!r.busRouteId || ty === 9) continue; const o = cnt.get(r.busRouteId) || [String(r.busRouteId).replace(/\D/g, '').slice(0, 12), xs(r.busRouteAbrv || r.busRouteNm, 10), ty, 0]; o[3]++; cnt.set(r.busRouteId, o); } } catch { break; } }
       if (cnt.size) routes = [...cnt.values()].sort((a, b) => b[3] - a[3]).slice(0, 24);
       else if (!sts.length) routes = [];
     } catch { /* 아래에서 여의도 노선으로 */ }
@@ -93,7 +93,7 @@ async function fetchRoute(id) {
   info ||= ['?', 3];
   // 지난번 자리(5m 넘게 움직였을 때)를 함께 줘서, 처음 보는 화면도 버스 방향을 안다
   const prev = new Map((pos.get(id)?.list || []).map((b) => [b.id, b]));
-  const list = (await busCall('pos', 'buspos/getBusPosByRtid', `busRouteId=${id}`)).filter((b) => +b.gpsY > 30).map((b) => { const o = { id: String(b.vehId), rid: id, route: info[0], type: info[1], lon: +b.gpsX, lat: +b.gpsY, t: b.dataTm, stop: b.stopFlag === '1', plate: String(b.plainNo || '').slice(-4), low: b.busType === '1' }, p = prev.get(o.id); if (p) { if (meters(p.lat, p.lon, o.lat, o.lon) > 5) { o.plat = p.lat; o.plon = p.lon; } else if (p.plat) { o.plat = p.plat; o.plon = p.plon; } } return o; });
+  const list = (await busCall('pos', 'buspos/getBusPosByRtid', `busRouteId=${id}`)).filter((b) => +b.gpsY > 30).map((b) => { const o = { id: xs(b.vehId, 16), rid: id, route: xs(info[0], 10), type: +info[1] || 3, lon: +b.gpsX, lat: +b.gpsY, t: xs(b.dataTm, 20), stop: b.stopFlag === '1', plate: xs(b.plainNo, 20).slice(-4), low: b.busType === '1' }, p = prev.get(o.id); if (p) { if (meters(p.lat, p.lon, o.lat, o.lon) > 5) { o.plat = p.lat; o.plon = p.lon; } else if (p.plat) { o.plat = p.plat; o.plon = p.plon; } } return o; });
   pos.set(id, { at: Date.now(), list });
 }
 // 사람이 있는 칸의 노선마다 무게 (칸마다 많이 지나는 노선 12개)
@@ -150,10 +150,21 @@ async function linePos(line) {
   const hit = cache.get(`p:${line}`); if (hit && Date.now() - hit.at < 20000) return hit.v;
   if (!canCall('subway')) return hit?.v || [];
   if (lineWork.has(line)) return lineWork.get(line);
-  const p = cached(`p:${line}`, 20000, async () => (await call(`realtimePosition/0/200/${encodeURIComponent(line)}`)).realtimePositionList?.map((t) => ({ no: t.trainNo, at: t.statnNm, sttus: +t.trainSttus, up: t.updnLine === '0', to: t.statnTnm, express: t.directAt === '1', last: t.lstcarAt === '1', t: t.recptnDt })) || []).catch(() => hit?.v || []).finally(() => lineWork.delete(line));
+  const p = cached(`p:${line}`, 20000, async () => (await call(`realtimePosition/0/200/${encodeURIComponent(line)}`)).realtimePositionList?.map((t) => (seen(t.statnNm), seen(t.statnTnm), { no: xs(t.trainNo, 12), at: xs(t.statnNm, 20), sttus: +t.trainSttus || 0, up: t.updnLine === '0', to: xs(t.statnTnm, 20), express: t.directAt === '1', last: t.lstcarAt === '1', t: xs(t.recptnDt, 24) })) || []).catch(() => hit?.v || []).finally(() => lineWork.delete(line));
   lineWork.set(line, p); return p;
 }
 const clean = (s, n = 20) => String(s || '').replace(/[^\p{L}\p{N}\s()·-]/gu, '').trim().slice(0, n);
+// 바깥(서울시 · 버스) 응답의 글자: 화면 innerHTML 에 들어갈 수 있으니 꺾쇠 · 따옴표 · 제어 문자를 빼고 짧게 (보안 10-3, 이 API 들은 http 라 중간에서 바뀔 수도 있다)
+function xs(v, n = 40) { return (typeof v === 'string' || typeof v === 'number' ? String(v) : '').replace(/[<>&"'`\u0000-\u001f\u007f]/g, '').slice(0, n); }
+// 역 이름 허용 (보안 10-1): 노선 위치 응답에서 본 역 이름 + 처음 보는 이름은 한 시간 200번까지만 바깥에 묻는다 (아무 이름으로 하루 예산을 태우지 못하게)
+const stations = new Set(); let unknownHour = -1, unknownN = 0;
+function seen(n) { if (typeof n === 'string' && n && n.length <= 20) { stations.add(n.replace(/역$/, '')); if (stations.size > 3000) stations.clear(); } }
+function stationOk(sn) {
+  if (!/^[가-힣A-Za-z0-9·()]{1,12}$/.test(sn)) return false;
+  if (stations.has(sn)) return true;
+  const h = Math.floor(Date.now() / 3600e3); if (h !== unknownHour) { unknownHour = h; unknownN = 0; }
+  return ++unknownN <= 200;
+}
 
 export async function seoulApi(req, res, url, json) {
   if (!url.pathname.startsWith('/api/seoul/')) return false;
@@ -168,7 +179,7 @@ export async function seoulApi(req, res, url, json) {
       const v = await cached(`c:${area}`, 300000, async () => {
         const r = await fetch(`http://openapi.seoul.go.kr:8088/${CITY_KEY}/json/citydata/1/5/${encodeURIComponent(area)}`, { signal: AbortSignal.timeout(8000) }); const c = (await r.json()).CITYDATA; if (!c) throw new Error('도시 정보가 없어요');
         const p = (c.LIVE_PPLTN_STTS || [])[0] || {}, road = c.ROAD_TRAFFIC_STTS?.AVG_ROAD_DATA || {}, w = (c.WEATHER_STTS || [])[0] || {};
-        return { area, congest: p.AREA_CONGEST_LVL || '', pplMin: +p.AREA_PPLTN_MIN || 0, pplMax: +p.AREA_PPLTN_MAX || 0, at: p.PPLTN_TIME || '', road: road.ROAD_TRAFFIC_IDX || '', roadSpd: +road.ROAD_TRAFFIC_SPD || 0, temp: +w.TEMP || null, rain: w.PRECPT_TYPE && w.PRECPT_TYPE !== '없음' ? w.PRECPT_TYPE : '', sky: w.SKY_STTS || '' };
+        return { area, congest: xs(p.AREA_CONGEST_LVL, 12), pplMin: +p.AREA_PPLTN_MIN || 0, pplMax: +p.AREA_PPLTN_MAX || 0, at: xs(p.PPLTN_TIME, 20), road: xs(road.ROAD_TRAFFIC_IDX, 12), roadSpd: +road.ROAD_TRAFFIC_SPD || 0, temp: Number.isFinite(+w.TEMP) && w.TEMP !== '' ? +w.TEMP : null, rain: w.PRECPT_TYPE && w.PRECPT_TYPE !== '없음' ? xs(w.PRECPT_TYPE, 12) : '', sky: xs(w.SKY_STTS, 12) };
       });
       return json(res, 200, v), true;
     } catch (e) { return json(res, 502, { error: e.message }), true; }
@@ -184,11 +195,13 @@ export async function seoulApi(req, res, url, json) {
   if (url.pathname === '/api/seoul/bus/stops') {
     if (!BUS_KEY) return json(res, 503, { error: '버스 정보 준비 중이에요' }), true;
     const rid = String(url.searchParams.get('rid') || '').replace(/\D/g, '').slice(0, 12); if (!rid) return json(res, 400, { error: '노선이 필요해요' }), true;
+    // 서버가 아는 노선만 (칸 노선 목록 · 여의도 노선 · 이미 받은 정류소): 아무 번호로 하루 예산을 태우지 못하게 (보안 10-1)
+    if (!routeInfo.has(rid) && !st.stops[rid] && !BUS_ROUTES.some(([id]) => id === rid) && !Object.values(st.cells).some((c) => c.routes?.some((q) => q[0] === rid))) return json(res, 400, { error: '알 수 없는 노선이에요' }), true;
     const hit = st.stops[rid];
     if (hit && Date.now() - hit.at < 7 * 86400e3) return json(res, 200, { rid, stops: hit.list }), true;
     if (!canCall('route')) return json(res, 200, { rid, stops: hit?.list || [], stale: true }), true;
     try {
-      const list = (await busCall('route', 'busRouteInfo/getStaionByRoute', `busRouteId=${rid}`)).map((q) => ({ n: String(q.stationNm || '').slice(0, 30), lat: +q.gpsY, lon: +q.gpsX, seq: +q.seq, dir: String(q.direction || '').slice(0, 20), tr: q.transYn === 'Y' })).filter((q) => q.lat > 30).sort((a, b) => a.seq - b.seq);
+      const list = (await busCall('route', 'busRouteInfo/getStaionByRoute', `busRouteId=${rid}`)).map((q) => ({ n: xs(q.stationNm, 30), lat: +q.gpsY, lon: +q.gpsX, seq: +q.seq || 0, dir: xs(q.direction, 20), tr: q.transYn === 'Y' })).filter((q) => q.lat > 30).sort((a, b) => a.seq - b.seq);
       st.stops[rid] = { at: Date.now(), list }; dirty = true; const ks = Object.keys(st.stops); if (ks.length > 1500) for (const k of ks.sort((a, b) => st.stops[a].at - st.stops[b].at).slice(0, 300)) delete st.stops[k];
       return json(res, 200, { rid, stops: list }), true;
     } catch (e) { return json(res, 200, { rid, stops: hit?.list || [], stale: true }), true; }
@@ -209,9 +222,10 @@ export async function seoulApi(req, res, url, json) {
   if (!KEY) return json(res, 503, { error: '지하철 정보 준비 중이에요' }), true;
   try {
     if (url.pathname === '/api/seoul/subway/arrival') {
-      const sn = clean(url.searchParams.get('station'), 12); if (!sn) return json(res, 400, { error: '역 이름이 필요해요' }), true;
+      const sn = clean(url.searchParams.get('station'), 12).replace(/\s/g, ''); if (!sn) return json(res, 400, { error: '역 이름이 필요해요' }), true;
+      if (!/^[가-힣A-Za-z0-9·()\s]{1,14}$/.test(String(url.searchParams.get('station'))) || !stationOk(sn)) return json(res, 400, { error: '알 수 없는 역이에요' }), true;
       const hit = cache.get(`a:${sn}`); if (!canCall('subway') && !(hit && Date.now() - hit.at < 20000)) return json(res, 200, { station: sn, trains: hit?.v || [], t: Date.now(), stale: true }), true;
-      const v = await cached(`a:${sn}`, 20000, async () => (await call(`realtimeStationArrival/0/16/${encodeURIComponent(sn)}`)).realtimeArrivalList?.map((t) => ({ line: LINE_OF[t.subwayId] || t.subwayId, up: t.updnLine, to: t.trainLineNm, msg: t.arvlMsg2, at: t.arvlMsg3, sec: +t.barvlDt || 0, no: t.btrainNo, kind: t.btrainSttus, last: t.lstcarAt === '1' })) || []);
+      const v = await cached(`a:${sn}`, 20000, async () => (await call(`realtimeStationArrival/0/16/${encodeURIComponent(sn)}`)).realtimeArrivalList?.map((t) => ({ line: LINE_OF[t.subwayId] || xs(t.subwayId, 8), up: xs(t.updnLine, 8), to: xs(t.trainLineNm, 40), msg: xs(t.arvlMsg2, 40), at: xs(t.arvlMsg3, 20), sec: Math.max(0, Math.min(36000, +t.barvlDt || 0)), no: xs(t.btrainNo, 12), kind: xs(t.btrainSttus, 12), last: t.lstcarAt === '1' })) || []);
       return json(res, 200, { station: sn, trains: v, t: Date.now() }), true;
     }
     if (url.pathname === '/api/seoul/subway/position') {

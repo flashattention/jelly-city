@@ -1075,7 +1075,7 @@ async function hgStationRender() {
     const j = await account.api(`/api/seoul/subway/arrival?station=${encodeURIComponent(st0.name)}`); hg.arrivals = j.trains || []; hg.arrivalsAt = Date.now();
     // 기다리는 사이 역에서 멀어졌으면(hgSt 가 바뀜) 그리지 않는다 (예전엔 null.name 오류)
     if (hgSt !== st0) return;
-    const rows = (j.trains || []).slice(0, 6).map((t) => `<div class="row"><span class="ln" style="background:${LCOL[t.line] || '#888'}">${String(t.line).replace('호선', '')}</span><span>${String(t.to || '').replace(/[<>&]/g, '')}</span><b>${String(t.msg || '').replace(/[<>&]/g, '')}</b></div>`).join('') || '<div class="row">곧 들어오는 열차가 없어요</div>';
+    const rows = (j.trains || []).slice(0, 6).map((t) => `<div class="row"><span class="ln" style="background:${LCOL[t.line] || '#888'}">${String(t.line).replace('호선', '').replace(/[<>&"']/g, '')}</span><span>${String(t.to || '').replace(/[<>&]/g, '')}</span><b>${String(t.msg || '').replace(/[<>&]/g, '')}</b></div>`).join('') || '<div class="row">곧 들어오는 열차가 없어요</div>';
     el.innerHTML = `<h4>🚇 ${hgSt.name}역${hgSt.ref ? ` · ${hgSt.ref}번 출구` : ''}</h4>${rows}<div class="note">실시간 · 서울 열린데이터광장</div>`;
   } catch (e) { if (hgSt !== st0) return; el.innerHTML = `<h4>🚇 ${hgSt.name}역${hgSt.ref ? ` · ${hgSt.ref}번 출구` : ''}</h4><div class="row">${/준비/.test(e.message) ? '실시간 도착 정보를 준비하고 있어요' : '도착 정보를 불러오지 못했어요'}</div>`; }
 }

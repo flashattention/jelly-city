@@ -276,6 +276,24 @@ test('8-2 운영자 흉내 · 보이지 않는 글자 이름', async () => {
   const j = await waitFor(ws, (m) => m.t === 'joined'); assert.ok(j); assert.ok(!j.members.some((m) => m.name === '운영자')); ws.close();
 });
 
+test('10 바깥 API: 정상 · 허용 목록 밖 거절 · 키가 응답에 안 나옴 (흉내 자료)', async () => {
+  const h = IP(90), get = async (p) => { const r = await fetch(S.base + p, { headers: h }); return { code: r.status, j: await r.json().catch(() => ({})), t: '' }; };
+  const pos = await get('/api/seoul/subway/positions?lines=5호선,9호선');
+  assert.equal(pos.code, 200); assert.ok(Array.isArray(pos.j.lines['5호선']));
+  const st = pos.j.lines['5호선'][0]?.at || '여의나루';
+  assert.equal((await get(`/api/seoul/subway/arrival?station=${encodeURIComponent(st)}`)).code, 200);
+  for (const bad of ['../../x', '%2F..%2Fadmin', 'a/b?c=1', 'http://evil', '여의나루/../../realtimePosition']) assert.equal((await get(`/api/seoul/subway/arrival?station=${encodeURIComponent(bad)}`)).code, 400, bad);
+  assert.equal((await get('/api/seoul/subway/position?line=' + encodeURIComponent('1호선/../../x'))).code, 400);
+  assert.equal((await get('/api/seoul/city?area=' + encodeURIComponent('http://169.254.169.254/'))).code >= 400, true);
+  const near = await get('/api/seoul/bus/near?lat=37.527&lon=126.932&c=t1');
+  assert.equal(near.code, 200);
+  assert.equal((await get('/api/seoul/bus/near?lat=40&lon=126.9')).code, 400, '서울 밖 좌표');
+  assert.equal((await get('/api/seoul/bus/stops?rid=999999999999')).code, 400, '모르는 노선 번호로 예산을 태우지 못한다');
+  const known = near.j.buses?.[0]?.rid; if (known) assert.equal((await get(`/api/seoul/bus/stops?rid=${known}`)).code, 200);
+  const status = await (await fetch(S.base + '/api/seoul/transit/status', { headers: h })).text();
+  assert.doesNotMatch(status, /serviceKey|SEOUL_\w*KEY|"mock"\s*:\s*"/i);
+});
+
 test('7-1 순위표에 익명 id 가 나가지 않는다', async () => {
   const anon = hex(24), h = IP(56);
   await postJ('/api/merge/record', { b: 'cup', value: 3, name: '비밀곰', anon }, h);

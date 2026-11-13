@@ -92,7 +92,7 @@ export async function tossAccountApi(req, res, url, toss, json, { cos, devLogin 
     try {
       if (devLogin && typeof b.dev === 'string' && clean(b.dev)) key = `dev-${clean(b.dev).slice(0, 16)}`; // 개발 서버: 토스 없이 시험
       else if (!tossReady) return json(res, 503, { error: '토스 로그인을 준비하고 있어요' }), true;
-      else if (typeof b.authorizationCode === 'string') key = await exchange(b.authorizationCode, String(b.referrer || 'DEFAULT'));
+      else if (typeof b.authorizationCode === 'string' && b.authorizationCode.length <= 1024) key = await exchange(b.authorizationCode, /^[A-Z_]{1,20}$/.test(String(b.referrer || '')) ? String(b.referrer) : 'DEFAULT'); // 바깥 API 로 가는 값: 길이 · 꼴만
       else return json(res, 400, { error: '토스 로그인이 필요해요' }), true;
     } catch (e) { return json(res, 502, { error: e.message }), true; }
     const sub = toss.login(key, toss.read(tok)); // 기기 계정으로 달리던 중이면 그 계정에 토스를 잇는다
