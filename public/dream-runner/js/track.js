@@ -250,7 +250,7 @@ export class Track {
     this.boxes = this.boxes.filter((o) => { if (o.s < cut) { this.root.remove(o.mesh); return false; } return true; });
     this.traps = this.traps.filter((o) => { if (o.s < cut) { this.root.remove(o.mesh); return false; } return true; });
     this.decos = this.decos.filter((o) => { if (o.userData.s < cut - 20) { this.drop(o); return false; } return true; });
-    this.movers = this.movers.filter((o) => o.sEnd >= cut);
+    this.movers = this.movers.filter((o) => (o.type === 'on' ? o.ob.sEnd > -1e8 : o.sEnd >= cut));
     this.strikes = this.strikes.filter((o) => { if (o.s < cut) { this.root.remove(o.g); return false; } return true; });
     this.meteors = this.meteors.filter((o) => { if (o.s < cut) { this.root.remove(o.g); return false; } return true; });
   }
@@ -769,11 +769,11 @@ export class Track {
     const g = this.makeMover?.(kind, o.n ?? 0) || new THREE.Group();
     this.root.add(g); g.userData.s = o.sEnd ?? o.s ?? 0;
     // sEnd: 치우는 기준 (판정이 잠깐 꺼진 동안 s1 = -1e9 라서 그걸로 치우면 앞에 있는 차 · 행인이 화면 · 판정에서 사라졌다 · 6-10)
-    const ob = { kind: o.hitKind || 'mover', s0: -1e9, s1: -1e9, x0: 1e9, x1: 1e9, y0: o.y, y1: o.y + o.h, mesh: g, seoul: kind, sEnd: (o.sEnd ?? o.s ?? 0) + 2 };
+    const ob = { kind: o.hitKind || 'mover', s0: -1e9, s1: -1e9, x0: 1e9, x1: 1e9, y0: o.y, y1: o.y + o.h, mesh: g, seoul: kind, sEnd: o.type === 'on' ? Infinity : (o.sEnd ?? o.s ?? 0) + 2 };
     this.obs.push(ob);
     const mv = { kind, ob, g, ...o }; this.movers.push(mv); this.placeMover(mv, this.time || 0); return mv;
   }
-  placeMover(m, t) {
+  placeMover(m, t, playerS = -1e9) {
     const ob = m.ob, g = m.g;
     if (m.type === 'cross') {
       // 건너기: 길 한쪽 밖 → 반대쪽 밖, 그다음 쉬었다가 다시 (방향은 정해진 대로)
@@ -781,19 +781,29 @@ export class Track {
       if (tau > run) { ob.x0 = ob.x1 = 1e9; g.visible = false; return; }
       const xc = m.dir > 0 ? m.xL + m.v * tau : m.xR - m.v * tau;
       ob.x0 = xc - m.lx / 2; ob.x1 = xc + m.lx / 2; ob.s0 = m.s - m.ls / 2; ob.s1 = m.s + m.ls / 2; g.visible = true;
+      // 보이는 것만 (6-12): 길 밖 끝에서 뚝 생기고 사라지지 않게 처음 · 끝 0.35초는 커지며 나오고 작아지며 들어간다
+      g.scale.setScalar(Math.min(1, Math.min(tau, run - tau) / 0.35));
       g.position.set(xc, m.y, this.z(m.s)); g.rotation.y = m.dir > 0 ? Math.PI / 2 : -Math.PI / 2; g.userData.walk = tau;
     } else {
-      // 마주 오기: sFar(길 끝 너머 40m)에서 나타나 sNear 까지, 쉬었다가 다시. 오토바이는 좌우로 흔들며
+      // 마주 오기: sFar(길 끝 너머 70m)에서 나타나 sNear 까지, 쉬었다가 다시. 오토바이는 좌우로 흔들며
       const span = m.sFar - m.sNear, run = span / m.v, cyc = run + m.rest, tau = (((t + m.ph * cyc) % cyc) + cyc) % cyc;
-      if (tau > run) { ob.s0 = ob.s1 = -1e9; g.visible = false; return; }
+      // 곰이 이 구간을 지난 뒤(6-12): 그때 달리던 한 바퀴만 끝까지 (보이는 동안은 부딪힘도), 새로 나타나지 않는다. 다 달리면 치운다(ob.sEnd)
+      //   예전엔 곰이 구간 끝 + 40m 를 지나면 막 나타나 곰 앞에 있던 차까지 통째로 지웠고, 그 차는 판정 구간 밖이라 곰을 그냥 통과했다
+      const ci = Math.floor((t + m.ph * cyc) / cyc);
+      if (m.ciPass === undefined && playerS > m.sEnd + 2) m.ciPass = ci;
+      const last = m.ciPass !== undefined;
+      if (last && (ci > m.ciPass || (ci === m.ciPass && tau > run + 0.45))) { ob.s0 = ob.s1 = -1e9; g.visible = false; ob.sEnd = -1e9; return; }
+      // 보이는 것만 (6-12): 구간 앞(sNear)에서 뚝 사라지지 않게 0.45초 더 달리며 작아지고, 나타날 땐 0.45초 동안 커진다 (판정은 그대로 · 이 꼬리는 부딪히지 않음)
+      if (tau > run) { ob.s0 = ob.s1 = -1e9; const k = 1 - (tau - run) / 0.45; if (k <= 0) { g.visible = false; return; } g.visible = true; g.scale.setScalar(k); g.position.z = this.z(m.sNear - m.v * (tau - run)); g.userData.anim?.(g, t); return; }
+      g.scale.setScalar(Math.min(1, tau / 0.45));
       const sc = m.sFar - m.v * tau, xc = m.x + (m.weave ? Math.sin(t * 1.7 + m.ph * 6) * m.weave : 0);
-      // 부딪힘은 그 길 구간 안에서만 (나타나는 곳은 늘 40m 앞)
-      if (sc < m.sEnd + 2) { ob.s0 = sc - m.ls / 2; ob.s1 = sc + m.ls / 2; ob.x0 = xc - m.lx / 2; ob.x1 = xc + m.lx / 2; } else { ob.s0 = ob.s1 = -1e9; }
+      // 부딪힘은 그 길 구간 안에서만 (나타나는 곳은 늘 70m 앞)
+      if (sc < m.sEnd + 2 || last) { ob.s0 = sc - m.ls / 2; ob.s1 = sc + m.ls / 2; ob.x0 = xc - m.lx / 2; ob.x1 = xc + m.lx / 2; } else { ob.s0 = ob.s1 = -1e9; }
       g.visible = true; g.position.set(xc, m.y, this.z(sc)); g.rotation.y = m.weave ? Math.cos(t * 1.7 + m.ph * 6) * 0.25 : 0; g.userData.walk = tau;
     }
     g.userData.anim?.(g, t);
   }
-  updateMovers(t) { for (const m of this.movers) this.placeMover(m, t); }
+  updateMovers(t, playerS) { for (const m of this.movers) this.placeMover(m, t, playerS); }
   // 길 위 장식 (건널목 줄무늬 · 정지선 · 중앙선): 발판 윗면에 얇게
   deco(s0, s1, x, w, y, kind) {
     const g = new THREE.Group(), white = glow('#f4f4f2'), yel = glow('#ffcf33');
@@ -845,8 +855,8 @@ export class Track {
     const safeEnd = base + SEOUL_U0 + v * 3 + 12;
     if (s < safeEnd) { const p = flat(Math.max(12, safeEnd - s)); this.starLine(p.s0 + 4, p.s1 - 4, r.pick(L), 0, 5); this.gs = at; return; }
     const VEH = { car: [1.86, 4.8, 1.45], suv: [1.9, 4.7, 1.72], taxi: [1.86, 4.9, 1.6], bus: [2.5, 11, 3.25], moto: [0.75, 2.0, 1.4], bike: [0.6, 1.8, 1.2], ped: [0.6, 0.6, 1.25] };
-    const oncoming = (p, kind, lane, speed, ph, extra = {}) => { const [wx, ls, h] = VEH[kind]; return this.mover(kind, { type: 'on', x: lane, y: 0, h, lx: wx, ls, sNear: p.s0 - 12, sFar: p.s1 + 40, sEnd: p.s1, v: speed, rest: r.range(0.6, 2.2), ph, n: r.int(0, 1e6), ...extra }); };
-    const cross = (p, kind, sAt, dir, speed, ph, rest, half = W / 2 + 4) => { const [wx, ls, h] = VEH[kind]; return this.mover(kind, { type: 'cross', s: sAt, sEnd: sAt + 4, y: 0, h, lx: ls, ls: wx, xL: -half, xR: half, dir, v: speed, rest, ph, n: r.int(0, 1e6) }); };
+    const oncoming = (p, kind, lane, speed, ph, extra = {}) => { const [wx, ls, h] = VEH[kind]; return this.mover(kind, { type: 'on', x: lane, y: 0, h, lx: wx, ls, sNear: p.s0 - 12, sFar: p.s1 + 70, sEnd: p.s1, v: speed, rest: r.range(0.6, 2.2), ph, n: r.int(0, 1e6), ...extra }); };
+    const cross = (p, kind, sAt, dir, speed, ph, rest, half = W / 2 + 11) => { const [wx, ls, h] = VEH[kind]; return this.mover(kind, { type: 'cross', s: sAt, sEnd: sAt + 4, y: 0, h, lx: ls, ls: wx, xL: -half, xR: half, dir, v: speed, rest, ph, n: r.int(0, 1e6) }); };
     const carKind = () => r.pick(['car', 'car', 'suv', 'taxi']);
     if (xS - s < 46) {
       // 실제 교차로: 그 너머 12m 까지 한 구간
@@ -913,7 +923,7 @@ export class Track {
     }
     for (const st of this.stars) if (!st.got) { st.mesh.rotation.y = t * 2.5 + st.s; }
     for (const po of this.portals) po.mesh.userData.anim(po.mesh, t);
-    if (this.seoul) { this.updateMovers(t); this.xLim = seoulLaneW(seoulCourseOf(this, this.dreamAt(playerS))) / 2 - 0.2; }
+    if (this.seoul) { this.updateMovers(t, playerS); this.xLim = seoulLaneW(seoulCourseOf(this, this.dreamAt(playerS))) / 2 - 0.2; }
     for (const b of this.boxes) if (!b.got) { b.mesh.children[0].rotation.set(t * 1.3, t * 1.8, 0); b.mesh.position.y = b.y + Math.sin(t * 2.5 + b.s) * 0.15; }
     // 아주 멀리 달리면 숫자가 커져서 떨리지 않게 원점을 옮긴다
     if (playerS - this.origin > 1500) this.shift(1500);
