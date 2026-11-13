@@ -139,38 +139,41 @@ registerAttraction({
 // 2-3 낙산 성곽길 밤 산책: 흥인지문 → 낙산 정상 → 혜화문 쪽 한양도성 (돌 성벽 · 위 여장 · 길가 밤 등)
 //   성벽은 길 동쪽(바깥)에. 체험하면 밤이 되고 곰이 길을 따라 정상까지 걸어 올라간다
 // ============================================================
-const NAKSAN = [[37.5715, 127.0094], [37.5745, 127.0085], [37.5776, 127.0081], [37.5806, 127.0075], [37.5838, 127.0062], [37.5862, 127.0044], [37.5876, 127.0022]].map(([a, b]) => LL(a, b));
+// 아래쪽(흥인지문 → 이화동)은 지도 집들과 겹쳐 빼고, 낙산공원 안 구간(이화마을 위 → 정상 → 장수마을 쪽)만
+const NAKSAN = [[37.5776, 127.0081], [37.5792, 127.0079], [37.5806, 127.0075], [37.5822, 127.0069], [37.5838, 127.0062]].map(([a, b]) => LL(a, b));
 function buildNaksan(A) {
   const g = new THREE.Group(); A.root.add(g); const p = [], lamps = [], r = rndS(1396);
   for (let i = 1; i < NAKSAN.length; i++) { const [ax, az] = NAKSAN[i - 1], [bx, bz] = NAKSAN[i], L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L, nx = uz, nz = -ux, ry = Math.atan2(ux, uz);
-    for (let t = 0; t < L; t += 3) { const x = ax + ux * t + nx * 3, z = az + uz * t + nz * 3, y = A.H(x, z), c = ['#b9b2a3', '#a9a293', '#c4bdae', '#9f998c'][Math.floor(r() * 4)];
+    for (let t = 0; t < L; t += 3) { const x = ax + ux * t - nx * 3, z = az + uz * t - nz * 3, y = A.H(x, z), c = ['#b9b2a3', '#a9a293', '#c4bdae', '#9f998c'][Math.floor(r() * 4)];
       p.push(part(new THREE.BoxGeometry(2.2, 4.2, 3.05), c, x, y + 1.6, z, 0, ry, 0));
       for (let k = 0; k < 4; k++) p.push(part(new THREE.BoxGeometry(2.2, 0.02, 3.06), '#8a8478', x, y + 0.5 + k * 0.9, z, 0, ry, 0));
-      if (Math.floor(t / 3) % 2 === 0) p.push(part(new THREE.BoxGeometry(0.7, 0.9, 2.4), '#cfc9bc', x + nx * 0.75, y + 4.15, z + nz * 0.75, 0, ry, 0)); else p.push(part(new THREE.BoxGeometry(0.7, 0.6, 2.4), '#cfc9bc', x + nx * 0.75, y + 4.0, z + nz * 0.75, 0, ry, 0));
-      if (Math.floor(t / 3) % 8 === 0) lamps.push([ax + ux * t - nx * 2.2, az + uz * t - nz * 2.2]); }
-    for (let t = 0; t < L; t += 2) { const x = ax + ux * t - nx * 0.4, z = az + uz * t - nz * 0.4; p.push(part(new THREE.BoxGeometry(3, 0.08, 2.05), '#b8ab94', x, A.H(x, z) + 0.06, z, 0, ry, 0)); }
+      if (Math.floor(t / 3) % 2 === 0) p.push(part(new THREE.BoxGeometry(0.7, 0.9, 2.4), '#cfc9bc', x - nx * 0.75, y + 4.15, z - nz * 0.75, 0, ry, 0)); else p.push(part(new THREE.BoxGeometry(0.7, 0.6, 2.4), '#cfc9bc', x - nx * 0.75, y + 4.0, z - nz * 0.75, 0, ry, 0));
+      if (Math.floor(t / 3) % 8 === 0) lamps.push([ax + ux * t + nx * 2.4, az + uz * t + nz * 2.4]); }
+    for (let t = 0; t < L; t += 2) { const x = ax + ux * t + nx * 0.2, z = az + uz * t + nz * 0.2; p.push(part(new THREE.BoxGeometry(3, 0.08, 2.05), '#b8ab94', x, A.H(x, z) + 0.06, z, 0, ry, 0)); }
   }
   g.add(new THREE.Mesh(merge(p), vcMat()));
   const lm = new THREE.MeshLambertMaterial({ color: '#fff0c8', emissive: '#ffcf80', emissiveIntensity: 0 }), lp = [], glows = [];
   for (const [x, z] of lamps) { const y = A.H(x, z); lp.push(part(new THREE.CylinderGeometry(0.06, 0.08, 3.2, 6), '#3a3d42', x, y + 1.6, z)); const b = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), lm); b.position.set(x, y + 3.3, z); g.add(b); glows.push(b); }
   g.add(new THREE.Mesh(merge(lp), vcMat())); lit(A, (L) => { lm.emissiveIntensity = 0.1 + L * 1.4; });
   // 길을 따라가는 점들 (걷기용)
-  const path = []; for (let i = 1; i < NAKSAN.length; i++) { const [ax, az] = NAKSAN[i - 1], [bx, bz] = NAKSAN[i], L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L; for (let t = 0; t < L; t += 2) path.push([ax + ux * t - uz * 0.4, az + uz * t + ux * 0.4]); }
+  const path = []; for (let i = 1; i < NAKSAN.length; i++) { const [ax, az] = NAKSAN[i - 1], [bx, bz] = NAKSAN[i], L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L; for (let t = 0; t < L; t += 2) path.push([ax + ux * t + uz * 0.6, az + uz * t - ux * 0.6]); }
   A.naksanPath = path;
   return { group: g, dispose() { g.traverse((q) => q.geometry?.dispose?.()); } };
 }
 registerAttraction({
-  id: 'naksan', name: '낙산 성곽길', seal: '낙산', icon: '🏯', x: NAKSAN[1][0] - 6, z: NAKSAN[1][1], pts: NAKSAN.slice(0, 4).map(([x, z]) => [x - 6, z]), r: 26, buildR: 1400, verb: '밤 산책',
-  go: [NAKSAN[1][0] - 8, NAKSAN[1][1] + 6, 0], intro: '흥인지문에서 낙산 정상까지 한양도성 성곽을 따라 걷는 밤길 · 아래로 도시 불빛',
+  id: 'naksan', name: '낙산 성곽길', seal: '낙산', icon: '🏯', x: NAKSAN[0][0] - 6, z: NAKSAN[0][1], pts: NAKSAN.slice(0, 3).map(([x, z]) => [x - 6, z]), r: 26, buildR: 1400, verb: '밤 산책',
+  go: [NAKSAN[0][0] - 8, NAKSAN[0][1] + 6, 0], intro: '이화마을 위에서 낙산 정상 너머까지 한양도성 성곽을 따라 걷는 밤길 · 아래로 도시 불빛',
   build: buildNaksan,
   start(A) {
     const hg = A.hg, P = A.naksanPath; if (!P) return null; const h0 = hg.state.hour; if (h0 > 5 && h0 < 19.5) hg.state.hour = 20.3;
-    let i0 = 0, bd = Infinity; P.forEach(([x, z], i) => { const d = Math.hypot(x - hg.px, z - hg.pz); if (d < bd) { bd = d; i0 = i; } }); const iEnd = Math.min(P.length - 1, Math.round(P.length * 0.62)); if (i0 > iEnd - 40) i0 = 0;
+    let i0 = 0, bd = Infinity; P.forEach(([x, z], i) => { const d = Math.hypot(x - hg.px, z - hg.pz); if (d < bd) { bd = d; i0 = i; } }); const iEnd = P.length - 1; if (i0 > iEnd - 60) i0 = 0;
     let u = i0, yawSet = false;
     const E = { title: '낙산 성곽길 밤 산책', lock: true,
-      status() { return u >= iEnd ? '🌃 낙산 정상 · 서울 밤 풍경' : `성곽을 따라 걷는 중 · 정상까지 ${Math.round((iEnd - u) * 2)}m · 마우스로 둘러보기`; },
-      tick(dt) { u = Math.min(iEnd, u + dt * 4.5); const k = Math.floor(u), f = u - k, a = P[k], b = P[Math.min(P.length - 1, k + 1)], x = a[0] + (b[0] - a[0]) * f, z = a[1] + (b[1] - a[1]) * f; hg.px = x; hg.pz = z; hg.y = 0; hg.v = 2.2; hg.face = Math.atan2(b[0] - a[0], b[1] - a[1]);
+      status() { return u >= iEnd ? '🌃 성곽 끝 · 서울 밤 풍경' : `성곽을 따라 걷는 중 · 남은 길 ${Math.round((iEnd - u) * 2)}m · 마우스로 둘러보기`; },
+      tick(dt) { u = Math.min(iEnd, u + dt * 5.5); const k = Math.floor(u), f = u - k, a = P[k], b = P[Math.min(P.length - 1, k + 1)], x = a[0] + (b[0] - a[0]) * f, z = a[1] + (b[1] - a[1]) * f; hg.px = x; hg.pz = z; hg.y = 0; hg.v = 2.2; hg.face = Math.atan2(b[0] - a[0], b[1] - a[1]);
         if (!yawSet) { hg.camYaw = hg.face + 0.5; hg.camPitch = 0.2; yawSet = true; } if (u >= iEnd) { this.top ||= this.t; hg.v = 0; if (this.t - this.top > 8) A.finish(E); } },
+      // 카메라: 곰 뒤 · 성벽 반대(서쪽, 도시 쪽) 위에서 성벽과 길을 함께
+      cam(camera, dt) { const fx = Math.sin(hg.face), fz = Math.cos(hg.face), y = A.H(hg.px, hg.pz), want = new THREE.Vector3(hg.px - fx * 8 + fz * 3.5, y + 4.8, hg.pz - fz * 8 - fx * 3.5); (this.cp ||= want.clone()).lerp(want, 1 - Math.exp(-dt * 3)); camera.position.copy(this.cp); camera.lookAt(hg.px + fx * 8 - fz * 1.5, y + 1.6, hg.pz + fz * 8 + fx * 1.5); },
       end() {}, where() { return '낙산 성곽길'; } };
     return E;
   },
@@ -185,7 +188,8 @@ function buildNodeul(A) {
   for (let k = 0; k < 6; k++) p.push(part(new THREE.BoxGeometry(30 - k * 2, 0.45, 1.8), k % 2 ? '#7aa858' : '#86b462', x, y + 0.22 + k * 0.45, z - 6 - k * 1.8));
   p.push(part(new THREE.CylinderGeometry(4, 4, 0.5, 24), '#cfc8bb', x, y + 0.25, z + 6), part(new THREE.BoxGeometry(0.12, 3.2, 0.12), '#3a3d42', x - 3, y + 1.6, z + 7.5), part(new THREE.BoxGeometry(0.12, 3.2, 0.12), '#3a3d42', x + 3, y + 1.6, z + 7.5), part(new THREE.BoxGeometry(6.4, 0.2, 0.2), '#3a3d42', x, y + 3.2, z + 7.5));
   jelly('#ffb0c8', 1.1).forEach((q) => { q.translate(x, y + 0.5, z + 6); p.push(q); }); p.push(part(new THREE.BoxGeometry(0.5, 0.15, 0.12), '#c98a3a', x + 0.3, y + 1.45, z + 6.3, 0, 0, 0.6), part(new THREE.CylinderGeometry(0.03, 0.03, 1.5, 6), '#2a2a2a', x - 0.8, y + 1.25, z + 6.6));
-  const r = rndS(31); for (let i = 0; i < 14; i++) jelly(['#9ad0ff', '#ffd76a', '#a8e0a0', '#e8c8ff', '#ff9ec0'][i % 5], 0.8).forEach((q) => { q.rotateY(Math.PI); const k = i % 6; q.translate(x - 12 + r() * 24, y + 0.45 + k * 0.45, z - 6 - k * 1.8); p.push(q); });
+  const r = rndS(31); for (let i = 0; i < 14; i++) jelly(['#9ad0ff', '#ffd76a', '#a8e0a0', '#e8c8ff', '#ff9ec0'][i % 5], 0.8).forEach((q) => { const k = i % 6; // 무대(+z)를 본다
+ q.translate(x - 12 + r() * 24, y + 0.45 + k * 0.45, z - 6 - k * 1.8); p.push(q); });
   g.add(new THREE.Mesh(merge(p), vcMat()));
   const notes = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(30 * 3), 3)), new THREE.PointsMaterial({ color: '#fff4c0', size: 0.6, map: dotTex(), transparent: true, opacity: 0.85, depthWrite: false })); notes.frustumCulled = false; g.add(notes);
   const lightM = new THREE.MeshLambertMaterial({ color: '#fff2d0', emissive: '#ffd890', emissiveIntensity: 0 }); for (const sx of [-3, 3]) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), lightM); b.position.set(x + sx, y + 3.0, z + 7.4); g.add(b); } lit(A, (L) => { lightM.emissiveIntensity = 0.2 + L * 1.5; });
@@ -228,7 +232,7 @@ function buildHuwon(A) {
   for (const [cx, cz, w, d] of [[x, z - PD / 2, PW + 2, 1], [x, z + PD / 2, PW + 2, 1], [x - PW / 2, z, 1, PD], [x + PW / 2, z, 1, PD]]) p.push(part(new THREE.BoxGeometry(w, 1.6, d), '#a9a293', cx, wy + 0.6, cz));
   p.push(part(new THREE.CylinderGeometry(3.2, 3.4, 1.6, 24), '#9f998c', x + 2, wy + 0.5, z - 2), part(new THREE.CylinderGeometry(3.0, 3.0, 0.2, 24), '#6a8a4a', x + 2, wy + 1.35, z - 2));
   p.push(part(new THREE.CylinderGeometry(0.18, 0.26, 3.4, 7), '#6a4a32', x + 2.2, wy + 3.0, z - 2.1, 0, 0, 0.25), part(new THREE.SphereGeometry(2.2, 10, 6), '#3f6a3a', x + 1.4, wy + 4.8, z - 2, 0, 0, 0, 1.3, 0.45, 1.1), part(new THREE.SphereGeometry(1.6, 10, 6), '#4a7a40', x + 3.2, wy + 4.2, z - 1.6, 0, 0, 0, 1.2, 0.4, 1));
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(PW - 1, PD - 1), new THREE.MeshPhongMaterial({ color: '#5f6e3a', specular: '#ffffff', shininess: 80, transparent: true, opacity: 0.92 })); water.rotation.x = -Math.PI / 2; water.position.set(x, wy + 0.05, z); g.add(water);
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(PW - 1, PD - 1), new THREE.MeshPhongMaterial({ color: '#4e5a2e', specular: '#55604a', shininess: 30 })); water.rotation.x = -Math.PI / 2; water.position.set(x, wy + 0.05, z); g.add(water);
   for (let i = 0; i < 9; i++) p.push(part(new THREE.CylinderGeometry(0.35, 0.35, 0.02, 10), '#5a8a3a', x - 8 + (i % 3) * 1.1, wy + 0.08, z + 6 + Math.floor(i / 3) * 0.9)); // 연잎
   // 부용정: 남쪽 가장자리, 두 돌기둥을 물에 담근 십자 정자 (북쪽 연못을 본다)
   const bx = x - 7, bz = z + PD / 2 + 2.5; hanok(p, bx, y, bz, 6, 5, 2.8, Math.PI, { base: 0.5 }); for (const sx of [-1.4, 1.4]) p.push(part(new THREE.BoxGeometry(0.5, 2.4, 0.5), '#b9b2a3', bx + sx, wy + 1.0, bz - 3.6)); p.push(part(new THREE.BoxGeometry(4.2, 0.35, 2.6), '#8a2a22', bx, y + 0.6, bz - 3.4), part(new THREE.BoxGeometry(4.4, 0.6, 0.1), '#8a2a22', bx, y + 1.1, bz - 4.7));
