@@ -1314,7 +1314,8 @@ export class Hangang {
     // 물 위 다리 높이: 한강처럼 물 위 구간이 긴(150m 넘는) 다리만 14m, 호수 · 개천을 잠깐 건너는 다리는 5.2m (석촌호수 송파대로 다리가 14m 산처럼 솟아 차가 넘어 다녔다)
     const wetLen = (w) => { let n = 0; for (let i = 1; i < w.pts.length; i++) { const a = w.pts[i - 1], c = w.pts[i], L = Math.hypot(c[0] - a[0], c[1] - a[1]), k = Math.max(1, Math.ceil(L / 10)); for (let j = 0; j < k; j++) if (inWater(a[0] + (c[0] - a[0]) * (j + 0.5) / k, a[1] + (c[1] - a[1]) * (j + 0.5) / k)) n += L / k; } return n; };
     // 8-42-1: 양 끝 점만 땅에 있는 긴 다리(동작대교 · 동호대교 철도처럼 OSM 점이 둑에만 있는 것)도 물 위로 본다 — 점만 보면 물에 안 닿아 철교가 7.5m 로 찻길 다리(14m) 아래에 깔렸다
-    for (const w of ways) { const wl = wetLen(w); if (wl > 0) w.wet = true; w.big = w.wet && wl > 150; }
+    // 8-43-1: 점 사이 물 재기는 '큰 다리(150m 넘게 물 위)' 판정에만 쓴다 — 짧은 다리까지 물 위로 잡으면 동호대교 남쪽 램프(폭 6m)처럼 7.5m 이던 다리가 5.2m 로 낮아졌다
+    for (const w of ways) { const wl = wetLen(w); w.big = wl > 150; if (w.big) w.wet = true; }
     const linkedBig = (self) => ways.some((w) => w !== self && w.big && (w.pts.some((q) => Math.hypot(q[0] - self.pts[0][0], q[1] - self.pts[0][1]) < 2.5 || Math.hypot(q[0] - self.pts[self.pts.length - 1][0], q[1] - self.pts[self.pts.length - 1][1]) < 2.5)));
     for (const w of ways) { w.free0 = !nearAny(w.pts[0], w); w.free1 = !nearAny(w.pts[w.pts.length - 1], w); w.top = w.big || linkedBig(w) ? 14 : w.wet || linkedWet(w) ? 5.2 : 7.5; }
     // 8-41-1: 복선 철교는 OSM 에서 선로마다 따로 그어져, 한쪽만 14m · 옆 선로는 7.5m 로 위아래 두 층이 됐다(당산철교) → 나란히(12m 안) 가는 철도 고가가 14m 면 같이 14m
