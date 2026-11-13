@@ -347,6 +347,21 @@ function pineTex() {
   }
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
 }
+// 종량제 봉투 그물 (높이 약 0.55m): 주름진 자루 + 묶은 목 · 귀, 정점색으로 인쇄 띠
+function bagGeo() {
+  const body = new THREE.SphereGeometry(0.3, 12, 8), p = body.attributes.position;
+  for (let k = 0; k < p.count; k++) { let x = p.getX(k), y = p.getY(k), z = p.getZ(k); const a = Math.atan2(z, x);
+    let w = 1 + Math.sin(a * 5 + y * 9) * 0.05 + Math.sin(a * 3 - y * 5) * 0.04; if (y > 0.1) w *= 1 - (y - 0.1) * 2.6; if (y < -0.16) { w *= 1.08; y = -0.16 + (y + 0.16) * 0.25; }
+    p.setXYZ(k, x * w, y * 0.92 + 0.17, z * w); }
+  body.computeVertexNormals();
+  const neck = new THREE.CylinderGeometry(0.02, 0.05, 0.09, 6, 1, true); neck.translate(0, 0.47, 0);
+  const ear = (s) => { const e = new THREE.ConeGeometry(0.045, 0.13, 4); e.rotateZ(s * 0.9); e.scale(1, 1, 0.35); e.translate(s * 0.06, 0.54, 0); return e; };
+  const parts = [body, neck, ear(1), ear(-1)], col = [];
+  const g = mergeGeos(parts), P = g.attributes.position;
+  for (let k = 0; k < P.count; k++) { const y = P.getY(k), a = Math.atan2(P.getZ(k), P.getX(k)); const band = y > 0.2 && y < 0.3 && Math.sin(a * 7) > -0.2; const v = 0.9 + (y - 0.17) * 0.18;
+    if (band) col.push(0.45, 0.72, 0.5); else if (y > 0.43) col.push(0.86, 0.86, 0.84); else col.push(v, v, v * 0.98); }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); return g;
+}
 function petalTex() { const cv = document.createElement('canvas'); cv.width = cv.height = 32; const g = cv.getContext('2d'); g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(16, 16, 12, 7, 0.6, 0, 7); g.fill(); return new THREE.CanvasTexture(cv); }
 // 나비 날개 그림: 위 · 아래 날개 + 무늬 (종류 4가지: 노랑나비 · 흰나비 · 호랑나비 · 푸른부전나비)
 function butterflyTex(kind) {
@@ -462,7 +477,7 @@ export class Hangang {
     const T = this.world0.tile, ti = Math.floor(px / T), tj = Math.floor(pz / T); this.tileNow = [ti, tj];
     if (this.farU) { const U = this.farU; U.uC.value.set(ti, tj); for (let b = -2; b <= 2; b++) for (let a = -2; a <= 2; a++) U.uL.value[(b + 2) * 5 + a + 2] = this.chunks.has(`${ti + a}_${tj + b}`) ? 1 : 0; }
     // 먼 나무 칸은 그리지 않는다 (1.1km 넘게, 날 때는 높이만큼 더 멀리까지). 0.4초마다
-    if ((this.treeLodN = (this.treeLodN || 0) + 1) % 12 === 1) { const R = 1100 + Math.min(900, (this.y || 0) * 3); for (const c of this.chunks.values()) c.scene.traverse((o) => { const L = o.userData.lod; if (L) o.count = Math.hypot(L[0] - px, L[1] - pz) < (L[3] ? L[3] + Math.min(900, (this.y || 0) * 3) : R + 360) ? L[2] : 0; const V = o.userData.lodV; if (V) o.visible = Math.hypot(V[0] - px, V[1] - pz) < V[2] + Math.min(600, (this.y || 0) * 2); }); }
+    if ((this.treeLodN = (this.treeLodN || 0) + 1) % 12 === 1) { const R = 1100 + Math.min(900, (this.y || 0) * 3); for (const c of this.chunks.values()) c.scene.traverse((o) => { const L = o.userData.lod; if (L) { o.count = Math.hypot(L[0] - px, L[1] - pz) < (L[3] ? L[3] + Math.min(900, (this.y || 0) * 3) : R + 360) ? L[2] : 0; o.visible = o.count > 0 && !o.userData.seasonOff; } const V = o.userData.lodV; if (V) o.visible = Math.hypot(V[0] - px, V[1] - pz) < V[2] + Math.min(600, (this.y || 0) * 2); }); }
     // 칸을 쉬어 가며 만드는 중에는 내리지 않는다 (같이 쓰는 목록을 내리기가 새로 만들어 버리면 만드는 칸이 옛 목록에 쓴다)
     if (this.chunkLoading) return;
     // 내리기도 한 프레임에 칸 하나만 (셋을 한꺼번에 내리면 목록 다시 만들기로 50ms 넘게 멈췄다)
@@ -1207,9 +1222,16 @@ export class Hangang {
       for (const sc of scoot) { const k = `${Math.floor(sc[0] / CS)},${Math.floor(sc[1] / CS)}`; if (!cells.has(k)) cells.set(k, []); cells.get(k).push(sc); }
       for (const [gk, L] of cells) { const n = L.length, g = parkedScooterGeo().clone(); g.setAttribute('iSt', new THREE.InstancedBufferAttribute(new Float32Array(n * 4), 4)); g.setAttribute('iCell', new THREE.InstancedBufferAttribute(new Float32Array(n * 2), 2));
         const sim = mk(g, scM, L, ([x, z, ry]) => { o.position.set(x, 0, z); o.rotation.set(0, ry, 0); }); L.forEach((sc, i) => sim.setColorAt(i, c.set(['#f4f5f6', '#1a1b1f', '#c8161d', '#8f969c', '#f4f5f6'][sc[3]]))); sim.userData.alleyProp = 1;
-        if (this.isChunk) { const [gx, gz] = gk.split(',').map(Number); sim.userData.lod = [(gx + 0.5) * CS, (gz + 0.5) * CS, n, 300]; sim.userData.noMerge = true; } } }
+        if (this.isChunk) { const [gx, gz] = gk.split(',').map(Number); sim.userData.lodV = [(gx + 0.5) * CS, (gz + 0.5) * CS, 300]; sim.userData.noMerge = true; } } }
     for (const [x, z] of scoot) this.addCircle(x, z, 0.45, 1);
-    const bg = new THREE.IcosahedronGeometry(0.32, 0); bg.scale(1, 0.85, 1); bg.translate(0, 0.27, 0); const bim = mk(bg, new THREE.MeshLambertMaterial({ color: '#ffffff' }), bags.flatMap(([x, z]) => [[x, z], [x + 0.4, z + 0.2], [x - 0.1, z + 0.45]]), ([x, z]) => { o.position.set(x, 0, z); o.rotation.set(0, 0, 0); o.scale.setScalar(0.8 + Math.random() * 0.4); }); if (bim) { bim.userData.alleyProp = 1; const c = new THREE.Color(); for (let i = 0; i < bim.count; i++) bim.setColorAt(i, c.set(i % 3 === 1 ? '#1d1d1f' : '#f2f0ea')); } o.scale.set(1, 1, 1);
+    // 쓰레기봉투: 서울 종량제 봉투처럼 묶은 비닐 자루 (아래가 눌려 퍼지고 위는 오므라져 묶인 매듭 · 귀 둘, 흰 봉투에 초록 · 파랑 인쇄 띠). 전봇대 밑에 두세 개씩
+    //   예전엔 흰 · 검은 정이십면체라 길 위의 흑백 바위처럼 보였다. 250m 칸마다 묶어 300m 안에서만 그린다
+    if (bags.length) { const bagG = bagGeo(), bagM = new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true }), c = new THREE.Color(), cells = new Map(), CS = this.isChunk ? 250 : 1e9, br = rnd(1212 + bags.length);
+      for (const [x, z] of bags) for (const [dx, dz, sc] of [[0, 0, 1], [0.42, 0.18, 0.85], [-0.12, 0.46, 0.92]]) { if (sc < 0.9 && br() < 0.3) continue; const k = `${Math.floor(x / CS)},${Math.floor(z / CS)}`; if (!cells.has(k)) cells.set(k, []); cells.get(k).push([x + dx, z + dz, sc * (0.85 + br() * 0.3), br() * 6.28, br()]); }
+      for (const [gk, L] of cells) { const bim = mk(bagG, bagM, L, ([x, z, sc, ry]) => { o.position.set(x, 0, z); o.rotation.set(0, ry, 0); o.scale.setScalar(sc); }); bim.userData.alleyProp = 1;
+        L.forEach((b, i) => bim.setColorAt(i, c.set(b[4] < 0.72 ? '#ffffff' : b[4] < 0.86 ? '#e4eef6' : b[4] < 0.95 ? '#f3ead2' : '#cfe6c8')));
+        if (this.isChunk) { const [gx, gz] = gk.split(',').map(Number); bim.userData.lodV = [(gx + 0.5) * CS, (gz + 0.5) * CS, 300]; bim.userData.noMerge = true; } }
+      o.scale.set(1, 1, 1); }
   }
   // 거리 지역 간판: 길을 바라보는 낮은 상가 벽마다 1층 간판 띠 + 2 · 3층 가로 간판 (그 동네 실제 가게 이름, 스타일 여러 가지)
   // 진짜 가게 간판 (소상공인 상가정보): 가게가 실제로 있는 건물의 길 쪽 벽에, 실제 층에. 1층은 가로 간판 + 들어갈 수 있는 문, 2층 위는 창문 글씨 간판
@@ -1763,10 +1785,10 @@ float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y
     // 줄기: 살짝 휘고 아래가 넓게 퍼진 몸통 + 위로 갈라지는 가지
     const trunkGeo = (h, r0, bend, branches, red = false) => {
       const parts = [];
-      const body = new THREE.CylinderGeometry(r0 * 0.55, r0, h, 9, 10); body.translate(0, h / 2, 0);
+      const body = new THREE.CylinderGeometry(r0 * 0.55, r0, h, 8, 5, true); body.translate(0, h / 2, 0);
       const p = body.attributes.position; for (let k = 0; k < p.count; k++) { const y = p.getY(k), t = y / h, flare = 1 + Math.max(0, 0.18 - t) * 3.2; p.setX(k, p.getX(k) * flare + Math.sin(t * 2.4) * bend); p.setZ(k, p.getZ(k) * flare + Math.sin(t * 1.7 + 1) * bend * 0.5); }
       body.computeVertexNormals(); parts.push(body);
-      for (const [ang, tilt, len, at] of branches) { const b = new THREE.CylinderGeometry(r0 * 0.18, r0 * 0.38, len, 6, 3); b.translate(0, len / 2, 0); b.rotateZ(tilt); b.rotateY(ang); b.translate(Math.sin(at * 2.4) * bend, h * at, Math.sin(at * 1.7 + 1) * bend * 0.5); parts.push(b); }
+      for (const [ang, tilt, len, at] of branches) { const b = new THREE.CylinderGeometry(r0 * 0.18, r0 * 0.38, len, 6, 2, true); b.translate(0, len / 2, 0); b.rotateZ(tilt); b.rotateY(ang); b.translate(Math.sin(at * 2.4) * bend, h * at, Math.sin(at * 1.7 + 1) * bend * 0.5); parts.push(b); }
       const m = mergeGeos(parts), pp = m.attributes.position, cl = []; for (let k = 0; k < pp.count; k++) { const t = Math.min(1, pp.getY(k) / h), v = 0.7 + t * 0.35; if (red) cl.push(0.78 + t * 0.5, 0.62 + t * 0.2, 0.56 + t * 0.08); else cl.push(v, v * 0.92, v * 0.86); } m.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3)); return m;
     };
     const SHAPES = [
@@ -2249,9 +2271,9 @@ float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y
       // 숲 나무: 봄엔 연두 새잎(벚꽃은 드물게), 여름 짙은 초록, 가을엔 단풍 · 갈잎 · 아직 푸른 잎이 섞인다
       const P2 = set.forest ? fpal : pal;
       idx.forEach((si, q) => { if (pine) c.set(['#4f7f47', '#58854c', '#47753f'][si % 3]).offsetHSL(0, 0, s === 'winter' ? 0.04 : 0); else { c.set(P2[Math.floor(r() * P2.length)]); if (s === 'spring' && si % 6 === 5) c.set(set.forest ? '#ffd0e0' : '#b9de8c'); } c.offsetHSL(0, 0, (r() - 0.5) * 0.06); crowns.setColorAt(q, c); });
-      crowns.instanceColor.needsUpdate = true; crowns.visible = pine || s !== 'winter';
+      crowns.instanceColor.needsUpdate = true; crowns.userData.seasonOff = !(pine || s !== 'winter'); crowns.visible = !crowns.userData.seasonOff && (!crowns.userData.lod || crowns.count > 0);
     }
-    for (const tw of this.twigSets) tw.visible = s === 'winter';
+    for (const tw of this.twigSets) { tw.userData.seasonOff = s !== 'winter'; tw.visible = !tw.userData.seasonOff && (!tw.userData.lod || tw.count > 0); }
     this.blossomTex ||= foliageTex(true); for (const m of this.cardMats || []) { m.map = s === 'spring' ? this.blossomTex : this.leafTex; m.needsUpdate = true; }
     const grass = { spring: '#9cbf7c', summer: '#86ab68', autumn: '#97a65e', winter: '#b3b89a' }[s];
     this.greenM.grass?.color.set(grass); for (const m of this.wideM || []) m.color.set(grass); this.stripM?.color.set(grass); this.greenM.wild?.color.set(grass).offsetHSL(0, -0.05, -0.03); if (this.greenM.wood) { const wm = this.greenM.wood; wm.map = forestFloorTex(s); if (wm.userData.uCan) wm.userData.uCan.value = canopyTex(s); wm.needsUpdate = true; } this.islandM.color.set(grass).offsetHSL(0, 0, -0.06);

@@ -167,7 +167,7 @@ export class SeoulRun {
       // 6-11: 먼 땅(200m 성긴 격자 · 초록)을 지금 코스 칸이 있는 곳에서는 40m 내린다 (서울 산책은 tickWorld 가 한다). 안 내리면 비탈에서 길보다 3m 넘게 솟아 곰 · 장애물을 덮었다
       if (hw.farU) { const TL = hw.world0.tile, ti = Math.floor(px / TL), tj = Math.floor(pz / TL), U = hw.farU, have = new Set(); for (const c of hw.chunks.values()) if (c.scene.visible) { const [a, b] = c.chunkKey.split('_'); have.add(`${a}_${b}`); }
         U.uC.value.set(ti, tj); for (let b = -2; b <= 2; b++) for (let a = -2; a <= 2; a++) U.uL.value[(b + 2) * 5 + a + 2] = have.has(`${ti + a}_${tj + b}`) ? 1 : 0; }
-      for (const c of hw.chunks.values()) c.scene.traverse((o) => { const L = o.userData.lod; if (L) o.count = Math.hypot(L[0] - px, L[1] - pz) < (L[3] ? L[3] : R + 360) ? L[2] : 0; const V = o.userData.lodV; if (V) o.visible = Math.hypot(V[0] - px, V[1] - pz) < V[2]; });
+      for (const c of hw.chunks.values()) c.scene.traverse((o) => { const L = o.userData.lod; if (L) { o.count = Math.hypot(L[0] - px, L[1] - pz) < (L[3] ? L[3] : R + 360) ? L[2] : 0; o.visible = o.count > 0 && !o.userData.seasonOff; } const V = o.userData.lodV; if (V) o.visible = Math.hypot(V[0] - px, V[1] - pz) < V[2]; });
       const v = this.v; for (const o of hw.lodObjs || []) { const bs = o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere); v.copy(bs.center).applyMatrix4(o.matrixWorld); o.visible = Math.hypot(v.x - px, v.z - pz) - bs.radius < 400; } }
   }
   // 코스가 바뀌는 순간 시간은 바로 (빛 문으로 하얗게 덮인 동안)
