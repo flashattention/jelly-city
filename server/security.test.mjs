@@ -263,6 +263,19 @@ test('7-2 · 7-3 위조 세션 · 관리자 아닌 사람은 관리자 기능을
   assert.equal((await fetch(S.base + '/api/me', { headers: H })).status, 401);
 });
 
+test('8-2 운영자 흉내 · 보이지 않는 글자 이름', async () => {
+  const h = IP(80), sid = (await (await postJ('/api/login', { dev: 'nicktest' }, h)).json()).session;
+  for (const n of ['운영자', '관 리 자', 'ADMIN곰', '젤리게임즈']) {
+    const r = await fetch(S.base + '/api/nick', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sid}`, ...h }, body: JSON.stringify({ nick: n }) });
+    assert.equal(r.status, 400, n); assert.match((await r.json()).error, /운영자처럼/);
+  }
+  await new Promise((r) => setTimeout(r, 50));
+  const ok = await (await fetch(S.base + '/api/nick', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sid}`, ...h }, body: JSON.stringify({ nick: '착한\u200b곰\u202e' }) })).json();
+  assert.equal(ok.user?.nick, '착한곰');
+  const ws = await wsOpen('/ten-ws', IP(81)); ws.send(JSON.stringify({ t: 'hello', name: '운영자', color: '#000000' })); ws.send(JSON.stringify({ t: 'create', name: '방' }));
+  const j = await waitFor(ws, (m) => m.t === 'joined'); assert.ok(j); assert.ok(!j.members.some((m) => m.name === '운영자')); ws.close();
+});
+
 test('7-1 순위표에 익명 id 가 나가지 않는다', async () => {
   const anon = hex(24), h = IP(56);
   await postJ('/api/merge/record', { b: 'cup', value: 3, name: '비밀곰', anon }, h);

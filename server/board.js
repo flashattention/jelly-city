@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { readJson } from './auth.js';
-import { sec } from './shared/guard.js';
+import { sec, cleanText, spamCheck, spamNote, ipHash } from './shared/guard.js';
 import { nickOf } from './cosmetics.js';
 import { complete, llmEnabled } from './jelly-city/llm.js';
 
@@ -12,9 +12,10 @@ const TITLE_MAX = 30, BODY_MAX = 2000, COMMENT_MAX = 500, MAX_POSTS = 3000, MAX_
 export const REPORT_WHY = { abuse: '욕설 · 비방', spam: '도배 · 광고', lewd: '음란 · 불쾌', privacy: '개인정보', etc: '기타' };
 // 관리자에게 보이는 신고 사유 목록
 const repList = (it) => Object.values(it.reports || {}).filter((v) => typeof v === 'object').map((v) => ({ why: REPORT_WHY[v.why] || v.why, text: v.text || '' }));
-const POST_GAP = 30000, COMMENT_GAP = 5000, HIDE_AT = 5; // 신고 점수가 이만큼이면 가린다 (체험판 신고는 0.5점)
-const oneLine = (s, n) => String(s ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
-const multiLine = (s, n) => String(s ?? '').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '').replace(/\n{4,}/g, '\n\n\n').trim().slice(0, n);
+const POST_GAP = 30000, COMMENT_GAP = 5000, HIDE_AT = 5, STRICT_POST_GAP = 60000, STRICT_COMMENT_GAP = 10000; // strict = 체험판 · 하루 안 된 새 계정 // 신고 점수가 이만큼이면 가린다 (체험판 신고는 0.5점)
+// 보이지 않는 글자 · 방향 바꾸기 글자 · 결합 문자 남용도 걷어 낸다 (guard.cleanText)
+const oneLine = (s, n) => cleanText(s, n);
+const multiLine = (s, n) => cleanText(s, n, { lines: true });
 const newId = () => crypto.randomBytes(6).toString('hex');
 const tally = (votes) => { let up = 0, down = 0; for (const v of Object.values(votes)) if (v > 0) up++; else down++; return { up, down }; };
 
@@ -66,37 +67,40 @@ export class Board {
     return { ...this.card(p, sub, admin), body: hide ? '' : p.body, edited: p.edited || 0, admin: !!admin, comments: p.comments.map((c) => { const { up, down } = tally(c.votes), h = this.hiddenFor(c, sub, admin); return { id: c.id, name: nickOf(c.sub, c.name), at: c.at, text: h ? '🚫 신고가 많아 가려진 댓글이에요' : c.text, up, down, my: c.votes[sub] || 0, hidden: !!c.hidden, mine: !!sub && c.sub === sub, reported: !!c.reports[sub], parent: c.parent || null, ...(admin && Object.keys(c.reports).length ? { reps: repList(c) } : {}) }; }) };
   }
   // AI 를 부르기 전에 걸러서 쓸데없는 호출을 막는다
-  checkWrite(sub, b, now = Date.now()) {
-    if (now - (this.lastPost.get(sub) || 0) < POST_GAP) throw new Error('글은 30초에 한 번만 쓸 수 있어요');
+  checkWrite(sub, b, now = Date.now(), strict = false) {
+    if (now - (this.lastPost.get(sub) || 0) < (strict ? STRICT_POST_GAP : POST_GAP)) throw new Error(strict ? '새 계정 · 체험판은 글을 1분에 한 번만 쓸 수 있어요' : '글은 30초에 한 번만 쓸 수 있어요');
     const title = oneLine(b.title, TITLE_MAX), body = multiLine(b.body, BODY_MAX);
     if (!title) throw new Error('제목을 써 주세요'); if (!body) throw new Error('내용을 써 주세요');
+    const spam = spamCheck(sub, `${title}\n${body}`, { strict, now }); if (spam) { sec.note('text', { where: '/api/board/write', detail: spam.slice(0, 30) }); throw new Error(spam); }
     return { title, body };
   }
   // 고치기: 내가 쓴 글만 (관리자도 남의 글은 못 고친다 · 지우기만)
-  checkEdit(sub, id, b) {
+  checkEdit(sub, id, b, strict = false) {
     const p = this.find(id); if (p.sub !== sub) throw new Error('내가 쓴 글만 고칠 수 있어요');
     const title = oneLine(b.title, TITLE_MAX), body = multiLine(b.body, BODY_MAX);
     if (!title) throw new Error('제목을 써 주세요'); if (!body) throw new Error('내용을 써 주세요');
+    const t = `${title}\n${body}`, spam = t === `${p.title}\n${p.body}` ? null : spamCheck(`edit:${sub}:${id}`, t, { strict }); if (spam) throw new Error(spam);
     return { title, body };
   }
-  edit(sub, id, b, now = Date.now()) { const { title, body } = this.checkEdit(sub, id, b), p = this.find(id); p.title = title; p.body = body; p.edited = now; this.dirty = true; return p; }
-  checkComment(sub, id, b, now = Date.now()) {
-    if (now - (this.lastComment.get(sub) || 0) < COMMENT_GAP) throw new Error('댓글은 5초에 한 번만 쓸 수 있어요');
+  edit(sub, id, b, now = Date.now(), strict = false) { const { title, body } = this.checkEdit(sub, id, b, strict), p = this.find(id); p.title = title; p.body = body; p.edited = now; this.dirty = true; return p; }
+  checkComment(sub, id, b, now = Date.now(), strict = false) {
+    if (now - (this.lastComment.get(sub) || 0) < (strict ? STRICT_COMMENT_GAP : COMMENT_GAP)) throw new Error(strict ? '새 계정 · 체험판은 댓글을 10초에 한 번만 쓸 수 있어요' : '댓글은 5초에 한 번만 쓸 수 있어요');
     const p = this.find(id), text = multiLine(b.text, COMMENT_MAX);
     if (!text) throw new Error('내용을 써 주세요'); if (p.comments.length >= MAX_COMMENTS) throw new Error('댓글이 너무 많아요');
+    const spam = spamCheck(sub, text, { strict, now }); if (spam) { sec.note('text', { where: '/api/board/comment', detail: spam.slice(0, 30) }); throw new Error(spam); }
     return { body: text };
   }
   // 검사 통과 뒤에만 부른다
-  write(sub, name, b, now = Date.now()) {
-    const { title, body } = this.checkWrite(sub, b, now);
-    this.lastPost.set(sub, now);
+  write(sub, name, b, now = Date.now(), strict = false) {
+    const { title, body } = this.checkWrite(sub, b, now, strict);
+    this.lastPost.set(sub, now); spamNote(sub, `${title}\n${body}`, now);
     const p = { id: newId(), sub, name, title, body, at: now, votes: {}, reports: {}, comments: [] };
     this.posts.push(p); if (this.posts.length > MAX_POSTS) this.posts.shift();
     this.dirty = true; return p;
   }
-  comment(sub, name, id, b, now = Date.now()) {
-    const { body: text } = this.checkComment(sub, id, b, now), p = this.find(id);
-    this.lastComment.set(sub, now);
+  comment(sub, name, id, b, now = Date.now(), strict = false) {
+    const { body: text } = this.checkComment(sub, id, b, now, strict), p = this.find(id);
+    this.lastComment.set(sub, now); spamNote(sub, text, now);
     // 답글: 한 단계만 (답글에 단 답글은 그 원 댓글 아래로)
     let parent = null; if (b.parent) { const q = p.comments.find((c) => c.id === String(b.parent)); if (!q) throw new Error('답글을 달 댓글이 없어요'); parent = q.parent || q.id; }
     p.comments.push({ id: newId(), sub, name, text, at: now, votes: {}, reports: {}, ...(parent ? { parent } : {}) }); this.dirty = true;
@@ -115,13 +119,16 @@ export class Board {
     this.dirty = true;
   }
   // 신고: 사유가 있어야 한다 (무차별 신고 막기). 기록 = { w 점수, why 사유, text 기타 내용, at }. 예전 기록은 숫자(점수)만
-  report(sub, guest, id, cid, why, text) {
+  // ip: 신고한 곳의 해시 (같은 곳에서 계정 여러 개로 신고해도 한 번만 센다 · 원래 IP 는 남기지 않는다)
+  report(sub, guest, id, cid, why, text, ip = '') {
     const it = this.item(id, cid); if (it.sub === sub) throw new Error('내 글은 신고할 수 없어요');
     if (it.reports[sub]) throw new Error('이미 신고했어요');
     if (!REPORT_WHY[why]) throw new Error('신고 사유를 골라 주세요');
     const t = oneLine(text || '', 200); if (why === 'etc' && t.length < 5) throw new Error('기타 사유를 5자 넘게 적어 주세요');
-    it.reports[sub] = { w: guest ? 0.5 : 1, why, text: t, at: Date.now() };
-    if (Object.values(it.reports).reduce((a, v) => a + (typeof v === 'number' ? v : v.w), 0) >= HIDE_AT) it.hidden = true;
+    const same = ip && Object.values(it.reports).some((v) => typeof v === 'object' && v.ip === ip);
+    it.reports[sub] = { w: same ? 0 : guest ? 0.5 : 1, why, text: t, at: Date.now(), ...(ip ? { ip } : {}) };
+    if (same) sec.note('text', { where: '/api/board/report', detail: 'same place reported again' });
+    if (!it.hidden && Object.values(it.reports).reduce((a, v) => a + (typeof v === 'number' ? v : v.w), 0) >= HIDE_AT) { it.hidden = true; sec.note('text', { where: '/api/board/report', detail: `auto-hidden ${cid ? 'comment' : 'post'}` }); }
     this.dirty = true;
   }
   // 검사 횟수 제한 (AI 호출은 돈이 든다). 한 사람은 한 번에 하나만
@@ -157,24 +164,25 @@ export async function boardApi(req, res, url, who, board, json, isAdmin, check =
     hits.push(now); board.ipHits.set(ip, hits);
     const b = await readJson(req, 16 * 1024), pid = String(b.id || ''), cid = b.cid ? String(b.cid) : null;
     const name = oneLine(who.user.nick || (who.user.guest ? who.user.name : ''), 14);
+    const strict = !!who.user.guest || !!who.user.toss || now - (who.user.created || 0) < 864e5; // 체험판 · 하루 안 된 새 계정은 더 엄격하게
     switch (url.pathname) {
       case '/api/board/write': {
         if (!name) return json(res, 400, { error: '닉네임을 먼저 정해 주세요' });
-        const stop = await board.screen(sub, ip, board.checkWrite(sub, b), check); if (stop) return json(res, stop.status, stop.body);
-        return json(res, 200, { id: board.write(sub, name, b).id });
+        const stop = await board.screen(sub, ip, board.checkWrite(sub, b, Date.now(), strict), check); if (stop) return json(res, stop.status, stop.body);
+        return json(res, 200, { id: board.write(sub, name, b, Date.now(), strict).id });
       }
       case '/api/board/edit': {
-        const stop = await board.screen(sub, ip, board.checkEdit(sub, pid, b), check); if (stop) return json(res, stop.status, stop.body);
-        board.edit(sub, pid, b); return json(res, 200, board.detail(pid, sub, admin));
+        const stop = await board.screen(sub, ip, board.checkEdit(sub, pid, b, strict), check); if (stop) return json(res, stop.status, stop.body);
+        board.edit(sub, pid, b, Date.now(), strict); return json(res, 200, board.detail(pid, sub, admin));
       }
       case '/api/board/comment': {
         if (!name) return json(res, 400, { error: '닉네임을 먼저 정해 주세요' });
-        const stop = await board.screen(sub, ip, board.checkComment(sub, pid, b), check); if (stop) return json(res, stop.status, stop.body);
-        board.comment(sub, name, pid, b); return json(res, 200, board.detail(pid, sub, admin));
+        const stop = await board.screen(sub, ip, board.checkComment(sub, pid, b, Date.now(), strict), check); if (stop) return json(res, stop.status, stop.body);
+        board.comment(sub, name, pid, b, Date.now(), strict); return json(res, 200, board.detail(pid, sub, admin));
       }
       case '/api/board/vote': return json(res, 200, board.vote(sub, pid, cid, b.v));
       case '/api/board/delete': { const theirs = admin && board.item(pid, cid).sub !== sub; board.remove(sub, admin, pid, cid); if (theirs) sec.note('admin', { ip, where: '/api/board/delete', detail: cid ? 'comment' : 'post' }); return json(res, 200, { ok: true }); }
-      case '/api/board/report': board.report(sub, !!who.user.guest, pid, cid, String(b.why || ''), String(b.text || '')); return json(res, 200, { ok: true });
+      case '/api/board/report': board.report(sub, !!who.user.guest, pid, cid, String(b.why || ''), String(b.text || ''), ipHash(ip)); return json(res, 200, { ok: true });
       case '/api/board/unhide': if (!admin) return json(res, 403, { error: '관리자만 할 수 있어요' }); board.unhide(pid, cid); sec.note('admin', { ip, where: '/api/board/unhide', detail: cid ? 'comment' : 'post' }); return json(res, 200, { ok: true });
     }
     return json(res, 404, { error: 'not found' });

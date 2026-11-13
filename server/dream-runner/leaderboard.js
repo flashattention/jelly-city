@@ -8,7 +8,7 @@ import { getCos, boardMedal, nameOf, tagChar } from '../cosmetics.js';
 import crypto from 'node:crypto';
 import { Tickets, ReplayPool, decodeReplay } from './verify.js';
 import { codeVer, archiveCode, hasVer, VER_RE } from './codever.js';
-import { publicId, sec, anonOk, ANON_FULL } from '../shared/guard.js';
+import { publicId, sec, anonOk, ANON_FULL, cleanName, impersonates } from '../shared/guard.js';
 // 죽은 이유 종류 → 이름 (runner.js die 의 code)
 export const DIE_LABEL = { step: '높은 턱 · 벽', fall: '떨어짐', hurdle: '낮은 장애물', wall: '높은 장애물', bar: '머리 위 가로대', meteor: '운석', laser: '빛줄기', slam: '괴물의 일격', car: '승용차', suv: 'SUV', taxi: '택시', bus: '버스', moto: '배달 오토바이', bike: '자전거', ped: '행인 젤리', cones: '공사 고깔', barrier: '공사 가림막', banner: '현수막' };
 import { itemById } from '../../public/shared/js/cos-items.js';
@@ -30,7 +30,7 @@ const HG_STAMPS = { gbg: 30, cable: 40, lock: 3, cruise: 60, bike: 45, obs63: 20
 const HG_TTL = 10 * 3600e3, HG_MO = ['sunset', 'sunrise', 'night', 'rain', 'snow', 'spring', 'summer', 'autumn', 'winter']; // 한강 러닝: 한 번에 10시간까지 · 순간들 // 이 날수보다 오래된 하루 기록은 지운다
 const MAPS = ['dream', 'hell', 'void', 'seoul'], mapOf = (m) => (m === 'hell' || m === 'void' || m === 'seoul' ? m : 'dream'); // 꿈나라 · 지옥 · 이공간 · 서울
 const SEP = new Set(['hell', 'void', 'seoul']); // 난이도마다 따로 쓰는 맵 (꿈나라 노멀만 예전 표)
-const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n);
+const clean = (s, n) => { const t = cleanName(s, n); return impersonates(t) ? '' : t; };
 
 // 5-2 입력 기록으로 본 사람 같지 않음: 누름 사이 간격의 변동계수가 2% 미만(30번 이상) · 50ms 안 연속 누름이 대부분
 //   돌려주는 값: 이유 글자 또는 null. 막지 않고 검토(노란 리포트)로만 쓴다

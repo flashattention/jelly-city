@@ -7,6 +7,7 @@ import path from 'node:path';
 import { BaseRooms } from '../shared/rooms.js';
 import { diffOf } from '../../public/dream-runner/js/diff.js';
 import { trustLook } from '../cosmetics.js';
+import { cleanName, impersonates } from '../shared/guard.js';
 
 const MAX = 12;
 const SNAP_HZ = 15;
@@ -16,7 +17,7 @@ const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 헷갈리는 0 O 1 I �
 const PAUSE_FILE = 'dream-pause.json'; // 서버 점검(배포) 동안 달리던 방을 잠깐 적어 두는 곳
 const PAUSE_MAX = 5 * 60 * 1000;  // 점검이 이보다 길면 이어 달리지 않는다
 const REJOIN_WAIT = 10000;        // 첫 사람이 돌아온 뒤 나머지를 기다리는 시간
-const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n);
+const clean = (s, n) => cleanName(s, n);
 
 export class DreamRooms {
   constructor(userOf, dataDir) {
@@ -52,6 +53,7 @@ export class DreamRooms {
         c.who = this.userOf(m.session) || null; // 없으면 비로그인 손님 (초대 코드로만 참가)
         c.hi = true;
         c.name = clean(m.name, 14) || '꿈꾸는 곰돌이';
+        if (impersonates(c.name)) c.name = '꿈꾸는 곰돌이';
         c.color = /^#[0-9a-fA-F]{6}$/.test(m.color || '') ? m.color : '#8a5634';
         const lj = m.look && typeof m.look === 'object' ? JSON.stringify(m.look) : '';
         c.look = trustLook(lj && lj.length < 1500 ? JSON.parse(lj) : null, c.who?.sub);

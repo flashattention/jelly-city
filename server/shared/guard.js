@@ -139,10 +139,36 @@ export function cleanText(s, n, { lines = false } = {}) {
 export const cleanName = (s, n) => cleanText(String(s ?? '').replace(/[<>]/g, ''), n);
 // 운영자 흉내: 비슷한 모양 글자 · 띄어쓰기 · 기호를 걷어 내고 본다
 const FOLD = { 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', 7: 't', '@': 'a', '$': 's', 'ⓐ': 'a', 'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'х': 'x', 'і': 'i', 'ı': 'i' };
-const RESERVED = /운영자|운영진|관리자|관리팀|젤리게임즈|젤리게임스|젤리겜즈|공식|gm|admin|administrator|moderator|operator|official|jellygames|staff|system|시스템|개발자|developer/;
-export function impersonates(name) {
-  const t = String(name || '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}@$]/gu, '').replace(/[0-9@$ⓐаеорсхіı]/g, (c) => FOLD[c] || c);
-  return RESERVED.test(t);
+// 한국어는 어디에 있어도, 영어는 앞 · 뒤에 붙었을 때만 (badminton · gmail 같은 낱말은 괜찮게)
+const RESERVED = /운영자|운영진|운영팀|관리자|관리팀|젤리게임즈|젤리게임스|젤리겜즈|개발자|개발팀|jellygames|^(admin|administrator|moderator|operator|official|staff|system|developer|gm(?![a-z]))|(admin|moderator|operator|official|staff|developer)$/;
+export const fold = (name) => String(name || '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}@$]/gu, '').replace(/[0-9@$аеорсхіı]/g, (c) => FOLD[c] || c);
+export const impersonates = (name) => RESERVED.test(fold(name));
+export const IMPERSONATE_MSG = '운영자처럼 보이는 이름은 쓸 수 없어요';
+
+// ---------- 도배 · 광고 (8-3) ----------
+//   링크 · 연락처 · 같은 글 되풀이. 새 계정(하루 안) · 체험판 · 익명은 더 엄격하게
+const LINK = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(com|net|org|kr|co|io|gg|me|xyz|site|shop|top|link|ly|to|app)\b|open\.kakao|t\.me\/|discord\.gg|bit\.ly)/i;
+const CONTACT = /(01[016789][-\s.·]?\d{3,4}[-\s.·]?\d{4}|카톡\s*(아이디|id)|오픈\s*채팅|텔레그램|telegram|라인\s*아이디|디스코드\s*서버)/i;
+const AD = /(무료\s*(충전|지급|다이아|코인)|핵\s*(판매|팝니다|구매)|계정\s*(판매|팝니다|삽니다|거래)|대리\s*(육성|랭크)|도박|카지노|토토|먹튀|환전)/i;
+const recentText = new Map(); // 정리한 글 → [{ sub, at }] (최근 1시간)
+const normText = (t) => String(t || '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '').slice(0, 300);
+// 문제면 안내 문구, 괜찮으면 null. strict = 새 계정 · 체험판 · 익명
+export function spamCheck(sub, text, { strict = false, now = Date.now() } = {}) {
+  const t = String(text || '');
+  if (CONTACT.test(t)) return '전화번호 · 메신저 아이디 같은 연락처는 올릴 수 없어요';
+  if (AD.test(t)) return '광고 · 거래 · 도박 같은 내용은 올릴 수 없어요';
+  if (strict && LINK.test(t)) return '새로 만든 계정 · 체험판은 링크를 올릴 수 없어요';
+  const k = normText(t); if (k.length < 4) return null;
+  const list = (recentText.get(k) || []).filter((x) => now - x.at < 3600e3);
+  if (list.some((x) => x.sub === sub)) return '같은 글을 되풀이해서 올릴 수 없어요';
+  if (new Set(list.map((x) => x.sub)).size >= 2) return '여러 계정이 같은 글을 올리고 있어요. 다른 내용으로 써 주세요';
+  return null;
+}
+// 실제로 올린 뒤에 적어 둔다 (거절된 글은 적지 않는다)
+export function spamNote(sub, text, now = Date.now()) {
+  const k = normText(text); if (k.length < 4) return;
+  const list = (recentText.get(k) || []).filter((x) => now - x.at < 3600e3); list.push({ sub, at: now }); recentText.set(k, list);
+  if (recentText.size > 20000) for (const [q, v] of recentText) if (!v.length || now - v[v.length - 1].at > 3600e3) recentText.delete(q);
 }
 
 // ---------- JSON 오염 ----------

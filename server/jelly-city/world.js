@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { trustLook } from '../cosmetics.js';
+import { cleanName, cleanText, impersonates, IMPERSONATE_MSG } from '../shared/guard.js';
 import * as THREE from 'three';
 import { SEED, DEFAULT_TIME_SPEED } from '../../public/jelly-city/js/config.js';
 import { setupWorld, housePrice, freeUnits, isHomeType, homeLabel, WORLD_VERSION } from '../../public/jelly-city/js/world-setup.js';
@@ -146,8 +147,9 @@ export class World {
   setNick(sub, nick) {
     const u = this.users[sub];
     if (!u) throw new Error('로그인이 필요해요');
-    const n = String(nick || '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim();
+    const n = cleanName(nick, 40);
     if ([...n].length < 2 || [...n].length > 12) throw new Error('닉네임은 2~12글자로 정해 주세요');
+    if (impersonates(n)) throw new Error(IMPERSONATE_MSG);
     u.nick = n; this.dirty = true;
     return this.publicUser(u);
   }
@@ -188,6 +190,7 @@ export class World {
     if (!u) throw new Error('로그인이 필요해요');
     if (u.chars.length >= MAX_CHARS) throw new Error(`캐릭터는 ${MAX_CHARS}개까지 만들 수 있어요`);
     const profile = sanitizeProfile({ ...body.profile, accessories: [], held: null, def: 0, charm: 0, regen: 0, jobName: '' });
+    if (impersonates(profile.name)) throw new Error(IMPERSONATE_MSG);
     const starter = {};
     for (const [slot, list] of Object.entries(BASIC_ACC)) if (list.some(([id]) => id === body.starter?.[slot])) starter[slot] = body.starter[slot];
     const token = crypto.randomBytes(12).toString('hex');
@@ -213,8 +216,9 @@ export class World {
     if (!u || !u.chars.includes(token)) throw new Error('내 캐릭터가 아니에요');
     const a = this.accounts[token];
     if (!a) throw new Error('캐릭터가 없어요');
-    const n = typeof name === 'string' ? name.trim().replace(/\s+/g, ' ').slice(0, 8) : '';
+    const n = typeof name === 'string' ? cleanName(name, 8) : '';
     if (!n) throw new Error('이름을 1~8글자로 지어 주세요');
+    if (impersonates(n)) throw new Error(IMPERSONATE_MSG);
     a.name = n; a.profile = { ...a.profile, name: n };
     for (const p of this.players.values()) if (p.token === token) { p.name = n; if (p.profile) p.profile.name = n; this.send(p, { t: 'sys', text: `✏️ 이제 '${n}'(이)에요 · 다른 사람에게는 다시 접속하면 새 이름으로 보여요` }); }
     this.dirty = true;
@@ -389,7 +393,7 @@ export class World {
         this.accounts[p.token].stats = st; this.dirty = true; break;
       }
       case 'say': {
-        const text = String(msg.text || '').slice(0, 120).trim();
+        const text = cleanText(msg.text, 120);
         if (!text) break;
         if (msg.anon) {
           // 익명 채팅: 다른 사람에게는 누가 보냈는지(id·이름) 보내지 않는다. 도배 방지로 2초에 한 번
@@ -680,7 +684,7 @@ export class World {
     const p = this.photos[id];
     const acc = this.ownsChar(sub, char);
     if (!acc || !p?.posted) throw new Error('없는 게시물');
-    text = String(text || '').trim().slice(0, 200);
+    text = cleanText(text, 200);
     if (!text) throw new Error('댓글을 적어주세요');
     if (!this.cooldown(`${char}:comment`, 1500)) throw new Error('잠시 후 다시 써주세요');
     p.comments ||= [];
@@ -755,7 +759,7 @@ export class World {
   sendDm(sub, char, to, text) {
     const acc = this.ownsChar(sub, char);
     if (!acc || !this.accounts[to] || to === char) throw new Error('보낼 수 없어요');
-    text = String(text || '').trim().slice(0, 300);
+    text = cleanText(text, 300);
     if (!text) throw new Error('메시지를 적어주세요');
     if (!this.cooldown(`${char}:dm`, 700)) throw new Error('천천히 보내주세요');
     const k = this.dmKey(char, to);
@@ -778,7 +782,7 @@ export class World {
   postInsta(sub, char, id, caption) {
     const p = this.photos[id];
     if (!this.ownsChar(sub, char) || !p || p.owner !== char) throw new Error('내 사진이 아니에요');
-    p.posted = true; p.postedAt = Date.now(); p.caption = String(caption || '').slice(0, 150);
+    p.posted = true; p.postedAt = Date.now(); p.caption = cleanText(caption, 150);
     this.dirty = true;
     this.broadcast({ t: 'sys', text: `📸 ${this.accounts[char].name}님이 젤리그램에 새 사진을 올렸어요!` });
   }
@@ -1081,7 +1085,7 @@ function playerMeta(p) {
 function sanitizeProfile(pr = {}) {
   const str = (v, n, d) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : d);
   return {
-    name: str(pr.name, 8, '젤리'),
+    name: cleanName(pr.name, 8) || '젤리',
     gender: ['여', '남'].includes(pr.gender) ? pr.gender : '여',
     age: Math.max(18, Math.min(80, Number(pr.age) || 25)),
     personality: str(pr.personality, 20, '명랑한 수다쟁이'),

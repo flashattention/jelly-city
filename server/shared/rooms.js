@@ -2,9 +2,11 @@
 //   게임마다 이 클래스를 상속해서 onStart(r) · onMessage(c, m) · onTick(r, now) 만 채운다
 import crypto from 'node:crypto';
 import { trustLook, noteRoomEnd } from '../cosmetics.js';
+import { cleanName, impersonates } from './guard.js';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 헷갈리는 0 O 1 I 는 뺐다
-export const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n);
+// 이름 · 채팅 · 방 이름: 제어 문자 · <> · 보이지 않는 글자 · 방향 바꾸기 글자 · 결합 문자 남용을 걷어 낸다
+export const clean = (s, n) => cleanName(s, n);
 
 export class BaseRooms {
   // opts: { max: 방 최대 인원, hz: 위치 중계 횟수, countdown: 출발 전 ms, defaults: 방 설정 기본값, allow: 설정 검사 함수 }
@@ -44,6 +46,7 @@ export class BaseRooms {
         c.who = this.userOf(m.session) || null; // 없으면 비로그인 손님 (초대 코드로만 참가)
         c.hi = true;
         c.name = clean(m.name, 14) || '꿈꾸는 곰돌이';
+        if (impersonates(c.name)) c.name = '꿈꾸는 곰돌이';
         c.color = /^#[0-9a-fA-F]{6}$/.test(m.color || '') ? m.color : '#8a5634';
         const lj = m.look && typeof m.look === 'object' ? JSON.stringify(m.look) : '';
         c.look = trustLook(lj && lj.length < 1500 ? JSON.parse(lj) : null, c.who?.sub);

@@ -8,7 +8,7 @@ import path from 'node:path';
 import https from 'node:https';
 import crypto from 'node:crypto';
 import { readJson } from './auth.js';
-import { safeEq } from './shared/guard.js';
+import { safeEq, cleanName, impersonates, IMPERSONATE_MSG } from './shared/guard.js';
 
 // 토스 파트너 API: 콘솔에서 받은 mTLS 인증서 · 키 (PEM 글자 그대로 또는 base64). 없으면 토스 로그인은 '준비 중'
 //   주소 · 응답 모양은 앱인토스 개발자센터 '토스 로그인' 문서로 확인해서 맞춘다
@@ -70,8 +70,9 @@ export class TossAccounts {
   }
   touch(sub) { const u = this.users[sub]; if (u && Date.now() - (u.last || 0) > 36e5) { u.last = Date.now(); this.dirty = true; } }
   setNick(sub, nick) {
-    const n = clean(nick);
+    const n = cleanName(nick, 40);
     if ([...n].length < 2 || [...n].length > 12) throw new Error('닉네임은 2~12글자로 정해 주세요');
+    if (impersonates(n)) throw new Error(IMPERSONATE_MSG);
     this.users[sub].nick = n; this.dirty = true;
   }
 }

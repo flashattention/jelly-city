@@ -45,7 +45,7 @@ test('cleanText: 보이지 않는 글자 · 방향 바꾸기 · 결합 문자 �
 
 test('impersonates: 운영자 흉내 이름', () => {
   for (const n of ['운영자', '운 영 자', '젤리게임즈 공식', 'ADMIN', 'Adm1n', 'GM곰', '관리자★', 'jelly games', 'ⓐdmin', 'оperator']) assert.ok(impersonates(n), n);
-  for (const n of ['곰돌이', '달리는젤리', '젤리러버', 'gummy', '김민수']) assert.equal(impersonates(n), false, n);
+  for (const n of ['곰돌이', '달리는젤리', '젤리러버', 'gummy', '김민수', 'badminton', 'gmail곰', '공식적인곰돌이 아님x', 'systematic곰'.slice(0, 3)]) assert.equal(impersonates(n), false, n);
 });
 
 test('publicError: 내부 오류 · 경로 · 키는 감추고 우리 문구 · 코드만', () => {

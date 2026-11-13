@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 import { readJson } from '../auth.js';
 import { clean } from './rooms.js';
 import { getCos, boardMedal, nameOf, tagChar } from '../cosmetics.js';
-import { sec, clientIp, publicId, anonOk, ANON_FULL, safeEq } from './guard.js';
+import { sec, clientIp, publicId, anonOk, ANON_FULL, safeEq, impersonates } from './guard.js';
 
 const ANON = /^[a-f0-9]{16,40}$/;
 const TICKET_TTL = 6 * 3600e3, HOLD_TOP = 10;
@@ -116,7 +116,7 @@ export class Records {
       // 5-2 기계처럼 일정한 간격으로 계속 남기면 의심
       const ts = [...(this.times.get(who.sub) || []), now].slice(-8); this.times.set(who.sub, ts); if (this.times.size > 20000) this.times.clear();
       if (!why && robotic(ts)) why = 'robotic';
-      const e = { name: clean(body.name, 14) || clean(who.user.nick || (who.user.guest ? who.user.name : ''), 14) || '곰돌이', color: /^#[0-9a-fA-F]{6}$/.test(body.color || '') ? body.color : '#8a5634', value: this.value(body), at: now, guest: !!who.user.guest, anon: !!who.user.anon, ...(sec0 != null ? { sec: sec0 } : {}) };
+      const e = { name: (impersonates(body.name) ? '' : clean(body.name, 14)) || clean(who.user.nick || (who.user.guest ? who.user.name : ''), 14) || '곰돌이', color: /^#[0-9a-fA-F]{6}$/.test(body.color || '') ? body.color : '#8a5634', value: this.value(body), at: now, guest: !!who.user.guest, anon: !!who.user.anon, ...(sec0 != null ? { sec: sec0 } : {}) };
       tagChar(who.sub, e);
       const T = (this.data[body.b] ||= {});
       const old = T[who.sub], best = !old || this.better(e, old);
