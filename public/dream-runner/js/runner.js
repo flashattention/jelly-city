@@ -169,15 +169,15 @@ export class Runner {
     const w = track.wall(prevS, this.s, this.x, this.y);
     if (w) {
       if (w.y - this.y < 1.3 || this.eff.ghost > 0 || this.eff.shield > 0 || this.invul > 0) { /* 1.3m 아래 턱은 훌쩍 올라선다 (유령 · 방어막이면 어떤 턱이든) */ if (w.y - this.y >= 1.3 && this.eff.ghost <= 0 && this.invul <= 0) { this.eff.shield = 0; fx?.('shieldbreak'); } this.y = w.y; this.vy = Math.max(0, this.vy); this.onGround = true; this.jumps = 0; }
-      else return this.die('벽에 쾅! 부딪혔어요', track);
+      else return this.die('벽에 쾅! 부딪혔어요', track, 'step');
     }
     // 공중에서 S 를 눌렀거나 누르고 있었으면 착지하면서 바로 숙인다 (안 그러면 입력이 씹힌 것처럼 느껴진다)
     if (!was && this.onGround && (this.slideBuf > 0 || input.slideHeld)) { if (this.slideT <= 0) fx?.('slide'); this.slideT = 0.75; this.slideBuf = 0; }
     // 장애물
     const o = this.eff.ghost > 0 || this.invul > 0 ? null : track.hit(this.s, this.x, this.y, this.h);
     if (o && this.eff.shield > 0) { this.eff.shield = 0; track.breakOne(o); fx?.('shieldbreak'); }
-    else if (o && o.seoul) return this.die(SEOUL_HIT[o.seoul] || '부딪혔어요', track);
-    else if (o) return this.die(o.kind === 'meteor' ? '운석에 맞았어요' : o.kind === 'laser' ? '빛줄기에 닿았어요' : o.kind === 'slam' ? '괴물의 일격에 맞았어요' : o.kind === 'bar' ? (track.hell ? '괴물의 팔에 머리를 쿵!' : '가로대에 머리를 쿵!') : '장애물에 부딪혔어요', track);
+    else if (o && o.seoul) return this.die(SEOUL_HIT[o.seoul] || '부딪혔어요', track, o.seoul);
+    else if (o) return this.die(o.kind === 'meteor' ? '운석에 맞았어요' : o.kind === 'laser' ? '빛줄기에 닿았어요' : o.kind === 'slam' ? '괴물의 일격에 맞았어요' : o.kind === 'bar' ? (track.hell ? '괴물의 팔에 머리를 쿵!' : '가로대에 머리를 쿵!') : '장애물에 부딪혔어요', track, o.kind);
     // 별사탕
     // 아이템전: ? 상자 · 함정 · 자석
     if (track.itemMode) {
@@ -190,7 +190,7 @@ export class Runner {
     const n = track.takeStars(this.s, this.x, this.y);
     if (n) { this.stars += n; fx?.('star', n); }
     // 꿈 밖으로 떨어짐
-    if (this.y < track.deathY(this.s)) return this.die(track.hell ? '지옥 끝까지 떨어졌어요' : track.void ? '이공간 너머로 떨어졌어요' : '꿈속 깊이 떨어졌어요', track);
+    if (this.y < track.deathY(this.s)) return this.die(track.hell ? '지옥 끝까지 떨어졌어요' : track.void ? '이공간 너머로 떨어졌어요' : '꿈속 깊이 떨어졌어요', track, 'fall');
     this.flipT = Math.max(0, this.flipT - dt);
     this.shoveT = Math.max(0, this.shoveT - dt);
   }
@@ -216,8 +216,9 @@ export class Runner {
     this.bear.inner.rotation.set(0, 0, 0);
     if (this.bear.poseState) this.bear.poseState.rx = 0;
   }
-  die(why, track) {
-    this.alive = false; this.dead = { why, t: 0, vy: Math.max(this.vy, 0), fall: why.includes('떨어') };
+  // code: 죽은 이유 종류 (서버가 '자주 깬 이유'로 센다 · 6-10)
+  die(why, track, code) {
+    this.alive = false; this.dead = { why, code, t: 0, vy: Math.max(this.vy, 0), fall: why.includes('떨어') };
     if (!this.dead.fall) { this.dead.vy = 7; this.knock = 0; }
     return why;
   }

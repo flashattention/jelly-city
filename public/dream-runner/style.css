@@ -82,6 +82,8 @@ h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 .ms-row { display: grid; grid-template-columns: 1fr 1.1fr 1.5fr 1.5fr; gap: 6px; align-items: center; padding: 4px 10px; font-size: 14px; border-radius: 8px; } .ms-row:nth-child(odd) { background: rgba(255,255,255,.06); } .ms-head { font-size: 12px; opacity: .75; background: none !important; }
 .ms-row > span:first-child { white-space: nowrap; }
 @media (max-width: 480px) { .ms-row { grid-template-columns: 1.25fr 1fr 1.4fr 1.4fr; font-size: 12px; padding: 4px 6px; gap: 4px; } }
+.ms-die { margin-top: 10px; } .ms-die-h { font-size: 13px; font-weight: 700; margin: 0 0 6px 4px; opacity: .9; } .ms-die-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .ms-die-col > small { display: block; opacity: .7; margin: 0 0 4px 4px; }
+.ms-die-row { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 3px 8px; margin-bottom: 3px; font-size: 13px; border-radius: 6px; background: rgba(255,255,255,.06); overflow: hidden; } .ms-die-row > i { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(255,140,170,.22); z-index: 0; } .ms-die-row > span, .ms-die-row > b { position: relative; z-index: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ms-die-row > b { font-size: 12px; }
 .board { display: flex; flex-direction: column; gap: 4px; text-align: left; max-height: 340px; overflow-y: auto; }
 .brow { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,.06); font-size: 15px; }
 .brow .rk { font-family: 'Jua', sans-serif; text-align: center; }

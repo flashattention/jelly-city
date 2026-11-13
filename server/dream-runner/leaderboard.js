@@ -8,6 +8,8 @@ import { getCos, boardMedal, nameOf, tagChar } from '../cosmetics.js';
 import crypto from 'node:crypto';
 import { Tickets, ReplayPool, decodeReplay } from './verify.js';
 import { codeVer, archiveCode, hasVer, VER_RE } from './codever.js';
+// 죽은 이유 종류 → 이름 (runner.js die 의 code)
+export const DIE_LABEL = { step: '높은 턱 · 벽', fall: '떨어짐', hurdle: '낮은 장애물', wall: '높은 장애물', bar: '머리 위 가로대', meteor: '운석', laser: '빛줄기', slam: '괴물의 일격', car: '승용차', suv: 'SUV', taxi: '택시', bus: '버스', moto: '배달 오토바이', bike: '자전거', ped: '행인 젤리', cones: '공사 고깔', barrier: '공사 가림막', banner: '현수막' };
 import { itemById } from '../../public/shared/js/cos-items.js';
 
 // 게임 코드 판: 서버가 다시 돌려 보는 코드와 브라우저 코드가 같아야 기록이 맞는다. 배포로 바뀌면 브라우저가 달리기 전에 새로 고친다
@@ -36,6 +38,7 @@ export class DreamBoard {
     this.best = {};   // 스피드전: sub → { name, color, score, dist, stars, themes, time, at, guest }
     this.bestItem = {}; // 아이템전
     this.boards = {};   // 노멀(easy) 말고 다른 난이도: 'speed:hard' → { sub → 기록 } (노멀은 위 둘을 그대로 쓴다)
+    this.dieAll = {};   // map → { 죽은 이유 → 판수 } (모든 사람)
     this.stats = {};    // sub → { runs, time, by: { easy: { runs, time } } } (순위와 상관없이 달린 판수 · 시간)
     this.hg = {}; this.hgSess = {}; // 한강 러닝: sub → { m 모두 · best 한 번에 · runs · sec · mo 순간별 } · 달리는 중인 판
     this.daily = {}; this.first = {}; // 운영 지표: 날짜(한국 시간) → 하루 숫자 · sub → 처음 달린 날
@@ -45,7 +48,7 @@ export class DreamBoard {
     this.ipHits = new Map();
     try {
       const d = JSON.parse(fs.readFileSync(this.file, 'utf8'));
-      this.best = d.best || {}; this.bestItem = d.bestItem || {}; this.boards = d.boards || {}; this.stats = d.stats || {}; this.daily = d.daily || {}; this.first = d.first || {}; this.hg = d.hg || {}; this.hgSess = d.hgSess || {}; this.runs = d.runs || 0; this.reports = d.reports || []; this.secret = d.secret || this.secret;
+      this.best = d.best || {}; this.bestItem = d.bestItem || {}; this.boards = d.boards || {}; this.stats = d.stats || {}; this.dieAll = d.dieAll || {}; this.daily = d.daily || {}; this.first = d.first || {}; this.hg = d.hg || {}; this.hgSess = d.hgSess || {}; this.runs = d.runs || 0; this.reports = d.reports || []; this.secret = d.secret || this.secret;
       // 예전 '확인 대기' 기록: 순위표에 올리고 비상 리포트로 옮긴다 (더는 기다리게 하지 않는다)
       for (const p of d.pending || []) { this.mig = true; const T = this.table(p.mode, p.diff, p.map); if (!T[p.sub] || p.e.score > T[p.sub].score) T[p.sub] = p.e; this.report('red', p.sub, p.mode, p.diff, p.map, p.why, p.e, p.r); }
     } catch { /* 처음 */ }
@@ -56,7 +59,7 @@ export class DreamBoard {
   save() {
     if (!this.dirty) return;
     this.dirty = false;
-    try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ best: this.best, bestItem: this.bestItem, boards: this.boards, stats: this.stats, daily: this.daily, first: this.first, hg: this.hg, hgSess: this.hgSess, runs: this.runs, reports: this.reports, secret: this.secret, used: this.tickets.dump(TICKET_TTL) })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('드림 러너 저장 실패', e); }
+    try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ best: this.best, bestItem: this.bestItem, boards: this.boards, stats: this.stats, dieAll: this.dieAll, daily: this.daily, first: this.first, hg: this.hg, hgSess: this.hgSess, runs: this.runs, reports: this.reports, secret: this.secret, used: this.tickets.dump(TICKET_TTL) })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('드림 러너 저장 실패', e); }
   }
   // map: 'hell' 은 난이도마다 따로 (꿈나라 노멀은 예전 표 그대로)
   table(mode, diff, map = 'dream') { if (SEP.has(map)) return (this.boards[`${map}:${mode}:${diff}`] ||= {}); if (diff !== 'easy') return (this.boards[`${mode}:${diff}`] ||= {}); return mode === 'item' ? this.bestItem : this.best; }
@@ -120,6 +123,8 @@ export class DreamBoard {
     if (time > real + 5) throw new Error('기록이 이상해요'); // 실제로 지난 시간보다 오래 달릴 수는 없다
     const s = (this.stats[sub] ||= { runs: 0, time: 0, by: {} }), d = (s.by[diff] ||= { runs: 0, time: 0 });
     s.runs++; s.time += Math.round(time); d.runs++; d.time += Math.round(time); this.dirty = true;
+    // 죽은 이유 (6-10): 정해진 종류만 센다. 나 · 모두 따로 (맵마다)
+    if (DIE_LABEL[b.die]) { const m1 = ((s.die ||= {})[map] ||= {}), m2 = (this.dieAll[map] ||= {}); m1[b.die] = (m1[b.die] || 0) + 1; m2[b.die] = (m2[b.die] || 0) + 1; }
     const D = this.day(now); D.runs++; D.time += Math.round(time); D.diff[diff] = (D.diff[diff] || 0) + 1; D.map[map] = (D.map[map] || 0) + 1; if (!D.subs.includes(sub)) D.subs.push(sub); this.first[sub] ||= dayKey(now);
     // 별 지갑: 실제로 지난 시간 · 거리에 비해 말이 안 되는 별은 받지 않는다
     const stars = Math.floor(Number(b.stars)) || 0, dist = Math.floor(Number(b.dist)) || 0;
@@ -205,7 +210,8 @@ export class DreamBoard {
       for (const mode of ['speed', 'item']) { const m = this.mine(sub, mode, k, map, false); row[mode] = m ? { rank: m.rank, score: m.score, of: Object.keys(this.table(mode, k, map)).length } : null; }
       diffs[k] = row;
     }
-    return { runs: s.runs, time: s.time, diffs };
+    const top = (o) => Object.entries(o || {}).sort((x, y) => y[1] - x[1]).slice(0, 5).map(([k, n]) => ({ k, label: DIE_LABEL[k], n }));
+    return { runs: s.runs, time: s.time, diffs, die: top(s.die?.[map]), dieAll: top(this.dieAll[map]) };
   }
   // 혼자 달린 스피드전은 입력 기록을 다시 돌려 확인한다. 애매해도 플레이어를 막지 않는다: 순위 상위에만 바로 못 오르고 사람이 본다
   async check(b, diff, map, mode, now, oldScore) {

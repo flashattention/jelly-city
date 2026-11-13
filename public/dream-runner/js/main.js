@@ -332,17 +332,23 @@ const playTime = (t) => (t < 60 ? `${t}초` : t < 3600 ? `${Math.floor(t / 60)}�
 $('stats-btn').onclick = () => { game.statsMap = game.pickMap || 'dream'; segSet('stats-map', game.statsMap); show('stats'); renderMyStats(); };
 for (const b of $('stats-map').children) b.onclick = () => { game.statsMap = b.dataset.m; segSet('stats-map', game.statsMap); renderMyStats(); };
 $('stats-close').onclick = () => show('title');
+// 자주 깬 이유 (6-10): 나 · 모두, 이 맵에서 많은 순서
+function dieBox(d) {
+  if (!d.die?.length && !d.dieAll?.length) return '';
+  const col = (title, arr) => { const sum = arr.reduce((a, x) => a + x.n, 0) || 1; return `<div class="ms-die-col"><small>${title}</small>${arr.length ? arr.map((x) => `<div class="ms-die-row"><span>${esc(x.label || x.k)}</span><i style="width:${Math.round((x.n / sum) * 100)}%"></i><b>${Math.round((x.n / sum) * 100)}%</b></div>`).join('') : '<small>아직 없어요</small>'}</div>`; };
+  return `<div class="ms-die"><div class="ms-die-h">💥 자주 깬 이유</div><div class="ms-die-cols">${col('나', d.die || [])}${col('모두', d.dieAll || [])}</div></div>`;
+}
 async function renderMyStats() {
   const el = $('my-stats'); let d;
   try { d = await account.api(`/api/dream/me?map=${game.statsMap || 'dream'}` + (logged() ? '' : `&anon=${anonId()}`)); } catch { el.innerHTML = ''; return; }
   const cell = (r) => (r ? `<b>${r.rank.toLocaleString()}위</b><small>${r.score.toLocaleString()}점 · ${r.of.toLocaleString()}명 중</small>` : '<small>기록 없음</small>');
   el.innerHTML = `<div class="ms-top"><div><small>내가 달린 판수</small><b>${d.runs.toLocaleString()}판</b></div><div><small>달린 시간</small><b>${playTime(d.time)}</b></div></div><small class="ms-note">판수와 시간은 2026년 11월 2일 패치부터 세요 (그 전 기록은 남아 있지 않아요)</small>
-    <div class="ms-table"><div class="ms-row ms-head"><span>난이도</span><span>판수 · 시간</span><span>⚡ 스피드전</span><span>🎁 아이템전</span></div>${Object.entries(DIFFS).map(([k, x]) => { const r = d.diffs[k]; return `<div class="ms-row"><span>${esc(x.name)}</span><span><b>${r.runs.toLocaleString()}판</b><small>${playTime(r.time)}</small></span><span>${cell(r.speed)}</span><span>${cell(r.item)}</span></div>`; }).join('')}</div>`;
+    <div class="ms-table"><div class="ms-row ms-head"><span>난이도</span><span>판수 · 시간</span><span>⚡ 스피드전</span><span>🎁 아이템전</span></div>${Object.entries(DIFFS).map(([k, x]) => { const r = d.diffs[k]; return `<div class="ms-row"><span>${esc(x.name)}</span><span><b>${r.runs.toLocaleString()}판</b><small>${playTime(r.time)}</small></span><span>${cell(r.speed)}</span><span>${cell(r.item)}</span></div>`; }).join('')}</div>${dieBox(d)}`;
 }
 // 달린 판수 · 시간 올리기 (한 판에 한 번, 서버 점검 중이면 다시 시도). 나갈 때는 페이지가 닫혀도 전해지게 한다
 function reportPlay(leaving) {
   if (game.playSent || game.runT < 3) return; game.playSent = true;
-  const body = { time: game.runT, diff: game.diff, map: game.map, stars: runner.stars, dist: Math.floor(runner.s), tk: game.tk || undefined, anon: logged() ? undefined : anonId() };
+  const body = { time: game.runT, diff: game.diff, map: game.map, stars: runner.stars, dist: Math.floor(runner.s), tk: game.tk || undefined, anon: logged() ? undefined : anonId(), die: game.mode === 'dead' ? runner.dead?.code : undefined };
   if (leaving) { fetch(apiUrl('/api/dream/played'), { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', ...(account.session ? { Authorization: `Bearer ${account.session}` } : {}) }, body: JSON.stringify(body) }).catch(() => {}); return; }
   (async () => { if (!body.tk && game.tkP) body.tk = await Promise.race([game.tkP, new Promise((ok) => setTimeout(ok, 8000))]) || undefined; for (let i = 0; i < 100; i++) { try { offerAd(await account.api('/api/dream/played', { method: 'POST', body }), body.tk); return; } catch (e) { if (e.status && e.status < 500) return; await new Promise((ok) => setTimeout(ok, 3000)); } } })();
 }
