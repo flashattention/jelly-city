@@ -416,6 +416,10 @@ export class Hangang {
     const S = c.map.scale, RG = 30, rg = new Map(); for (const rd of c.map.roads || []) { const w = rd[0], pts = unpack(rd.slice(2), S); for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k], e = w / 2 + 1; for (let gx = Math.floor((Math.min(a[0], b[0]) - e) / RG); gx <= Math.floor((Math.max(a[0], b[0]) + e) / RG); gx++) for (let gz = Math.floor((Math.min(a[1], b[1]) - e) / RG); gz <= Math.floor((Math.max(a[1], b[1]) + e) / RG); gz++) { const kk = `${gx},${gz}`; if (!rg.has(kk)) rg.set(kk, []); rg.get(kk).push([a, b, w / 2 + 0.6]); } } }
     const onRoad = (x, z) => { for (const [a, b, hw] of rg.get(`${Math.floor(x / RG)},${Math.floor(z / RG)}`) || []) { const dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1, t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / L2, 0, 1); if (Math.hypot(a[0] + dx * t - x, a[1] + dz * t - z) < hw) return true; } return false; };
     const zero = new THREE.Matrix4().makeScale(0, 0, 0); let n = 0;
+    // 지하철 출구 둘레 2m 안 가로수도 치운다 (나무를 출구보다 먼저 심어 서울역 13번처럼 지붕에 나무가 걸쳤다). 이 칸 나무 + 이웃 칸 나무 모두, 출구는 불러온 칸 것 전부
+    { const EG = new Map(); for (const e of this.entrances || []) { if (!e.g) continue; const k = `${Math.floor(e.x / 20)},${Math.floor(e.z / 20)}`; if (!EG.has(k)) EG.set(k, []); EG.get(k).push(e); }
+      const nearExit = (x, z) => { const gx = Math.floor(x / 20), gz = Math.floor(z / 20); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const e of EG.get(`${gx + a},${gz + b}`) || []) { const th = e.g.rotation.y, dx = x - e.x, dz = z - e.z, lx = dx * Math.cos(th) - dz * Math.sin(th), lz = dx * Math.sin(th) + dz * Math.cos(th); if (Math.abs(lx) < 1.5 + 2.6 && Math.abs(lz) < 2.6 + 2.2) return true; } return false; };
+      if (EG.size) for (const o of new Set([...this.chunks.values(), c])) { for (const G of o.treeGroups || []) { if (G.arr === 'f') continue; let hit = false; const A = o.trees || []; G.idx.forEach((si, q) => { const p = A[si]; if (!p || p.cut || !nearExit(p[0], p[1])) return; for (const m of G.ms) m?.setMatrixAt(q, zero); p.cut = true; hit = true; n++; const l = this.circGrid?.get(`${Math.floor(p[0] / 20)},${Math.floor(p[1] / 20)}`); if (l) { const i = l.findIndex((q2) => q2.x === p[0] && q2.z === p[1]); if (i >= 0) l.splice(i, 1); } }); if (hit) for (const m of G.ms) if (m) m.instanceMatrix.needsUpdate = true; } } }
     for (const o of this.chunks.values()) { if (o === c || !o.treeGroups) continue; for (const G of o.treeGroups) { let hit = false; const A = G.arr === 'f' ? o.forestFill || [] : o.trees || []; G.idx.forEach((si, q) => { const p = A[si]; if (!p || !rg.has(`${Math.floor(p[0] / RG)},${Math.floor(p[1] / RG)}`) || !onRoad(p[0], p[1])) return; for (const m of G.ms) m?.setMatrixAt(q, zero); p.cut = true; hit = true; n++; const l = this.circGrid?.get(`${Math.floor(p[0] / 20)},${Math.floor(p[1] / 20)}`); if (l) { const i = l.findIndex((q2) => q2.x === p[0] && q2.z === p[1]); if (i >= 0) l.splice(i, 1); } }); if (hit) for (const m of G.ms) if (m) m.instanceMatrix.needsUpdate = true; } }
     return n;
   }
@@ -2839,7 +2843,7 @@ export const LANDMARKS = {
   월드컵주경기장: { facade: 'panels', stadium: { h: 32, roof: '#f4f4f0', mast: true } }, 목동주경기장: { facade: 'stone', stadium: { h: 18, roof: '#e8e4dc' } }, '올림픽 주경기장': { facade: 'stone', stadium: { h: 30, roof: '#ece8e0' } }, 잠실야구장: { facade: 'stone', stadium: { h: 22, roof: '#d8d4cc' } }, 목동야구장: { facade: 'stone', stadium: { h: 16, roof: '#d8d4cc' } },
   // 예술의전당 오페라하우스(김석철, 1993): 둥근 몸통 위에 갓을 얹은 모양의 지붕 — 넓고 낮게 휜 챙 + 가운데 둥근 갓 머리. 밝은 돌 외벽, 지붕은 짙은 회색
   //   '오페라하우스' 이름 아파트 · 빌라가 서울에 10곳 넘어 위치(서초동 예술의전당)로만
-  오페라하우스: { at: [2998, 5609, 160], facade: 'assembly', color: '#ece6d8', height: 31, gat: { r: 47, crown: 23, rise: 5, crownH: 12, c: '#3d4045' }, rimLight: true },
+  오페라하우스: { at: [2998, 5609, 160], facade: 'stone', color: '#d9cfbd', height: 24, gat: { colH: 7, out: 9, rise: 6, crown: 13, crownH: 9, c: '#3a3d42', brim: '#d4d8db', stone: '#ddd3c2' } },
   '예술의전당 음악당': { facade: 'stone', color: '#e6dfd2' },
   // 코엑스(삼성동 무역센터): 길고 낮은 은회색 금속판 · 유리 띠 전시장 (지도 높이 10.9m 는 층수 없는 기본값, 실제 4층 남짓)
   코엑스: { at: [7041, 2016, 400], facade: 'panels', color: '#c3cad0', height: 22, roof: '#8d959b', rimLight: true },
@@ -2902,19 +2906,40 @@ function ringAxes(ring) {
   for (const [x, z] of ring) { const a = (x - cx) * ux + (z - cz) * uz, b = -(x - cx) * uz + (z - cz) * ux; a0 = Math.min(a0, a); a1 = Math.max(a1, a); b0 = Math.min(b0, b); b1 = Math.max(b1, b); }
   return { cx: cx + ux * (a0 + a1) / 2 - uz * (b0 + b1) / 2, cz: cz + uz * (a0 + a1) / 2 + ux * (b0 + b1) / 2, ux, uz, ang, A: (a1 - a0) / 2, B: (b1 - b0) / 2 };
 }
-// 갓 지붕 (예술의전당 오페라하우스): 몸통 위 넓은 챙(바깥 끝이 살짝 처짐) + 가운데 둥근 갓 머리(위가 둥글게 닫힘) + 챙 끝 테 · 갓 머리 띠
-function buildGatRoof(hg, [x, z], h, G) {
-  const pts = [], R = G.r, C = G.crown;
-  pts.push(new THREE.Vector2(R - 0.4, -1.4)); // 챙 밑면 두께
-  for (let i = 0; i <= 10; i++) { const t = i / 10, r = R - (R - C) * t; pts.push(new THREE.Vector2(r, -0.6 + G.rise * Math.pow(t, 1.6))); }
-  for (let i = 1; i <= 6; i++) { const t = i / 6; pts.push(new THREE.Vector2(C - 1.2 * t * t, G.rise + G.crownH * 0.75 * t)); }
-  for (let i = 1; i <= 8; i++) { const a = (i / 8) * Math.PI / 2, rr = C - 1.2; pts.push(new THREE.Vector2(Math.max(0.01, rr * Math.cos(a)), G.rise + G.crownH * 0.75 + G.crownH * 0.25 * Math.sin(a))); }
-  const m = new THREE.MeshPhongMaterial({ color: G.c, shininess: 40, specular: '#6a7078', side: THREE.DoubleSide });
-  const roof = new THREE.Mesh(new THREE.LatheGeometry(pts, 64), m); roof.position.set(x, h, z); hg.scene.add(roof);
-  const band = new THREE.Mesh(new THREE.CylinderGeometry(C + 0.05, C + 0.05, 1.1, 64, 1, true), new THREE.MeshLambertMaterial({ color: '#8a8f96', side: THREE.DoubleSide })); band.position.set(x, h + G.rise + 0.9, z); hg.scene.add(band);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(R - 0.2, 0.35, 6, 96), new THREE.MeshLambertMaterial({ color: '#5a5e64' })); rim.rotation.x = Math.PI / 2; rim.position.set(x, h - 0.9, z); hg.scene.add(rim);
-  // 밤: 챙 밑 몸통 위쪽 둘레가 따뜻하게 빛난다 (밤에만 밝아지는 재질 목록에)
-  const glowM = new THREE.MeshLambertMaterial({ color: '#d9cdb4', emissive: '#ffd99a', emissiveIntensity: 0, side: THREE.DoubleSide }); const glow = new THREE.Mesh(new THREE.CylinderGeometry(R - 4, R - 4, 1.4, 64, 1, true), glowM); glow.position.set(x, h - 2.0, z); hg.scene.add(glow); (hg.lmCrowns ||= []).push(glowM);
+// 예술의전당 오페라하우스 (위키미디어 공용 사진 Seoul_Arts_Center_20 · Korea-Seoul.Arts.Center-02 를 보고):
+//   둥근 베이지 돌 몸통 위에 기둥이 둘러선 유리 띠(열주랑) → 그 위로 넓고 얇게 바깥으로 휘어 나온 밝은 회색 금속 챙(갓 챙, 몸통보다 9m 넘게 나옴, 끝이 살짝 처짐, 밑면은 짙은 회색)
+//   → 가운데 짙은 회색 둥근 갓 머리. 앞(북쪽 광장 쪽)엔 아래층 유리 정면과 넓은 돌계단
+function buildGatRoof(hg, ring, h, G) {
+  const ax = ringAxes(ring), x = ax.cx, z = ax.cz; let R0 = 0; for (const [px, pz] of ring) R0 += Math.hypot(px - x, pz - z); R0 = Math.max(20, R0 / ring.length);
+  const g = new THREE.Group(); g.position.set(x, 0, z); hg.scene.add(g);
+  const CH = G.colH, BR = R0 + G.out;
+  // 열주랑: 안쪽 유리 띠(밤엔 따뜻한 불빛) + 베이지 돌기둥 28개 + 위아래 돌 띠
+  const glassM = new THREE.MeshPhongMaterial({ color: '#4d5a66', specular: '#c8d8e8', shininess: 80, emissive: '#ffd9a0', emissiveIntensity: 0, side: THREE.DoubleSide });
+  const gl = new THREE.Mesh(new THREE.CylinderGeometry(R0 - 2.2, R0 - 2.2, CH, 72, 1, true), glassM); gl.position.y = h + CH / 2; g.add(gl); (hg.lmCrowns ||= []).push(glassM);
+  const stoneM = new THREE.MeshLambertMaterial({ color: G.stone }), parts = [];
+  for (let i = 0; i < 28; i++) { const a = (i / 28) * Math.PI * 2, c = new THREE.CylinderGeometry(0.75, 0.85, CH, 10); c.translate(Math.cos(a) * (R0 - 0.6), h + CH / 2, Math.sin(a) * (R0 - 0.6)); parts.push(c); }
+  { const b = new THREE.CylinderGeometry(R0 + 0.3, R0 + 0.3, 1.1, 72, 1, true); b.translate(0, h + 0.55, 0); parts.push(b); const t = new THREE.CylinderGeometry(R0 + 0.6, R0 + 0.6, 1.0, 72); t.translate(0, h + CH - 0.6, 0); parts.push(t); }
+  g.add(new THREE.Mesh(mergeGeos(parts), stoneM));
+  // 갓 챙: 얇은 회전체. 윗면은 밝은 회색 금속, 밑면은 짙게 (밑면은 따로 한 겹)
+  const y0 = h + CH + 1.0, top = [], bot = [];
+  for (let i = 0; i <= 24; i++) { const t = i / 24, r = BR - (BR - G.crown * 1.15) * t, y = y0 + 0.4 + G.rise * Math.pow(t, 1.7) - 0.9 * Math.pow(1 - t, 6); top.push(new THREE.Vector2(r, y)); bot.push(new THREE.Vector2(r, y - 0.55 - 0.5 * t)); }
+  const brim = new THREE.Mesh(new THREE.LatheGeometry(top, 96), new THREE.MeshPhongMaterial({ color: G.brim, specular: '#ffffff', shininess: 60, side: THREE.DoubleSide })); g.add(brim);
+  const under = new THREE.Mesh(new THREE.LatheGeometry(bot, 96), new THREE.MeshLambertMaterial({ color: '#5d6166', side: THREE.DoubleSide })); g.add(under);
+  const edge = new THREE.Mesh(new THREE.TorusGeometry(BR, 0.42, 6, 128), new THREE.MeshPhongMaterial({ color: '#d9dcde', shininess: 80 })); edge.rotation.x = Math.PI / 2; edge.position.y = y0 - 0.4; g.add(edge);
+  // 챙 위 금속판 이음매 (방사선 64줄)
+  const L = []; for (let i = 0; i < 64; i++) { const a = (i / 64) * Math.PI * 2; for (let k = 0; k < 24; k++) { const p = top[k], q = top[k + 1]; L.push(Math.cos(a) * p.x, p.y + 0.05, Math.sin(a) * p.x, Math.cos(a) * q.x, q.y + 0.05, Math.sin(a) * q.x); } }
+  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(L, 3)); g.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: '#8d9296', transparent: true, opacity: 0.6 })));
+  // 갓 머리: 짙은 회색 둥근 통 + 둥근 윗면
+  const yc = y0 + 0.4 + G.rise, cr = G.crown, prof = []; for (let i = 0; i <= 5; i++) prof.push(new THREE.Vector2(cr - 0.6 * (i / 5) ** 2, yc - 0.3 + G.crownH * 0.7 * (i / 5)));
+  for (let i = 1; i <= 8; i++) { const a = (i / 8) * Math.PI / 2; prof.push(new THREE.Vector2(Math.max(0.01, (cr - 0.6) * Math.cos(a)), yc - 0.3 + G.crownH * 0.7 + G.crownH * 0.3 * Math.sin(a))); }
+  g.add(new THREE.Mesh(new THREE.LatheGeometry(prof, 48), new THREE.MeshPhongMaterial({ color: G.c, shininess: 30, specular: '#5a6068' })));
+  // 앞 유리 정면 (북쪽 광장 쪽 1 ~ 2층, 몸통에 붙은 굽은 유리) + 넓은 돌계단
+  const glassF = new THREE.MeshPhongMaterial({ color: '#3f4c58', specular: '#dfe8f0', shininess: 90, emissive: '#ffe2b0', emissiveIntensity: 0, side: THREE.DoubleSide });
+  const fg = new THREE.Mesh(new THREE.CylinderGeometry(R0 + 0.35, R0 + 0.35, 9, 40, 1, true, Math.PI - 0.55, 1.1), glassF); fg.position.y = 4.5; g.add(fg); (hg.lmCrowns ||= []).push(glassF);
+  const steps = []; for (let k = 0; k < 10; k++) { const s = new THREE.BoxGeometry(46 - k * 0.6, 0.3 * (k + 1), 1.2); s.translate(0, 0.15 * (k + 1), -(R0 + 13 - k * 1.2)); steps.push(s); }
+  const plat = new THREE.BoxGeometry(40, 3, 6); plat.translate(0, 1.5, -(R0 + 2.5)); steps.push(plat);
+  g.add(new THREE.Mesh(mergeGeos(steps), new THREE.MeshLambertMaterial({ color: '#cfc8bb' })));
+  hg.addFoot({ ring: [[x - 20, z - R0 - 5.5], [x + 20, z - R0 - 5.5], [x + 20, z - R0 + 0.5], [x - 20, z - R0 + 0.5]], h: 3, x0: x - 20, x1: x + 20, z0: z - R0 - 5.5, z1: z - R0 + 0.5, name: '오페라하우스 계단', type: 'stone' });
 }
 // 서울식물원 온실: 외곽선(꽃잎 모양) 그대로 유리 벽 + 오목한 접시 지붕(가장자리 rim · 가운데 mid), 흰 철골 격자선. 밤엔 안쪽 빛
 function buildDishHouse(hg, ring, D) {
@@ -2987,7 +3012,7 @@ function buildLandmarkExtras(hg, { name, ring, h, L }) {
     const cm = hg.crossM || new THREE.MeshLambertMaterial({ color: '#f4f1ea' }); const pole = new THREE.Mesh(new THREE.BoxGeometry(0.4, 3, 0.4), cm); pole.position.set(tx, L.spire.h + 1.5, tz); const bar = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.4, 0.4), cm); bar.position.set(tx, L.spire.h + 2, tz); hg.scene.add(pole, bar);
     hg.addFoot({ ring: [[tx - W / 2, tz - W / 2], [tx + W / 2, tz - W / 2], [tx + W / 2, tz + W / 2], [tx - W / 2, tz + W / 2]], h: h + 10, x0: tx - W / 2, x1: tx + W / 2, z0: tz - W / 2, z1: tz + W / 2, name: '', type: 'brick' }); }
   if (L.jbug) buildJBug(hg, ring);
-  if (L.gat) buildGatRoof(hg, L.at ? [L.at[0], L.at[1]] : [cx, cz], h, L.gat);
+  if (L.gat) buildGatRoof(hg, ring, h, L.gat);
   if (L.dish) buildDishHouse(hg, ring, L.dish);
   if (L.peaceGate) buildPeaceGate(hg, ring, L.peaceGate);
   if (L.egg) { // 은색 타원 지붕: 외곽선의 긴 축 · 짧은 축에 맞춘 반타원체
