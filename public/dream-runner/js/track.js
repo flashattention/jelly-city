@@ -840,6 +840,9 @@ export class Track {
     let at = s;
     const flat = (len) => { const p = this.plat(at, at + len, 0, W, 0); at += len; return p; };
     const L = [-W / 3, 0, W / 3];
+    // 코스가 바뀐 뒤(문을 지나 하얗게 덮였다 열린 뒤) 3초 동안은 장애물 없이 별만 (6-10 건의: 열리자마자 부딪혀 억울함)
+    const safeEnd = base + SEOUL_U0 + v * 3 + 12;
+    if (s < safeEnd) { const p = flat(Math.max(12, safeEnd - s)); this.starLine(p.s0 + 4, p.s1 - 4, r.pick(L), 0, 5); this.gs = at; return; }
     const VEH = { car: [1.86, 4.8, 1.45], suv: [1.9, 4.7, 1.72], taxi: [1.86, 4.9, 1.6], bus: [2.5, 11, 3.25], moto: [0.75, 2.0, 1.4], bike: [0.6, 1.8, 1.2], ped: [0.6, 0.6, 1.25] };
     const oncoming = (p, kind, lane, speed, ph, extra = {}) => { const [wx, ls, h] = VEH[kind]; return this.mover(kind, { type: 'on', x: lane, y: 0, h, lx: wx, ls, sNear: p.s0 - 12, sFar: p.s1 + 40, sEnd: p.s1, v: speed, rest: r.range(0.6, 2.2), ph, n: r.int(0, 1e6), ...extra }); };
     const cross = (p, kind, sAt, dir, speed, ph, rest, half = W / 2 + 4) => { const [wx, ls, h] = VEH[kind]; return this.mover(kind, { type: 'cross', s: sAt, sEnd: sAt + 4, y: 0, h, lx: ls, ls: wx, xL: -half, xR: half, dir, v: speed, rest, ph, n: r.int(0, 1e6) }); };
@@ -870,10 +873,19 @@ export class Track {
         case 'rush': { for (let i = 0; i < 4; i++) oncoming(p, i === 0 && r.chance(0.5) ? 'bus' : carKind(), L[i % 3], r.range(8, 12), r.next()); break; }
         case 'delivery': { for (let i = 0; i < r.int(3, 4); i++) oncoming(p, 'moto', L[i % 3], r.range(10, 14), r.next(), { weave: r.range(0.6, 1.4), rest: r.range(0.3, 1) }); break; }
         case 'bikepath': { for (let i = 0; i < r.int(3, 4); i++) oncoming(p, r.chance(0.5) ? 'bike' : 'ped', L[i % 3], r.range(2.5, 5), r.next(), { rest: r.range(0.2, 0.8) }); this.starLine(p.s0 + 4, p.s1 - 4, r.pick(L), 0, 4); break; }
-        case 'construction': { const at2 = p.s0 + (p.s1 - p.s0) * 0.35, side = r.chance(0.5) ? 1 : -1, half = W * r.range(0.45, 0.6);
-          const x0 = side > 0 ? W / 2 - half : -W / 2, x1 = x0 + half; this.seoulStatic('barrier', at2, x0, x1, 0, 1.4, 1.4);
-          if (p.s1 - at2 > v * 0.9) this.seoulStatic('cones', at2 + v * 0.75, -W / 2, W / 2, 0, 0.6, 0.6);
-          if (d > 0.05 && p.s1 - at2 > v * 1.6) this.seoulStatic('banner', at2 + v * 1.5, -W / 2, W / 2, 1.0, 2.2, 0.5);
+        case 'construction': {
+          // 공사 구간: 가림막(옆으로 피하기) · 고깔 줄(점프) · 현수막(숙이기) 중 1 ~ 3개를 섞인 순서 · 간격으로 (늘 같은 묶음이 나오지 않게)
+          const at2 = p.s0 + (p.s1 - p.s0) * r.range(0.25, 0.45), side = r.chance(0.5) ? 1 : -1, half = W * r.range(0.45, 0.6);
+          const x0 = side > 0 ? W / 2 - half : -W / 2, x1 = x0 + half;
+          const kinds = r.shuffle(['barrier', 'cones', 'banner']).slice(0, r.weighted([[1, 2], [2, d > 0.05 ? 2 : 1], [3, d > 0.2 ? 1 : 0]], (x) => x[1])[0]);
+          let sAt = at2;
+          for (const k of kinds) {
+            if (sAt > p.s1 - 2) break;
+            if (k === 'barrier') this.seoulStatic('barrier', sAt, x0, x1, 0, 1.4, 1.4);
+            else if (k === 'cones') this.seoulStatic('cones', sAt, -W / 2, W / 2, 0, 0.6, 0.6);
+            else this.seoulStatic('banner', sAt, -W / 2, W / 2, 1.0, 2.2, 0.5);
+            sAt += v * r.range(0.75, 1.3);
+          }
           this.starLine(p.s0 + 2, at2 - 2, side > 0 ? x0 - 1 : x1 + 1, 0, 4); break; }
       }
     }
