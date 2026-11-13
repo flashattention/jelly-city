@@ -23,7 +23,7 @@ const TOP_GUARD = 10, DAY_STARS = 300000; // 확인 안 된 기록이 이 순위
 const dayKey = (t = Date.now()) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);
 const DAILY_KEEP = 120;
 // 서울 명소 도장: 명소 id → 체험에 걸리는 최소 시간(초, 실제 시간). 시작(begin)을 알리고 이 시간이 지나야 도장(done)이 찍힌다
-const HG_STAMPS = { gbg: 30, cable: 40, lock: 3, cruise: 60, bike: 45, obs63: 20, lwt: 20, lotteworld: 30 };
+const HG_STAMPS = { gbg: 30, cable: 40, lock: 3, cruise: 60, bike: 45, obs63: 20, lwt: 20, lotteworld: 30, market: 15, haneul: 25, naksan: 30, nodeul: 18, huwon: 20, museum: 20, ddp: 20, library: 15, botanic: 20, baseball: 30 };
 const HG_TTL = 10 * 3600e3, HG_MO = ['sunset', 'sunrise', 'night', 'rain', 'snow', 'spring', 'summer', 'autumn', 'winter']; // 한강 러닝: 한 번에 10시간까지 · 순간들 // 이 날수보다 오래된 하루 기록은 지운다
 const MAPS = ['dream', 'hell', 'void', 'seoul'], mapOf = (m) => (m === 'hell' || m === 'void' || m === 'seoul' ? m : 'dream'); // 꿈나라 · 지옥 · 이공간 · 서울
 const SEP = new Set(['hell', 'void', 'seoul']); // 난이도마다 따로 쓰는 맵 (꿈나라 노멀만 예전 표)
