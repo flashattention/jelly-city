@@ -2568,6 +2568,8 @@ float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y
     const m = size / span, c = size / 2;
     ctx.fillStyle = 'rgba(30,30,40,.9)'; ctx.font = `bold ${Math.round(size / 15)}px sans-serif`; ctx.textAlign = 'center';
     for (const [n, ms] of this.map.marks || []) { const p = this.at(ms), x = c + (p.x - this.px) * m, y = c + (p.z - this.pz) * m; if (x > 8 && x < size - 8 && y > 8 && y < size - 8) ctx.fillText(n, x, y - 4); }
+    // 서울 전체: 지하철역 (첫 호선 색 동그라미 + 이름, 흰 테두리 글씨)
+    if (this.chunks) { ctx.save(); ctx.font = `bold ${Math.round(size / 17)}px sans-serif`; ctx.textBaseline = 'bottom'; ctx.lineJoin = 'round'; for (const st of this.stations || []) { const x = c + (st.x - this.px) * m, y = c + (st.z - this.pz) * m; if (x < 12 || x > size - 12 || y < 16 || y > size - 12) continue; const rr = Math.max(3, size / 42); ctx.fillStyle = LINE_COLOR[st.lines[0]] || '#7a7f8a'; ctx.beginPath(); ctx.arc(x, y, rr, 0, 7); ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = '#fff'; ctx.stroke(); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.92)'; ctx.strokeText(st.name, x, y - rr - 1); ctx.fillStyle = '#1f2a3a'; ctx.fillText(st.name, x, y - rr - 1); } ctx.restore(); }
     for (const p of this.people) { const [x0, z0] = this.world(p.s, p.lat), x = c + (x0 - this.px) * m, y = c + (z0 - this.pz) * m; ctx.fillStyle = p.kind.startsWith('runner') ? '#ffffff' : '#ffd23f'; ctx.beginPath(); ctx.arc(x, y, 2.2, 0, 7); ctx.fill(); }
     this.attr?.drawMini(ctx, size, m, c);
     this.live?.drawMini(ctx, c, m, this.px, this.pz, size);
@@ -2850,7 +2852,7 @@ export const LANDMARKS = {
   // 옛 서울역 (문화역서울284): 붉은 벽돌 + 화강석 띠 + 가운데 초록 돔 · 덕수궁 석조전 (흰 돌 신고전) · 지금 서울역 (유리)
   문화역서울284: { facade: 'brick', color: '#a8573e', height: 15, domeTop: { r: 7, h: 9, c: '#4f8a76' } }, 석조전: { facade: 'stone', color: '#ece6d8', height: 17 }, '서울역(철도역)': { facade: 'glass', color: '#9fb6c8', height: 24 },
   서울특별시청: { facade: 'glass', color: '#a9c8dc', height: 52 }, 동대문디자인플라자: { facade: 'panels', color: '#c9ccd0', height: 29 }, 국립중앙박물관: { facade: 'stone', color: '#d9d2c4', height: 26 },
-  경복궁: { facade: 'hanok', color: '#e8dccb', height: 9, roofH: 7 }, '경복궁 건춘문': { facade: 'hanok', color: '#e8dccb', height: 9, roofH: 5 }, 조계사: { facade: 'hanok', color: '#e8dccb', roofH: 7 },
+  경복궁: { at: [-250, -5600, 1200], facade: 'hanok', color: '#e8dccb', height: 9, roofH: 7 }, '경복궁 건춘문': { facade: 'hanok', color: '#e8dccb', height: 9, roofH: 5 }, 조계사: { facade: 'hanok', color: '#e8dccb', roofH: 7 },
   여의도순복음교회: { facade: 'panels', color: '#5d4f48', campus: 160, campusFacade: 'stone', campusColor: '#a08a7a', front: { w: 16, d: 9, up: 13, face: 'west', screen: true, cross: true, sign: '여의도순복음교회' }, rimLight: true },
 };
 // 역 · 호선 (서울 지하철 노선 색)
