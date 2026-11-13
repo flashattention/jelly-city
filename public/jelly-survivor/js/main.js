@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { isPhone, autoRes } from '../../shared/js/perf.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { account, store } from '../../shared/js/account.js';
+import { takeTicket, ticketFor } from '../../shared/js/run-ticket.js';
 import { Shell, esc } from '../../shared/js/shell.js';
 import { Roach } from '../../shared/js/roach.js';
 import { faceHtml, makeSound, confetti, rankIcon } from '../../shared/js/party.js';
@@ -470,6 +471,7 @@ function startSolo() {
   game.endless = game.pick.mode === 'endless'; game.stage = Math.min(game.pick.stage, unlocked());
   game.sim = new Sim([me], { hard: game.pick.diff === 'hard', stage: game.stage, endless: game.endless });
   game.diff = game.pick.diff;
+  takeTicket('/api/surv', game.endless ? 'endless' : game.diff);
   begin('solo', [me], 2500);
   apply(game.sim.snapshot(), true);
 }
@@ -587,7 +589,7 @@ async function endSolo() {
 function anonId() { let a = store.get(ANON_KEY); if (!/^[a-f0-9]{24}$/.test(a || '')) { a = [...crypto.getRandomValues(new Uint8Array(12))].map((b) => b.toString(16).padStart(2, '0')).join(''); store.set(ANON_KEY, a); } return a; }
 async function saveRecord(rec) {
   try {
-    const r = await account.api('/api/surv/record', { method: 'POST', body: rec });
+    const r = await account.api('/api/surv/record', { method: 'POST', body: { ...rec, tk: await ticketFor('/api/surv', rec.b) } });
     $('ov-me').textContent += r.best ? ` · 🎉 새 최고 기록! ${r.me?.rank}등` : ` · 최고 ${r.me?.value}점 (${r.me?.rank}등)`;
     if (r.best) confetti();
     renderTop(r.top, r.me);

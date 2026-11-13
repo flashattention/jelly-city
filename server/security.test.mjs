@@ -168,6 +168,64 @@ test('3-2 IP 하나당 동시 접속 상한', async () => {
   const other = await wsOpen('/word-ws', IP(45)); assert.ok(other instanceof WebSocket); other.close();
 });
 
+// ---------- 점수 · 기록 위조 ----------
+const hex = (n) => [...Array(n)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');
+test('5-1 기록판: 출발표로 남기기 · 같은 출발표 재사용 거절', async () => {
+  const anon = hex(24), h = IP(50);
+  const { tk } = await (await postJ('/api/slide/start', { b: 's4' }, h)).json();
+  assert.ok(tk);
+  await new Promise((r) => setTimeout(r, 2100)); // 같은 사람 2초 간격
+  let r = await postJ('/api/slide/record', { b: 's4', value: 1234, name: '정상곰', anon, tk }, h);
+  assert.equal(r.status, 200); let j = await r.json(); assert.equal(j.hold, true, '10초 안 = 너무 빠름 → 상위권이면 보류');
+  await new Promise((r2) => setTimeout(r2, 2100));
+  r = await postJ('/api/slide/record', { b: 's4', value: 9999, name: '정상곰', anon, tk }, h);
+  assert.equal(r.status, 409, '같은 출발표는 한 번만');
+});
+
+test('5-1 기록판: 출발표 없는 1등은 공개 순위표에서 보류, 주인에게만 보인다 · 관리자가 인정하면 보인다', async () => {
+  const anon = hex(24), h = IP(51);
+  const r = await postJ('/api/ten/record', { b: 't60', score: 170, name: '수상한곰', anon }, h);
+  assert.equal(r.status, 200); const j = await r.json(); assert.equal(j.hold, true); assert.equal(j.me.hold, true);
+  const pub = await (await fetch(S.base + '/api/ten/board?b=t60', { headers: IP(52) })).json();
+  assert.ok(!pub.top.some((e) => e.name === '수상한곰'), '공개 순위표에는 없다');
+  const mine = await (await fetch(S.base + `/api/ten/board?b=t60&anon=${anon}`, { headers: IP(52) })).json();
+  assert.equal(mine.me.name, '수상한곰');
+  // 관리자 화면에서 인정
+  const admin = (await (await postJ('/api/login', { dev: 'admin' }, IP(53))).json()).session;
+  const list = await (await fetch(S.base + '/api/sec/held', { headers: { Authorization: `Bearer ${admin}`, ...IP(53) } })).json();
+  const it = list.list.find((x) => x.name === '수상한곰'); assert.ok(it); assert.equal(it.why, 'noticket');
+  assert.equal((await postJ('/api/sec/held', { game: 'jelly-ten', b: 't60', key: it.key, act: 'ok' }, IP(53), )).status, 401, '로그인 없이는 안 된다');
+  const ok = await fetch(S.base + '/api/sec/held', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${admin}`, ...IP(53) }, body: JSON.stringify({ game: 'jelly-ten', b: 't60', key: it.key, act: 'ok' }) });
+  assert.equal(ok.status, 200);
+  const pub2 = await (await fetch(S.base + '/api/ten/board?b=t60', { headers: IP(52) })).json();
+  assert.ok(pub2.top.some((e) => e.name === '수상한곰'));
+  // 관리자가 아닌 사람은 못 본다
+  const user = (await (await postJ('/api/login', { dev: 'notadmin' }, IP(54))).json()).session;
+  assert.equal((await fetch(S.base + '/api/sec/held', { headers: { Authorization: `Bearer ${user}`, ...IP(54) } })).status, 403);
+});
+
+test('5-1 기록판: 실제로 지난 시간보다 긴 기록은 거절', async () => {
+  const anon = hex(24), h = IP(55);
+  const { tk } = await (await postJ('/api/drift/start', { b: 'candy' }, h)).json();
+  const r = await postJ('/api/drift/record', { b: 'candy', time: 60, name: '순간이동곰', anon, tk }, h);
+  assert.equal(r.status, 400);
+  const t2 = (await (await postJ('/api/surv/start', { b: 'endless' }, h)).json()).tk;
+  await new Promise((r2) => setTimeout(r2, 2100));
+  assert.equal((await postJ('/api/surv/record', { b: 'endless', score: 900, name: '순간이동곰', anon, tk: t2 }, h)).status, 400);
+  // 다른 판의 출발표는 없는 것과 같다 (보류)
+  const t3 = (await (await postJ('/api/drift/start', { b: 'neon' }, h)).json()).tk;
+  await new Promise((r2) => setTimeout(r2, 2100));
+  const j = await (await postJ('/api/drift/record', { b: 'candy', time: 30, name: '순간이동곰', anon, tk: t3 }, h)).json();
+  assert.equal(j.hold, true);
+});
+
+test('7-1 순위표에 익명 id 가 나가지 않는다', async () => {
+  const anon = hex(24), h = IP(56);
+  await postJ('/api/merge/record', { b: 'cup', value: 3, name: '비밀곰', anon }, h);
+  const txt = await (await fetch(S.base + '/api/merge/board?b=cup', { headers: h })).text();
+  assert.ok(!txt.includes(anon.slice(-8)) && !txt.includes(anon), '익명 id 조각이 없다');
+});
+
 test('2-2 정적 파일: public 밖 · 숨김 파일을 읽을 수 없다', async () => {
   const bad = ['/..%2f..%2f.env', '/..%2fpackage.json', '/%2e%2e/%2e%2e/.env', '/..%5c..%5cserver%5cindex.js', '/dream-runner/..%2f..%2fserver/index.js', '/.env', '/.git/config', '/%2egit/config', '/shared/%00.js', '/x.js%00.html', '/..%2f..%2fserver/index.js?w=1', '/.well-known/../../.env'];
   for (const p of bad) {

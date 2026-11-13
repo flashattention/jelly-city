@@ -3,6 +3,7 @@ import '../../shared/js/renamed.js'; // 옛 이름으로 저장된 값 옮기기
 import * as THREE from 'three';
 import { isPhone, autoRes } from '../../shared/js/perf.js';
 import { account, store } from '../../shared/js/account.js';
+import { takeTicket, ticketFor } from '../../shared/js/run-ticket.js';
 import { Shell, esc, TEAMS } from '../../shared/js/shell.js';
 import { Env } from '../../dream-runner/js/env.js';
 import { sfx, setMusic, unlock, toggleMute, sound, engine } from '../../dream-runner/js/music.js';
@@ -165,6 +166,7 @@ function setupRace(trackId, itemMode, team) {
 function startSolo(withBots) {
   game.multi = false; shell.multi = false;
   const tid = pickTrack(game.pick.track);
+  takeTicket('/api/drift', tid);
   if (isRandom(game.pick.track)) { const t = TRACKS.find((x) => x.id === tid); shell.toast(`🎲 ${t.emoji} ${t.name} (${stars(t.lv)})`, 2600); }
   setupRace(tid, withBots && game.pick.mode === 'item', false);
   const me = game.me = new Kart({ scene, profile: shell.profile, id: 'me' });
@@ -467,7 +469,7 @@ function showResults(m) {
 function anonId() { let a = store.get(ANON_KEY); if (!/^[a-f0-9]{24}$/.test(a || '')) { a = [...crypto.getRandomValues(new Uint8Array(12))].map((b) => b.toString(16).padStart(2, '0')).join(''); store.set(ANON_KEY, a); } return a; }
 async function saveRecord(rec) {
   try {
-    const r = await account.api('/api/drift/record', { method: 'POST', body: rec });
+    const r = await account.api('/api/drift/record', { method: 'POST', body: { ...rec, tk: await ticketFor('/api/drift', rec.b) } });
     game.boards = {}; loadTops(); // 새 기록이 처음 화면에 바로 보이게
     $('ov-best').textContent = r.best ? `🎉 이 트랙 내 최고 기록! 전체 ${r.me.rank}위` : `내 최고 ${fmt(r.me.value)} · 전체 ${r.me.rank}위`;
     if (r.best) sfx('best');

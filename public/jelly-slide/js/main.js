@@ -308,7 +308,7 @@ function begin(kind, seed, size, ms, sp = game.pick) {
   for (const v of vis.values()) v.born = performance.now() + Math.min(ms, 600);
   countdown(ms); S.sfx('start'); S.music('apple');
 }
-function startSolo() { S.unlock(); begin('solo', (Math.random() * 2 ** 31) | 0, game.pick.size, 1600); }
+function startSolo() { S.unlock(); ranking.begin(`s${game.pick.size}`); begin('solo', (Math.random() * 2 ** 31) | 0, game.pick.size, 1600); }
 function practice() { S.unlock(); shell.sendAfterHello({ t: 'practice', opts: { time: game.pick.time, bots: Math.max(1, game.pick.bots), size: game.pick.size, star: game.pick.star, sugar: game.pick.sugar } }); }
 function startMulti(m) {
   game.myId = shell.myId; game.players.clear();

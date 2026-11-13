@@ -98,12 +98,16 @@ for (const [o, n] of [['jelly-apple', 'jelly-ten'], ['jelly-rider', 'jelly-drift
 const tenRecords = new Records(DATA_DIR, 'jelly-ten', {
   boards: ['t60', 't120', 't180'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.score)),
   check: (b) => (Number.isInteger(Number(b.score)) && Number(b.score) >= 0 && Number(b.score) <= 170 ? null : '기록이 이상해요'),
+  // 출발표 뒤 실제 시간: 60 · 120 · 180초 판인데 한참 짧으면 의심 (판이 일찍 끝날 수도 있어 막지는 않는다)
+  timing: (b, body, s) => (s < Number(b.slice(1)) * 0.8 ? { flag: 'fast' } : null),
 });
 // 젤리 서바이버: 협동 방 · 혼자 하기 최고 점수 (보통 · 어려움)
 const survRooms = new SurvRooms((sid) => world.userOf(sid));
 const survRecords = new Records(DATA_DIR, 'jelly-survivor', {
   boards: ['normal', 'hard', 'endless'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.score)), // endless = 버틴 시간(초)
   check: (b) => (Number.isInteger(Number(b.score)) && Number(b.score) >= 0 && Number(b.score) <= 60000 ? null : '기록이 이상해요'),
+  // 끝없이(endless) 는 버틴 초: 실제로 지난 시간보다 오래 버틸 수는 없다
+  timing: (b, body, s) => (b === 'endless' ? (Number(body.score) > s + 5 ? { reject: '기록이 이상해요' } : null) : s < 30 ? { flag: 'fast' } : null),
 });
 const wordDict = new Dict(DATA_DIR); // 끝말잇기 사전 판정 (LLM 결과를 저장해 둔다)
 const wordRooms = new WordRooms((sid) => world.userOf(sid), wordDict);
@@ -125,19 +129,24 @@ const arcadeRooms = new ArcadeRooms((sid) => world.userOf(sid), arcadeRecords); 
 const typeRecords = new Records(DATA_DIR, 'jelly-type', {
   boards: ['kpm', 'rain'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.value)),
   check: (b) => { const v = Number(b.value); return Number.isFinite(v) && v >= 0 && v <= (b.b === 'kpm' ? 1600 : 5000000) ? null : '기록이 이상해요'; },
+  timing: (b, body, s) => (s < (b === 'kpm' ? 5 : 20) ? { flag: 'fast' } : null),
 });
 // 젤리 머지 · 젤리 슬라이드: 혼자 하기 최고 점수 (통 · 판 크기마다)
 const mergeRecords = new Records(DATA_DIR, 'jelly-merge', {
   boards: ['box', 'bowl', 'cup'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.value)),
   check: (b) => { const v = Number(b.value); return Number.isFinite(v) && v >= 0 && v <= 500000 ? null : '기록이 이상해요'; },
+  timing: (b, body, s) => (s < 20 ? { flag: 'fast' } : null),
 });
 const slideRecords = new Records(DATA_DIR, 'jelly-slide', {
   boards: ['s4', 's5'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.value)),
   check: (b) => { const v = Number(b.value); return Number.isFinite(v) && v >= 0 && v <= 5000000 ? null : '기록이 이상해요'; },
+  timing: (b, body, s) => (s < 10 ? { flag: 'fast' } : null),
 });
 const driftRecords = new Records(DATA_DIR, 'jelly-drift', {
   boards: RIDER_TRACKS, better: (a, b) => a.value < b.value, value: (b) => Math.round(Number(b.time) * 1000) / 1000,
   check: (b) => (Number.isFinite(Number(b.time)) && Number(b.time) >= 25 && Number(b.time) <= 3600 ? null : '기록이 이상해요'),
+  // 경주 시간보다 실제 시간이 짧을 수는 없다 (출발 전 4초 카운트다운도 있다)
+  timing: (b, body, s) => (s < Number(body.time) - 5 ? { reject: '기록이 이상해요' } : s < Number(body.time) + 2 ? { flag: 'fast' } : null),
 });
 // 업적: 기록판 · 방 경기 결과를 치장 쪽에 잇는다
 Object.assign(cosmetics.records, { 'jelly-ten': tenRecords, 'jelly-survivor': survRecords, 'jelly-type': typeRecords, 'jelly-merge': mergeRecords, 'jelly-slide': slideRecords, 'jelly-drift': driftRecords });
@@ -250,6 +259,21 @@ async function api(req, res, url) {
   if (url.pathname.startsWith('/api/arcade/')) return arcadeRecords.api(req, res, url, world.userOf(sid), json, '/api/arcade');
   const who = world.userOf(sid);
   if (!who) return json(res, 401, { error: 'login' });
+  // 보안 관리자 (5-2 · 12-2): 보류된 기록 · 보안 사건 요약. 관리자만, 행동은 보안 사건(admin)으로 남긴다
+  if (url.pathname.startsWith('/api/sec/')) {
+    if (!isAdmin(who.user)) { sec.note('admin', { ip, where: url.pathname, detail: 'not admin' }); return json(res, 403, { error: '관리자만 볼 수 있어요' }); }
+    const RECS = { 'jelly-ten': tenRecords, 'jelly-survivor': survRecords, 'jelly-type': typeRecords, 'jelly-merge': mergeRecords, 'jelly-slide': slideRecords, 'jelly-drift': driftRecords };
+    if (url.pathname === '/api/sec/held' && req.method === 'GET') return json(res, 200, { list: Object.values(RECS).flatMap((R) => R.heldList()) });
+    if (url.pathname === '/api/sec/held' && req.method === 'POST') {
+      const b = await readJson(req), R = RECS[String(b.game)];
+      if (!R || !R.boards.includes(b.b)) return json(res, 400, { error: '판이 없어요' });
+      try { R.resolveHeld(b.b, String(b.key), String(b.act)); } catch (e) { return json(res, 400, { error: e.message }); }
+      sec.note('admin', { ip, where: url.pathname, detail: `${b.act} ${b.game}.${b.b}` });
+      return json(res, 200, { ok: true });
+    }
+    if (url.pathname === '/api/sec/summary') return json(res, 200, sec.summary(Math.min(30, Math.max(1, +url.searchParams.get('days') || 7))));
+    return json(res, 404, { error: 'not found' });
+  }
   if (url.pathname === '/api/me') return json(res, 200, { user: world.publicUser(who.user), chars: world.charList(who.sub), admin: isAdmin(who.user), cos: cosmetics.pub(who.sub) });
   // 닉네임 정하기 · 바꾸기 (구글 실명 대신 모든 게임에서 쓴다)
   if (url.pathname === '/api/nick' && req.method === 'POST') { if (rateLimited('nick', who.sub, { req, res, json, where: url.pathname })) return; const b = await readJson(req); try { return json(res, 200, { user: world.setNick(who.sub, b.nick) }); } catch (e) { return json(res, 400, { error: e.message }); } }

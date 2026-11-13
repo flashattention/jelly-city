@@ -4,6 +4,7 @@
 import { account, store } from './account.js';
 import { esc } from './shell.js';
 import { rankIcon } from './party.js';
+import { takeTicket, ticketFor } from './run-ticket.js';
 
 const ANON_KEY = 'dreamrunner.anon'; // 비로그인 기록 주인 (여러 게임이 같이 쓴다)
 const $ = (id) => document.getElementById(id);
@@ -35,14 +36,16 @@ export class Ranking {
     $('bd-seg').querySelectorAll('[data-b]').forEach((btn) => { btn.onclick = () => this.open(btn.dataset.b); });
     this.o.shell.show('board-screen'); this.show(b, $('bd-list'));
   }
+  // 혼자 하기를 시작할 때: 출발표를 받아 둔다 (기록을 남길 때 같이 보낸다)
+  begin(b) { takeTicket(this.o.api, b); }
   // 혼자 하기가 끝났을 때: 결과 화면(#over)의 el 에 순위표 · 내 순위를 보여 준다. 비로그인이면 닉네임 칸
   async submit(b, value, el, note) {
     const key = `${b}:${value}`; if (this.lastKey === key && Date.now() - this.lastAt < 4000) return; // 같은 판을 두 번 보내지 않게
     this.lastKey = key; this.lastAt = Date.now();
-    const rec = { b, value, color: this.o.shell.profile?.color };
+    const rec = { b, value, color: this.o.shell.profile?.color }, tk = ticketFor(this.o.api, b);
     const post = async (extra) => {
       try {
-        const r = await account.api(`${this.o.api}/record`, { method: 'POST', body: { ...rec, ...extra } });
+        const r = await account.api(`${this.o.api}/record`, { method: 'POST', body: { ...rec, ...extra, tk: await tk } });
         note?.(r.best ? `🏆 새 최고 기록! 전체 ${r.me?.rank}등` : `🏆 내 최고 ${r.me?.value}${this.o.unit} · 전체 ${r.me?.rank}등`, r.best);
         this.render(r.top, r.me, el);
       } catch (e) { note?.(`기록을 남기지 못했어요 (${e.message})`); }

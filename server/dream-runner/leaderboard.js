@@ -8,6 +8,7 @@ import { getCos, boardMedal, nameOf, tagChar } from '../cosmetics.js';
 import crypto from 'node:crypto';
 import { Tickets, ReplayPool, decodeReplay } from './verify.js';
 import { codeVer, archiveCode, hasVer, VER_RE } from './codever.js';
+import { publicId, sec } from '../shared/guard.js';
 // 죽은 이유 종류 → 이름 (runner.js die 의 code)
 export const DIE_LABEL = { step: '높은 턱 · 벽', fall: '떨어짐', hurdle: '낮은 장애물', wall: '높은 장애물', bar: '머리 위 가로대', meteor: '운석', laser: '빛줄기', slam: '괴물의 일격', car: '승용차', suv: 'SUV', taxi: '택시', bus: '버스', moto: '배달 오토바이', bike: '자전거', ped: '행인 젤리', cones: '공사 고깔', barrier: '공사 가림막', banner: '현수막' };
 import { itemById } from '../../public/shared/js/cos-items.js';
@@ -31,6 +32,19 @@ const MAPS = ['dream', 'hell', 'void', 'seoul'], mapOf = (m) => (m === 'hell' ||
 const SEP = new Set(['hell', 'void', 'seoul']); // 난이도마다 따로 쓰는 맵 (꿈나라 노멀만 예전 표)
 const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n);
 
+// 5-2 입력 기록으로 본 사람 같지 않음: 누름 사이 간격의 변동계수가 2% 미만(30번 이상) · 50ms 안 연속 누름이 대부분
+//   돌려주는 값: 이유 글자 또는 null. 막지 않고 검토(노란 리포트)로만 쓴다
+export function inputRobotic(rp) {
+  const T = [0]; for (const d of rp.dts) T.push(T[T.length - 1] + d / 10); // 프레임 시작 시각(ms)
+  let prev = 0; const press = [];
+  for (const [f, v] of rp.evs) { if (v & ~prev) press.push(T[f]); prev = v; }
+  if (press.length < 30) return null;
+  const gaps = press.slice(1).map((t, i) => t - press[i]).filter((g) => g > 0), m = gaps.reduce((a, v) => a + v, 0) / gaps.length;
+  const sd = Math.sqrt(gaps.reduce((a, v) => a + (v - m) ** 2, 0) / gaps.length);
+  if (m > 0 && sd / m < 0.02) return `even-gaps cv=${(sd / m).toFixed(3)}`;
+  if (gaps.filter((g) => g < 50).length / gaps.length > 0.8) return 'superhuman-taps';
+  return null;
+}
 export class DreamBoard {
   // name: 저장 파일 이름 (토스 미니앱은 'dream-runner-toss' 로 따로) · opt.pool: 기록 다시 돌리기 스레드를 같이 쓴다 · opt.ads: 광고 보너스를 주는 순위표
   constructor(dataDir, name = 'dream-runner', opt = {}) {
@@ -43,7 +57,7 @@ export class DreamBoard {
     this.hg = {}; this.hgSess = {}; // 한강 러닝: sub → { m 모두 · best 한 번에 · runs · sec · mo 순간별 } · 달리는 중인 판
     this.daily = {}; this.first = {}; // 운영 지표: 날짜(한국 시간) → 하루 숫자 · sub → 처음 달린 날
     this.runs = 0; this.pending = []; this.reports = []; this.secret = crypto.randomBytes(24).toString('hex'); this.vstat = { ok: 0, bad: 0, none: 0, skip: 0 }; this.dayStars = new Map();
-    this.lastPost = new Map();
+    this.lastPost = new Map(); this.hourN = new Map();
     this.lastPlay = new Map();
     this.ipHits = new Map();
     try {
@@ -63,7 +77,8 @@ export class DreamBoard {
   }
   // map: 'hell' 은 난이도마다 따로 (꿈나라 노멀은 예전 표 그대로)
   table(mode, diff, map = 'dream') { if (SEP.has(map)) return (this.boards[`${map}:${mode}:${diff}`] ||= {}); if (diff !== 'easy') return (this.boards[`${mode}:${diff}`] ||= {}); return mode === 'item' ? this.bestItem : this.best; }
-  sorted(mode, diff, map) { return Object.entries(this.table(mode, diff, map)).sort((a, b) => b[1].score - a[1].score || a[1].at - b[1].at); }
+  // 보류(hold: 사람 같지 않은 입력 · 상위권)된 기록은 그 주인(viewer)에게만 보인다
+  sorted(mode, diff, map, viewer = null) { return Object.entries(this.table(mode, diff, map)).filter(([s, e]) => !e.hold || s === viewer).sort((a, b) => b[1].score - a[1].score || a[1].at - b[1].at); }
   // 메달: 드림러너 모든 순위표(난이도 × 꿈나라 · 지옥)의 지금 1 ~ 3위 메달. 익스트림 이상 먼저(1위 → 2위 → 3위, 같은 순위면 높은 난이도 · 지옥 먼저), 그다음 익스트림 아래
   podium() {
     const P = new Map();
@@ -80,7 +95,7 @@ export class DreamBoard {
     return { title, medals, medal: own };
   }
   top(mode, diff, map) {
-    const all = this.sorted(mode, diff, map), n = all.length, P = this.podium(); return all.slice(0, TOP).map(([sub, e], i) => ({ rank: i + 1, id: sub.slice(-8), ...this.badges(sub, P, mode, diff, map, i + 1, n), name: nameOf(sub, e), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon }));
+    const all = this.sorted(mode, diff, map), n = all.length, P = this.podium(); return all.slice(0, TOP).map(([sub, e], i) => ({ rank: i + 1, id: publicId(sub), ...this.badges(sub, P, mode, diff, map, i + 1, n), name: nameOf(sub, e), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon }));
   }
   // 명예의 전당: 꿈나라 초월 1위 → 지옥 초월 1위 → 꿈나라 광속 1위 → … → 지옥 익스트림 1위, 다음은 2위 · 3위 차례로. 한 사람은 한 번만 (가장 높은 자리)
   fame(n = 12) {
@@ -89,16 +104,16 @@ export class DreamBoard {
       if (out.length >= n) return out;
       const all = this.sorted('speed', diff, map), x = all[r]; if (!x || seen.has(x[0])) continue;
       const [sub, e] = x; seen.add(sub);
-      out.push({ rank: r + 1, diff, map, id: sub.slice(-8), name: nameOf(sub, e), color: e.color, score: e.score, medals: this.badges(sub, P, 'speed', diff, map, r + 1, all.length).medals }); // 그 사람의 메달 모두 (순위표와 같은 순서)
+      out.push({ rank: r + 1, diff, map, id: publicId(sub), name: nameOf(sub, e), color: e.color, score: e.score, medals: this.badges(sub, P, 'speed', diff, map, r + 1, all.length).medals }); // 그 사람의 메달 모두 (순위표와 같은 순서)
     }
     return out;
   }
   mine(sub, mode, diff, map, badges = true) {
     const T = this.table(mode, diff, map);
     if (!sub || !T[sub]) return null;
-    const i = this.sorted(mode, diff, map).findIndex(([s]) => s === sub);
+    const i = this.sorted(mode, diff, map, sub).findIndex(([s]) => s === sub);
     const e = T[sub];
-    return { rank: i + 1, id: sub.slice(-8), ...(badges ? this.badges(sub, this.podium(), mode, diff, map, i + 1, Object.keys(T).length) : null), name: nameOf(sub, e), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon };
+    return { rank: i + 1, id: publicId(sub), ...(badges ? this.badges(sub, this.podium(), mode, diff, map, i + 1, Object.keys(T).length) : null), name: nameOf(sub, e), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon };
   }
   // 달린 기록: 탈락 · 그만두기 · 팀전 끝 모두 센다 (순위에 올리지 않아도 센다)
   // 출발표 확인: 서버 서명 · 맵 · 난이도 (· 모드) 가 맞고, 받은 지 6시간 안이어야 한다. 아니면 null
@@ -235,6 +250,9 @@ export class DreamBoard {
     // 느리게 돌리기(게임 시계를 늦추는 조작): 기록된 게임 시간이 실제로 지난 시간보다 한참 짧은데, 느린 기기처럼 프레임이 막힌(0.05초) 흔적도 없으면 의심
     if (tk) { const real = (now - tk.at) / 1000, capped = rp.dts.filter((v) => v >= 500).length / rp.dts.length;
       if (real - sum > Math.max(15, real * 0.25) && capped < 0.1) { this.vstat.slow = (this.vstat.slow || 0) + 1; console.warn(`드림 러너 느리게 돌리기 의심: 게임 ${sum.toFixed(1)}초 / 실제 ${real.toFixed(1)}초 (${diff} ${map})`); return { ok: false, why: 'slowmo', r, game: sum, real }; } }
+    // 5-2 사람 같지 않은 입력: 입력 간격이 기계처럼 일정함 · 사람 반응보다 빠른 연타가 계속됨 → 막지 않고 검토로
+    const bot = inputRobotic(rp);
+    if (bot) { this.vstat.robot = (this.vstat.robot || 0) + 1; return { ok: false, why: 'robotic', r, detail: bot }; }
     this.vstat.ok++; return { ok: true, r, ticket: !!tk };
   }
   ticket(b) { return this.tickets.issue({ seed: Number(b.seed) | 0, diff: diffOf(b.diff), map: mapOf(b.map), mode: b.mode === 'item' ? 'item' : 'speed' }); }
@@ -248,11 +266,11 @@ export class DreamBoard {
   resolve(id, act) {
     const x = this.reports.find((q) => q.id === id); if (!x) throw new Error('없어요'); x.open = false; x.act = act; this.dirty = true;
     const T = this.table(x.mode, x.diff, x.map), e = T[x.sub];
-    if (act === 'ok' && e && e.at === x.eat) { delete e.u; e.v = 1; getCos()?.refresh(x.sub); }
+    if (act === 'ok' && e && e.at === x.eat) { delete e.u; delete e.hold; e.v = 1; getCos()?.refresh(x.sub); }
     if (act === 'del') this.removeRecord(x.sub, this.tkey(x.mode, x.diff, x.map));
     for (const q of this.reports) if (q.open && q.sub === x.sub && act === 'del') q.open = false; // 지운 사람의 다른 리포트도 닫는다
   }
-  verifyRecord(sub, t) { const e = this.tableOf(t)?.[sub]; if (!e) throw new Error('없어요'); delete e.u; e.v = 1; this.dirty = true; for (const q of this.reports) if (q.open && q.sub === sub && this.tkey(q.mode, q.diff, q.map) === t) { q.open = false; q.act = 'ok'; } getCos()?.refresh(sub); }
+  verifyRecord(sub, t) { const e = this.tableOf(t)?.[sub]; if (!e) throw new Error('없어요'); delete e.u; delete e.hold; e.v = 1; this.dirty = true; for (const q of this.reports) if (q.open && q.sub === sub && this.tkey(q.mode, q.diff, q.map) === t) { q.open = false; q.act = 'ok'; } getCos()?.refresh(sub); }
   tableOf(t) { const [a, b] = String(t).split(':'); return SEP.has(a) ? this.boards[t] : b === 'easy' ? (a === 'item' ? this.bestItem : this.best) : this.boards[`${a}:${b}`]; }
   removeRecord(sub, t) { const [a, b, c] = String(t).split(':'), T = SEP.has(a) ? this.boards[t] : b === 'easy' ? (a === 'item' ? this.bestItem : this.best) : this.boards[`${a}:${b}`]; if (T?.[sub]) { delete T[sub]; this.dirty = true; } getCos()?.punish(sub, 'dr.'); void c; }
   // 한 판 끝: 말이 안 되는 기록은 거르고, 점수는 서버가 다시 계산한다
@@ -273,6 +291,9 @@ export class DreamBoard {
     if (time > (now - tk.at) / 1000 + 5) throw err('기록이 이상해요'); // 실제로 지난 시간보다 오래 달릴 수는 없다
     if (now - (this.lastPost.get(who.sub) || 0) < 2500) throw err('너무 빨라요');
     this.lastPost.set(who.sub, now);
+    // 5-3 한 계정이 한 시간에 아주 많이 (사람은 닿지 못할 만큼: 한 시간 600판)
+    const hk = `${who.sub}:${Math.floor(now / 3600e3)}`, hn = (this.hourN.get(hk) || 0) + 1; this.hourN.set(hk, hn); if (this.hourN.size > 50000) this.hourN.clear();
+    if (hn > 600) { if (hn === 601) sec.note('record', { where: 'dream-runner', detail: 'too many scores/hour' }); throw err('기록을 너무 많이 남겼어요. 잠시 후 다시 해 주세요', 429); }
     this.busy.add(tk.id);
     let chk; try { chk = await this.check(b, diff, map, mode, now, T[who.sub]?.score || 0); } finally { this.busy.delete(tk.id); }
     // 혼자 달린 스피드전: 플레이 기록을 다시 돌려 봐서 맞아야만 올린다 (기록이 없거나 결과가 다르면 거절, 확인을 못 했으면 잠시 뒤 다시)
@@ -287,8 +308,9 @@ export class DreamBoard {
     tagChar(who.sub, entry);
     if (newBest) T[who.sub] = entry;
     // 비상 리포트 (기록은 바로 순위표에 오른다)
-    if (newBest) { const higher = Object.values(T).filter((e) => e.score > score).length;
-      if (!chk.ok && !chk.soft && higher < TOP_GUARD) this.report('red', who.sub, mode, diff, map, chk.why, entry, chk.r, chk.why === 'slowmo' ? { game: Math.round(chk.game), real: Math.round(chk.real) } : undefined); }
+    if (newBest) { const higher = Object.values(T).filter((e) => e.score > score && !e.hold).length;
+      if (chk.why === 'robotic' && higher < TOP_GUARD) { entry.hold = true; sec.note('record', { where: `dream-runner.${map}.${diff}`, detail: `held: robotic ${chk.detail} score=${score}` }); this.report('yellow', who.sub, mode, diff, map, 'robotic', entry, chk.r, { bot: chk.detail }); }
+      else if (!chk.ok && !chk.soft && chk.why !== 'robotic' && higher < TOP_GUARD) this.report('red', who.sub, mode, diff, map, chk.why, entry, chk.r, chk.why === 'slowmo' ? { game: Math.round(chk.game), real: Math.round(chk.real) } : undefined); }
     else { old.name = name; old.color = color; old.char = entry.char; } // 이름·색은 최근 것으로
     getCos()?.refresh(who.sub); // 업적: 거리 · 순위
     const out = { score, mode, diff, map, newBest, prev: old?.score || 0, me: this.mine(who.sub, mode, diff, map), top: this.top(mode, diff, map), runs: this.runs };

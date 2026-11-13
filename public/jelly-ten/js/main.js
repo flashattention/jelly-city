@@ -2,6 +2,7 @@
 //   같이 하기는 '각자 판' (같은 판을 따로따로 겨루기) 과 '한 판 같이' (판 하나를 다 같이 · 먼저 묶으면 임자 · 내 색으로 물든다)
 import '../../shared/js/renamed.js'; // 옛 이름으로 저장된 값 옮기기 (맨 먼저)
 import { account, store } from '../../shared/js/account.js';
+import { takeTicket, ticketFor } from '../../shared/js/run-ticket.js';
 import { Shell, esc } from '../../shared/js/shell.js';
 import { faceHtml, makeSound, confetti, rankIcon } from '../../shared/js/party.js';
 import { COLS, ROWS, TIMES, makeBoard, sumRect, tryMove } from './board.js';
@@ -253,7 +254,7 @@ function begin(kind, seed, time, ms) {
   $('best').textContent = kind === 'solo' && game.bestOf?.[time] ? `내 최고 ${game.bestOf[time]}` : '';
   layout(); countdown(ms); S.sfx('start'); S.music('apple');
 }
-function startSolo() { S.unlock(); game.shared = false; begin('solo', (Math.random() * 2 ** 31) | 0, game.pick.time, 3000); }
+function startSolo() { S.unlock(); game.shared = false; takeTicket('/api/ten', `t${game.pick.time}`); begin('solo', (Math.random() * 2 ** 31) | 0, game.pick.time, 3000); }
 function practice() { S.unlock(); shell.sendAfterHello({ t: 'practice', opts: { time: game.pick.time, bots: Math.max(1, game.pick.bots), mode: game.pick.mode } }); }
 function startMulti(m) {
   game.myId = shell.myId; game.players.clear();
@@ -350,7 +351,7 @@ async function endSolo() {
 function anonId() { let a = store.get(ANON_KEY); if (!/^[a-f0-9]{24}$/.test(a || '')) { a = [...crypto.getRandomValues(new Uint8Array(12))].map((b) => b.toString(16).padStart(2, '0')).join(''); store.set(ANON_KEY, a); } return a; }
 async function saveRecord(rec) {
   try {
-    const r = await account.api('/api/ten/record', { method: 'POST', body: rec });
+    const r = await account.api('/api/ten/record', { method: 'POST', body: { ...rec, tk: await ticketFor('/api/ten', rec.b) } });
     game.bestOf = { ...(game.bestOf || {}), [game.time]: Math.max(r.me?.value || 0, game.bestOf?.[game.time] || 0) };
     $('ov-me').textContent = r.best ? `🎉 새 최고 기록! 순위 ${r.me?.rank}등` : `최고 기록 ${r.me?.value}개 · 순위 ${r.me?.rank}등`;
     if (r.best) { confetti(); S.sfx('win'); }

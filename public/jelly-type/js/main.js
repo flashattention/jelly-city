@@ -1,5 +1,6 @@
 // 젤리 타자연습: 짧은 글 연습(타수 · 정확도) · 젤리비(떨어지는 낱말) · 같이 경주(같은 문장 · 곰돌이 트랙) · 젤리봇과 경주
 import { account, store } from '../../shared/js/account.js';
+import { takeTicket, ticketFor } from '../../shared/js/run-ticket.js';
 import { Shell, esc, TEAMS } from '../../shared/js/shell.js';
 import { faceHtml, makeSound, confetti, rankIcon } from '../../shared/js/party.js';
 import { SENTENCES, RAIN_WORDS, strokesIn, correctStrokes } from './texts.js';
@@ -97,7 +98,7 @@ function raceTick(now) {
 const R = window.rainState = { drops: [], parts: [], score: 0, level: 1, lives: 5, hit: 0, spawnT: 0, cv: $('rain-cv'), over: false };
 const DROP_COLS = ['#ff8fc4', '#ffd84d', '#7cf0c8', '#8fd3ff', '#b388ff', '#ff9a62'];
 function startRain() {
-  S.unlock(); game.kind = 'rain'; game.mode = 'play';
+  S.unlock(); takeTicket('/api/type', 'rain'); game.kind = 'rain'; game.mode = 'play';
   Object.assign(R, { drops: [], parts: [], score: 0, level: 1, lives: 5, hit: 0, spawnT: 1.2, over: false, H: fieldH() });
   shell.hideScreens(); $('game').classList.add('hidden'); $('rain').classList.remove('hidden');
   $('rain-in').value = ''; rainHud(); $('rain-in').focus(); S.music('apple');
@@ -187,7 +188,7 @@ function countdown(ms, done) {
   const tk = () => { const left = ms - (performance.now() - t0), k = Math.ceil(left / 1000); if (left <= 0) { n.textContent = '시작!'; S.sfx('count', 1); setTimeout(() => el.classList.add('hidden'), 450); done?.(); return; } if (n.textContent !== String(k)) { n.textContent = k; n.style.animation = 'none'; void n.offsetWidth; n.style.animation = ''; S.sfx('count', 0); } setTimeout(tk, 60); };
   tk();
 }
-function startSolo() { S.unlock(); const idx = [...SENTENCES.keys()].sort(() => Math.random() - 0.5).slice(0, game.pick.count); startTexts('solo', idx.map((i) => SENTENCES[i]), 2000); }
+function startSolo() { S.unlock(); takeTicket('/api/type', 'kpm'); const idx = [...SENTENCES.keys()].sort(() => Math.random() - 0.5).slice(0, game.pick.count); startTexts('solo', idx.map((i) => SENTENCES[i]), 2000); }
 function practice() { S.unlock(); shell.sendAfterHello({ t: 'practice', opts: { count: game.pick.count, bots: Math.max(1, game.pick.bots) } }); }
 function startRace(m) {
   game.myId = shell.myId; game.players.clear();
@@ -255,7 +256,7 @@ async function showSoloOver(b, value, title, sub) {
 function anonId() { let a = store.get(ANON_KEY); if (!/^[a-f0-9]{24}$/.test(a || '')) { a = [...crypto.getRandomValues(new Uint8Array(12))].map((x) => x.toString(16).padStart(2, '0')).join(''); store.set(ANON_KEY, a); } return a; }
 async function saveRecord(rec) {
   try {
-    const r = await account.api('/api/type/record', { method: 'POST', body: rec });
+    const r = await account.api('/api/type/record', { method: 'POST', body: { ...rec, tk: await ticketFor('/api/type', rec.b) } });
     $('ov-me').textContent += r.best ? ` · 🎉 새 최고 기록! ${r.me?.rank}등` : ` · 최고 ${r.me?.value} · ${r.me?.rank}등`;
     if (r.best) { confetti(); S.sfx('win'); }
     renderTop(r.top, r.me, rec.b);

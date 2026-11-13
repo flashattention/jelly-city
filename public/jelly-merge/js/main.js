@@ -320,7 +320,7 @@ function begin(kind, seed, cont, ms, sp = game.pick) {
   $('best').textContent = kind === 'solo' && bestOf[cont] ? `내 최고 ${bestOf[cont]}` : CONTAINERS[cont].n;
   layout(); renderNext(); countdown(ms); S.sfx('start'); S.music('draw');
 }
-function startSolo() { S.unlock(); begin('solo', (Math.random() * 2 ** 31) | 0, game.pick.cont, 2400); }
+function startSolo() { S.unlock(); ranking.begin(game.pick.cont); begin('solo', (Math.random() * 2 ** 31) | 0, game.pick.cont, 2400); }
 function practice() { S.unlock(); shell.sendAfterHello({ t: 'practice', opts: { time: game.pick.time, bots: Math.max(1, game.pick.bots), cont: game.pick.cont, bomb: game.pick.bomb, star: game.pick.star } }); }
 function startMulti(m) {
   game.myId = shell.myId; game.players.clear();
