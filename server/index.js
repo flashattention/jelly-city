@@ -46,6 +46,7 @@ import { normWord } from '../public/jelly-draw/js/prompts.js';
 import { complete } from './jelly-city/llm.js';
 import { Records } from './shared/records.js';
 import { Cosmetics, cosApi, setNames } from './cosmetics.js';
+import { sec, clientIp, limited as rateLimited } from './shared/guard.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
@@ -68,6 +69,7 @@ try {
   const imp = path.join(DATA_DIR, 'import.json');
   if (fs.existsSync(imp)) { fs.renameSync(imp, path.join(DATA_DIR, 'world.json')); console.log('📦 import.json 으로 세계를 복원했어요'); }
 } catch (e) { console.error('복원 실패', e); }
+sec.init(DATA_DIR); // 보안 사건 기록
 const world = new World({ dataDir: DATA_DIR });
 const dreamBoard = new DreamBoard(DATA_DIR); // 드림 러너 리더보드
 const swMetrics = new SwMetrics(DATA_DIR); // 젤리 서울 러너 이용 지표 (익명)
@@ -159,6 +161,14 @@ const limited = (req) => {
 
 async function api(req, res, url) {
   const sid = (req.headers.authorization || '').replace(/^Bearer /, '');
+  // CSP 위반 알림 (브라우저가 보낸다): 어느 지시 · 어느 출처인지만 센다
+  if (url.pathname === '/api/csp-report' && req.method === 'POST') {
+    const ip = clientIp(req);
+    if (!rateLimited('post', ip)) {
+      try { const b = await readJson(req, 8 * 1024); const r = b['csp-report'] || b; const blocked = String(r['blocked-uri'] || '').replace(/^(https?:\/\/[^/]+).*$/, '$1'); sec.note('csp', { ip, where: String(r['violated-directive'] || r['effective-directive'] || '').slice(0, 40), detail: `${blocked} @ ${String(r['document-uri'] || '').replace(/^https?:\/\/[^/]+/, '').slice(0, 60)}` }); } catch { /* 이상한 알림 */ }
+    }
+    res.writeHead(204); return res.end();
+  }
   // 토스 미니앱: /api/toss/... 는 토스 계정으로, 드림 러너 · 치장 API 를 토스 저장소에 그대로 쓴다
   if (url.pathname.startsWith('/api/toss/')) {
     tossCors(res);
@@ -291,7 +301,36 @@ const server = http.createServer((req, res) => {
     if (!res.headersSent) { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('bad request'); } else res.destroy();
   }
 });
+// 보안 헤더: 모든 응답에. CSP 는 쓰는 출처(자기 주소 · jsDelivr · 구글 로그인 · 유튜브 · 구글 글꼴)만
+//   CSP_MODE=report 이면 막지 않고 위반만 /api/csp-report 로 모은다 (CSP_MODE=off 면 CSP 를 보내지 않는다)
+const CSP_MODE = process.env.CSP_MODE || 'enforce';
+const FRAME_ANCESTORS = "'self' https://*.toss.im https://*.tossmini.com";
+const cspFor = (host) => [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://accounts.google.com https://apis.google.com https://www.youtube.com https://s.ytimg.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https:",
+  "media-src 'self' data: blob:",
+  `connect-src 'self' ${/^[\w.:-]+$/.test(host) ? `wss://${host} ws://${host}` : ''} https://cdn.jsdelivr.net https://accounts.google.com`,
+  "worker-src 'self' blob:",
+  "frame-src https://accounts.google.com https://www.youtube.com https://www.youtube-nocookie.com",
+  `frame-ancestors ${FRAME_ANCESTORS}`,
+  "object-src 'none'", "base-uri 'self'", "form-action 'self'",
+  'report-uri /api/csp-report',
+].join('; ');
+function secHeaders(req, res) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Strict-Transport-Security', 'max-age=15552000');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
+  if (CSP_MODE === 'off') return;
+  const csp = cspFor(String(req.headers.host || ''));
+  if (CSP_MODE === 'enforce') res.setHeader('Content-Security-Policy', csp);
+  else { res.setHeader('Content-Security-Policy-Report-Only', csp); res.setHeader('Content-Security-Policy', `frame-ancestors ${FRAME_ANCESTORS}; object-src 'none'; base-uri 'self'`); }
+}
 function handle(req, res) {
+  secHeaders(req, res);
   const url = new URL(req.url, 'http://x');
   if (REDIRECT_TO && url.pathname !== '/healthz') { res.writeHead(301, { Location: REDIRECT_TO + req.url, 'Cache-Control': 'no-store' }); res.end(); return; }
   if (url.pathname.startsWith('/api/')) {
