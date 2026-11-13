@@ -118,7 +118,8 @@ function bikeMesh() {
   frame.push(part(new THREE.TorusGeometry(0.33, 0.06, 6, 18, Math.PI), '#f2f2f2', 0, 0.36, -0.5, 0, Math.PI / 2, 0), part(new THREE.TorusGeometry(0.33, 0.06, 6, 18, Math.PI), '#f2f2f2', 0, 0.36, 0.52, 0, Math.PI / 2, 0));
   g.add(new THREE.Mesh(merge(frame), vcMat()));
   for (const z of [-0.5, 0.52]) { const w = new THREE.Group(); w.position.set(0, 0.33, z); const tg = new THREE.TorusGeometry(0.31, 0.035, 6, 20); tg.rotateY(Math.PI / 2); const sp = []; sp.push(part(tg, '#1c1c1c')); for (let k = 0; k < 6; k++) sp.push(part(new THREE.BoxGeometry(0.01, 0.6, 0.012), '#c8ccd0', 0, 0, 0, (k * Math.PI) / 6)); w.add(new THREE.Mesh(merge(sp), vcMat())); g.add(w); wheels.push(w); }
-  const ped = new THREE.Group(); ped.position.set(0, 0.36, 0.05); ped.add(new THREE.Mesh(merge([part(new THREE.BoxGeometry(0.34, 0.03, 0.03), '#303030'), part(new THREE.BoxGeometry(0.03, 0.3, 0.03), '#303030', 0.17, 0, 0), part(new THREE.BoxGeometry(0.03, 0.3, 0.03), '#303030', -0.17, 0, 0)]), vcMat())); g.add(ped);
+  // 크랭크: 오른쪽 팔은 위(+y), 왼쪽은 아래로 엇갈리고 끝에 페달. 곰 발이 이 끝(PEDAL)을 따라 돈다
+  const ped = new THREE.Group(); ped.position.set(0, 0.36, 0.05); ped.add(new THREE.Mesh(merge([part(new THREE.BoxGeometry(0.34, 0.03, 0.03), '#303030'), part(new THREE.BoxGeometry(0.03, 0.15, 0.03), '#303030', 0.17, 0.075, 0), part(new THREE.BoxGeometry(0.03, 0.15, 0.03), '#303030', -0.17, -0.075, 0), part(new THREE.BoxGeometry(0.1, 0.025, 0.06), '#202020', 0.22, 0.15, 0), part(new THREE.BoxGeometry(0.1, 0.025, 0.06), '#202020', -0.22, -0.15, 0)]), vcMat())); g.add(ped);
   g.userData = { wheels, ped };
   return g;
 }
@@ -142,7 +143,10 @@ registerAttraction({
   build(A) { const gs = STATIONS.map((S) => buildStation(A, S)); return { dispose() { gs.forEach((g) => { A.root.remove(g); g.traverse((q) => q.geometry?.dispose?.()); }); } }; },
   start(A) {
     const hg = A.hg, b = bikeMesh(), root = hg.bear?.root; if (!root) return null;
-    const sc = root.scale.x || 1; b.scale.setScalar(1 / sc); b.name = 'rent-bike'; b.position.set(0, 0, 0); root.add(b);
+    // 곰 키(약 1.3m, 다리가 짧다)에 맞춘 작은 자전거(0.6배): 안장 윗면 0.53m. 곰 몸 밑면(곰 단위 0.36)을 안장에 올리도록 몸 전체를 LIFT 만큼 들고, 자전거는 그만큼 내려 땅에 둔다
+    const sc = root.scale.x || 1, BS = 0.6, LIFT = 0.89 * BS - 0.36 * sc; b.scale.setScalar(BS / sc); b.name = 'rent-bike'; b.position.set(0, -LIFT / sc, 0); root.add(b);
+    const toRoot = (x, y, z) => [(x * BS) / sc, (-LIFT + y * BS) / sc, (z * BS) / sc]; // 자전거 m → 곰 몸 단위
+    const aim = (pivot, from, to, len0) => { const dy = to[1] - from[1], dz = to[2] - from[2], L = Math.hypot(dy, dz) || 1; pivot.rotation.x = Math.atan2(-dz, -dy); pivot.rotation.z = 0; pivot.scale.y = clamp(L / len0, 0.6, 2.4); };
     const target0 = hg.target; let dist = 0, lastX = hg.px, lastZ = hg.pz, spin = 0;
     hg.onToast?.('🚲 자전거를 빌렸어요! W A S D 로 달리고, 대여소에서 E 로 반납');
     const E = {
@@ -153,9 +157,16 @@ registerAttraction({
       tick(dt) {
         hg.target = hg.boostOn ? 7.5 : 6.4; if (hg.flying) hg.flying = false;
         const d = Math.hypot(hg.px - lastX, hg.pz - lastZ); if (d < 30) dist += d; lastX = hg.px; lastZ = hg.pz;
-        spin += d / 0.33; for (const w of b.userData.wheels) w.rotation.x = spin; b.userData.ped.rotation.x = spin * 0.5;
+        spin += d / (0.33 * BS); for (const w of b.userData.wheels) w.rotation.x = spin; b.userData.ped.rotation.x = spin * 0.5;
       },
-      end() { root.remove(b); b.traverse((q) => q.geometry?.dispose?.()); hg.target = target0; },
+      // 곰 자세(매 프레임, 기본 자세 다음): 안장에 앉아 몸을 살짝 앞으로, 두 손은 손잡이, 두 발은 페달 끝을 따라 돈다
+      post() {
+        const B = hg.bear; if (!B?.legs) return; root.position.y += LIFT; B.inner.rotation.x = 0.18;
+        const th = b.userData.ped.rotation.x;
+        B.legs.forEach((leg, i) => { const sd = i === 0 ? -1 : 1, py = 0.36 + sd * 0.15 * Math.cos(th), pz = 0.05 + sd * 0.15 * Math.sin(th); aim(leg, [sd * 0.2, 0.62, 0], toRoot(sd * 0.21, py, pz), 0.6); });
+        for (const i of [0, 1]) { const a = B.arms[i], sd = i === 0 ? -1 : 1; aim(a, [sd * 0.42, 1.32, 0.04], toRoot(sd * 0.27, 0.96, 0.4), 0.42); a.rotation.z = sd * 0.15; }
+      },
+      end() { root.remove(b); b.traverse((q) => q.geometry?.dispose?.()); hg.target = target0; const B = hg.bear; if (B?.legs) { for (const l of B.legs) l.scale.y = 1; for (const a of B.arms) { a.scale.y = 1; a.rotation.z = a.userData.baseZ; } B.inner.rotation.x = 0; } },
       where() { return '공공자전거 타는 중'; },
     };
     return E;

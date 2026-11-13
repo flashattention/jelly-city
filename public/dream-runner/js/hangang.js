@@ -2307,6 +2307,7 @@ float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y
     this.bear.climbing = !!this.climb;
     if (!this.climb) poseBear(this.bear, { ground: this.y <= this.groundAt(bx, bz, this.y) + 0.001, slide: this.slide, flip: this.flipT > 0 ? 1 - this.flipT / FLIP_T : null, vy: this.vy, alive: true }, dt);
     this.drive?.post();
+    this.attr?.exp?.post?.(dt); // 명소 체험이 곰 자세를 덮어쓴다 (자전거 안장에 앉기 등)
     this.shadow.position.set(bx, this.groundAt(bx, bz, this.y) + tb + 0.02, bz); this.shadow.scale.setScalar(BEAR * (1 - Math.min(0.5, this.y * 0.2)));
     this.tickSignals(this.time);
     this.worldT = (this.worldT || 0) - dt; if (this.worldT <= 0) { this.worldT = 0.5; this.tickWorld(bx, bz); }
