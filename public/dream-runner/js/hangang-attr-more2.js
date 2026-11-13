@@ -98,3 +98,80 @@ registerAttraction({
     return E;
   },
 });
+
+// ============================================================
+// 2-7 DDP 밤 조명 (사진: 은빛 알루미늄 판이 덮인 매끈한 곡면 덩어리 · 밤엔 아래 둘레가 환하고 지붕 곡선을 따라 빛이 흐른다)
+//   지도 '동대문디자인플라자' 외곽선(OSM)을 부드럽게 다듬어, 벽에서 지붕으로 둥글게 넘어가는 곡면 껍질로 다시 짓는다 (지도 상자 대신)
+//   동쪽 잔디엔 하얀 빛 꽃밭. 체험하면 밤이 되고 둘레를 천천히 돌며 본다
+// ============================================================
+const DDP_RING = [[2620, -4206], [2597, -4121], [2600, -4110], [2611, -4099], [2580, -4089], [2572, -4084], [2558, -4071], [2542, -4049], [2530, -4029], [2527, -4015], [2529, -4000], [2545, -3981], [2562, -3969], [2575, -3963], [2589, -3962], [2609, -3965], [2623, -3971], [2693, -4002], [2708, -4011], [2711, -4015], [2711, -4025], [2705, -4031], [2701, -4033], [2595, -4024], [2593, -4025], [2594, -4028], [2646, -4056], [2653, -4062], [2663, -4078], [2668, -4096], [2668, -4188], [2657, -4226], [2652, -4233], [2646, -4236], [2641, -4235], [2633, -4230], [2626, -4217]];
+ATTR_SKIP.add('동대문디자인플라자');
+const inRing = (x, z, r) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) if (r[i][1] > z !== r[j][1] > z && x < ((r[j][0] - r[i][0]) * (z - r[i][1])) / (r[j][1] - r[i][1]) + r[i][0]) c = !c; return c; };
+function chaikin(pts, n = 2) { let p = pts; for (let k = 0; k < n; k++) { const q = []; for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; q.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25], [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]); } p = q; } return p; }
+// 은빛 알루미늄 판 (크기 · 밝기가 조금씩 다른 판, 가는 이음매) · 밤에 빛나는 이음매와 작은 구멍 점
+const panelTex = () => cvTex(256, 256, (c, W, H) => { const r = rndS(45133); for (let y = 0; y < H; y += 32) { let x = -r() * 40; while (x < W) { const w = 50 + r() * 60, l = 208 + r() * 14; c.fillStyle = `rgb(${l - 4},${l},${l + 6})`; c.fillRect(x, y, w, 32); const g = c.createLinearGradient(x, y, x + w, y + 32); g.addColorStop(0, 'rgba(255,255,255,.12)'); g.addColorStop(1, 'rgba(0,0,0,.08)'); c.fillStyle = g; c.fillRect(x, y, w, 32); c.fillStyle = 'rgba(90,96,104,.18)'; c.fillRect(x, y, 1, 32); x += w; } c.fillStyle = 'rgba(90,96,104,.2)'; c.fillRect(0, y, W, 1); } });
+const panelEm = () => cvTex(256, 256, (c, W, H) => { const r = rndS(7); c.fillStyle = '#000'; c.fillRect(0, 0, W, H); c.fillStyle = 'rgba(150,190,255,.55)'; for (let y = 0; y < H; y += 32) c.fillRect(0, y, W, 1.5); for (let i = 0; i < 420; i++) { c.fillStyle = `rgba(220,235,255,${0.25 + r() * 0.5})`; c.fillRect(r() * W, r() * H, 1.6, 1.6); } });
+function buildDDP(A) {
+  const hg = A.hg, g = new THREE.Group(); A.root.add(g); const ring = chaikin(DDP_RING, 2), N = ring.length, base = Math.min(...DDP_RING.map(([x, z]) => A.H(x, z))) - 0.3;
+  let per = 0; const acc = [0]; for (let i = 1; i <= N; i++) { per += Math.hypot(ring[i % N][0] - ring[i - 1][0], ring[i % N][1] - ring[i - 1][1]); acc.push(per); }
+  const area = ring.reduce((s, [x, z], i) => s + x * ring[(i + 1) % N][1] - ring[(i + 1) % N][0] * z, 0), sgn = area > 0 ? 1 : -1;
+  const nrm = ring.map((p, i) => { const a = ring[(i - 1 + N) % N], b = ring[(i + 1) % N]; let nx = (b[1] - a[1]) * sgn, nz = -(b[0] - a[0]) * sgn; const l = Math.hypot(nx, nz) || 1; return [nx / l, nz / l]; });
+  // 높이: 둘레를 따라 15 ~ 29m 로 출렁인다 (실제 DDP 처럼 한쪽은 높고 한쪽은 낮게)
+  const Hs = acc.slice(0, N).map((s) => 15 + 14 * (0.5 + 0.5 * Math.sin((s / per) * Math.PI * 2 * 2 + 0.9)) * (0.75 + 0.25 * Math.sin((s / per) * Math.PI * 2 * 5)));
+  // 둥근 어깨 반지름: 좁은 곳(동쪽 목)은 작게 (안쪽으로 줄이다 반대편과 겹치지 않게)
+  const K = 6, rings = [], Rv = ring.map(([x, z], i) => { let w = 0; for (; w < 24; w += 0.5) if (!inRing(x - nrm[i][0] * (w + 0.5), z - nrm[i][1] * (w + 0.5), ring)) break; return clamp(w * 0.38, 1.2, 7); });
+  rings.push(ring.map(([x, z]) => [x, base, z]));
+  for (let k = 0; k <= K; k++) { const th = (k / K) * (Math.PI / 2), ins = 7 * (1 - Math.cos(th)); rings.push(ring.map(([x, z], i) => [x - nrm[i][0] * ins * Rv[i] / 7, base + Hs[i] - Rv[i] + Rv[i] * Math.sin(th), z - nrm[i][1] * ins * Rv[i] / 7])); }
+  const P = [], UV = [], I = []; let vacc = new Array(N + 1).fill(0);
+  rings.forEach((rg, k) => { for (let i = 0; i <= N; i++) { const p = rg[i % N]; if (k) { const q = rings[k - 1][i % N]; vacc[i] += Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); } P.push(...p); UV.push(acc[i] / 12, vacc[i] / 8); } });
+  for (let k = 0; k < rings.length - 1; k++) for (let i = 0; i < N; i++) { const a = k * (N + 1) + i, b = a + 1, c = a + N + 1, d = c + 1; I.push(a, c, b, b, c, d); }
+  // 지붕 덮개: 맨 안쪽 고리를 그대로 삼각형으로
+  const top = rings[rings.length - 1], tri = THREE.ShapeUtils.triangulateShape(top.map(([x, , z]) => new THREE.Vector2(x, z)), []), o0 = P.length / 3; for (const p of top) { P.push(...p); UV.push(p[0] / 12, p[2] / 12); } for (const [a, b, c] of tri) I.push(o0 + a, o0 + b, o0 + c);
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(UV, 2)); geo.setIndex(I); geo.computeVertexNormals();
+  // 바깥을 보게 (첫 벽 면의 법선이 바깥쪽인지)
+  { const nx = geo.attributes.normal.getX(N + 1), nz = geo.attributes.normal.getZ(N + 1); if (nx * nrm[0][0] + nz * nrm[0][1] < 0) { const ix = geo.index.array; for (let i = 0; i < ix.length; i += 3) { const q = ix[i + 1]; ix[i + 1] = ix[i + 2]; ix[i + 2] = q; } geo.computeVertexNormals(); } }
+  const shellM = new THREE.MeshPhongMaterial({ map: panelTex(), specular: '#c8d2dc', shininess: 28, emissive: '#ffffff', emissiveMap: panelEm(), emissiveIntensity: 0, side: THREE.DoubleSide }); g.add(new THREE.Mesh(geo, shellM));
+  // 빛 띠: 아래 둘레(환한 띠) · 지붕 곡선을 따라 흐르는 빛 (더하기 섞기, 셰이더 안에서 흐름)
+  const U = { uT: { value: 0 }, uN: { value: 0 } }, ribbons = [], RP = [], RU = [], RI = [];
+  const ribbon = (k, h, out, kind) => { const rg = rings[k], o = RP.length / 3; for (let i = 0; i <= N; i++) { const p = rg[i % N], [nx, nz] = nrm[i % N]; RP.push(p[0] + nx * out, p[1], p[2] + nz * out, p[0] + nx * out, p[1] + h, p[2] + nz * out); RU.push(acc[i], kind, acc[i], kind + 0.5); } for (let i = 0; i < N; i++) { const a = o + i * 2; RI.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); } };
+  ribbon(0, 0.7, 0.12, 0); ribbon(1, 0.5, 0.15, 2); ribbon(3, 0.4, 0.1, 4); ribbon(5, 0.35, 0.08, 6);
+  const rgeo = new THREE.BufferGeometry(); rgeo.setAttribute('position', new THREE.Float32BufferAttribute(RP, 3)); rgeo.setAttribute('uv', new THREE.Float32BufferAttribute(RU, 2)); rgeo.setIndex(RI);
+  const rmat = new THREE.ShaderMaterial({ uniforms: U, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform float uT, uN; varying vec2 vUv;
+      void main(){ float kind = floor(vUv.y); float v = fract(vUv.y) * 2.0; float edge = smoothstep(0.0, 0.35, v) * smoothstep(1.0, 0.65, v);
+        vec3 col; float a;
+        if (kind < 1.0) { col = vec3(1.0, 0.93, 0.8); a = 0.85; }
+        else { float s = vUv.x / 60.0 - uT * (0.12 + kind * 0.01) + kind * 0.37; float pulse = pow(0.5 + 0.5 * sin(s * 6.2832), 10.0); col = mix(vec3(0.55, 0.75, 1.0), vec3(1.0, 1.0, 1.0), pulse); a = 0.12 + pulse * 0.9; }
+        gl_FragColor = vec4(col * a * edge * uN, 1.0); }` });
+  const rib = new THREE.Mesh(rgeo, rmat); rib.renderOrder = 3; g.add(rib);
+  // 빛 꽃밭: 동쪽 잔디 (하얀 꽃 머리, 셰이더로 하나씩 반짝)
+  const fl = [], r = rndS(2014); for (let x = 2676; x < 2702; x += 1.3) for (let z = -4182; z < -4062; z += 1.3) { const px = x + (r() - 0.5) * 0.8, pz = z + (r() - 0.5) * 0.8; if (inRing(px, pz, DDP_RING)) continue; fl.push([px, A.H(px, pz) + 0.55 + r() * 0.25, pz]); }
+  const fg = new THREE.SphereGeometry(0.16, 8, 5); fg.scale(1, 0.7, 1); const FU = { uT: U.uT, uN: U.uN };
+  const fmat = new THREE.ShaderMaterial({ uniforms: FU, vertexShader: 'uniform float uT; varying float vB; varying vec3 vN; void main(){ vec4 ip = instanceMatrix * vec4(0.0,0.0,0.0,1.0); vB = 0.6 + 0.4 * sin(uT * 1.6 + ip.x * 0.9 + ip.z * 0.7); vN = normal; gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0); }', fragmentShader: 'uniform float uN; varying float vB; varying vec3 vN; void main(){ float day = 0.55 + 0.35 * max(0.0, vN.y); vec3 c = mix(vec3(day), vec3(1.0, 0.98, 0.92) * (0.7 + vB * 0.9), uN); gl_FragColor = vec4(c, 1.0); }' });
+  const flowers = new THREE.InstancedMesh(fg, fmat, fl.length), m4 = new THREE.Matrix4(); fl.forEach(([x, y, z], i) => flowers.setMatrixAt(i, m4.makeTranslation(x, y, z))); flowers.frustumCulled = false; g.add(flowers);
+  const stems = []; for (let i = 0; i < fl.length; i += 1) { const [x, y, z] = fl[i]; stems.push(part(new THREE.CylinderGeometry(0.015, 0.015, y - A.H(x, z), 3), '#3a4a2a', x, (y + A.H(x, z)) / 2, z)); } g.add(new THREE.Mesh(merge(stems), vcMat()));
+  lit(A, (L) => { U.uN.value = L; shellM.emissiveIntensity = L * 0.55; });
+  const undo = hideTrees(hg, (x, z) => inRing(x, z, DDP_RING));
+  A.ddp = { ring, nrm, Hs, base, per, acc };
+  return { group: g, tick(dt) { U.uT.value += dt; }, dispose() { undo(); g.traverse((q) => q.geometry?.dispose?.()); } };
+}
+registerAttraction({
+  id: 'ddp', name: 'DDP 밤 조명', seal: 'DDP', icon: '✨', x: 2690, z: -4052, r: 24, buildR: 1500, verb: '밤 산책',
+  go: [2694, -4048, -Math.PI / 2], intro: '은빛 곡면 지붕을 따라 흐르는 빛 · 환한 둘레 · 하얀 빛 꽃밭을 밤에 한 바퀴 돌아봐요',
+  build: buildDDP,
+  start(A) {
+    const hg = A.hg, D = A.ddp; if (!D) return null; const h0 = hg.state.hour; if (h0 > 5 && h0 < 19.8) hg.state.hour = 20.4; const bearVis = hg.bear?.root.visible;
+    // 둘레 바깥 22m 를 따라 도는 길 (꽃밭이 있는 동쪽에서 시작)
+    const N = D.ring.length; let i0 = 0, bd = Infinity; D.ring.forEach(([x, z], i) => { const d = Math.hypot(x - 2690, z - 4052 * -1); if (d < bd) { bd = d; i0 = i; } });
+    const at = (s) => { const f = ((s % N) + N) % N, i = Math.floor(f), t = f - i, a = D.ring[i], b = D.ring[(i + 1) % N], na = D.nrm[i], nb = D.nrm[(i + 1) % N]; return { x: a[0] + (b[0] - a[0]) * t, z: a[1] + (b[1] - a[1]) * t, nx: na[0] + (nb[0] - na[0]) * t, nz: na[1] + (nb[1] - na[1]) * t, h: D.Hs[i] }; };
+    const E = { title: 'DDP 밤 조명', lock: true,
+      status() { return this.t < 26 ? `은빛 지붕선을 따라 빛이 흘러요 · ${Math.ceil(26 - this.t)}초` : '다 돌아봤어요'; },
+      tick() { if (hg.bear) hg.bear.root.visible = false; if (this.t > 27) A.finish(E); },
+      // 카메라: 꽃밭이 있는 동쪽 → 남동쪽 → 남쪽 광장 위에서 DDP 를 비스듬히 내려다본다 (사이를 부드럽게)
+      cam(camera, dt) { const KF = [[2750, 24, -4150, 2640, -4090], [2725, 34, -3950, 2630, -4060], [2775, 42, -4060, 2610, -4080]], u = clamp(this.t / 24, 0, 1) * (KF.length - 1), i = Math.min(KF.length - 2, Math.floor(u)), f = smooth(u - i), a = KF[i], b = KF[i + 1], L = (k) => a[k] + (b[k] - a[k]) * f;
+        const pos = new THREE.Vector3(L(0), D.base + L(1), L(2)), look = new THREE.Vector3(L(3), D.base + 8, L(4)); (this.cp ||= pos.clone()).lerp(pos, 1 - Math.exp(-dt * 2)); camera.position.copy(this.cp); (this.lk ||= look.clone()).lerp(look, 1 - Math.exp(-dt * 2)); camera.lookAt(this.lk); },
+      end() { if (hg.bear) hg.bear.root.visible = bearVis ?? true; }, where() { return 'DDP 둘레'; } };
+    return E;
+  },
+});
