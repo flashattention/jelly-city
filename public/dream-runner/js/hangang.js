@@ -2926,8 +2926,8 @@ function buildGatRoof(hg, ring, h, G) {
   const y0 = h + CH + 1.0, top = [], bot = [];
   for (let i = 0; i <= 24; i++) { const t = i / 24, r = BR - (BR - G.crown * 1.15) * t, y = y0 + 0.4 + G.rise * Math.pow(t, 1.7) - 0.9 * Math.pow(1 - t, 6); top.push(new THREE.Vector2(r, y)); bot.push(new THREE.Vector2(r, y - 0.55 - 0.5 * t)); }
   const brim = new THREE.Mesh(new THREE.LatheGeometry(top, 96), new THREE.MeshPhongMaterial({ color: G.brim, specular: '#ffffff', shininess: 60, side: THREE.DoubleSide })); g.add(brim);
-  const under = new THREE.Mesh(new THREE.LatheGeometry(bot, 96), new THREE.MeshLambertMaterial({ color: '#5d6166', side: THREE.DoubleSide })); g.add(under);
-  const edge = new THREE.Mesh(new THREE.TorusGeometry(BR, 0.42, 6, 128), new THREE.MeshPhongMaterial({ color: '#d9dcde', shininess: 80 })); edge.rotation.x = Math.PI / 2; edge.position.y = y0 - 0.4; g.add(edge);
+  const under = new THREE.Mesh(new THREE.LatheGeometry(bot, 96), new THREE.MeshLambertMaterial({ color: '#9a9fa4', side: THREE.DoubleSide })); g.add(under);
+  const edge = new THREE.Mesh(new THREE.TorusGeometry(BR, 0.55, 8, 128), new THREE.MeshPhongMaterial({ color: '#eef1f3', specular: '#ffffff', shininess: 140, emissive: '#c8ccd0', emissiveIntensity: 0.25 })); edge.rotation.x = Math.PI / 2; edge.position.y = y0 - 0.4; g.add(edge);
   // 챙 위 금속판 이음매 (방사선 64줄)
   const L = []; for (let i = 0; i < 64; i++) { const a = (i / 64) * Math.PI * 2; for (let k = 0; k < 24; k++) { const p = top[k], q = top[k + 1]; L.push(Math.cos(a) * p.x, p.y + 0.05, Math.sin(a) * p.x, Math.cos(a) * q.x, q.y + 0.05, Math.sin(a) * q.x); } }
   const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(L, 3)); g.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: '#8d9296', transparent: true, opacity: 0.6 })));
@@ -2936,12 +2936,16 @@ function buildGatRoof(hg, ring, h, G) {
   for (let i = 1; i <= 8; i++) { const a = (i / 8) * Math.PI / 2; prof.push(new THREE.Vector2(Math.max(0.01, (cr - 0.6) * Math.cos(a)), yc - 0.3 + G.crownH * 0.7 + G.crownH * 0.3 * Math.sin(a))); }
   g.add(new THREE.Mesh(new THREE.LatheGeometry(prof, 48), new THREE.MeshPhongMaterial({ color: G.c, shininess: 30, specular: '#5a6068' })));
   // 앞 유리 정면 (북쪽 광장 쪽 1 ~ 2층, 몸통에 붙은 굽은 유리) + 넓은 돌계단
-  const glassF = new THREE.MeshPhongMaterial({ color: '#3f4c58', specular: '#dfe8f0', shininess: 90, emissive: '#ffe2b0', emissiveIntensity: 0, side: THREE.DoubleSide });
+  const glassF = new THREE.MeshPhongMaterial({ color: '#8fa8b8', specular: '#ffffff', shininess: 120, emissive: '#ffe2b0', emissiveIntensity: 0, side: THREE.DoubleSide });
   const fg = new THREE.Mesh(new THREE.CylinderGeometry(R0 + 0.35, R0 + 0.35, 9, 40, 1, true, Math.PI - 0.55, 1.1), glassF); fg.position.y = 4.5; g.add(fg); (hg.lmCrowns ||= []).push(glassF);
+  // 유리 정면 틀: 밝은 금속 세로대(2.6m 마다) · 위 · 가운데 · 아래 가로대 (검은 틈처럼 보이지 않게)
+  { const fr = [], th0 = Math.PI - 0.55, R1 = R0 + 0.5; for (let a = th0; a <= th0 + 1.1 + 1e-3; a += 2.6 / R1) { const b2 = new THREE.BoxGeometry(0.22, 9, 0.22); b2.translate(Math.sin(a) * R1, 4.5, Math.cos(a) * R1); fr.push(b2); }
+    for (const y of [0.15, 4.5, 8.9]) { const t2 = new THREE.CylinderGeometry(R1, R1, 0.3, 40, 1, true, th0, 1.1); t2.translate(0, y, 0); fr.push(t2); }
+    g.add(new THREE.Mesh(mergeGeos(fr), new THREE.MeshPhongMaterial({ color: '#dfe3e6', specular: '#ffffff', shininess: 90, side: THREE.DoubleSide }))); }
   const steps = []; for (let k = 0; k < 10; k++) { const s = new THREE.BoxGeometry(46 - k * 0.6, 0.3 * (k + 1), 1.2); s.translate(0, 0.15 * (k + 1), -(R0 + 13 - k * 1.2)); steps.push(s); }
   const plat = new THREE.BoxGeometry(40, 3, 6); plat.translate(0, 1.5, -(R0 + 2.5)); steps.push(plat);
   g.add(new THREE.Mesh(mergeGeos(steps), new THREE.MeshLambertMaterial({ color: '#cfc8bb' })));
-  hg.addFoot({ ring: [[x - 20, z - R0 - 5.5], [x + 20, z - R0 - 5.5], [x + 20, z - R0 + 0.5], [x - 20, z - R0 + 0.5]], h: 3, x0: x - 20, x1: x + 20, z0: z - R0 - 5.5, z1: z - R0 + 0.5, name: '오페라하우스 계단', type: 'stone' });
+  hg.addFoot({ ring: [[x - 20, z - R0 - 5.5], [x + 20, z - R0 - 5.5], [x + 20, z - R0 + 0.5], [x - 20, z - R0 + 0.5]], h: 3, x0: x - 20, x1: x + 20, z0: z - R0 - 5.5, z1: z - R0 + 0.5, name: '오페라하우스 계단', type: 'stone', noClimb: true }); // noClimb: 가게 문 자리(벽 찾기)에서 빠진다 (계단 앞면에 가게 문 · 차양이 붙어 광장에 떠 있었다)
 }
 // 서울식물원 온실: 외곽선(꽃잎 모양) 그대로 유리 벽 + 오목한 접시 지붕(가장자리 rim · 가운데 mid), 흰 철골 격자선. 밤엔 안쪽 빛
 function buildDishHouse(hg, ring, D) {

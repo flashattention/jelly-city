@@ -33,12 +33,14 @@ const tex = (w, h, draw) => { const cv = document.createElement('canvas'); cv.wi
 
 // ---------- 가게 앞 ----------
 //   shops: [[이름, 종류, x, z], ...] (지도 단위) → 가까운 건물 벽에 붙인다. 붙일 벽이 없으면 건너뛴다
+// 가게 점이 그 건물 안이면 가장 가까운 벽(22m 안)에, 건물 밖이면 6m 안 벽에만 문을 단다 (예술의전당 광장 한가운데 가게 점이 10m 떨어진 미술관 외곽선에 붙어 광장에 문 · 차양이 떠 있었다)
+function inRingS(x, z, r) { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) if (r[i][1] > z !== r[j][1] > z && x < ((r[j][0] - r[i][0]) * (z - r[i][1])) / (r[j][1] - r[i][1]) + r[i][0]) c = !c; return c; }
 export function buildShopFronts(hg, raw, S) {
   const fronts = [], used = new Map();
   for (const [name, kind, x0, z0] of raw) {
     const x = x0 * S, z = z0 * S, cell = []; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const fi of hg.footGrid?.get(`${Math.floor(x / 40) + a},${Math.floor(z / 40) + b}`) || []) cell.push(fi);
     let best = null;
-    for (const fi of cell) { const f = hg.foot[fi]; if (f.noClimb || f.h < 3) continue; const ring = f.ring, sg = ringSign(ring); for (let k = 0; k < ring.length; k++) { const a = ring[k], c = ring[(k + 1) % ring.length], ex = c[0] - a[0], ez = c[1] - a[1], L = Math.hypot(ex, ez); if (L < 4) continue; const t = Math.max(1.4 / L, Math.min(1 - 1.4 / L, ((x - a[0]) * ex + (z - a[1]) * ez) / (L * L))), px = a[0] + ex * t, pz = a[1] + ez * t, d = Math.hypot(x - px, z - pz); if (d < 22 && (!best || d < best.d)) best = { d, px, pz, nx: (sg > 0 ? ez : -ez) / L, nz: (sg > 0 ? -ex : ex) / L, fi, k }; } }
+    for (const fi of cell) { const f = hg.foot[fi]; if (f.noClimb || f.h < 3) continue; const ring = f.ring, sg = ringSign(ring), inside = inRingS(x, z, ring); for (let k = 0; k < ring.length; k++) { const a = ring[k], c = ring[(k + 1) % ring.length], ex = c[0] - a[0], ez = c[1] - a[1], L = Math.hypot(ex, ez); if (L < 4) continue; const t = Math.max(1.4 / L, Math.min(1 - 1.4 / L, ((x - a[0]) * ex + (z - a[1]) * ez) / (L * L))), px = a[0] + ex * t, pz = a[1] + ez * t, d = Math.hypot(x - px, z - pz); if ((inside ? d < 22 : d < 6) && (!best || d < best.d)) best = { d, px, pz, nx: (sg > 0 ? ez : -ez) / L, nz: (sg > 0 ? -ex : ex) / L, fi, k }; } }
     if (!best) continue;
     // 같은 벽 같은 자리에 겹치면 옆으로 4m 씩
     const key = `${best.fi}:${best.k}`, n = used.get(key) || 0; used.set(key, n + 1); if (n > 5) continue;
