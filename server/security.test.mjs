@@ -294,6 +294,15 @@ test('10 바깥 API: 정상 · 허용 목록 밖 거절 · 키가 응답에 안 
   assert.doesNotMatch(status, /serviceKey|SEOUL_\w*KEY|"mock"\s*:\s*"/i);
 });
 
+test('8-1 XSS 글: 이름 · 방 이름 · 채팅에 넣은 태그는 서버에서 빠진다', async () => {
+  const h = IP(95), x = '<img src=x onerror=alert(1)>';
+  const j = await (await postJ('/api/merge/record', { b: 'box', value: 7, name: `곰${x}`, anon: hex(24) }, h)).json();
+  assert.ok(!JSON.stringify(j).includes('<img'), '순위표 이름');
+  const ws = await wsOpen('/word-ws', IP(96)); ws.send(JSON.stringify({ t: 'hello', name: `나${x}` })); ws.send(JSON.stringify({ t: 'create', name: `방"><script>alert(1)</script>` }));
+  const jn = await waitFor(ws, (m) => m.t === 'joined'); assert.ok(jn);
+  assert.ok(!JSON.stringify(jn).includes('<'), '방 이름 · 이름표'); ws.close();
+});
+
 test('7-1 순위표에 익명 id 가 나가지 않는다', async () => {
   const anon = hex(24), h = IP(56);
   await postJ('/api/merge/record', { b: 'cup', value: 3, name: '비밀곰', anon }, h);

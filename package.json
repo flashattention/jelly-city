@@ -5,7 +5,8 @@
   "type": "module",
   "description": "젤리시티 - 곰돌이 젤리들의 3D 멀티플레이 라이프 시뮬레이션",
   "scripts": {
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "test": "node --test server/"
   },
   "engines": {
     "node": ">=20"
