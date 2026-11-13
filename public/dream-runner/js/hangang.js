@@ -1321,6 +1321,10 @@ export class Hangang {
     // 8-41-1: 복선 철교는 OSM 에서 선로마다 따로 그어져, 한쪽만 14m · 옆 선로는 7.5m 로 위아래 두 층이 됐다(당산철교) → 나란히(12m 안) 가는 철도 고가가 14m 면 같이 14m
     const segD = (p, pts) => { let m = Infinity; for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], c = pts[i], ex = c[0] - a[0], ez = c[1] - a[1], t = clamp(((p[0] - a[0]) * ex + (p[1] - a[1]) * ez) / (ex * ex + ez * ez || 1), 0, 1); m = Math.min(m, Math.hypot(p[0] - a[0] - ex * t, p[1] - a[1] - ez * t)); } return m; };
     for (let pass = 0; pass < 2; pass++) for (const w of ways) { if (!w.b.rail || w.top === 14) continue; const tall = ways.filter((o) => o !== w && o.b.rail && o.top === 14); if (!tall.length) continue; let n = 0; for (const p of w.pts) if (tall.some((o) => segD(p, o.pts) < 12)) n++; if (n >= w.pts.length * 0.5) w.top = 14; }
+    // 8-43-3: 찻길 다리 바로 밑을 같이 건너는 철교(청담대교 7호선)는 2층 다리의 아래층 — 물 위 10m 마다 재서 60% 넘게 14m 찻길 다리 폭 안이면 7.5m (위층 찻길 바닥 밑 12.4m 와 사이가 뜬다)
+    const big = ways.filter((o) => !o.b.rail && o.top === 14 && o.b.w >= 12);
+    {
+      if (big.length) for (const w of ways) { if (!w.b.rail || w.top !== 14) continue; let m = 0, n = 0; for (let i = 1; i < w.pts.length; i++) { const a = w.pts[i - 1], c = w.pts[i], k = Math.max(1, Math.ceil(Math.hypot(c[0] - a[0], c[1] - a[1]) / 10)); for (let j = 0; j < k; j++) { const p = [a[0] + (c[0] - a[0]) * (j + 0.5) / k, a[1] + (c[1] - a[1]) * (j + 0.5) / k]; if (!inWater(p[0], p[1])) continue; m++; if (big.some((o) => segD(p, o.pts) < o.b.w / 2)) n++; } } if (m > 10 && n >= m * 0.6) { w.top = 7.5; w.lowDeck = true; } } }
     for (const w of ways) {
       const b = w.b, pts = w.pts;
       const fine = []; for (let i = 1; i < pts.length; i++) { const [a, c] = [pts[i - 1], pts[i]], L = Math.hypot(c[0] - a[0], c[1] - a[1]), n = Math.max(1, Math.ceil(L / 15)); for (let k = 0; k < n; k++) fine.push([lerp(a[0], c[0], k / n), lerp(a[1], c[1], k / n)]); } fine.push(pts[pts.length - 1]);
@@ -1329,7 +1333,7 @@ export class Hangang {
       const total = acc[acc.length - 1];
       const ys = fine.map((_, i) => { if (wet[i]) return top; const d0 = w.free0 ? acc[i] : Infinity, d1 = w.free1 ? total - acc[i] : Infinity; return Math.min(top, 0.25 + Math.min(d0, d1) * 0.07); });
       // 8-31: 철도 고가는 역에서 끊긴 끝(350m 안에 다른 철도 고가 끝이 있으면)에선 땅으로 내려오지 않는다 (역마다 고가가 찻길 위로 내려앉아 차가 뚫고 지났다)
-      if (b.rail) { const near2 = (p) => ways.some((o) => o !== w && o.b.rail && [o.pts[0], o.pts[o.pts.length - 1]].some((q) => Math.hypot(q[0] - p[0], q[1] - p[1]) < 350)), k0 = w.free0 && !near2(pts[0]), k1 = w.free1 && !near2(pts[pts.length - 1]); for (let i = 0; i < ys.length; i++) if (!wet[i]) ys[i] = Math.min(top, 0.25 + Math.min(k0 ? acc[i] : Infinity, k1 ? total - acc[i] : Infinity) * 0.07); }
+      if (b.rail) { const near2 = (p) => !w.lowDeck && ways.some((o) => o !== w && o.b.rail && [o.pts[0], o.pts[o.pts.length - 1]].some((q) => Math.hypot(q[0] - p[0], q[1] - p[1]) < 350)), k0 = w.free0 && !near2(pts[0]), k1 = w.free1 && !near2(pts[pts.length - 1]); for (let i = 0; i < ys.length; i++) if (!wet[i]) ys[i] = Math.min(top, 0.25 + Math.min(k0 ? acc[i] : Infinity, k1 ? total - acc[i] : Infinity) * 0.07); }
       // 8-31: 땅의 찻길을 가로지르는 곳은 바닥 위 5.2m 이상(바닥 두께 1.6m 아래로 버스가 지난다), 그 앞뒤는 완만하게(1m 에 12cm) 이어 올린다
       else {
         let raised = false;
@@ -1345,7 +1349,8 @@ export class Hangang {
       // 난간 (양쪽 낮은 벽)
       for (const sgn of [-1, 1]) { const off = fine.map((p, i) => { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1; return [p[0] - dz / L * (b.w / 2) * sgn, p[1] + dx / L * (b.w / 2) * sgn]; }); rails2.push({ off, ys, rail: !!b.rail, fine }); }
       // 철교 트러스는 물 위(와 그 바로 옆)에만 — 땅 위 지하철 고가는 콘크리트 상판이라 트러스가 없다
-      if (b.rail) rails.push({ fine, ys, w: b.w, n: b.n || '', wetR: fine.map((_, i) => wet[i] || wet[i - 1] || wet[i + 1] || wet[i - 2] || wet[i + 2]) });
+      // 8-43-3: 아래층 철교는 트러스 대신 위층 찻길 바닥을 받치는 기둥(아래 railPaths 다음)
+      if (b.rail) rails.push({ fine, ys, w: b.w, n: b.n || '', low: !!w.lowDeck, wet, wetR: fine.map((_, i) => !w.lowDeck && (wet[i] || wet[i - 1] || wet[i + 1] || wet[i - 2] || wet[i + 2])) });
       for (let i = 0; i < fine.length; i += 2) { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], ang = Math.atan2(c[1] - a[1], c[0] - a[0]) + Math.PI / 2; if (ys[i] < 3) continue; if (wet[i]) { if (i % 4 === 0) piers.push([fine[i][0], fine[i][1], ys[i], b.w, ang]); } else piers.push([fine[i][0], fine[i][1], ys[i], b.w * 0.6, ang]); }
       if (anyWet) for (let i = 0; i < fine.length; i += 3) { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1; for (const sgn of [-1, 1]) lamps.push(fine[i][0] - dz / L * b.w / 2 * sgn, ys[i] + 1.2, fine[i][1] + dx / L * b.w / 2 * sgn); }
     }
@@ -1388,6 +1393,10 @@ export class Hangang {
     const twin = (self, x, z) => rails.some((o) => o !== self && o.fine.some((q, k) => k > 0 && Math.abs(q[0] - x) < 30 && Math.abs(q[1] - z) < 30 && segD([x, z], [o.fine[k - 1], q]) < 2.6));
     const tP = []; for (const rr of rails) { const { fine, ys, w, wetR } = rr; for (let i = 1; i < fine.length; i++) { if (wetR && !wetR[i] && !wetR[i - 1]) continue; const a = fine[i - 1], c = fine[i], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1, nx = -dz / L * w / 2, nz = dx / L * w / 2; for (const sgn of [-1, 1]) { if (twin(rr, (a[0] + c[0]) / 2 + nx * sgn, (a[1] + c[1]) / 2 + nz * sgn)) continue; const ax = a[0] + nx * sgn, az = a[1] + nz * sgn, cx = c[0] + nx * sgn, cz = c[1] + nz * sgn, y0 = ys[i - 1], y1 = ys[i]; tP.push(ax, y0, az, cx, y1 + 7, cz, ax, y0 + 7, az, cx, y1 + 7, cz, ax, y0, az, ax, y0 + 7, az); } } }
     this.railPaths = rails;
+    // 8-43-3: 2층 다리 아래층(청담대교 7호선) 바깥 가장자리에 15m 마다 위층 바닥 밑(12.4m)까지 강철 기둥 — 옆에 나란한 선로 바닥이 있는 쪽은 뺀다(열차가 지나는 자리)
+    { const posts = []; for (const rr of rails) { if (!rr.low) continue; const { fine, ys, w, wet } = rr; for (let i = 0; i < fine.length; i++) { if (!wet[i] || !big.some((o) => segD(fine[i], o.pts) < o.b.w / 2)) continue; const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1; for (const sgn of [-1, 1]) { const x = fine[i][0] - (dz / L) * (w / 2 + 0.2) * sgn, z = fine[i][1] + (dx / L) * (w / 2 + 0.2) * sgn; if (rails.some((o) => o !== rr && o.low && segD([x, z], o.fine) < o.w / 2 + 0.5)) continue; posts.push([x, ys[i], z, Math.atan2(dx, dz)]); } } }
+      if (posts.length) { const pg = new THREE.BoxGeometry(0.7, 1, 0.9); pg.translate(0, 0.5, 0); const sm2 = new THREE.MeshLambertMaterial({ color: '#8d97a3' }), pim = new THREE.InstancedMesh(pg, sm2, posts.length), o5 = new THREE.Object3D();
+        posts.forEach(([x, y, z, a], i) => { o5.position.set(x, y, z); o5.rotation.set(0, a, 0); o5.scale.set(1, 12.4 - y, 1); o5.updateMatrix(); pim.setMatrixAt(i, o5.matrix); }); this.scene.add(pim); this.lowDeckPosts = posts.length; } }
     if (tP.length) { const beams = []; for (let i = 0; i < tP.length; i += 6) beams.push([tP[i], tP[i + 1], tP[i + 2], tP[i + 3], tP[i + 4], tP[i + 5]]); const bg = new THREE.BoxGeometry(0.5, 0.5, 1); bg.translate(0, 0, 0.5); const bm = new THREE.InstancedMesh(bg, new THREE.MeshLambertMaterial({ color: '#5b6672' }), beams.length), o2 = new THREE.Object3D(), A = new THREE.Vector3(), B = new THREE.Vector3(); beams.forEach(([x1, y1, z1, x2, y2, z2], i) => { A.set(x1, y1, z1); B.set(x2, y2, z2); o2.position.copy(A); o2.lookAt(B); o2.scale.set(1, 1, A.distanceTo(B)); o2.updateMatrix(); bm.setMatrixAt(i, o2.matrix); }); this.scene.add(bm); }
     // 아치 (서강대교)
     for (const [, ax, az, span] of this.map.arches || []) {
