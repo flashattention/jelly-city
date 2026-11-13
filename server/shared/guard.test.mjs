@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { Bucket, DayCount, publicPath, parseSafe, pick, cleanText, cleanName, impersonates, publicError } from './guard.js';
+import { Bucket, DayCount, publicPath, parseSafe, pick, cleanText, cleanName, impersonates, publicError, WsGuard, originOk, wsShapeOk, specOk, ROOM_SPECS } from './guard.js';
 
 test('토큰 버킷: 한 번에 burst 까지, 그 뒤엔 rate 만큼 다시 찬다', () => {
   const b = new Bucket({ rate: 2, burst: 3 }); const t = 1e6;
@@ -56,4 +56,36 @@ test('publicError: 내부 오류 · 경로 · 키는 감추고 우리 문구 · 
   assert.doesNotMatch(publicError('ENOENT: no such file, open /app/data/world.json'), /app|ENOENT/);
   assert.doesNotMatch(publicError('오류 sk-abcdefghijklmnop1234 · OPENAI_API_KEY'), /sk-abc|OPENAI_API_KEY/);
   assert.doesNotMatch(publicError('버스 오류 serviceKey=abc%2Fdef&x=1'), /abc%2F/);
+});
+
+test('originOk: 같은 호스트 · 운영 · 토스 · 로컬만', () => {
+  assert.ok(originOk('https://jelly-city.fly.dev', 'jelly-city.fly.dev'));
+  assert.ok(originOk('https://my.domain.kr', 'my.domain.kr'));
+  assert.ok(originOk('https://x.apps.tossmini.com', 'jelly-city.fly.dev'));
+  assert.ok(originOk('http://localhost:5173', 'jelly-city.fly.dev'));
+  assert.ok(originOk(undefined, 'a'));
+  for (const o of ['https://evil.com', 'https://jelly-city.fly.dev.evil.com', 'http://tossmini.com.evil.io', 'null', 'http://x.toss.im']) assert.equal(originOk(o, 'jelly-city.fly.dev'), false, o);
+});
+test('wsShapeOk · specOk', () => {
+  assert.ok(wsShapeOk({ t: 'st', p: [1, 2, 3] }));
+  assert.equal(wsShapeOk({ t: 'st', p: [Infinity] }), false);
+  assert.equal(wsShapeOk({ t: '1x' }), false);
+  assert.equal(wsShapeOk(JSON.parse('{"t":"a","__proto__":1}')), false);
+  assert.ok(specOk({ t: 'chat', s: 'hi' }, ROOM_SPECS));
+  assert.equal(specOk({ t: 'chat', s: { a: 1 } }, ROOM_SPECS), false);
+  assert.equal(specOk({ t: 'st', p: Array(40).fill(1) }, ROOM_SPECS), false);
+});
+test('4-3 핑에 답이 없거나 첫 메시지가 없거나 오래 조용하면 끊는다', () => {
+  const g = new WsGuard({ pingMs: 1e9 }); clearInterval(g.timer);
+  const fake = () => { const w = { ev: {}, on(e, f) { (this.ev[e] ||= []).push(f); }, once(e, f) { this.on(e, f); }, emit() { return true; }, ping() { this.pinged = (this.pinged || 0) + 1; }, terminate() { this.dead = 'terminate'; }, close(c) { this.dead = c; }, readyState: 1 }; return w; };
+  const req = { headers: {}, socket: { remoteAddress: '1.2.3.4' } };
+  const a = fake(), b = fake(), c = fake();
+  g.attach(a, req, '/x'); g.attach(b, req, '/x'); g.attach(c, req, '/x', { idleMs: 1000 });
+  const t0 = Date.now();
+  a.emit('message', Buffer.from('{"t":"hello"}')); c.emit('message', Buffer.from('{"t":"hello"}'));
+  g.beat(t0 + 10); assert.equal(a.pinged, 1); assert.equal(a.dead, undefined);
+  g.beat(t0 + 20); assert.equal(a.dead, 'terminate'); // 핑에 답(pong)이 없었다
+  g.beat(t0 + 61000 + 30); assert.equal(b.dead === 4001 || b.dead === 'terminate', true);
+  const d = fake(); g.attach(d, req, '/x', { idleMs: 1000 }); d.emit('message', Buffer.from('{"t":"hello"}')); d.ev.pong.forEach((f) => f());
+  g.beat(Date.now() + 2000); assert.equal(d.dead, 4002);
 });

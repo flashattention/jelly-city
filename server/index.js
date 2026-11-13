@@ -46,7 +46,7 @@ import { normWord } from '../public/jelly-draw/js/prompts.js';
 import { complete } from './jelly-city/llm.js';
 import { Records } from './shared/records.js';
 import { Cosmetics, cosApi, setNames } from './cosmetics.js';
-import { sec, clientIp, limited as rateLimited, publicPath, publicError, DayCount } from './shared/guard.js';
+import { sec, clientIp, limited as rateLimited, publicPath, publicError, DayCount, WsGuard, ROOM_SPECS } from './shared/guard.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
@@ -421,6 +421,8 @@ server.maxHeadersCount = 100;
 const GZ = new Map(); let gzBytes = 0;
 const WMOD = new Map(); // 워커용으로 바꾼 모듈 (파일이 바뀌면 다시)
 
+// 웹소켓 지킴이 (IP 하나: 동시 80 · 1분 새 접속 120, 접속 하나: 1초 60 메시지 · 한 번에 240)
+const wsGuard = new WsGuard();
 // WS_COMPRESS=1 이면 메시지를 압축해서 보낸다 (트래픽 ↓, CPU ↑)
 const COMPRESS = process.env.WS_COMPRESS === '1';
 const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024, perMessageDeflate: COMPRESS ? { zlibDeflateOptions: { level: 3 }, threshold: 512 } : false });
@@ -456,7 +458,14 @@ server.on('upgrade', (req, socket, head) => {
   const p = OLD_WS[p0] || p0;
   const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/drift-ws' ? driftWss : p === '/tactical-ws' ? tacticalWss : p === '/drop-ws' ? dropWss : p === '/guard-ws' ? guardWss : p === '/ten-ws' ? tenWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : p === '/type-ws' ? typeWss : p === '/surv-ws' ? survWss : p === '/sketch-ws' ? sketchWss : p === '/rumble-ws' ? rumbleWss : p === '/merge-ws' ? mergeWss : p === '/court-ws' ? courtWss : p === '/ding-ws' ? dingWss : p === '/slide-ws' ? slideWss : p === '/hide-ws' ? hideWss : p === '/arena-ws' ? arenaWss : p === '/arcade-ws' ? arcadeWss : null;
   if (!target) { socket.destroy(); return; }
-  target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
+  // 웹소켓 지킴이: 허용한 출처 · IP 하나당 접속 수 · 새 접속 속도를 보고, 붙인 뒤에는 메시지 속도 · 꼴 · 핑을 본다
+  const ok = wsGuard.admit(req, p);
+  if (!ok.ok) { try { socket.write(`HTTP/1.1 ${ok.status} ${ok.status === 403 ? 'Forbidden' : 'Too Many Requests'}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`); } catch { /* 끊김 */ } socket.destroy(); return; }
+  const max = target.options.maxPayload || 16384;
+  target.handleUpgrade(req, socket, head, (ws) => {
+    wsGuard.attach(ws, req, p, { specs: p === '/ws' ? null : ROOM_SPECS, maxStr: max, maxNodes: Math.max(4000, max / 4), idleMs: p === '/ws' ? 0 : 30 * 60e3 });
+    target.emit('connection', ws, req);
+  });
 });
 wss.on('connection', (ws) => {
   if (REDIRECT_TO) { ws.close(4000, 'moved'); return; } // 이사 간 서버는 접속을 받지 않는다

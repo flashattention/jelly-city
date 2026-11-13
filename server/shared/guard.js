@@ -155,3 +155,106 @@ export function publicError(msg) {
   if (!/[가-힣]/.test(m)) return '요청을 처리하지 못했어요. 잠시 후 다시 해 주세요';
   return m.replace(SECRETISH, '…').slice(0, 300);
 }
+
+// ---------- 웹소켓 메시지 꼴 (4-2) ----------
+// 모든 게임 공통: JSON 객체 · t 는 짧은 이름 · 깊이 8 · 오염 키 없음 · 숫자는 유한하고 1e15 안 · 글자는 maxLen 안
+const T_RE = /^[A-Za-z][A-Za-z0-9_]{0,31}$/;
+export function wsShapeOk(m, { maxNodes = 4000, maxStr = 4096 } = {}) {
+  if (!m || typeof m !== 'object' || Array.isArray(m) || typeof m.t !== 'string' || !T_RE.test(m.t)) return false;
+  let nodes = 0;
+  const walk = (v, d) => {
+    if (++nodes > maxNodes || d > 8) return false;
+    if (typeof v === 'number') return Number.isFinite(v) && Math.abs(v) <= 1e15;
+    if (typeof v === 'string') return v.length <= maxStr;
+    if (v === null || typeof v === 'boolean') return true;
+    if (Array.isArray(v)) { for (const x of v) if (!walk(x, d + 1)) return false; return true; }
+    if (typeof v === 'object') { for (const k of Object.keys(v)) { if (BAD_KEYS.has(k) || k.length > 64 || !walk(v[k], d + 1)) return false; } return true; }
+    return false;
+  };
+  return walk(m, 0);
+}
+// 방 게임 공통 메시지 (BaseRooms · 드림 러너 방): 종류마다 필드 형 · 길이
+const str = (n) => (v) => v === undefined || v === null || (typeof v === 'string' && v.length <= n);
+const num = (lo, hi) => (v) => v === undefined || (typeof v === 'number' && v >= lo && v <= hi) || (typeof v === 'string' && v.length <= 12 && Number(v) >= lo && Number(v) <= hi);
+const arr = (n) => (v) => v === undefined || (Array.isArray(v) && v.length <= n);
+export const ROOM_SPECS = {
+  hello: { session: str(128), name: str(80), color: str(32), acc: arr(24) },
+  create: { name: str(80) },
+  join: { id: str(16) },
+  chat: { s: str(600) },
+  st: { p: arr(16) },
+  shove: { to: num(0, 1e9), dir: num(-10, 10) },
+};
+export function specOk(m, specs) {
+  const sp = specs?.[m.t]; if (!sp) return true;
+  for (const [k, ok] of Object.entries(sp)) if (!ok(m[k])) return false;
+  return true;
+}
+
+// ---------- 웹소켓 지킴이 (3-2 · 3-3 · 3-4 · 4-1 · 4-3) ----------
+// 허용 출처: 같은 호스트 · 운영 주소 · 토스 미니앱 · 로컬 개발. Origin 이 없으면(브라우저가 아닌 것) 받되 기록한다
+const PROD_ORIGINS = new Set(['https://jelly-city.fly.dev']);
+export function originOk(origin, host) {
+  if (!origin) return true;
+  let u; try { u = new URL(origin); } catch { return false; }
+  if (host && u.host === host) return true;
+  if (PROD_ORIGINS.has(u.origin)) return true;
+  if (u.protocol === 'https:' && /(^|\.)(toss\.im|tossmini\.com)$/.test(u.hostname)) return true;
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(u.hostname)) return true;
+  for (const o of String(process.env.WS_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean)) if (u.origin === o) return true;
+  return false;
+}
+export class WsGuard {
+  // perIp: IP 하나 동시 접속 · newPerMin: IP 하나 1분 새 접속 · rate/burst: 접속 하나 메시지 · idleMs: 조용하면 끊기 (0 = 안 끊음)
+  constructor({ perIp = 80, newPerMin = 120, rate = 60, burst = 240, pingMs = 30000, firstMs = 60000 } = {}) {
+    this.o = { perIp, rate, burst, pingMs, firstMs };
+    this.live = new Map(); this.fresh = new Bucket({ rate: newPerMin / 60, burst: newPerMin });
+    this.joins = new Bucket({ rate: 0.5, burst: 20 }); this.creates = new Bucket({ rate: 0.2, burst: 10 });
+    this.socks = new Set();
+    this.timer = setInterval(() => this.beat(), pingMs); this.timer.unref?.();
+  }
+  // 업그레이드 전에: { ok } 또는 { ok: false, status, why }
+  admit(req, where) {
+    const ip = clientIp(req), origin = req.headers.origin, host = String(req.headers.host || '');
+    if (!originOk(origin, host)) { sec.note('origin', { ip, where, detail: String(origin).slice(0, 80) }); return { ok: false, status: 403, why: 'origin' }; }
+    if ((this.live.get(ip) || 0) >= this.o.perIp) { sec.note('ws', { ip, where, detail: 'too many sockets' }); return { ok: false, status: 429, why: 'busy' }; }
+    if (!this.fresh.take(ip)) { sec.note('ws', { ip, where, detail: 'too many new sockets' }); return { ok: false, status: 429, why: 'busy' }; }
+    if (!origin) sec.note('origin', { ip, where, detail: 'no origin (not a browser)' });
+    return { ok: true, ip };
+  }
+  // 접속 뒤: 메시지 속도 · 꼴 확인 (ws.emit 을 감싸서, 넘친 메시지는 게임 코드에 닿지 않는다) · 핑
+  attach(ws, req, where, { specs = null, maxNodes, maxStr, idleMs = 0 } = {}) {
+    const ip = clientIp(req), bucket = { t: this.o.burst, at: Date.now() };
+    this.live.set(ip, (this.live.get(ip) || 0) + 1);
+    const st = { ip, where, alive: true, last: Date.now(), first: false, born: Date.now(), drop: 0, bad: 0, win: Date.now(), idleMs };
+    ws._guard = st; this.socks.add(ws);
+    ws.on('pong', () => { st.alive = true; });
+    ws.once('close', () => { this.socks.delete(ws); const n = (this.live.get(ip) || 1) - 1; if (n <= 0) this.live.delete(ip); else this.live.set(ip, n); });
+    const emit = ws.emit.bind(ws);
+    const tell = (text) => { try { if (ws.readyState === 1) ws.send(JSON.stringify({ t: 'error', code: 'slow', text })); } catch { /* 끊김 */ } };
+    ws.emit = (ev, ...a) => {
+      if (ev !== 'message') return emit(ev, ...a);
+      const now = Date.now(); st.last = now; st.first = true;
+      if (now - st.win > 10000) { st.win = now; st.drop = 0; st.bad = 0; }
+      bucket.t = Math.min(this.o.burst, bucket.t + ((now - bucket.at) / 1000) * this.o.rate); bucket.at = now;
+      if (bucket.t < 1) { if (++st.drop === 1) sec.note('ws', { ip, where, detail: 'message flood' }); if (st.drop > 300) ws.close(1008, 'too fast'); return false; }
+      bucket.t -= 1;
+      let m; try { m = parseSafe(String(a[0])); } catch { m = null; }
+      if (!m || !wsShapeOk(m, { maxNodes, maxStr }) || !specOk(m, specs)) { if (++st.bad === 1) sec.note('ws', { ip, where, detail: `bad message ${typeof m?.t === 'string' ? m.t.slice(0, 20) : ''}` }); if (st.bad > 50) ws.close(1008, 'bad messages'); return false; }
+      // 초대 코드 맞히기 · 방 만들기 폭탄: IP 하나 기준
+      if ((m.t === 'join' || m.t === 'quick') && !this.joins.take(ip, 1, now)) { sec.note('ws', { ip, where, detail: 'join flood (code guessing?)' }); tell('방 찾기를 너무 많이 했어요. 잠시 후 다시 해 주세요'); return false; }
+      if (m.t === 'create' && !this.creates.take(ip, 1, now)) { sec.note('ws', { ip, where, detail: 'create flood' }); tell('방을 너무 많이 만들었어요. 잠시 후 다시 해 주세요'); return false; }
+      return emit(ev, ...a);
+    };
+  }
+  // 30초마다: 지난 핑에 답이 없으면 끊는다 · 첫 메시지를 60초 안에 안 보내면 끊는다 · (방 게임) 오래 조용하면 끊는다
+  beat(now = Date.now()) {
+    for (const ws of this.socks) {
+      const st = ws._guard;
+      if (!st.alive) { ws.terminate(); continue; }
+      if (!st.first && now - st.born > this.o.firstMs) { ws.close(4001, 'hello timeout'); continue; }
+      if (st.idleMs && now - st.last > st.idleMs) { ws.close(4002, 'idle'); continue; }
+      st.alive = false; try { ws.ping(); } catch { /* 끊김 */ }
+    }
+  }
+}
