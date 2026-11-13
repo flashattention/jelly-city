@@ -69,6 +69,7 @@ function seoulSwap(on) {
   const to = on ? seoulRun.hw.scene : scene;
   boosterTo(runner.booster, to); for (const g of game.ghosts.values()) boosterTo(g.booster, to);
   for (const o of [track.root, runner.bear.root, runner.shadow]) to.add(o);
+  if (!on) { runner.bear.root.scale.setScalar(1); for (const g of game.ghosts.values()) g.bear.root.scale.setScalar(1); }
   for (const g of game.ghosts.values()) { to.add(g.bear.root); if (g.tag) to.add(g.tag); }
   if (on) {
     renderer.shadowMap.enabled = !isPhone; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15; renderer.domElement.style.filter = '';
@@ -888,8 +889,12 @@ function frame() {
 }
 // 서울 맵 한 프레임: 칸 불러오기 · 판정 자리 물체 휘기 · 카메라 · 하늘 · 그리기
 const seoulP = new THREE.Vector3();
+// 6-13: 서울 맵에서는 곰을 행인 젤리 · 실제 차와 같은 비율로 (보이는 키 2.38m → 약 1.5m, 판정 키 1.45m 와 맞음). 꿈나라 · 지옥 · 이공간은 그대로
+const SEOUL_BEAR = 0.63;
 function seoulFrame(dt) {
   seoulRun.tick(dt, runner.s);
+  runner.bear.root.scale.setScalar(SEOUL_BEAR);
+  for (const g of game.ghosts.values()) g.bear.root.scale.setScalar(SEOUL_BEAR);
   const objs = [...track.root.children, runner.bear.root, runner.shadow];
   boosterTo(runner.booster, seoulRun.hw.scene);
   // 다른 곰은 내 카메라가 있는 코스 길 위에 (문 너머로 먼저 간 곰은 문을 지나 그 길 끝을 곧게 이어 달리고, 내가 문을 지나는 순간 함께 다음 코스로)
@@ -936,7 +941,7 @@ function followCamera(dt) {
   const v = w ? speedAt(s) * (runner.speedK || 1) : runner.v;
   const dead = game.mode === 'dead' && !w;
   game.camK += ((game.camLow ? 1 : 0) - game.camK) * Math.min(1, dt * 6);
-  const mix = (a, b) => a + (b - a) * game.camK, up = mix(CAM.high.up, CAM.low.up), back = mix(CAM.high.back, CAM.low.back), look = mix(CAM.high.look, CAM.low.look), ahead = mix(CAM.high.ahead, CAM.low.ahead);
+  const mix = (a, b) => a + (b - a) * game.camK; let up = mix(CAM.high.up, CAM.low.up), back = mix(CAM.high.back, CAM.low.back), look = mix(CAM.high.look, CAM.low.look), ahead = mix(CAM.high.ahead, CAM.low.ahead);
   // 지옥: 바닥 높이가 계속 바뀐다 · 떨어지는 동안은 위에서 내려다봐서 내릴 곳이 보이게
   const hell = track.hell, fl = hell ? track.deathY(s) + 6 : -6, drop = hell && !w && runner.alive && !runner.onGround ? y - (fl + 10) : 0, falling = drop > 7 ? Math.min(1, (drop - 7) / 12) : 0; // 숙이기 · 작은 턱에는 시점이 흔들리지 않고, 까마득히 떨어질 때만 내려다본다
   game.camFall = (game.camFall || 0) + (falling - (game.camFall || 0)) * Math.min(1, dt * 2.5);
@@ -951,6 +956,8 @@ function followCamera(dt) {
     game.camR += (game.camH - game.camR) * Math.min(1, dt * 7);
     yc = game.camR;
   } else game.camG = null;
+  // 서울 맵은 곰이 작아진 만큼(6-13) 카메라를 가까이 · 낮게
+  const sk = seoulOn() ? 0.72 : 1; up *= sk; back *= sk; look *= sk; ahead *= sk;
   const cx = x * 0.85, cy = Math.max(yc, fl) + up + game.camFall * 5;
   // 서울 맵: 곧은 길 자리에서 정하고, 그리기 전에 실제 길 위로 옮긴다 (seoulFrame)
   const cam = seoulOn() ? seoulCam : camera;
