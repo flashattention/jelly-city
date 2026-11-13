@@ -175,3 +175,81 @@ registerAttraction({
     return E;
   },
 });
+
+// ============================================================
+// 2-8 코엑스 큰 서가 도서관 (사진: 둥근 모서리 13m 책장 탑 · 선반마다 따뜻한 띠 조명 · 위는 사선 철골 유리 천장 · 가운데 독서 탁자)
+//   코엑스 몰 남쪽 입구에 카드 → 먼 곳의 실내로. 책장으로 걸어가 책을 한 권 꺼내 탁자에 앉아 읽는다
+// ============================================================
+const LIB_GO = LL(37.5103, 127.0598), LB = new THREE.Vector3(152000, 0, -18000);
+// 책장 그림: 한 장 = 가로 4m × 세로 4.5m (선반 10칸). 책등 색 · 높이 · 굵기가 다 다르고, 선반 판 아래 따뜻한 띠 조명
+function shelfTex(seed = 3) {
+  const r = rndS(seed), cols = ['#8a2a2a', '#2a4a7a', '#d8c8a0', '#3a6a4a', '#e8e0d0', '#c86a2a', '#1a1a1a', '#6a4a8a', '#e8b84a', '#4a8aa8', '#a83a5a', '#f2efe6', '#7a5a3a'];
+  const map = cvTex(512, 512, (c, W, H) => { c.fillStyle = '#3a2416'; c.fillRect(0, 0, W, H);
+    for (let row = 0; row < 10; row++) { const y0 = row * 51.2; let x = 4; while (x < W - 4) { const bw = 6 + r() * 12, bh = 30 + r() * 15, col = cols[Math.floor(r() * cols.length)]; if (r() < 0.06) { x += 10 + r() * 20; continue; } c.fillStyle = col; c.fillRect(x, y0 + 46 - bh, bw - 1, bh); c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(x + 1, y0 + 46 - bh + 4, bw - 3, 2); c.fillStyle = 'rgba(0,0,0,.25)'; c.fillRect(x + bw - 2, y0 + 46 - bh, 1, bh); if (bw > 10) { c.fillStyle = 'rgba(255,240,200,.5)'; c.fillRect(x + 2, y0 + 46 - bh * 0.6, bw - 5, 2); } x += bw; }
+      c.fillStyle = '#c8a070'; c.fillRect(0, y0 + 46, W, 5.2); c.fillStyle = '#fff2c8'; c.fillRect(0, y0 + 50, W, 1.2); }
+    c.fillStyle = '#b08858'; for (let x = 0; x < W; x += 128) c.fillRect(x, 0, 5, H); });
+  // 빛나는 부분: 선반 아래 띠 · 책등이 띠에 비친 아래쪽
+  const em = cvTex(512, 512, (c, W, H) => { c.fillStyle = '#000'; c.fillRect(0, 0, W, H); for (let row = 0; row < 10; row++) { const y0 = row * 51.2; const g = c.createLinearGradient(0, y0 + 51, 0, y0 + 51 + 30); g.addColorStop(0, 'rgba(255,214,150,.95)'); g.addColorStop(1, 'rgba(255,190,120,0)'); c.fillStyle = g; c.fillRect(0, y0 + 50, W, 30); c.fillStyle = '#ffe6b0'; c.fillRect(0, y0 + 49, W, 2.5); } });
+  return { map, em };
+}
+// 둥근 모서리 네모 둘레를 따라 세운 책장 벽 (u = 둘레 길이 / 4m, v = 높이 / 4.5m) + 위 판
+function shelfTower(w, d, h, rad, o = {}) {
+  const pts = [], seg = 8, hw = w / 2 - rad, hd = d / 2 - rad; for (const [cx, cz, a0] of [[hw, hd, 0], [hw, -hd, -Math.PI / 2], [-hw, -hd, Math.PI], [-hw, hd, Math.PI / 2]]) for (let i = 0; i <= seg; i++) { const a = a0 - (i / seg) * (Math.PI / 2) + Math.PI / 2; pts.push([cx + Math.sin(a) * rad, cz + Math.cos(a) * rad]); }
+  pts.push(pts[0]); const P = [], UV = [], I = []; let acc = 0;
+  for (let i = 0; i < pts.length; i++) { if (i) acc += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); P.push(pts[i][0], 0, pts[i][1], pts[i][0], h, pts[i][1]); UV.push(acc / 4, 0, acc / 4, h / 4.5); if (i) { const a = (i - 1) * 2; I.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); } }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(UV, 2)); g.setIndex(I); g.computeVertexNormals();
+  if (g.attributes.normal.getX(0) * pts[0][0] + g.attributes.normal.getZ(0) * pts[0][1] < 0) { const ix = g.index.array; for (let i = 0; i < ix.length; i += 3) { const q = ix[i + 1]; ix[i + 1] = ix[i + 2]; ix[i + 2] = q; } g.computeVertexNormals(); }
+  return g;
+}
+function buildLibrary(A) {
+  const g = new THREE.Group(); g.position.copy(LB); const V = [], SH = [], FL = [], WL = [], GL = [], H = 21;
+  // 바닥(밝은 돌 판) · 둘레 벽 · 2층 마루(뒤쪽) · 에스컬레이터
+  FL.push(partUV(boxUV(60, 0.2, 50, 4, 4), 0, -0.1, 0));
+  for (const [x, z, w, d] of [[0, -25.5, 60, 1], [0, 25.5, 60, 1], [-30.5, 0, 1, 50], [30.5, 0, 1, 50]]) WL.push(partUV(boxUV(w, H, d, 6, 3), x, H / 2, z, 0, '#e8e2d8'));
+  V.push(part(new THREE.BoxGeometry(60, 0.5, 9), '#d8d2c8', 0, 5.6, -20.5), part(new THREE.BoxGeometry(60, 0.08, 0.1), '#b88a50', 0, 6.95, -16));
+  GL.push(partUV(plainBox(60, 1.1, 0.05), 0, 6.4, -16));
+  { const esc = []; esc.push(part(new THREE.BoxGeometry(1.6, 0.4, 12), '#8a8e94', -8, 2.9, -10, -Math.atan2(5.6, 12), 0, 0)); for (const sx of [-0.85, 0.85]) esc.push(part(new THREE.BoxGeometry(0.12, 1.1, 12.4), '#3a3e44', -8 + sx, 3.5, -10, -Math.atan2(5.6, 12), 0, 0)); V.push(...esc); GL.push(partUV(plainBox(0.04, 0.9, 12), -8.9, 3.6, -10, 0, '#ffffff', -Math.atan2(5.6, 12))); }
+  // 책장: 둥근 모서리 탑 둘 (사진처럼 마주 선다) + 뒤 벽 긴 책장 (2층까지)
+  for (const [x, z, w, d, rr] of [[-15, 4, 18, 11, 3.2], [15, 4, 16, 12, 3.6]]) { const t = shelfTower(w, d, 13, rr); t.translate(x, 0, z); SH.push(t); V.push(part(new THREE.BoxGeometry(w - 0.2, 0.3, d - 0.2), '#3a2416', x, 13.1, z)); }
+  { const back = new THREE.PlaneGeometry(56, 13); const uv = back.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 14, uv.getY(i) * 13 / 4.5); back.translate(0, 6.5, -24.9); SH.push(back); }
+  // 가운데 독서 탁자 (긴 나무 탁자 · 스탠드 · 의자 · 읽는 젤리)
+  const lampM = new THREE.MeshLambertMaterial({ color: '#fff4d8', emissive: '#ffd890', emissiveIntensity: 1.2 }), lamps = [];
+  const seats = []; for (let k = 0; k < 3; k++) { const z = 10 + k * 4.5; V.push(part(new THREE.BoxGeometry(12, 0.08, 1.6), '#a87a4a', 0, 0.78, z)); for (const sx of [-5.5, 5.5]) V.push(part(new THREE.BoxGeometry(0.1, 0.78, 1.4), '#6a4a2a', sx, 0.39, z)); for (let i = 0; i < 5; i++) { const x = -4.8 + i * 2.4; V.push(part(new THREE.CylinderGeometry(0.03, 0.03, 0.4, 6), '#3a3a3a', x, 1.0, z), part(new THREE.BoxGeometry(0.4, 0.08, 0.4), '#2a2a2a', x, 0.82, z)); lamps.push([x, 1.24, z]); for (const sd of [-1, 1]) { V.push(part(new THREE.BoxGeometry(0.5, 0.06, 0.5), '#e8e2d6', x + 0.6, 0.46, z + sd * 1.15), part(new THREE.BoxGeometry(0.5, 0.6, 0.06), '#e8e2d6', x + 0.6, 0.76, z + sd * 1.4)); if ((i + k + (sd > 0 ? 1 : 0)) % 3 === 0 && !(k === 0 && i === 2 && sd > 0)) seats.push([x + 0.6, 0.12, z + sd * 1.15, sd > 0 ? Math.PI : 0]); } } }
+  { const lg = []; for (const [x, y, z] of lamps) lg.push(part(new THREE.CylinderGeometry(0.16, 0.2, 0.14, 12), '#ffffff', x, y, z)); g.add(new THREE.Mesh(merge(lg), lampM)); }
+  const ppl = [...seats]; const r = rndS(8); for (let i = 0; i < 18; i++) ppl.push([(r() - 0.5) * 50, 0, -12 + r() * 32]); for (let i = 0; i < 6; i++) ppl.push([(r() - 0.5) * 50, 6.0, -22 + r() * 4]); const cg = crowd(ppl, 9, 0.95); if (cg) V.push(cg);
+  // 위: 사선 철골 유리 천장 (밤엔 어둡게) — 그림 한 장
+  const roofT = cvTex(256, 256, (c, W2, H2) => { c.fillStyle = '#eef4f8'; c.fillRect(0, 0, W2, H2); c.strokeStyle = '#c9ced2'; c.lineWidth = 3; for (let i = -W2; i < W2 * 2; i += 32) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i + H2, H2); c.stroke(); c.beginPath(); c.moveTo(i, H2); c.lineTo(i + H2, 0); c.stroke(); } c.strokeStyle = '#aab0b6'; c.lineWidth = 2; for (let i = 0; i < W2; i += 64) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, H2); c.stroke(); } });
+  roofT.repeat.set(6, 5); const roofM = new THREE.MeshBasicMaterial({ map: roofT }); const roof = new THREE.Mesh(new THREE.PlaneGeometry(60, 50), roofM); roof.rotation.x = Math.PI / 2; roof.position.y = H; g.add(roof);
+  const { map, em } = shelfTex(17); const shelfM = new THREE.MeshLambertMaterial({ map, emissive: '#ffffff', emissiveMap: em, emissiveIntensity: 0.7 }); shelfM.userData.e0 = 0.7;
+  const floorM = inMat(cvTex(256, 256, (c, W2, H2) => { const r2 = rndS(2); for (let y = 0; y < H2; y += 64) for (let x = 0; x < W2; x += 128) { const l = 196 + r2() * 16; c.fillStyle = `rgb(${l},${l - 4},${l - 10})`; c.fillRect(x, y, 128, 64); } c.fillStyle = 'rgba(90,80,70,.35)'; for (let y = 0; y < H2; y += 64) c.fillRect(0, y, W2, 1.5); for (let x = 0; x < W2; x += 128) c.fillRect(x, 0, 1.5, H2); }), { e: 0.22 });
+  const wallM = inMat(cvTex(64, 64, (c) => { c.fillStyle = '#d8d2c8'; c.fillRect(0, 0, 64, 64); }), { e: 0.2 });
+  g.add(new THREE.Mesh(mergeUV(SH), shelfM), new THREE.Mesh(mergeUV(FL), floorM), new THREE.Mesh(mergeUV(WL), wallM), new THREE.Mesh(merge(V), vcMat({ emissive: '#ffffff', emissiveIntensity: 0.1 })), new THREE.Mesh(mergeUV(GL), new THREE.MeshLambertMaterial({ color: '#d8ecf0', transparent: true, opacity: 0.3, depthWrite: false })));
+  inLit(A, [shelfM, floorM, wallM], 0.25); lit(A, (Lt) => roofM.color.setRGB(1 - Lt * 0.8, 1 - Lt * 0.78, 1 - Lt * 0.7));
+  // 꺼내 읽는 책 (표지 둘 · 책장 묶음 · 넘어가는 한 장)
+  const book = new THREE.Group(), cover = vcMat(), bc = merge([part(new THREE.BoxGeometry(0.17, 0.24, 0.012), '#2a5a8a', -0.085, 0, 0), part(new THREE.BoxGeometry(0.17, 0.24, 0.012), '#2a5a8a', 0.085, 0, 0), part(new THREE.BoxGeometry(0.16, 0.23, 0.01), '#f4efe2', -0.08, 0, 0.011), part(new THREE.BoxGeometry(0.16, 0.23, 0.01), '#f4efe2', 0.08, 0, 0.011)]);
+  const bm = new THREE.Mesh(bc, cover); book.add(bm); const pageG = new THREE.PlaneGeometry(0.155, 0.225); pageG.translate(0.0775, 0, 0); const page = new THREE.Mesh(pageG, new THREE.MeshLambertMaterial({ color: '#fbf7ec', side: THREE.DoubleSide, emissive: '#ffffff', emissiveIntensity: 0.25 })); page.position.z = 0.018; book.add(page); book.visible = false; g.add(book);
+  g.userData = { book, page, H };
+  return g;
+}
+registerAttraction({
+  id: 'library', name: '코엑스 큰 서가 도서관', seal: '도서관', icon: '📚', x: LIB_GO[0], z: LIB_GO[1], r: 24, buildR: 900, verb: '책 읽으러',
+  go: [LIB_GO[0], LIB_GO[1] + 8, Math.PI], intro: '13m 높이 책장 사이를 걸어 책을 한 권 골라 탁자에 앉아 읽어요',
+  start(A) {
+    const hg = A.hg; A.lib ||= buildLibrary(A); const g = A.lib; if (!g.parent) A.root.add(g); g.visible = true; const D = g.userData, bearVis = hg.bear?.root.visible; let picked = -1, flip = 0;
+    const shelfP = new THREE.Vector3(LB.x - 15 + 5.5, 1.5, LB.z + 4 + 5.6), seatP = new THREE.Vector3(LB.x + 0.6, 1.25, LB.z + 10 + 0.9);
+    const E = { title: '코엑스 큰 서가 도서관', lock: true,
+      status() { return picked < 0 ? (this.t < 7 ? '책장 사이를 걸어요 · 위를 올려다봐요' : '책을 한 권 골라요 (E)') : this.t - picked < 3 ? '탁자로 가서 앉아요' : `📖 읽는 중 · ${Math.min(5, flip)} / 5 쪽`; },
+      actLabel() { return picked < 0 && this.t >= 6 ? '📕 이 책으로' : ''; },
+      act() { if (picked < 0 && this.t >= 6) { picked = this.t; D.book.visible = true; A.drum(0.25, 420, 0.06); hg.onToast?.('📕 책을 한 권 꺼냈어요'); } },
+      tick() { if (hg.bear) hg.bear.root.visible = false; if (picked < 0 && this.t > 11) this.act();
+        const B = D.book; if (picked >= 0) { const k = clamp((this.t - picked) / 3, 0, 1), s = smooth(k); B.position.lerpVectors(shelfP.clone().sub(LB), seatP.clone().sub(LB).add(new THREE.Vector3(0, -0.4, -0.45)), s); B.rotation.set(-1.1 * s, 0, 0); const rt = this.t - picked - 3; if (rt > 0) { flip = Math.floor(rt / 1.6); D.page.rotation.y = -Math.PI * smooth((rt % 1.6) / 1.2); } if (rt > 9) A.finish(E); } },
+      cam(camera, dt) {
+        const t = this.t; let pos, look;
+        if (picked < 0) { const k = smooth(t / 8); pos = new THREE.Vector3(LB.x + 2 - k * 4, 1.7, LB.z + 22 - k * 9); look = new THREE.Vector3(LB.x - 12 + k * 2, 4 + Math.sin(t * 0.5) * 3 + (1 - k) * 2, LB.z + 6); }
+        else { const k = smooth((t - picked) / 3); pos = new THREE.Vector3(LB.x + 2, 1.7, LB.z + 13).lerp(seatP.clone().add(new THREE.Vector3(0, 0.25, 0.5)), k); look = new THREE.Vector3(LB.x - 10, 3, LB.z + 7).lerp(seatP.clone().add(new THREE.Vector3(0, -0.45, -0.5)), k); }
+        (this.cp ||= pos.clone()).lerp(pos, 1 - Math.exp(-dt * 3)); camera.position.copy(this.cp); (this.lk ||= look.clone()).lerp(look, 1 - Math.exp(-dt * 3)); camera.lookAt(this.lk);
+      },
+      end() { g.visible = false; D.book.visible = false; if (hg.bear) hg.bear.root.visible = bearVis ?? true; }, where() { return '코엑스 큰 서가 도서관'; } };
+    return E;
+  },
+});
