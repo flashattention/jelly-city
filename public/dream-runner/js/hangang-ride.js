@@ -411,7 +411,14 @@ export class LiveRide {
     if (C.doors && thr > 0.05) { C.doors = false; C.closeT = 1.5; beep(SND.close); this.say('출입문 닫습니다.', false); }
     if (C.closeT > 0) { C.closeT -= dt; thr = 0; }
     const VMAX = 80 / 3.6;
-    if (thr > 0.05) C.v = Math.min(VMAX, C.v + 1.0 * thr * dt * Math.max(0.15, 1 - C.v / VMAX)); else if (thr < -0.05) C.v = Math.max(0, C.v - 1.3 * -thr * dt); else C.v = Math.max(0, C.v - 0.05 * dt);
+    // 8-42-3: 같은 선로 · 같은 방향 앞 실제 열차 — 제동 거리 안이면 가속을 막고 자동으로 세운다 (뚫고 지나가지 않게 25m 앞에서 멈춤)
+    const ahead = this.cabAhead(R), stopGap = 25, need = (C.v * C.v) / (2 * 1.3) + stopGap; C.ahead = ahead;
+    //   한 번 걸리면 앞차가 넉넉히(제동 거리 + 60m) 멀어질 때까지 풀지 않는다 (W 를 누른 채면 섰다 갔다 했다)
+    if (ahead < need + 8) C.autoOn = true; else if (ahead > need + 60) C.autoOn = false;
+    const auto = !!C.autoOn; if (auto) thr = Math.min(thr, -1);
+    if (auto && !C.autoSaid) { C.autoSaid = true; beep([[880, 0, 0.12, 'square', 0.05], [880, 0.18, 0.12, 'square', 0.05]]); this.say('앞 열차가 가까워 자동으로 멈춥니다.', false); } else if (!auto) C.autoSaid = false;
+    if (thr > 0.05) C.v = Math.min(VMAX, C.v + 1.0 * thr * dt * Math.max(0.15, 1 - C.v / VMAX)); else if (thr < -0.05) C.v = Math.max(0, C.v - (auto ? 1.6 : 1.3) * -thr * dt); else C.v = Math.max(0, C.v - 0.05 * dt);
+    { const room = Math.max(0, ahead - stopGap); if (C.v * dt > room) C.v = room / Math.max(dt, 1e-3) * 0.5; }
     C.d += C.v * C.dir * dt;
     // 역 사이를 넘어가기 (끝 역이면 선다)
     if (C.d > C.e.len) { const nx = this.seqNext(line, C.e.a, C.e.b), e2 = nx && L.edge(line, C.e.b, nx); if (e2) { C.d -= C.e.len; C.e = e2; C.said = null; } else { C.d = C.e.len; C.v = 0; } }
@@ -424,6 +431,20 @@ export class LiveRide {
     // 손잡이 · 계기판
     const I = R.cabI; I.lever.rotation.x = -thr * 0.6;
     C.gT -= dt; if (C.gT <= 0) { C.gT = 0.1; drawCab(I.gauge, { kmh: C.v * 3.6, dir: C.dir, next: nm(nextK), dist, doors: C.doors, line, color: Ln.color }); }
+  }
+  // 8-42-3: 내가 가는 쪽 같은 선로의 앞 실제 열차 꼬리까지 남은 거리 (m, 없으면 Infinity). 탄 열차(감춰 둔 것)는 뺀다
+  //   실제 열차는 역 사이(a → b) 위 머리 자리 d 로 달린다 → 내 역 사이와 그다음 두 역 사이까지 본다
+  cabAhead(R) {
+    const C = R.cab, L = this.hg.live, line = R.o.line, Ln = L.sub.lines[line], [n, clen] = Ln.cars || [8, 20], tl = n * clen;
+    let A = C.dir > 0 ? C.e.a : C.e.b, B = C.dir > 0 ? C.e.b : C.e.a; const my = C.dir > 0 ? C.d : C.e.len - C.d;
+    const chain = [[A, B, -my]]; let base = C.e.len - my;
+    for (let k = 0; k < 2; k++) { const nx = this.seqNext(line, A, B); if (!nx) break; const e2 = L.edge(line, B, nx); if (!e2) break; chain.push([B, nx, base]); base += e2.len; A = B; B = nx; if (base > 1500) break; }
+    let best = Infinity;
+    for (const o of L.trains.values()) {
+      if (o.line !== line || o.id === L.rideId || !o.e) continue;
+      for (const [a, b, off] of chain) { if (o.e.a !== a || o.e.b !== b) continue; if (off < 0 && o.d < my - 3) break; const g = off + o.d - tl; if (g < best) best = g; break; }
+    }
+    return best;
   }
   // 운전실 앞 선로 다시 놓기 (16m 갈 때마다): 내 선로를 따라 4m 마다, 땅 밑(k 1)만 빼고
   cabRails() {
@@ -598,7 +619,7 @@ export class LiveRide {
   card() {
     const el = this.el.card, R = this.on, c = this.cand, b1 = el.querySelector('.b1'), b2 = el.querySelector('.b2'), ic = el.querySelector('.ic');
     el.classList.toggle('cab', !!R?.cab);
-    if (R?.cab) { const C = R.cab, kmh = Math.round(C.v * 3.6); ic.textContent = '🧑‍✈️'; el.querySelector('b').textContent = `${R.o.line} 운전실 · ${kmh}km/h${C.dir < 0 ? ' · 뒤로' : ''}`; el.querySelector('small').textContent = C.doors ? '문이 열렸어요 · 내릴 수 있어요 (W 로 출발하면 문이 닫혀요)' : 'W 가속 · S 제동 · R 앞뒤 바꾸기 · 역에 서면 문이 열려요'; b1.innerHTML = C.doors ? '내리기 <kbd>E</kbd>' : '⇄ 앞뒤 <kbd>R</kbd>'; b1.onclick = C.doors ? () => this.alight() : () => this.cabFlip(); b2.classList.add('hidden'); el.classList.remove('hidden'); return; }
+    if (R?.cab) { const C = R.cab, kmh = Math.round(C.v * 3.6); ic.textContent = '🧑‍✈️'; el.querySelector('b').textContent = `${R.o.line} 운전실 · ${kmh}km/h${C.dir < 0 ? ' · 뒤로' : ''}`; el.querySelector('small').textContent = C.doors ? '문이 열렸어요 · 내릴 수 있어요 (W 로 출발하면 문이 닫혀요)' : C.ahead < 400 ? `⚠️ 앞 열차 ${Math.max(0, Math.round(C.ahead))}m${C.autoOn ? (C.v < 0.1 ? ' · 앞차가 떠나면 출발해요' : ' · 자동 제동') : ' · 속도를 줄여요'}` : 'W 가속 · S 제동 · R 앞뒤 바꾸기 · 역에 서면 문이 열려요'; b1.innerHTML = C.doors ? '내리기 <kbd>E</kbd>' : '⇄ 앞뒤 <kbd>R</kbd>'; b1.onclick = C.doors ? () => this.alight() : () => this.cabFlip(); b2.classList.add('hidden'); el.classList.remove('hidden'); return; }
     if (R) { const can = this.canAlight(); ic.textContent = R.kind === 'bus' ? '🚌' : '🚇'; el.querySelector('b').textContent = R.kind === 'bus' ? `${R.o.route}번 버스 안` : `${R.o.line} ${R.o.to || ''}행 열차 안`; el.querySelector('small').textContent = can ? '문이 열렸어요 · 내릴 수 있어요' : R.kind === 'bus' ? (R.bell ? '다음 정류장에서 서요' : '내리려면 하차벨을 눌러요') : '역에 서면 내릴 수 있어요'; b1.innerHTML = can ? '내리기 <kbd>E</kbd>' : '🪑 자리 바꾸기'; b1.onclick = can ? () => this.alight() : () => this.openSeats(); b2.classList.toggle('hidden', R.kind !== 'bus' || can); el.classList.remove('hidden'); return; }
     if (!c) { el.classList.add('hidden'); return; }
     // 같은 실시간 버스를 운전 카드(hangang-drive.js, 운전석 · 승객 고르기)가 보여 주고 있으면 겹치지 않게 숨긴다

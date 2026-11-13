@@ -236,6 +236,10 @@ export class LiveTransit {
   drawTrains() {
     const hg = this.hg, cnt = new Map(), mat = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), pos = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
     for (const im of this.lineMesh.values()) { im.body.count = 0; im.win.count = 0; }
+    // 8-42-3: 운전실에선 실제 열차 자료가 선로 한 줄(상 · 하행 같은 선)이라, 내 운전실 · 승강장과 겹쳤다(동작역)
+    //   → 내 둘레 450m 안 같은 노선 열차는 내 운전실 축에 맞춘다: 같은 방향은 내 선로 위, 반대 방향은 승강장 반대쪽 옆 선로(4m)
+    const R = hg.rideL?.on, C = R?.cab; let cv = null;
+    if (C && !R.under && R.x != null) { const pC = this.edgeAt(C.e, C.d), fx = pC.dx * C.dir, fz = pC.dz * C.dir, P = hg.rideL.plat; if (P?.g.visible) C.oppR = P.flip ? 1 : -1; cv = { line: R.o.line, x: R.x, z: R.z, fx, fz, lat0: (R.x - (pC.x - this.cx)) * -fz + (R.z - (pC.z - this.cz)) * fx, opp: (C.oppR ?? -1) * 4 }; }
     for (const o of this.trains.values()) {
       // 타고 있는 열차는 바깥 껍데기를 그리지 않는다 (안에서 보면 껍데기가 창을 가린다)
       if (!o.show || o.id === this.rideId) continue; const L = this.sub.lines[o.line], [n, clen] = L.cars || [8, 20]; let im = this.lineMesh.get(o.line);
@@ -243,7 +247,8 @@ export class LiveTransit {
       const prevE = o.prevAt ? this.edge(o.line, o.prevAt, o.e.a) : null;
       for (let c = 0; c < n; c++) {
         let d = o.d - clen * (c + 0.5), e = o.e; if (d < 0 && prevE) { e = prevE; d += prevE.len; } if (d < 0) continue;
-        const p = this.edgeAt(e, d); if (p.k === 1) continue; const x = p.x - this.cx, z = p.z - this.cz; if (im.body.count >= 120) break;
+        const p = this.edgeAt(e, d); if (p.k === 1) continue; let x = p.x - this.cx, z = p.z - this.cz; if (im.body.count >= 120) break;
+        if (cv && o.line === cv.line && (x - cv.x) ** 2 + (z - cv.z) ** 2 < 450 * 450) { const same = p.dx * cv.fx + p.dz * cv.fz > 0, mfx = same ? p.dx : -p.dx, mfz = same ? p.dz : -p.dz, off = cv.lat0 + (same ? 0 : cv.opp); x -= mfz * off; z += mfx * off; }
         pos.set(x, this.trackY(x, z, p.k), z); q.setFromAxisAngle(up, Math.atan2(p.dx, p.dz)); mat.compose(pos, q, one);
         im.body.setMatrixAt(im.body.count++, mat); im.win.setMatrixAt(im.win.count++, mat);
       }
