@@ -1082,12 +1082,6 @@ async function hgStationRender() {
 hg.onStation = (st) => { hgSt = st; clearInterval(hgStT); $('hg-subway').classList.toggle('hidden', !st); if (st) { $('hg-subway').innerHTML = `<h4>🚇 ${st.name}역</h4><div class="row">불러오는 중…</div>`; hgStationRender(); hgStT = setInterval(hgStationRender, 20000); } };
 // 실시간 도시데이터 안내: 들어간 지역의 실제 장소 이름으로 (사람 수는 만 명 · 천 명 단위로)
 hg.onCity = (c) => { if (!c?.congest) return; const n = (c.pplMin + c.pplMax) / 2, ppl = n >= 10000 ? `${Math.round(n / 10000)}만 명` : `${Math.max(1, Math.round(n / 1000))}천 명`; toast(`📡 지금 실제 ${c.area || HG_REGIONS[hgRegion]?.label || ''}: ${c.congest} · 약 ${ppl} · 도로 ${c.road || '-'}${c.temp != null ? ` · ${c.temp}°C` : ''}`, 3200); };
-// 이웃 지역으로 걸어 들어가기: 지금 지역을 정리하고 그 지역 코스의 이쪽 끝에서 이어 걷는다
-async function hgGoRegion(G) {
-  hgReport(true); hgSavePos(); hg.exitInterior?.(); hg.onShop(null); hg.onStation(null); const from = hgRegion; hgKeepNow(); hg.leave(); hgUse(G.id); toast(`${G.label}(으)로 걸어가요…`, 2200);
-  await startHangang(null); const back = (hg.gates || []).find((q) => q.id === from); if (back) hg.teleport(back.end === 0 ? 14 : hg.L - 14, 0);
-}
-hg.onRegionGate = (G) => hgGoRegion(G);
 hg.onFly = (on) => toast(on === 'fall' ? '🍂 날기를 멈췄어요' : on ? '🕊️ 날기! Space 꾹 = 위로 · S = 아래로 · Space 두 번 빠르게 = 떨어지기' : '🐾 내려앉았어요', on === true ? 2600 : 1200);
 hg.onTurn = (txt) => toast(`🚧 ${txt}이에요 · 돌아서 달려요`, 2200);
 // 역 안: 실제 도착 정보를 계속 받아 안내판에 (hg.arrivals)
