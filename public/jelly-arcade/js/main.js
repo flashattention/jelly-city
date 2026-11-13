@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { isPhone, autoRes } from '../../shared/js/perf.js';
 import { Shell, esc, TEAMS } from '../../shared/js/shell.js';
 import { account } from '../../shared/js/account.js';
-import { Ranking } from '../../shared/js/ranking.js';
+import { Ranking, anonId } from '../../shared/js/ranking.js';
 import { makeBear, poseBear } from '../../dream-runner/js/runner.js';
 import * as G from './sim.js';
 import { think, newBrain } from './bots.js';
@@ -284,6 +284,12 @@ function startSolo() {
   const S = G.createGame({ map, seed: (Math.random() * 2 ** 31) | 0, players: members.map((m) => ({ id: m.id, bot: !!m.bot, diff: game.diff, name: m.name })) });
   game.brains = new Map(S.players.filter((p) => p.bot).map((p) => [p.id, newBrain(p.id * 977 + S.seed)]));
   beginGame(S, members, { net: false, startIn: 3000 });
+  soloNote({});
+}
+// 혼자 하기 판수 · 승리 업적: 시작 · 끝을 서버에 알린다 (서버가 30초 넘은 판만 센다)
+function soloNote(body) {
+  const who = account.session ? {} : { anon: anonId() };
+  account.api('/api/cos/solo', { method: 'POST', body: { ...who, game: 'jelly-arcade', ...body } }).catch(() => {});
 }
 function quit() { if (shell.room) { shell.send({ t: 'leave' }); shell.room = null; } toTitle(); }
 function toTitle() {
@@ -519,7 +525,7 @@ function playFrame(dt) {
       G.tickView(S, dt);
     }
   }
-  if (!game.net && game.resultAt && now >= game.resultAt) { game.resultAt = 0; showResult(G.ranking(S), S.winner); }
+  if (!game.net && game.resultAt && now >= game.resultAt) { game.resultAt = 0; const rows = G.ranking(S); soloNote({ end: true, win: !!rows.find((r) => r.id === game.myId)?.win }); showResult(rows, S.winner); }
   for (const p of S.players) game.bears.get(p.id)?.update(dt, p);
   // 시간 · 좁아짐
   const t = S.t, left = Math.max(0, G.MATCH_T - t), clk = $('h-clock');

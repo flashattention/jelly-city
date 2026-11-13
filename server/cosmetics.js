@@ -74,6 +74,14 @@ export class Cosmetics {
   earnRaw(sub, n) { n = Math.max(0, Math.min(MAX_STARS_RUN * 10, n | 0)); if (!n) return 0; const u = this.u(sub); u.stars += n; u.total += n; this.dirty = true; this.refresh(sub); return n; }
   earn(sub, stars, diff, map) { const n = starsEarned(Math.min(MAX_STARS_RUN, Math.max(0, stars | 0)), diff, map); if (n <= 0) return 0; const u = this.u(sub); u.stars += n; u.total += n; this.dirty = true; this.refresh(sub); return n; }
   // 방 경기 하나 끝: 판수 · 승리 (pvp = 다른 사람과 함께)
+  // 혼자 하기(봇과 이 화면에서만 도는 판) 기록: 시작을 서버에 알리고, 30초 ~ 30분 뒤 끝을 알리면 판수 · 승리에 넣는다 (대인전은 아님)
+  soloStart(sub, game) { if (!SOLO_GAMES.has(game)) throw new Error('game'); this.u(sub).solo = { game, at: Date.now() }; }
+  soloEnd(sub, game, won) {
+    const u = this.u(sub), s = u.solo; u.solo = null;
+    if (!s || s.game !== game) return false;
+    const el = Date.now() - s.at; if (el < 30e3 || el > 30 * 60e3) return false;
+    this.noteGame(game, sub, !!won, false); return true;
+  }
   noteGame(game, sub, won, pvp) { const u = this.u(sub); u.plays[game] = (u.plays[game] || 0) + 1; if (won) { u.wins[game] = (u.wins[game] || 0) + 1; if (pvp) u.pvp[game] = (u.pvp[game] || 0) + 1; } this.dirty = true; this.refresh(sub); }
   // 기록 · 순위를 보고 새로 달성한 업적을 적는다 (예전 기록도 여기서 인정된다)
   // 조건 하나를 지금 기록으로 확인한다 (cache 는 한 번 계산할 때만 쓴다)
@@ -182,6 +190,7 @@ export function noteRoomEnd(game, r, payload) {
     for (const p of humans) inst.noteGame(game, p.who.sub, win.has(p.id), pvp);
   } catch (e) { console.warn('경기 기록 실패', game, e.message); }
 }
+const SOLO_GAMES = new Set(['jelly-arcade']);
 export async function cosApi(req, res, url, who, cos, json) {
   const sub0 = who?.sub || null, anonQ = url.searchParams.get('anon');
   if (url.pathname === '/api/cos/me') return json(res, 200, cos.pub(sub0 || (ANON.test(anonQ || '') ? 'anon:' + anonQ : null)));
@@ -193,6 +202,7 @@ export async function cosApi(req, res, url, who, cos, json) {
     if (url.pathname === '/api/cos/equip') { cos.equip(sub, String(b.slot || ''), b.id ? String(b.id) : null); return json(res, 200, cos.pub(sub)); }
     if (url.pathname === '/api/cos/attend') { const r = cos.attend(sub); return json(res, 200, { ...r, me: cos.pub(sub) }); }
     if (url.pathname === '/api/cos/gacha') { const r = cos.gacha(sub); return json(res, 200, { ...r, me: cos.pub(sub) }); }
+    if (url.pathname === '/api/cos/solo') { const g = String(b.game || ''); if (b.end) return json(res, 200, { ok: cos.soloEnd(sub, g, b.win) }); cos.soloStart(sub, g); return json(res, 200, { ok: true }); }
     if (url.pathname === '/api/cos/seen') { cos.u(sub).fresh = []; cos.dirty = true; return json(res, 200, { ok: true }); }
   } catch (e) { return json(res, 400, { error: e.message }); }
   return json(res, 404, { error: 'not found' });
