@@ -41,6 +41,7 @@ import { DingRooms } from './jelly-ding/rooms.js';
 import { SlideRooms } from './jelly-slide/rooms.js';
 import { HideRooms } from './jelly-hide/rooms.js';
 import { ArenaRooms } from './jelly-arena/rooms.js';
+import { ArcadeRooms } from './jelly-arcade/rooms.js';
 import { normWord } from '../public/jelly-draw/js/prompts.js';
 import { complete } from './jelly-city/llm.js';
 import { Records } from './shared/records.js';
@@ -116,6 +117,9 @@ const dingRooms = new DingRooms((sid) => world.userOf(sid)); // 젤리 땡 (종 
 const slideRooms = new SlideRooms((sid) => world.userOf(sid)); // 젤리 슬라이드 (밀어서 합치기)
 const hideRooms = new HideRooms((sid) => world.userOf(sid)); // 젤리 숨바꼭질 (몸에 색칠해 숨기)
 const arenaRooms = new ArenaRooms((sid) => world.userOf(sid)); // 젤리 아레나 (5 대 5 라인전)
+// 젤리 아케이드: 방 경기가 끝날 때 서버가 승리 수 · 톡 수를 더한다 (화면에서 보내는 기록은 받지 않는다)
+const arcadeRecords = new Records(DATA_DIR, 'jelly-arcade', { boards: ['wins', 'pops'], better: (a, b) => a.value > b.value, value: () => 0, check: () => '같이 하기 방 경기로만 남아요' });
+const arcadeRooms = new ArcadeRooms((sid) => world.userOf(sid), arcadeRecords); // 젤리 아케이드 (격자 젤리 폭탄 대전)
 const typeRecords = new Records(DATA_DIR, 'jelly-type', {
   boards: ['kpm', 'rain'], better: (a, b) => a.value > b.value, value: (b) => Math.round(Number(b.value)),
   check: (b) => { const v = Number(b.value); return Number.isFinite(v) && v >= 0 && v <= (b.b === 'kpm' ? 1600 : 5000000) ? null : '기록이 이상해요'; },
@@ -135,7 +139,7 @@ const driftRecords = new Records(DATA_DIR, 'jelly-drift', {
 });
 // 업적: 기록판 · 방 경기 결과를 치장 쪽에 잇는다
 Object.assign(cosmetics.records, { 'jelly-ten': tenRecords, 'jelly-survivor': survRecords, 'jelly-type': typeRecords, 'jelly-merge': mergeRecords, 'jelly-slide': slideRecords, 'jelly-drift': driftRecords });
-for (const [k, R] of Object.entries({ 'jelly-drift': driftRooms, 'jelly-tactical': tacticalRooms, 'jelly-drop': dropRooms, 'jelly-guard': guardRooms, 'jelly-ten': tenRooms, 'jelly-survivor': survRooms, 'jelly-word': wordRooms, 'jelly-draw': drawRooms, 'jelly-sketch': sketchRooms, 'jelly-type': typeRooms, 'jelly-rumble': rumbleRooms, 'jelly-merge': mergeRooms, 'jelly-court': courtRooms, 'jelly-ding': dingRooms, 'jelly-slide': slideRooms, 'jelly-hide': hideRooms, 'jelly-arena': arenaRooms })) R.gameKey = k;
+for (const [k, R] of Object.entries({ 'jelly-drift': driftRooms, 'jelly-tactical': tacticalRooms, 'jelly-drop': dropRooms, 'jelly-guard': guardRooms, 'jelly-ten': tenRooms, 'jelly-survivor': survRooms, 'jelly-word': wordRooms, 'jelly-draw': drawRooms, 'jelly-sketch': sketchRooms, 'jelly-type': typeRooms, 'jelly-rumble': rumbleRooms, 'jelly-merge': mergeRooms, 'jelly-court': courtRooms, 'jelly-ding': dingRooms, 'jelly-slide': slideRooms, 'jelly-hide': hideRooms, 'jelly-arena': arenaRooms, 'jelly-arcade': arcadeRooms })) R.gameKey = k;
 // 옛 주소: REDIRECT_TO 가 있으면 모든 요청을 새 주소로 보낸다
 const REDIRECT_TO = (process.env.REDIRECT_TO || '').replace(/\/$/, '');
 
@@ -218,6 +222,7 @@ async function api(req, res, url) {
   if (url.pathname.startsWith('/api/ten/')) return tenRecords.api(req, res, url, world.userOf(sid), json, '/api/ten');
   if (url.pathname.startsWith('/api/apple/')) return tenRecords.api(req, res, url, world.userOf(sid), json, '/api/apple'); // 옛 주소
   if (url.pathname.startsWith('/api/surv/')) return survRecords.api(req, res, url, world.userOf(sid), json, '/api/surv');
+  if (url.pathname.startsWith('/api/arcade/')) return arcadeRecords.api(req, res, url, world.userOf(sid), json, '/api/arcade');
   const who = world.userOf(sid);
   if (!who) return json(res, 401, { error: 'login' });
   if (url.pathname === '/api/me') return json(res, 200, { user: world.publicUser(who.user), chars: world.charList(who.sub), admin: isAdmin(who.user), cos: cosmetics.pub(who.sub) });
@@ -374,6 +379,7 @@ survWss.on('connection', (ws) => survRooms.connect(ws));
 // 숨바꼭질: 칠한 몸 그림(작은 JPEG)을 주고받아서 크게 · 압축
 const hideWss = new WebSocketServer({ noServer: true, maxPayload: 128 * 1024, perMessageDeflate: { threshold: 1024 } });
 hideWss.on('connection', (ws) => hideRooms.connect(ws));
+const arcadeWss = partyWss(arcadeRooms);
 const arenaWss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: { threshold: 512 } });
 arenaWss.on('connection', (ws) => arenaRooms.connect(ws));
 const sketchWss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024, perMessageDeflate: { threshold: 1024 } }); // 그리는 획을 실시간으로
@@ -381,7 +387,7 @@ sketchWss.on('connection', (ws) => sketchRooms.connect(ws));
 // 주소로 나눠 받는다: /ws = 젤리시티 · /dream-ws = 드림 러너
 server.on('upgrade', (req, socket, head) => {
   const p0 = new URL(req.url, 'http://x').pathname, p = OLD_WS[p0] || p0;
-  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/drift-ws' ? driftWss : p === '/tactical-ws' ? tacticalWss : p === '/drop-ws' ? dropWss : p === '/guard-ws' ? guardWss : p === '/ten-ws' ? tenWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : p === '/type-ws' ? typeWss : p === '/surv-ws' ? survWss : p === '/sketch-ws' ? sketchWss : p === '/rumble-ws' ? rumbleWss : p === '/merge-ws' ? mergeWss : p === '/court-ws' ? courtWss : p === '/ding-ws' ? dingWss : p === '/slide-ws' ? slideWss : p === '/hide-ws' ? hideWss : p === '/arena-ws' ? arenaWss : null;
+  const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/drift-ws' ? driftWss : p === '/tactical-ws' ? tacticalWss : p === '/drop-ws' ? dropWss : p === '/guard-ws' ? guardWss : p === '/ten-ws' ? tenWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : p === '/type-ws' ? typeWss : p === '/surv-ws' ? survWss : p === '/sketch-ws' ? sketchWss : p === '/rumble-ws' ? rumbleWss : p === '/merge-ws' ? mergeWss : p === '/court-ws' ? courtWss : p === '/ding-ws' ? dingWss : p === '/slide-ws' ? slideWss : p === '/hide-ws' ? hideWss : p === '/arena-ws' ? arenaWss : p === '/arcade-ws' ? arcadeWss : null;
   if (!target) { socket.destroy(); return; }
   target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
 });
@@ -438,7 +444,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
     try { const n = dreamRooms.maint(); if (n) console.log(`🌙 드림 러너: 달리던 방 ${n}개를 멈춰 적어 뒀어요`); } catch (e) { console.error('드림 러너 멈추기 실패', e); }
     try { swMetrics.flush(); } catch (e) { console.error('지표 저장 실패', e); }
     try { world.save(); console.log('💾 세계를 저장했어요'); } catch (e) { console.error('저장 실패', e); }
-    dreamBoard.save(); dreamToss.save(); toss.save(); playtime.save(); cosmetics.save(); board.save(); driftRecords.save(); tenRecords.save(); survRecords.save(); wordDict.save(); typeRecords.save(); mergeRecords.save(); slideRecords.save();
+    dreamBoard.save(); dreamToss.save(); toss.save(); playtime.save(); cosmetics.save(); board.save(); driftRecords.save(); tenRecords.save(); survRecords.save(); wordDict.save(); typeRecords.save(); mergeRecords.save(); slideRecords.save(); arcadeRecords.save();
     setTimeout(() => process.exit(0), 500);
   });
 }

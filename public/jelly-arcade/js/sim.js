@@ -248,7 +248,7 @@ export const flameAt = (S, x, y) => S.flames.find((f) => f.x === x && f.y === y)
 export function trap(S, p, by, ev) { if (p.out || p.trap > 0 || p.safe > 0) return; p.trap = TRAP_T; p.trapBy = by; p.slide = -1; ev?.push({ k: 'trap', id: p.id, by }); }
 export function knockOut(S, p, by, why, ev) {
   if (p.out) return; p.out = true; p.trap = 0; p.outAt = S.t;
-  const k = S.players.find((q) => q.id === by); if (k && k !== p) k.pops++;
+  const k = S.players.find((q) => q.id === by); if (k && k !== p && k.team !== p.team) k.pops++; // 같은 편 물결로 갇혀 시간이 다 된 건 세지 않는다
   ev?.push({ k: 'out', id: p.id, by, why });
 }
 const sameTeam = (a, b) => a.team === b.team;
@@ -373,7 +373,7 @@ export function apply(S, e) {
     case 'pick': { S.items.delete(idx(e.x, e.y)); const p = P(e.id); if (p) applyItem(p, e.type); break; }
     case 'trap': { const p = P(e.id); if (p) { p.trap = TRAP_T; p.trapBy = e.by; p.slide = -1; } break; }
     case 'free': { const p = P(e.id); if (p) { p.trap = 0; p.safe = 1.2; if (e.self) p.escape = Math.max(0, p.escape - 1); } break; }
-    case 'out': { const p = P(e.id); if (p) { p.out = true; p.trap = 0; p.outAt = S.t; } const k = P(e.by); if (k && k.id !== e.id) k.pops++; break; }
+    case 'out': { const p = P(e.id); if (p) { p.out = true; p.trap = 0; p.outAt = S.t; } const k = P(e.by); if (k && p && k.id !== e.id && k.team !== p.team) k.pops++; break; }
     case 'warn': S.falls.push({ x: e.x, y: e.y, at: S.t + e.at }); break;
     case 'fall': { const i = idx(e.x, e.y); S.grid[i] = FALLEN; S.items.delete(i); S.falls = S.falls.filter((f) => !(f.x === e.x && f.y === e.y)); S.bombs = S.bombs.filter((b) => !(b.x === e.x && b.y === e.y)); break; }
     case 'end': S.over = true; S.winner = e.winner; break;

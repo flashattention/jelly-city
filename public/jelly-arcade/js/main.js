@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { isPhone, autoRes } from '../../shared/js/perf.js';
 import { Shell, esc, TEAMS } from '../../shared/js/shell.js';
 import { account } from '../../shared/js/account.js';
+import { Ranking } from '../../shared/js/ranking.js';
 import { makeBear, poseBear } from '../../dream-runner/js/runner.js';
 import * as G from './sim.js';
 import { think, newBrain } from './bots.js';
@@ -189,6 +190,13 @@ function readInput() {
   const bomb = bombEdge; bombEdge = false;
   return { x, y, bomb };
 }
+// 시험용 자동 조작 (arcade.auto = true): 내 곰도 젤리봇 머리로
+function autoInput(inp, me, dt) {
+  if (!game.auto || !me || me.out) return inp;
+  const b = game.autoBrain ||= newBrain(7 + game.myId);
+  const t = think(game.S, { ...me, bot: true, diff: "normal" }, b, dt);
+  return { x: t.x, y: t.y, bomb: t.bomb || inp.bomb };
+}
 function syncMute() { $('b-mute').textContent = sound.muted ? '🔇' : '🔊'; shell.syncSound(); }
 $('b-mute').onclick = () => { toggleMute(); syncMute(); };
 $('b-quit').onclick = () => quit();
@@ -207,7 +215,8 @@ const shell = new Shell({
   multiLabel: '👥 같이 하기', roomIcon: '💣', startLabel: '💣 다 같이 시작!',
   keysHelp: '← ↑ ↓ → 또는 W A S D 움직이기 · Space 젤리 폭탄 · 갇혔을 때 Space = 탈출 젤리 · M 소리',
   buttons: [{ id: 'solo-btn', label: '💣 혼자 하기 <small>젤리봇 3마리와</small>', onClick: () => startSolo() }],
-  screens: ['over'],
+  screens: ['over', 'board-screen'],
+  extraRow: [{ label: '🏆 순위표', onClick: () => ranking.open('wins') }],
   describe: (o) => `${MAP_NAME[o.map] || ''} · ${o.team ? '2팀전' : '개인전'} · ${o.fill}명`,
   options: {
     title: () => {},
@@ -224,6 +233,8 @@ const shell = new Shell({
   onFinish: (m) => onNetFinish(m),
   onDisconnect: () => { if (game.mode !== 'title' && game.net) toTitle(); },
 });
+// 순위표: 같이 하기 방에서 이긴 수 · 톡 수 (서버가 판이 끝날 때 더한다)
+const ranking = new Ranking({ shell, api: '/api/arcade', boards: [{ id: 'wins', label: '🏆 이긴 판' }, { id: 'pops', label: '✨ 톡 터뜨리기' }], unit: '번', title: '🏆 젤리 아케이드 순위표 <small>(같이 하기)</small>', nickKey: 'jellyarcade.nick' });
 shell.pickOpts = () => ({ map: game.map, team: false, fill: 4, diff: game.diff });
 function renderTitleOpts() {
   const el = $('title-opts'); el.innerHTML = '';
@@ -297,7 +308,12 @@ function onNetStart(m) {
   beginGame(S, members, { net: true, startIn: m.in || 3000 });
   game.netStart = performance.now() + (m.in || 3000);
 }
-shell.on('ev', (m) => { if (!game.net || !game.S) return; for (const e of m.e) { if (e.k === 'pos') continue; G.apply(game.S, e); onEvent(e); } });
+shell.on('ev', (m) => {
+  if (!game.net || !game.S) return;
+  // 판 시계 맞추기: 조금씩 따라가고, 많이 어긋나면 바로
+  if (Number.isFinite(m.tt)) { const d = m.tt - game.S.t; game.S.t += Math.abs(d) > 0.5 ? d : d * 0.3; }
+  for (const e of m.e) { G.apply(game.S, e); onEvent(e); }
+});
 shell.on('snap', (m) => {
   if (!game.net || !game.S) return;
   for (const [id, x, y, dir, f] of m.p) {
@@ -364,10 +380,10 @@ function onEvent(e) {
       if (bear) { bear.setTrap(false); }
       if (p) { B.burst(p.x, p.y, '#ffffff', 22, 6, 8); B.burst(p.x, p.y, game.members.get(e.id)?.color || '#ff8fbf', 12, 4, 6); }
       sfx('out');
-      const why = e.why === 'fall' ? '푸딩 블록에 깔렸어요' : e.why === 'left' ? '나갔어요' : e.by && e.by !== e.id ? `${nm(e.by)}에게 톡!` : '젤리 속에서 시간이 다 됐어요';
+      const why = e.why === 'fall' ? '푸딩 블록에 깔렸어요' : e.why === 'left' ? '나갔어요' : e.why === 'pop' ? `${nm(e.by)}에게 톡!` : e.by && e.by !== e.id ? `${nm(e.by)}의 물결에 갇혀 시간이 다 됐어요` : '젤리 속에서 시간이 다 됐어요';
       feed(`💥 ${nm(e.id)} · ${why}`);
       if (e.id === me) banner('💧 탈락… 구경하며 응원해요', 'bad');
-      else if (e.by === me) banner(`✨ ${nm(e.id)} 톡!`, 'good');
+      else if (e.by === me && e.why === 'pop') banner(`✨ ${nm(e.id)} 톡!`, 'good');
       renderPlayers();
       break;
     }
@@ -477,7 +493,7 @@ function playFrame(dt) {
     if (!game.net) {
       // 혼자 하기: 판 전체를 이 화면에서
       game.acc += dt;
-      const inp = readInput();
+      const inp = autoInput(readInput(), me, dt);
       const inputs = new Map();
       inputs.set(game.myId, { x: inp.x, y: inp.y, bomb: inp.bomb });
       let first = true;
@@ -492,7 +508,7 @@ function playFrame(dt) {
       if (S.over && !game.resultAt) game.resultAt = now + 1200;
     } else if (me) {
       // 같이 하기: 내 곰만 먼저 움직이고 위치를 보낸다
-      const inp = readInput();
+      const inp = autoInput(readInput(), me, dt);
       if (!me.out) {
         game.acc += dt;
         while (game.acc >= DT) { game.acc -= DT; G.movePlayer(S, me, inp.x, inp.y, DT); }
