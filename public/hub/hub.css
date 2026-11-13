@@ -205,6 +205,11 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 @keyframes sglide { 0%, 30% { transform: translateX(0); } 50%, 80% { transform: translateX(40px); } 100% { transform: translateX(0); } }
 .slide .sarrow { position: absolute; right: 16%; top: 40px; font-size: 28px; color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,.2); animation: wob 1.6s ease-in-out infinite; }
 
+/* 젤리 아케이드: 실제 게임 화면 */
+.card.arcade .art { background: url(/hub/img/arcade.webp) center 40% / 165% auto no-repeat, #c4e6a8; transition: transform .6s; }
+.card.arcade:hover .art { transform: scale(1.04); }
+.arcade .new { position: absolute; right: 14px; top: 12px; padding: 4px 12px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-size: 13px; font-family: 'Jua', sans-serif; }
+
 /* 젤리 아레나 */
 .card.arena .art { background: radial-gradient(circle at 20% 80%, #4cc3ff66, transparent 42%), radial-gradient(circle at 80% 20%, #ff5a7a66, transparent 42%), #2f6b45; }
 .arena .alane { position: absolute; left: -10%; right: -10%; top: 62px; height: 20px; background: #e6cd99; transform: rotate(-24deg); box-shadow: 0 0 0 4px #d8bd8688; }

@@ -278,6 +278,7 @@
 | 18 | 🫥 젤리 숨바꼭질 | 3D 파티 | `/jelly-hide/` | 몸에 색을 칠해 배경과 똑같아지는 숨바꼭질 · 스포이드 · 무늬 도장 · 위장도 계기판 · 술래는 물감총 (최대 10명 · 젤리봇) |
 | 19 | ⚔️ 젤리 아레나 | 3D 전략 | `/jelly-arena/` | 탑 · 미드 · 정글 · 바텀 · 서폿! 챔피언 20명 · CS · 포탑 · 수문 · 정글 몬스터 · 상점 · 전장의 안개로 젤리 심장을 부수는 5 대 5 (빈 자리는 젤리봇) |
 | 20 | ⚔️ 젤리 오디세이 | 3D 스토리 액션 | `/jelly-odyssey/` | 『오디세이아』 × 사이버 세상 × 젤리시티. 곰돌 군단이 트로이 목마(FREE_COMPUTE_PATCH.exe)로 바이러스가 차지한 GPU 신전에 쳐들어간다. 1장 「불타는 신전」: 잠입 → 성문 → 광장 돌격 → 불타는 열주랑 → 세 제단에서 신 해방 → 바이러스 왕(케이블 끊기 → 핵). 칼+방패 · 창+방패(던지기) · 활, 위장 · 방화벽 진형, 감염 · 젤리 부활 · 세상 끊김 같은 비틀기, 막마다 코드로 만든 비장한 음악(애가 · 행진 · 찬가 · 왕의 테마 · 새벽) ([기획서](docs/jelly-odyssey/기획서.md)) |
+| 21 | 💣 젤리 아케이드 | 3D 대전 | `/jelly-arcade/` | 격자 미로에 젤리 폭탄을 놓아 십자 물결로 상대 곰을 가두는 대전 · 사탕 마을 · 젤리 공장(컨베이어) · 얼음 과자 섬(미끄럼) · 아이템 4가지 · 젤리봇과 혼자 · 최대 8명 개인전/2팀전 (서버 판정) |
 
 ---
 
@@ -703,6 +704,7 @@ server/
   jelly-slide/rooms.js   젤리 슬라이드 대결 · 봇 (/slide-ws)
   jelly-hide/rooms.js    젤리 숨바꼭질 판 · 찾기 판정 · 칠한 그림 중계 · 봇 (/hide-ws)
   jelly-arena/sim.js     젤리 아레나 경기 계산 (전투 · 기술 · 건물 · 꼬마 · 정글 · 시야 · 봇) · rooms.js 방 · 챔피언 고르기 (/arena-ws)
+  jelly-arcade/rooms.js  젤리 아케이드 방 · 서버 판정 · 별 · 순위표 (/arcade-ws), sim.test.mjs · rooms.test.mjs 규칙 시험
 public/
   index.html, hub/       메인 화면: 로그인 · 캐릭터 관리 · 게임 고르기
   shared/js/             공용: roach.js(곰돌이 모델) · char-studio.js(캐릭터 만들기 · 썸네일) · account.js(로그인)
@@ -730,6 +732,7 @@ public/
   jelly-slide/           젤리 슬라이드 (js/engine.js 판 규칙 · main.js)
   jelly-hide/            젤리 숨바꼭질 (js/maps.js 맵 · 위장도 · 봇 자리 · paint.js 칠하기 · main.js)
   jelly-arena/           젤리 아레나 (js/data.js 맵 · 챔피언 20명 · 아이템 · world.js 맵 그리기 · main.js)
+  jelly-arcade/          젤리 아케이드 (js/sim.js 판 규칙 · bots.js 젤리봇 · world.js 그리기 · sfx.js 소리 · main.js)
 docs/기능정리.md          젤리시티 전체 기능 정리
 docs/dream-runner/        드림 러너 기획서 · 의사결정 기록 · 서울 산책 작업 지시서
 docs/jelly-odyssey/       젤리 오디세이 기획서
