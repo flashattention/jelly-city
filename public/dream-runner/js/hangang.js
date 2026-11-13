@@ -433,6 +433,8 @@ export class Hangang {
     this.foot = keep(this.foot); this.footGrid.clear(); this.foot.forEach((f, fi) => { for (let gx = Math.floor(f.x0 / 40); gx <= Math.floor(f.x1 / 40); gx++) for (let gz = Math.floor(f.z0 / 40); gz <= Math.floor(f.z1 / 40); gz++) { const k = `${gx},${gz}`; if (!this.footGrid.has(k)) this.footGrid.set(k, []); this.footGrid.get(k).push(fi); } });
     this.decks = keep(this.decks); this.deckGrid.clear(); this.decks.forEach((sg, si) => { for (let gx = Math.floor((Math.min(sg.ax, sg.cx) - sg.hw) / 40); gx <= Math.floor((Math.max(sg.ax, sg.cx) + sg.hw) / 40); gx++) for (let gz = Math.floor((Math.min(sg.az, sg.cz) - sg.hw) / 40); gz <= Math.floor((Math.max(sg.az, sg.cz) + sg.hw) / 40); gz++) { const k = `${gx},${gz}`; if (!this.deckGrid.has(k)) this.deckGrid.set(k, []); this.deckGrid.get(k).push(si); } });
     for (const [k, list] of this.circGrid) { const l2 = list.filter((q) => q.key !== key); if (l2.length) this.circGrid.set(k, l2); else this.circGrid.delete(k); }
+    // 8-4: 다리 기둥 부딪힘 원 목록도 그 칸 것을 뺀다 — 원이 칸의 기둥 인스턴스(col.m)를 붙들고 있어, 내린 칸 장면 전체가 메모리에 남았다
+    if (this.pierCircles) for (const pc of [...this.pierCircles]) if (pc.key === key) this.pierCircles.delete(pc);
     this.malls = keep(this.malls || []); this.shopFronts = keep(this.shopFronts); this.shopGrid.clear(); this.shopFronts.forEach((F, i) => { const k = `${Math.floor(F.x / 40)},${Math.floor(F.z / 40)}`; if (!this.shopGrid.has(k)) this.shopGrid.set(k, []); this.shopGrid.get(k).push(i); });
     this.entrances = keep(this.entrances || []); const ws = keep(this.waterSets); this.waterSets.length = 0; this.waterSets.push(...ws);
     for (const c2 of this.chunks.values()) { c2.foot = this.foot; c2.decks = this.decks; c2.shopFronts = this.shopFronts; }
@@ -2507,13 +2509,13 @@ float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y
     // 서울 전체: 주인 지도에는 건물이 없다. 칸마다 만든 목록을 모은다
     if (M.kind === 'world') { this.labels = [...this.chunks.values()].flatMap((c) => { if (!c.labels) c.setupLabels(); return c.labels; }); return; }
     const tile = M.kind === 'tile';
-    for (const b of M.buildings) {
+    for (const [bi, b] of M.buildings.entries()) {
       if (b[4] < 0) continue; const name = M.names[b[4]]; if (!name || /^\d|^[A-Z]?\d|동$|주차|창고|화장실|관리|^[가-힣]?\d/.test(name) || name.length < 2) continue;
       const ring = unpack(b.slice(7), S); let x = 0, z = 0; for (const [a, c] of ring) { x += a; z += c; } x /= ring.length; z /= ring.length;
       const famous = /국회|63|IFC|파크원|트윈|타워|센터|호텔|공원|역|교회|성당|방송|KBS|MBC|SBS|증권|금융|빌딩|아파트|레지던스|회관|우체국/.test(name);
       if (b[0] < 30 && !famous && !(tile && /궁|문$|박물관|미술관|극장|대학|학교|시장|병원|백화점|도서관|청사|구청|시청|문화|사찰|서원/.test(name))) continue;
       if (!tile && Math.abs(this.project0(x, z).lat) > 650) continue;
-      const old = best.get(name); if (!old || old.h < b[0]) best.set(name, { name, x, z, h: b[0] });
+      const old = best.get(name); if (!old || old.h < b[0]) best.set(name, { name, x, z, h: b[0], sub: labelSub(M.binfo?.[bi], b[0]) });
     }
     for (const [n, x, z, h] of M.labels || []) best.set(n, { name: n, x: x * S, z: z * S, h });
     this.labels = [...best.values()];
@@ -2580,6 +2582,10 @@ float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y
     g.fillStyle = '#e9e5dc'; g.fillRect(0, 0, N, N);
     if (W) { for (const c of W.values()) { const M = c.map, S2 = M.scale; for (const gr of M.green) fillP(gr.slice(1).map((r) => unpack(r, S2)), '#bfdba4'); for (const w of c.water || []) fillP(w, '#8fc4ea'); for (const w of c.islands || []) fillP(w, '#a9cf8c'); }
       for (const c of W.values()) { const M = c.map, S2 = M.scale; for (const rd of M.roads) line(unpack(rd.slice(2), S2), '#ffffff', Math.max(1, rd[0] * k)); for (const b of M.bridges) line(unpack(b.p, S2), '#8c8c8c', Math.max(1.5, b.w * k)); for (const b of M.buildings) fillP([unpack(b.slice(7), S2)], b[0] > 60 ? '#a9a39a' : '#cfc8bd'); }
+      // 8-4: 미니맵 자세히 — 땅 위 철길(짙은 회색 + 흰 점선) · 철교, 이름 있는 큰 공원 · 녹지(2만㎡ 넘음) 이름
+      for (const c of W.values()) { const M = c.map, S2 = M.scale; for (const rl of M.rails || []) { const pts = unpack(rl, S2); line(pts, '#6f6a64', Math.max(2, 5 * k)); g.setLineDash([6 * k * 2, 6 * k * 2]); line(pts, '#f4f1ea', Math.max(1, 2 * k)); g.setLineDash([]); } for (const b of M.bridges) if (b.rail) line(unpack(b.p, S2), '#6f6a64', Math.max(2, 5 * k)); }
+      // 이름은 그릴 때 글씨로 (그림에 넣으면 확대돼 흐려진다): 칸이 바뀔 때 한 번 모은다
+      this.miniAreas = []; { const seenA = new Set(); for (const c of W.values()) for (const [n, ...f] of c.map.areas || []) { if (seenA.has(n) || !/공원|숲|녹지|광장|궁|산$|유원지|한강/.test(n)) continue; const ring = unpack(f, c.map.scale), A = Math.abs(ringArea(ring)); if (A < 20000) continue; seenA.add(n); let ax = 0, az = 0; for (const [x, z] of ring) { ax += x; az += z; } this.miniAreas.push({ n, x: ax / ring.length, z: az / ring.length, A }); } this.miniAreas.sort((a, b) => b.A - a.A); }
       return (this.mini = cv); }
     for (const gr of this.map.green) fillP(gr.slice(1).map((r) => unpack(r, S)), '#bfdba4');
     for (const w of this.water) fillP(w, '#8fc4ea'); for (const w of this.islands) fillP(w, '#a9cf8c');
@@ -2598,6 +2604,8 @@ float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y
     const m = size / span, c = size / 2;
     ctx.fillStyle = 'rgba(30,30,40,.9)'; ctx.font = `bold ${Math.round(size / 15)}px sans-serif`; ctx.textAlign = 'center';
     for (const [n, ms] of this.map.marks || []) { const p = this.at(ms), x = c + (p.x - this.px) * m, y = c + (p.z - this.pz) * m; if (x > 8 && x < size - 8 && y > 8 && y < size - 8) ctx.fillText(n, x, y - 4); }
+    // 서울 전체: 큰 공원 · 녹지 이름 (초록 글씨, 넓은 곳 먼저 · 겹치면 뺀다)
+    if (this.chunks && this.miniAreas) { ctx.save(); ctx.font = `bold ${Math.round(size / 19)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round'; const put = []; for (const a of this.miniAreas) { const x = c + (a.x - this.px) * m, y = c + (a.z - this.pz) * m; if (x < 20 || x > size - 20 || y < 14 || y > size - 14) continue; const w = ctx.measureText(a.n).width; if (put.some(([px2, py2, w2]) => Math.abs(px2 - x) < (w + w2) / 2 && Math.abs(py2 - y) < size / 15)) continue; put.push([x, y, w]); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.strokeText(a.n, x, y); ctx.fillStyle = '#3f6a35'; ctx.fillText(a.n, x, y); if (put.length >= 4) break; } ctx.restore(); }
     // 서울 전체: 지하철역 (첫 호선 색 동그라미 + 이름, 흰 테두리 글씨)
     if (this.chunks) { ctx.save(); ctx.font = `bold ${Math.round(size / 17)}px sans-serif`; ctx.textBaseline = 'bottom'; ctx.lineJoin = 'round'; for (const st of this.stations || []) { const x = c + (st.x - this.px) * m, y = c + (st.z - this.pz) * m; if (x < 12 || x > size - 12 || y < 16 || y > size - 12) continue; const rr = Math.max(3, size / 42); ctx.fillStyle = LINE_COLOR[st.lines[0]] || '#7a7f8a'; ctx.beginPath(); ctx.arc(x, y, rr, 0, 7); ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = '#fff'; ctx.stroke(); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.92)'; ctx.strokeText(st.name, x, y - rr - 1); ctx.fillStyle = '#1f2a3a'; ctx.fillText(st.name, x, y - rr - 1); } ctx.restore(); }
     for (const p of this.people) { const [x0, z0] = this.world(p.s, p.lat), x = c + (x0 - this.px) * m, y = c + (z0 - this.pz) * m; ctx.fillStyle = p.kind.startsWith('runner') ? '#ffffff' : '#ffd23f'; ctx.beginPath(); ctx.arc(x, y, 2.2, 0, 7); ctx.fill(); }
@@ -3155,6 +3163,17 @@ function bSeed(b) { let h = (Math.round(b[7]) * 73856093) ^ (Math.round(b[8]) * 
 const APT_BRANDS = [[/래미안/, '#e4e4e2', '#4a5866'], [/자이/, '#eeeeec', '#3d3f44'], [/힐스테이트/, '#e6ddd0', '#7a5f48'], [/푸르지오/, '#efefec', '#5f8a5a'], [/편한세상/, '#f0f0ee', '#3f6fa8'], [/롯데캐슬/, '#e8dfd0', '#8a6a50'], [/아이파크/, '#ebebe8', '#6a6e74'], [/더샵/, '#e2e3e3', '#4f5a60'], [/SK|에스케이/, '#f0eeea', '#d0602a'], [/주공|LH|휴먼시아/, '#efe8d8', '#4f9a6a'], [/현대/, '#efe8d6', '#2f7a5a'], [/한신/, '#efe6d0', '#3f6fa8'], [/삼성/, '#eeeae2', '#2f5fa8'], [/우성/, '#efe9dc', '#b0453a'], [/대림/, '#efebe2', '#3f6fa8'], [/쌍용|예가/, '#ece6da', '#a8463a'], [/위브|두산/, '#ece9e4', '#5a6a8a'], [/금호|어울림/, '#eeeae2', '#c46a2a'], [/벽산/, '#efe8da', '#3f7a5a']];
 function aptBrand(name) { if (!name) return null; for (const [re, w, a] of APT_BRANDS) if (re.test(name)) return [w, a]; return null; }
 // 건축물 정보 → 외벽 [종류, 색]. use: 1 단독 · 2 공동주택 · 3 · 4 근린생활 · 6 종교 · 7 판매 · 9 의료 · 10 교육 · 14 업무 · 15 숙박, st: 11 · 12 · 13 · 19 조적(벽돌 · 블록 · 돌) · 21 · 22 철근콘크리트 · 3x 철골, yr: 사용승인 연도
+// 이름표 둘째 줄: 건축물대장 주용도 · 구조 · 사용승인 연도 + 높이로 어림한 층수 (예: '업무시설 · 철골 · 2012년 · 약 23층')
+const USE_NAME = { 1: '단독주택', 2: '공동주택', 3: '근린생활시설', 4: '근린생활시설', 5: '문화 · 집회시설', 6: '종교시설', 7: '판매시설', 8: '운수시설', 9: '의료시설', 10: '교육연구시설', 11: '노유자시설', 12: '수련시설', 13: '운동시설', 14: '업무시설', 15: '숙박시설', 16: '위락시설', 17: '공장', 18: '창고', 20: '자동차 관련 시설', 25: '방송통신시설', 28: '관광휴게시설' };
+function labelSub(info, h) {
+  const out = []; const [use, st, yr] = info || [];
+  if (USE_NAME[use]) out.push(USE_NAME[use]);
+  if (st) out.push(st >= 11 && st <= 19 ? '벽돌 · 돌' : st >= 21 && st <= 29 ? '철근콘크리트' : st >= 31 && st <= 39 ? '철골' : st >= 41 && st <= 49 ? '철골철근콘크리트' : st >= 51 && st <= 59 ? '목구조' : '');
+  if (yr > 1900) out.push(`${yr}년`);
+  // 층수는 높이로 어림: 60m 넘는 탑은 층 높이 · 첨탑이 제각각이라 빼고
+  if (h >= 6 && h <= 60) out.push(`약 ${Math.max(2, Math.round(h / 3.3))}층`);
+  return out.filter(Boolean).join(' · ');
+}
 function styleOf([use, st, yr], h, r, shopG) {
   const pick2 = (a) => a[Math.floor(r() * a.length)], masonry = st >= 11 && st <= 19, steel = st >= 31 && st <= 39, era = yr ? (yr < 1990 ? 0 : yr < 2005 ? 1 : 2) : 1;
   // 한옥: 목구조(건축물대장 구조 코드 51 ~ 59 = 일반목구조 · 통나무 등) 낮은 집 (북촌 · 서촌 · 인사동) → 흰 회벽 · 나무 기둥 · 기와 지붕은 따로 얹는다
