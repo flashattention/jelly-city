@@ -649,6 +649,29 @@ function motoBike(lod, empty = false) {
   return B.done();
 }
 
+// 골목에 세워 둔 스쿠터 (가벼운 모양, 삼각형 약 300): 검은 타이어 · 은빛 휠, 앞 가림판 · 발판 · 둥근 뒤 몸통(도색), 검은 안장, 핸들 · 거울, 앞등 · 뒷등, 배달 상자
+//   길 위 차 모델(scooter)과 같은 크기 · 같은 색 규칙(VK.paint 가 인스턴스 색). 앞이 +z
+let PARKED_SC = null;
+export function parkedScooterGeo() {
+  if (PARKED_SC) return PARKED_SC;
+  const B = new Build(), r = 0.27, zf = 0.65, zr = -0.65;
+  for (const z of [zf, zr]) { B.add(new THREE.CylinderGeometry(r, r, 0.11, 10).rotateZ(Math.PI / 2), '#141416', 0, T(0, r, z)); B.add(new THREE.CylinderGeometry(r * 0.6, r * 0.6, 0.125, 6).rotateZ(Math.PI / 2), '#9a9fa6', 0, T(0, r, z)); }
+  B.add(new THREE.BoxGeometry(0.05, 0.62, 0.06), '#a9aeb4', 0, T(0, r + 0.3, zf - 0.1, -0.4));
+  B.add(new THREE.BoxGeometry(0.4, 0.66, 0.12), '#ffffff', VK.paint, T(0, 0.66, 0.43, -0.25));
+  B.add(new THREE.BoxGeometry(0.34, 0.07, 0.56), '#1d1e21', 0, T(0, 0.32, 0.08));
+  B.add(new THREE.CylinderGeometry(0.19, 0.17, 0.74, 8).rotateX(Math.PI / 2), '#ffffff', VK.paint, T(0, 0.55, -0.44, 0, 0, 0, 1, 0.95, 1));
+  B.add(new THREE.BoxGeometry(0.29, 0.1, 0.6), '#1a1a1c', 0, T(0, 0.77, -0.33, 0.04));
+  B.add(new THREE.BoxGeometry(0.3, 0.17, 0.28), '#ffffff', VK.paint, T(0, 0.99, 0.6, -0.3));
+  B.add(new THREE.BoxGeometry(0.66, 0.035, 0.035), '#202124', 0, T(0, 1.03, 0.47));
+  for (const s of [-1, 1]) { B.add(new THREE.BoxGeometry(0.02, 0.2, 0.02), '#202124', 0, T(s * 0.25, 1.14, 0.47, 0, 0, -s * 0.2)); B.add(new THREE.BoxGeometry(0.09, 0.06, 0.02), '#1a1a1c', 0, T(s * 0.28, 1.25, 0.47)); }
+  B.add(new THREE.BoxGeometry(0.14, 0.08, 0.04), '#fff6e2', VK.head, T(0, 0.97, 0.75, -0.3));
+  B.add(new THREE.BoxGeometry(0.12, 0.05, 0.03), '#d8221a', VK.tail, T(0, 0.74, -0.83));
+  B.add(new THREE.BoxGeometry(0.42, 0.03, 0.42), '#2a2b2f', 0, T(0, 0.86, -0.72));
+  B.add(new THREE.BoxGeometry(0.48, 0.42, 0.46), '#ecedee', 0, T(0, 1.09, -0.72));
+  B.add(new THREE.BoxGeometry(0.5, 0.05, 0.48), '#ffffff', VK.paint, T(0, 1.18, -0.72));
+  return (PARKED_SC = B.done());
+}
+
 // ---------- 종류 · 단계별 그물 (처음 쓸 때 한 번) ----------
 const GEO = new Map();
 //   empty: 탄 사람 없이 (오토바이를 세워 두거나 내가 탈 때)

@@ -17,6 +17,7 @@ import { setupAttractions, ATTR_SKIP } from './hangang-attractions.js';
 import { LiveTransit } from './hangang-transit.js';
 import { LiveRide } from './hangang-ride.js';
 import { Traffic } from './hangang-vehicles.js';
+import { parkedScooterGeo, vehicleMat } from './hangang-vehicle-models.js';
 import { Drive } from './hangang-drive.js';
 // 롯데월드 (8-17): 섬 · 어드벤처 건물은 지도 상자 건물 대신 hangang-park.js 가 실제 모습으로. 놀이기구는 명소 체험(registerAttraction)으로 붙는다
 import { parkSkip } from './hangang-park.js';
@@ -333,6 +334,19 @@ function foliageTex(blossom) {
   }
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
 }
+// 소나무 바늘잎 그림: 짧은 바늘이 한 점에서 부채꼴로 퍼진 다발 수백 개 (잎 카드와 같은 둥근 덩어리 안)
+function pineTex() {
+  const N = 256, cv = document.createElement('canvas'); cv.width = cv.height = N; const g = cv.getContext('2d'), r = rnd(47);
+  g.clearRect(0, 0, N, N); g.lineCap = 'round';
+  const inBlob = (x, y) => { const dx = x - 128, dy = y - 128, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx); return d < 100 + Math.sin(a * 5) * 12 + Math.sin(a * 11) * 7; };
+  for (let i = 0; i < 300; i++) {
+    const x = 22 + r() * 212, y = 22 + r() * 212; if (!inBlob(x, y)) continue;
+    const d = Math.hypot(x - 128, y - 128) / 110, v = Math.round(250 - d * 75 - r() * 45), a0 = r() * 6.28, n = 9 + Math.floor(r() * 7);
+    g.strokeStyle = `rgb(${v},${v},${v})`; g.lineWidth = 2.2;
+    for (let k = 0; k < n; k++) { const a = a0 + (k / n - 0.5) * 2.4, L = 10 + r() * 9; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); g.stroke(); }
+  }
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+}
 function petalTex() { const cv = document.createElement('canvas'); cv.width = cv.height = 32; const g = cv.getContext('2d'); g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(16, 16, 12, 7, 0.6, 0, 7); g.fill(); return new THREE.CanvasTexture(cv); }
 // 나비 날개 그림: 위 · 아래 날개 + 무늬 (종류 4가지: 노랑나비 · 흰나비 · 호랑나비 · 푸른부전나비)
 function butterflyTex(kind) {
@@ -428,7 +442,7 @@ export class Hangang {
   }
   unloadChunk(key) {
     const c = this.chunks.get(key); if (!c) return; this.chunks.delete(key); this.scene.remove(c.scene);
-    c.scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of ms) { m.map?.dispose?.(); m.dispose?.(); } });
+    c.scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of ms) { if (m.userData?.shared) continue; m.map?.dispose?.(); m.dispose?.(); } });
     const keep = (a) => a.filter((x) => x.key !== key);
     this.foot = keep(this.foot); this.footGrid.clear(); this.foot.forEach((f, fi) => { for (let gx = Math.floor(f.x0 / 40); gx <= Math.floor(f.x1 / 40); gx++) for (let gz = Math.floor(f.z0 / 40); gz <= Math.floor(f.z1 / 40); gz++) { const k = `${gx},${gz}`; if (!this.footGrid.has(k)) this.footGrid.set(k, []); this.footGrid.get(k).push(fi); } });
     this.decks = keep(this.decks); this.deckGrid.clear(); this.decks.forEach((sg, si) => { for (let gx = Math.floor((Math.min(sg.ax, sg.cx) - sg.hw) / 40); gx <= Math.floor((Math.max(sg.ax, sg.cx) + sg.hw) / 40); gx++) for (let gz = Math.floor((Math.min(sg.az, sg.cz) - sg.hw) / 40); gz <= Math.floor((Math.max(sg.az, sg.cz) + sg.hw) / 40); gz++) { const k = `${gx},${gz}`; if (!this.deckGrid.has(k)) this.deckGrid.set(k, []); this.deckGrid.get(k).push(si); } });
@@ -1185,8 +1199,13 @@ export class Hangang {
       this.alleyGlowM = new THREE.MeshBasicMaterial({ map: pool, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
       const gim = mk(pg, this.alleyGlowM, poles, ([x, z, , , ax, az]) => { o.position.set(x + ax * 1.6, 0, z + az * 1.6); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1); }); if (gim) { gim.renderOrder = 5; gim.frustumCulled = true; } }
     // 스쿠터: 몸통 · 앞 · 바퀴 둘 (색 다섯 가지), 쓰레기봉투: 흰 · 검은 봉투 덩어리
-    const scG = (() => { const gs = []; const b = new THREE.BoxGeometry(0.42, 0.42, 1.1); b.translate(0, 0.55, 0); gs.push(b); const f = new THREE.BoxGeometry(0.38, 0.75, 0.22); f.translate(0, 0.8, 0.5); gs.push(f); const s2 = new THREE.BoxGeometry(0.36, 0.12, 0.6); s2.translate(0, 0.82, -0.15); gs.push(s2); for (const z of [-0.48, 0.55]) { const w = new THREE.CylinderGeometry(0.22, 0.22, 0.12, 12); w.rotateZ(Math.PI / 2); w.translate(0, 0.22, z); gs.push(w); } return mergeGeos(gs); })();
-    const sim = mk(scG, new THREE.MeshLambertMaterial({ color: '#ffffff' }), scoot, ([x, z, ry]) => { o.position.set(x, 0, z); o.rotation.set(0, ry, 0); }); if (sim) { const c = new THREE.Color(); scoot.forEach((sc, i) => sim.setColorAt(i, c.set(['#e8e4dc', '#d8352a', '#2f6bff', '#1d1d1f', '#7be07b'][sc[3]]))); }
+    // 골목에 세워 둔 스쿠터: 길 위 차와 같은 스쿠터 모델(앞 가림판 · 발판 · 둥근 뒤 몸통 · 안장 · 핸들 · 검은 타이어 · 배달 상자), 탄 사람 없이. 색은 흰 · 검 · 빨 · 회 · 파
+    //   가벼운 모양 · 250m 칸마다 한 묶음, 칸 가운데에서 300m 안에서만 그린다 (1m 짜리라 멀면 안 보인다)
+    if (scoot.length) { const scM = vehicleMat(); scM.userData.shared = true; const c = new THREE.Color(), cells = new Map(), CS = this.isChunk ? 250 : 1e9;
+      for (const sc of scoot) { const k = `${Math.floor(sc[0] / CS)},${Math.floor(sc[1] / CS)}`; if (!cells.has(k)) cells.set(k, []); cells.get(k).push(sc); }
+      for (const [gk, L] of cells) { const n = L.length, g = parkedScooterGeo().clone(); g.setAttribute('iSt', new THREE.InstancedBufferAttribute(new Float32Array(n * 4), 4)); g.setAttribute('iCell', new THREE.InstancedBufferAttribute(new Float32Array(n * 2), 2));
+        const sim = mk(g, scM, L, ([x, z, ry]) => { o.position.set(x, 0, z); o.rotation.set(0, ry, 0); }); L.forEach((sc, i) => sim.setColorAt(i, c.set(['#f4f5f6', '#1a1b1f', '#c8161d', '#8f969c', '#f4f5f6'][sc[3]])));
+        if (this.isChunk) { const [gx, gz] = gk.split(',').map(Number); sim.userData.lod = [(gx + 0.5) * CS, (gz + 0.5) * CS, n, 300]; sim.userData.noMerge = true; } } }
     for (const [x, z] of scoot) this.addCircle(x, z, 0.45, 1);
     const bg = new THREE.IcosahedronGeometry(0.32, 0); bg.scale(1, 0.85, 1); bg.translate(0, 0.27, 0); const bim = mk(bg, new THREE.MeshLambertMaterial({ color: '#ffffff' }), bags.flatMap(([x, z]) => [[x, z], [x + 0.4, z + 0.2], [x - 0.1, z + 0.45]]), ([x, z]) => { o.position.set(x, 0, z); o.rotation.set(0, 0, 0); o.scale.setScalar(0.8 + Math.random() * 0.4); }); if (bim) { const c = new THREE.Color(); for (let i = 0; i < bim.count; i++) bim.setColorAt(i, c.set(i % 3 === 1 ? '#1d1d1f' : '#f2f0ea')); } o.scale.set(1, 1, 1);
   }
@@ -1727,10 +1746,10 @@ float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y
     const cardCrown = (blobs, nCards, size) => {
       const P = [], N = [], U = [], Cl = [], I = []; const rr = rnd(77 + nCards);
       for (let k = 0; k < nCards; k++) {
-        const [bx, by, bz, br] = blobs[Math.floor(rr() * blobs.length)];
+        const [bx, by, bz, br, bsy = 1] = blobs[Math.floor(rr() * blobs.length)];
         const th = rr() * Math.PI * 2, ph = Math.acos(1 - rr() * 1.85), d = br * (0.55 + rr() * 0.5);
         const nx = Math.sin(ph) * Math.cos(th), ny = Math.cos(ph), nz = Math.sin(ph) * Math.sin(th);
-        const cx = bx + nx * d, cy = by + ny * d * 0.85, cz = bz + nz * d, sz = size * (0.75 + rr() * 0.6);
+        const cx = bx + nx * d, cy = by + ny * d * 0.85 * bsy, cz = bz + nz * d, sz = size * (0.75 + rr() * 0.6);
         // 카드 방향: 아무렇게나 (사방에서 볼 때 덩어리처럼)
         const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rr() * 6.28, rr() * 6.28, rr() * 6.28)), ax = new THREE.Vector3(1, 0, 0).applyQuaternion(q), ay = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
         const base = P.length / 3, shade = 0.78 + (ny * 0.5 + 0.5) * 0.35 + (d / br - 0.55) * 0.2;
@@ -1740,18 +1759,19 @@ float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(Cl, 3)); g.setIndex(I); return g;
     };
     // 줄기: 살짝 휘고 아래가 넓게 퍼진 몸통 + 위로 갈라지는 가지
-    const trunkGeo = (h, r0, bend, branches) => {
+    const trunkGeo = (h, r0, bend, branches, red = false) => {
       const parts = [];
       const body = new THREE.CylinderGeometry(r0 * 0.55, r0, h, 9, 10); body.translate(0, h / 2, 0);
       const p = body.attributes.position; for (let k = 0; k < p.count; k++) { const y = p.getY(k), t = y / h, flare = 1 + Math.max(0, 0.18 - t) * 3.2; p.setX(k, p.getX(k) * flare + Math.sin(t * 2.4) * bend); p.setZ(k, p.getZ(k) * flare + Math.sin(t * 1.7 + 1) * bend * 0.5); }
       body.computeVertexNormals(); parts.push(body);
       for (const [ang, tilt, len, at] of branches) { const b = new THREE.CylinderGeometry(r0 * 0.18, r0 * 0.38, len, 6, 3); b.translate(0, len / 2, 0); b.rotateZ(tilt); b.rotateY(ang); b.translate(Math.sin(at * 2.4) * bend, h * at, Math.sin(at * 1.7 + 1) * bend * 0.5); parts.push(b); }
-      const m = mergeGeos(parts), pp = m.attributes.position, cl = []; for (let k = 0; k < pp.count; k++) { const v = 0.7 + Math.min(1, pp.getY(k) / h) * 0.35; cl.push(v, v * 0.92, v * 0.86); } m.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3)); return m;
+      const m = mergeGeos(parts), pp = m.attributes.position, cl = []; for (let k = 0; k < pp.count; k++) { const t = Math.min(1, pp.getY(k) / h), v = 0.7 + t * 0.35; if (red) cl.push(0.78 + t * 0.5, 0.62 + t * 0.2, 0.56 + t * 0.08); else cl.push(v, v * 0.92, v * 0.86); } m.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3)); return m;
     };
     const SHAPES = [
       { crown: cardCrown([[0, 4.3, 0, 2.1], [1.6, 3.8, 0.5, 1.5], [-1.5, 3.9, -0.6, 1.55], [0.4, 3.7, -1.6, 1.4], [-0.5, 3.6, 1.6, 1.4], [0.2, 5.3, 0.2, 1.4]], isPhone ? 90 : 170, 1.85), trunk: trunkGeo(3.6, 0.32, 0.25, [[0.3, 0.75, 1.9, 0.62], [2.4, 0.8, 1.7, 0.7], [4.4, 0.7, 1.8, 0.66]]), cherry: true },
       { crown: cardCrown([[0, 4.8, 0, 1.4], [0.5, 6.0, 0.3, 1.1], [-0.5, 4.0, -0.3, 1.15], [0.2, 6.9, 0, 0.8]], isPhone ? 50 : 85, 1.5), trunk: trunkGeo(4.0, 0.24, 0.12, [[1, 0.5, 1.4, 0.7], [3.5, 0.55, 1.3, 0.78]]) },
-      { crown: (() => { const gs = [[3.0, 2.0, 2.0], [4.3, 1.6, 1.7], [5.4, 1.15, 1.4], [6.3, 0.7, 1.1]].map(([y, rr2, hh]) => { const g = new THREE.ConeGeometry(rr2, hh, 9, 2); g.translate(0, y, 0); const p = g.attributes.position; for (let k = 0; k < p.count; k++) { const a = Math.atan2(p.getZ(k), p.getX(k)); const w = 1 + Math.sin(a * 9) * 0.08; p.setX(k, p.getX(k) * w); p.setZ(k, p.getZ(k) * w); } g.computeVertexNormals(); return g; }); const m = mergeGeos(gs), p = m.attributes.position, cl = []; for (let k = 0; k < p.count; k++) { const v = 0.62 + (p.getY(k) - 2) / 6 * 0.42; cl.push(v, v, v); } m.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3)); return m; })(), trunk: trunkGeo(3.0, 0.2, 0.05, []), pine: true },
+      // 소나무(적송): 붉은 줄기가 길게 올라가 살짝 휘고, 위쪽에 납작한 바늘잎 뭉치가 몇 층 (북악 · 인왕 · 남산 · 궁궐에 흔한 우산 모양)
+      { crown: cardCrown([[0.2, 5.5, 0, 1.9, 0.42], [1.5, 4.9, 0.7, 1.3, 0.45], [-1.4, 5.3, -0.5, 1.35, 0.42], [-0.3, 6.3, 0.6, 1.25, 0.45], [0.8, 6.6, -0.6, 0.95, 0.5]], isPhone ? 40 : 70, 1.75), trunk: trunkGeo(5.0, 0.2, 0.38, [[0.6, 0.85, 1.6, 0.78], [2.6, 0.9, 1.5, 0.84], [4.6, 0.8, 1.3, 0.9]], true), pine: true },
     ];
     const kindOf = spots.map(() => { const x = r(); return x < 0.62 ? 0 : x < 0.84 ? 1 : 2; });
     this.treeKinds = kindOf; this.crownSets = []; this.twigSets = [];
@@ -1764,7 +1784,7 @@ float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y
       const groups = new Map(); for (const i of idxAll) { const k = this.isChunk ? `${Math.floor(spots[i][0] / 500)},${Math.floor(spots[i][1] / 500)}` : '0'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); }
       for (const [gk, idx] of groups) { const n = idx.length;
       const tg = sh.trunk;
-      const cm = sh.pine ? new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true }) : new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true, map: this.leafTex ||= foliageTex(false), alphaTest: 0.42, side: THREE.DoubleSide }); windify(cm, this.windU, 0.05, true); if (!sh.pine) this.cardMats = [...(this.cardMats || []), cm];
+      const cm = sh.pine ? (this.pineCardM ||= new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true, map: (this.needleTex ||= pineTex()), alphaTest: 0.42, side: THREE.DoubleSide })) : new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true, map: this.leafTex ||= foliageTex(false), alphaTest: 0.42, side: THREE.DoubleSide }); if (!sh.pine || !cm.userData.windy) { windify(cm, this.windU, 0.05, true); cm.userData.windy = 1; } if (!sh.pine) this.cardMats = [...(this.cardMats || []), cm];
       const crowns = new THREE.InstancedMesh(sh.crown, cm, n), trunks = new THREE.InstancedMesh(tg, barkM, n), tw = sh.pine ? null : new THREE.InstancedMesh(twigG, twigM, n);
       idx.forEach((si, q) => { const [x, z, k] = spots[si]; o.position.set(x, 0, z); o.rotation.set(0, r() * 6.28, 0); o.scale.set(k * (0.85 + r() * 0.3), k * (0.85 + r() * 0.35), k * (0.85 + r() * 0.3)); o.updateMatrix(); crowns.setMatrixAt(q, o.matrix); trunks.setMatrixAt(q, o.matrix); tw?.setMatrixAt(q, o.matrix); });
       for (const m of [crowns, trunks, tw]) if (m) { m.castShadow = true; m.receiveShadow = false; this.scene.add(m); if (this.isChunk) { const [gx, gz] = gk.split(',').map(Number); m.userData.lod = [(gx + 0.5) * 500, (gz + 0.5) * 500, n]; m.userData.noMerge = true; } }
@@ -1773,16 +1793,17 @@ float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y
     // 숲 채우기 나무: 둥근 활엽수 · 키 큰 활엽수 · 소나무 (가벼운 모양, 500m 칸마다 · 800m 안에서만 그린다)
     if (this.forestFill?.length) {
       const F = this.forestFill, trunk = (h, r0) => { const g = new THREE.CylinderGeometry(r0 * 0.5, r0, h, 6, 1, true); g.translate(0, h / 2, 0); const p = g.attributes.position, cl = []; for (let k = 0; k < p.count; k++) { const v = 0.6 + (p.getY(k) / h) * 0.4; cl.push(v, v * 0.92, v * 0.86); } g.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3)); return g; };
-      const pineC = (() => { const gs = [[4.3, 2.0, 2.7], [5.7, 1.5, 2.3], [7.0, 0.9, 1.9]].map(([y, rr2, hh]) => { const g = new THREE.ConeGeometry(rr2, hh, 7, 1); g.translate(0, y, 0); return g; }); const m = mergeGeos(gs), p = m.attributes.position, cl = []; for (let k = 0; k < p.count; k++) { const v = 0.6 + ((p.getY(k) - 3) / 5) * 0.45; cl.push(v, v, v); } m.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3)); return m; })();
+      // 숲 소나무: 줄기 위쪽에 납작한 바늘잎 뭉치 세 층 (가벼운 카드 수)
+      const pineC = cardCrown([[0.1, 6.6, 0, 1.8, 0.42], [1.2, 6.0, 0.5, 1.25, 0.45], [-1.1, 7.3, -0.3, 1.2, 0.45]], isPhone ? 12 : 18, 2.5);
       const FS = [
         { crown: cardCrown([[0, 6.0, 0, 2.1], [1.4, 5.4, 0.5, 1.5], [-1.3, 5.5, -0.6, 1.5], [0.3, 7.1, 0.1, 1.3]], isPhone ? 36 : 64, 2.0), th: 5.6, tr: 0.19 },
         { crown: cardCrown([[0, 6.6, 0, 1.6], [0.5, 7.8, 0.3, 1.2], [-0.4, 5.6, -0.3, 1.3]], isPhone ? 28 : 48, 1.7), th: 6.4, tr: 0.16 },
-        { crown: pineC, th: 5.0, tr: 0.15, pine: true },
+        { crown: pineC, th: 6.4, tr: 0.15, pine: true },
       ];
       // 줄기는 세 모양을 한 그물로 (칸마다 그리기 한 번): 높이 1 · 굵기 1 짜리를 나무마다 늘린다. 회갈색 (느티나무 · 참나무 껍질), 소나무는 붉은 기
       const unitTrunk = trunk(1, 1), fBark = new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true }), tcol = new THREE.Color();
       const leafM = new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true, map: this.leafTex ||= foliageTex(false), alphaTest: 0.42, side: THREE.DoubleSide }); windify(leafM, this.windU, 0.05, true); this.cardMats = [...(this.cardMats || []), leafM];
-      const pineM = new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true });
+      const pineM = this.pineCardM ||= new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true, map: (this.needleTex ||= pineTex()), alphaTest: 0.42, side: THREE.DoubleSide }); if (!pineM.userData.windy) { windify(pineM, this.windU, 0.05, true); pineM.userData.windy = 1; }
       const fk = F.map(() => { const x = r(); return x < 0.5 ? 0 : x < 0.75 ? 1 : 2; });
       const cells = new Map(); F.forEach(([x, z], i) => { const k = `${Math.floor(x / 500)},${Math.floor(z / 500)}`; if (!cells.has(k)) cells.set(k, []); cells.get(k).push(i); });
       for (const [gk, all] of cells) {
@@ -1791,7 +1812,7 @@ float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y
         FS.forEach((sh, t) => {
           const idx = all.filter((i) => fk[i] === t), n = idx.length; if (!n) return;
           const crowns = new THREE.InstancedMesh(sh.crown, sh.pine ? pineM : leafM, n), tw = sh.pine ? null : new THREE.InstancedMesh(twigG, twigM, n);
-          idx.forEach((si, q) => { const [x, z, k] = F[si], sx = k * (0.85 + r() * 0.3), sy = k * (0.85 + r() * 0.35), sz = k * (0.85 + r() * 0.3), ry = r() * 6.28; o.position.set(x, 0, z); o.rotation.set(0, ry, 0); o.scale.set(sx, sy, sz); o.updateMatrix(); crowns.setMatrixAt(q, o.matrix); tw?.setMatrixAt(q, o.matrix);
+          idx.forEach((si, q) => { const [x, z, k] = F[si], sx = k * (0.85 + r() * 0.3), sy = k * (0.85 + r() * 0.35), sz = k * (0.85 + r() * 0.3), ry = r() * 6.28; o.position.set(x, 0, z); o.rotation.set(sh.pine ? (r() - 0.5) * 0.16 : 0, ry, sh.pine ? (r() - 0.5) * 0.16 : 0); o.scale.set(sx, sy, sz); o.updateMatrix(); crowns.setMatrixAt(q, o.matrix); tw?.setMatrixAt(q, o.matrix);
             o.scale.set(sh.tr * sx, sh.th * sy, sh.tr * sz); o.updateMatrix(); trunks.setMatrixAt(tq, o.matrix); tOrd.push(si); trunks.setColorAt(tq++, tcol.set(sh.pine ? '#8a5a44' : r() < 0.5 ? '#7a6e62' : '#6a5e52').offsetHSL(0, 0, (r() - 0.5) * 0.08)); });
           crowns.castShadow = true; lod(crowns, n); if (tw) { lod(tw, n); this.twigSets.push(tw); }
           this.crownSets.push({ crowns, idx, pine: !!sh.pine, forest: true }); (this.treeGroups ||= []).push({ ms: [crowns, tw], idx, arr: 'f' });
@@ -2225,7 +2246,7 @@ float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y
       if (!set) continue; const { crowns, idx, pine } = set;
       // 숲 나무: 봄엔 연두 새잎(벚꽃은 드물게), 여름 짙은 초록, 가을엔 단풍 · 갈잎 · 아직 푸른 잎이 섞인다
       const P2 = set.forest ? fpal : pal;
-      idx.forEach((si, q) => { if (pine) c.set(['#2f5d3a', '#355f3c', '#2a5233'][si % 3]).offsetHSL(0, 0, s === 'winter' ? 0.04 : 0); else { c.set(P2[Math.floor(r() * P2.length)]); if (s === 'spring' && si % 6 === 5) c.set(set.forest ? '#ffd0e0' : '#b9de8c'); } c.offsetHSL(0, 0, (r() - 0.5) * 0.06); crowns.setColorAt(q, c); });
+      idx.forEach((si, q) => { if (pine) c.set(['#4f7f47', '#58854c', '#47753f'][si % 3]).offsetHSL(0, 0, s === 'winter' ? 0.04 : 0); else { c.set(P2[Math.floor(r() * P2.length)]); if (s === 'spring' && si % 6 === 5) c.set(set.forest ? '#ffd0e0' : '#b9de8c'); } c.offsetHSL(0, 0, (r() - 0.5) * 0.06); crowns.setColorAt(q, c); });
       crowns.instanceColor.needsUpdate = true; crowns.visible = pine || s !== 'winter';
     }
     for (const tw of this.twigSets) tw.visible = s === 'winter';
