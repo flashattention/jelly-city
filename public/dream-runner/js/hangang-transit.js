@@ -169,7 +169,8 @@ export class LiveTransit {
       }
       const near = Math.hypot(o.x - px, o.z - pz) < BUS_NEAR3D;
       if (near && !o.mesh) o.mesh = this.busMesh(o); else if (!near && o.mesh) this.dropBus(o);
-      if (o.mesh) { o.mesh.position.set(o.x, 0, o.z); o.mesh.rotation.y = o.yaw; }
+      // 내가 빼앗아 운전 중인 버스(hangang-drive.js, 내 화면에서만)는 실제 자리 버스를 숨긴다. 내리면 다시 보인다
+      if (o.mesh) { o.mesh.position.set(o.x, 0, o.z); o.mesh.rotation.y = o.yaw; if (o.hijack) o.mesh.visible = false; else if (o.id !== this.rideId) o.mesh.visible = true; }
     }
     const night = this.hg.light?.night || 0; this.lampM.color.setScalar(0.07 + night * 0.9);
   }

@@ -5,7 +5,8 @@
 //   휴대폰: 조이스틱 = 가속 · 조향, 화면 단추 = 시점 · 경적 · 손 브레이크 · 내리기
 import * as THREE from 'three';
 import { sound } from './music.js';
-import { TYPES, topAt } from './hangang-vehicle-models.js';
+import { TYPES, topAt, liveRoute } from './hangang-vehicle-models.js';
+import { BUS_COLOR } from './hangang-transit.js';
 import { buildInterior, drawGauge, seatEye } from './hangang-vehicle-interior.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -103,6 +104,12 @@ export class Drive {
       const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw), lz = dx * fx + dz * fz, lx = dx * fz - dz * fx, d = Math.hypot(Math.max(0, Math.abs(lx) - v.hw), Math.max(0, Math.abs(lz) - v.len / 2));
       if (d < 2.0 && (!best || d < best.d)) best = { v, d };
     }
+    // 8-40-1: 실시간 버스(hangang-transit.js)도 빼앗아 운전할 수 있다. 고르기 전엔 모양(종류)만 빌린 가짜 차로 둔다
+    const LV = hg.live; if (LV) for (const o of LV.buses.values()) {
+      if (!o.mesh || !o.L || o.hijack || o.id === LV.rideId) continue; const dx = hg.px - o.x, dz = hg.pz - o.z; if (Math.abs(dx) > 14 || Math.abs(dz) > 14) continue;
+      const fx = Math.sin(o.yaw), fz = Math.cos(o.yaw), lz = dx * fx + dz * fz, lx = dx * fz - dz * fx, d = Math.hypot(Math.max(0, Math.abs(lx) - 1.25), Math.max(0, Math.abs(lz) - 5.5));
+      if (d < 2.0 && (!best || d < best.d)) best = { v: { t: TYPES.busCity, live: o }, d };
+    }
     return best;
   }
   // E: 타고 있으면 내리기, 아니면 가까운 차 타기 (버스 · 지하철 타기 · 역 출구가 더 가까우면 그쪽)
@@ -111,7 +118,8 @@ export class Drive {
     if (this.pick) { this.choose(Math.max(0, this.pick.v.t.seats.findIndex((s) => s[4]))); return true; }
     if (this.on) { this.exit(); return true; }
     const c = this.near; if (!c) return false;
-    const R = this.hg.rideL?.cand; if (R) { const rd = R.d ?? (R.e ? Math.hypot(R.e.x - this.hg.px, R.e.z - this.hg.pz) : 99); if (rd < c.d) return false; }
+    // 실시간 버스가 정류장에 서 있으면 타기(hangang-ride.js)도 같은 버스를 고른다 → 이 창(운전석 · 승객)으로 한 번에
+    const R = this.hg.rideL?.cand; if (R && !(c.v.live && R.o === c.v.live)) { const rd = R.d ?? (R.e ? Math.hypot(R.e.x - this.hg.px, R.e.z - this.hg.pz) : 99); if (rd < c.d) return false; }
     this.openSeats(c.v); return true;
   }
   // ---------- 자리 고르기 (8-27-4): 위에서 본 차 모양에 자리 단추, 옆에 이름 목록 ----------
@@ -119,7 +127,8 @@ export class Drive {
     const t = v.t, el = this.el.seat, map = el.querySelector('.map'), list = el.querySelector('.list'), cur = switching ? this.on?.seat : -1;
     this.pick = { v, switching };
     el.querySelector('h3').textContent = `${{ bike: '🛵', bus: '🚌', truck: '🚚' }[t.cat] || '🚗'} ${t.name} · ${switching ? '자리 바꾸기' : '어디에 앉을까요?'}`;
-    el.querySelector('.sub').textContent = `운전석 = 직접 운전${v.parked || switching ? '' : ' (운전하던 젤리는 내려요)'} · 다른 자리 = 젤리 운전사가 길을 따라 달려요 · 숫자 키로도 골라요`;
+    if (v.live) el.querySelector('.sub').textContent = `실시간 ${v.live.route}번 버스 · 운전석 = 내 화면에서만 직접 운전 (운전하던 젤리는 내리고, 다른 사람 화면의 실제 버스는 그대로 · 내리면 실제 자리로 돌아가요) · 다른 자리 = 승객으로 실제 노선대로 · 숫자 키로도 골라요`;
+    else el.querySelector('.sub').textContent = `운전석 = 직접 운전${v.parked || switching ? '' : ' (운전하던 젤리는 내려요)'} · 다른 자리 = 젤리 운전사가 길을 따라 달려요 · 숫자 키로도 골라요`;
     const S = Math.min(72, 330 / t.L), w = t.W * S + 16, h = t.L * S + 16; map.style.width = w + 'px'; map.style.height = h + 'px'; map.innerHTML = ''; list.innerHTML = '';
     const P = (x, z) => [w / 2 - x * S, h / 2 - z * S];
     t.seats.forEach((st, i) => {
@@ -132,7 +141,7 @@ export class Drive {
   closeSeats() { this.el.seat.classList.add('hidden'); this.pick = null; }
   choose(i) {
     const P = this.pick; if (!P) return; this.closeSeats();
-    if (P.switching) this.switchSeat(i); else this.board(P.v, i);
+    if (P.switching) this.switchSeat(i); else if (P.v.live) this.takeLive(P.v.live, i); else this.board(P.v, i);
   }
   key(code) {
     const D = this.on; if (!D) return false;
@@ -148,13 +157,25 @@ export class Drive {
   horn() { const D = this.on; if (!D) return; tone(HORN[D.v.t.cat === 'bike' ? 'bike' : D.v.t.cat === 'bus' ? 'bus' : D.v.t.cat === 'truck' ? 'truck' : 'car']); D.hornT = 0.6; }
   honked(v) { if (!this.on) return; tone([[392, 0, 0.3, 'square', 0.03], [494, 0, 0.3, 'square', 0.025]]); this.pop('📯 빵! 뒤차가 기다려요'); void v; }
   pop(t) { const P = this.el.pop; P.textContent = t; P.classList.remove('hidden'); clearTimeout(P.h); P.h = setTimeout(() => P.classList.add('hidden'), 1500); }
+  // ---------- 실시간 버스 빼앗기 (8-40-1) ----------
+  //   운전석: 그 버스를 내 화면에서만 길 위 차(hg.traffic)로 옮겨 내가 몬다 (실제 버스는 숨겨 두고 실시간 자리는 계속 따라간다)
+  //   다른 자리: 승객으로 실제 노선대로 (hangang-ride.js 타기와 같다)
+  takeLive(o, si) {
+    const hg = this.hg, T = hg.traffic; if (!hg.live?.buses.has(o.id) || !o.L) return;
+    if (!TYPES.busCity.seats[si]?.[4]) { hg.rideL?.board({ kind: 'bus', o, d: 0 }); return; }
+    if (!T) return;
+    const v = T.spawn(o.L, clamp(o.d ?? 0, 0, o.L.len), o.dir || 1, Math.random, { key: 'busCity' });
+    v.x = o.x; v.z = o.z; v.yaw = o.yaw; v.init = true; v.cur = o.cur || 0; v.siren = 0; v.keep = true; v.col = new THREE.Color(BUS_COLOR[o.type] || BUS_COLOR[3]); v.route = liveRoute(o.route); v.liveId = o.id;
+    o.hijack = true; this.board(v, si);
+    hg.onToast?.(`🚌 실시간 ${o.route}번 버스를 빼앗았어요 · 내 화면에서만 운전해요 · 내리면 실제 자리로 돌아가요`);
+  }
   // ---------- 타기 ----------
   enter(v) { this.board(v, Math.max(0, v.t.seats.findIndex((s) => s[4]))); }
   //   si: 앉을 자리. 운전석이면 내가 운전(운전하던 젤리는 놀라 내림), 아니면 젤리 운전사가 길을 따라 달린다
   board(v, si) {
     const hg = this.hg, t = v.t;
     const I = buildInterior(v.key);
-    if (I.shell) { I.shell.setColorAt(0, v.col); I.shell.instanceColor.needsUpdate = true; }
+    if (I.shell) { I.shell.setColorAt(0, v.col); I.shell.instanceColor.needsUpdate = true; const ce = I.shell.geometry.attributes.iCell; if (ce) { ce.setXY(0, v.plate || 0, v.route || 0); ce.needsUpdate = true; } }
     I.g.visible = false; I.g.userData.noDrape = true; if (I.g.parent !== hg.scene) hg.scene.add(I.g);
     this.on = { v, t, I, seat: si, driver: false, view: 'chase', speed: v.cur, steer: 0, lights: 0, t0: 0, shake: 0, hornT: 0, gT: 0, camInit: false };
     hg.exitInterior?.(); hg.flying = false; hg.climb = null; hg.v = 0;
@@ -246,13 +267,15 @@ export class Drive {
     let pick = out[0]; for (const p of out) { const r = hg.pushOut(p[0], p[1], 0.2, 0.3); if (!r.hit && hg.walkable(p[0], p[1], 0)) { pick = p; break; } }
     // 내가 몰던 차는 그 자리에 세워 두고, 젤리 운전사가 몰던 차는 다시 제 길을 간다
     if (D.driver) { v.player = false; v.parked = true; v.cur = 0; v.brake = 0; v.blink = 0; } else { v.ride = false; v.stopReq = false; }
+    // 빼앗은 실시간 버스: 내 화면의 복사본은 치우고, 실제 버스를 지금 실시간 자리에 다시 보인다
+    const liveBack = v.liveId != null; if (liveBack) { const T = hg.traffic, i = T?.list.indexOf(v) ?? -1; if (i >= 0) T.list.splice(i, 1); const o = hg.live?.buses.get(v.liveId); if (o) o.hijack = false; v.liveId = null; }
     v.keep = false; v.hidden = false; this.dropNpc();
     D.I.g.visible = false; if (D.I.g.parent) D.I.g.parent.remove(D.I.g);
     this.on = null; this.el.hud.classList.add('hidden'); this.engine(false);
     hg.bear.setSeated?.(false); hg.bear.root.rotation.set(0, 0, 0); if (this.bearBase != null) { hg.bear.root.scale.setScalar(this.bearBase); this.bearBase = null; this.fitSeat = -1; } hg.placeAt(pick[0], pick[1], v.yaw); hg.y = 0;
     if (this.cam0) { this.cam0.near = this.near0; this.cam0.updateProjectionMatrix(); this.cam0 = null; }
     this.el.hud.classList.remove('pass'); this.closeSeats();
-    hg.onToast?.('🚪 내렸어요');
+    hg.onToast?.(liveBack ? '🚪 내렸어요 · 버스는 실제 자리로 돌아갔어요' : '🚪 내렸어요');
   }
   // ---------- 엔진 소리 (낮은 톱니파 + 걸러서, 속도 따라 높아짐) ----------
   engine(on) {
@@ -360,6 +383,7 @@ export class Drive {
   }
   card() {
     const el = this.el.card, c = this.near; if (!c || this.on) { el.classList.add('hidden'); return; }
+    if (c.v.live) { el.querySelector('.ic').textContent = '🚌'; el.querySelector('b').textContent = `${c.v.live.route}번 버스 · 실시간`; el.querySelector('small').textContent = '운전석 = 내 화면에서만 운전 · 승객 = 실제 노선대로'; el.querySelector('.b1').innerHTML = '타기 · 자리 고르기 <kbd>E</kbd>'; el.classList.remove('hidden'); return; }
     const t = c.v.t; el.querySelector('.ic').textContent = t.cat === 'bike' ? '🛵' : t.cat === 'bus' ? '🚌' : t.cat === 'truck' ? '🚚' : '🚗';
     el.querySelector('b').textContent = t.name; el.querySelector('small').textContent = c.v.parked ? '세워 둔 차예요' : '운전하는 젤리가 깜짝 놀라 내려요';
     el.querySelector('.b1').innerHTML = '타기 · 자리 고르기 <kbd>E</kbd>'; el.classList.remove('hidden');

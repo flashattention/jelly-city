@@ -167,7 +167,7 @@ export class LiveRide {
   // ---------- 탈 수 있는 것 찾기 ----------
   findCand() {
     const hg = this.hg, L = hg.live; if (!L || hg.drive?.on) return null; let best = null;
-    if (!hg.inside && !hg.inShop && !hg.inMall) for (const o of L.buses.values()) { if (!o.mesh || !o.L) continue; const d = Math.hypot(o.x - hg.px, o.z - hg.pz), still = (o.cur ?? 0) < 0.4; if (d < 7 && still && (!best || d < best.d)) best = { kind: 'bus', o, d }; }
+    if (!hg.inside && !hg.inShop && !hg.inMall) for (const o of L.buses.values()) { if (!o.mesh || !o.L || o.hijack) continue; const d = Math.hypot(o.x - hg.px, o.z - hg.pz), still = (o.cur ?? 0) < 0.4; if (d < 7 && still && (!best || d < best.d)) best = { kind: 'bus', o, d }; }
     if (best || !L.sub) return best;
     // 지하철: 역 안이거나 출구 8m 안 → 그 역에 진입 · 도착한 실제 열차
     // 역 안이면 승강장 층(땅 높이)에 있을 때만
@@ -345,6 +345,8 @@ export class LiveRide {
     const el = this.el.card, R = this.on, c = this.cand, b1 = el.querySelector('.b1'), b2 = el.querySelector('.b2'), ic = el.querySelector('.ic');
     if (R) { const can = this.canAlight(); ic.textContent = R.kind === 'bus' ? '🚌' : '🚇'; el.querySelector('b').textContent = R.kind === 'bus' ? `${R.o.route}번 버스 안` : `${R.o.line} ${R.o.to || ''}행 열차 안`; el.querySelector('small').textContent = can ? '문이 열렸어요 · 내릴 수 있어요' : R.kind === 'bus' ? (R.bell ? '다음 정류장에서 서요' : '내리려면 하차벨을 눌러요') : '역에 서면 내릴 수 있어요'; b1.innerHTML = can ? '내리기 <kbd>E</kbd>' : '🪑 자리 바꾸기'; b1.onclick = can ? () => this.alight() : () => this.openSeats(); b2.classList.toggle('hidden', R.kind !== 'bus' || can); el.classList.remove('hidden'); return; }
     if (!c) { el.classList.add('hidden'); return; }
+    // 같은 실시간 버스를 운전 카드(hangang-drive.js, 운전석 · 승객 고르기)가 보여 주고 있으면 겹치지 않게 숨긴다
+    if (c.kind === 'bus' && this.hg.drive?.near?.v?.live === c.o) { el.classList.add('hidden'); return; }
     b2.classList.add('hidden'); b1.onclick = () => this.act();
     if (c.kind === 'exit') { ic.textContent = '🚇'; el.querySelector('b').textContent = `${c.e.st.name}역 ${c.e.ref || ''}번 출구`; el.querySelector('small').textContent = '계단으로 내려가 승강장에서 열차를 타요'; b1.innerHTML = '역으로 내려가기 <kbd>E</kbd>'; el.classList.remove('hidden'); return; }
     if (c.kind === 'bus') { ic.textContent = '🚌'; el.querySelector('b').textContent = `${c.o.route}번 버스가 서 있어요`; el.querySelector('small').textContent = '문이 열렸어요 · 교통카드를 찍고 타요'; }

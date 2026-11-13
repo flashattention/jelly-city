@@ -54,6 +54,19 @@ export function atlas() {
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
   ATLAS = { cv, tex }; return ATLAS;
 }
+// 실시간 버스 노선 번호 (8-40-1): 그림 맨 아래 빈 칸 16개(112 ~ 127)에 그 번호를 LED 글씨로 써 두고, v.route 로 쓸 값(칸 - 64)을 돌려준다
+const LIVE_ROUTE = new Map();
+export function liveRoute(no) {
+  no = String(no || '버스'); const A = atlas(); let i = LIVE_ROUTE.get(no);
+  if (i == null) {
+    i = 112 + (LIVE_ROUTE.size % 16); for (const [k, q] of LIVE_ROUTE) if (q === i) LIVE_ROUTE.delete(k); LIVE_ROUTE.set(no, i);
+    const g = A.cv.getContext('2d'), x = (i % 8) * 128, y = Math.floor(i / 8) * 32; g.fillStyle = '#0a0a0b'; g.fillRect(x, y, 128, 32);
+    g.fillStyle = '#ffb21e'; g.font = `bold ${no.length > 4 ? 20 : 26}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(no, x + 64, y + 17, 120);
+    g.fillStyle = 'rgba(10,10,11,0.45)'; for (let k = 0; k < 128; k += 3) g.fillRect(x + k, y, 1, 32); for (let k = 0; k < 32; k += 3) g.fillRect(x, y + k, 128, 1);
+    A.tex.needsUpdate = true;
+  }
+  return i - 64;
+}
 // 고정 글씨 칸의 uv (칸 번호 → 그림 안 자리)
 function cellUV(i) { const cx = i % 8, cy = Math.floor(i / 8); return [cx / 8, 1 - (cy + 1) / 16, (cx + 1) / 8, 1 - cy / 16]; }
 
