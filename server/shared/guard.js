@@ -141,3 +141,16 @@ export function publicPath(root, pathname) {
   const file = path.normalize(path.join(root, p)), base = path.resolve(root);
   return file === base || file.startsWith(base + path.sep) ? file : null;
 }
+
+// ---------- 오류 문구 ----------
+// 응답에 나가는 오류: 우리가 쓴 한국어 문구 · 약속된 코드만 그대로, 나머지(TypeError · 바깥 API 문구 · 경로)는 감춘다
+const CODES = new Set(['login', 'not found', 'password', 'admin', 'needlogin']);
+const KNOWN = { 'too large': '보낸 내용이 너무 커요', 'bad json': '요청 꼴이 이상해요' };
+const SECRETISH = /(sk-[A-Za-z0-9_-]{8,}|serviceKey=[^&\s]+|[A-Za-z0-9+/]{32,}={0,2}|\/(?:app|Users|home|data|private|tmp)\/[^\s'"]+|[A-Z][A-Z0-9_]{2,}_(?:KEY|SECRET|TOKEN|PASSWORD)\b)/g;
+export function publicError(msg) {
+  const m = String(msg ?? '');
+  if (CODES.has(m)) return m;
+  if (KNOWN[m]) return KNOWN[m];
+  if (!/[가-힣]/.test(m)) return '요청을 처리하지 못했어요. 잠시 후 다시 해 주세요';
+  return m.replace(SECRETISH, '…').slice(0, 300);
+}

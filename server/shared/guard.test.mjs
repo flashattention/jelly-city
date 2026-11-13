@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { Bucket, DayCount, publicPath, parseSafe, pick, cleanText, cleanName, impersonates } from './guard.js';
+import { Bucket, DayCount, publicPath, parseSafe, pick, cleanText, cleanName, impersonates, publicError } from './guard.js';
 
 test('토큰 버킷: 한 번에 burst 까지, 그 뒤엔 rate 만큼 다시 찬다', () => {
   const b = new Bucket({ rate: 2, burst: 3 }); const t = 1e6;
@@ -46,4 +46,14 @@ test('cleanText: 보이지 않는 글자 · 방향 바꾸기 · 결합 문자 �
 test('impersonates: 운영자 흉내 이름', () => {
   for (const n of ['운영자', '운 영 자', '젤리게임즈 공식', 'ADMIN', 'Adm1n', 'GM곰', '관리자★', 'jelly games', 'ⓐdmin', 'оperator']) assert.ok(impersonates(n), n);
   for (const n of ['곰돌이', '달리는젤리', '젤리러버', 'gummy', '김민수']) assert.equal(impersonates(n), false, n);
+});
+
+test('publicError: 내부 오류 · 경로 · 키는 감추고 우리 문구 · 코드만', () => {
+  assert.equal(publicError('login'), 'login');
+  assert.equal(publicError('글이 없어요'), '글이 없어요');
+  assert.equal(publicError('too large'), '보낸 내용이 너무 커요');
+  assert.doesNotMatch(publicError("Cannot read properties of undefined (reading 'x')"), /undefined/);
+  assert.doesNotMatch(publicError('ENOENT: no such file, open /app/data/world.json'), /app|ENOENT/);
+  assert.doesNotMatch(publicError('오류 sk-abcdefghijklmnop1234 · OPENAI_API_KEY'), /sk-abc|OPENAI_API_KEY/);
+  assert.doesNotMatch(publicError('버스 오류 serviceKey=abc%2Fdef&x=1'), /abc%2F/);
 });

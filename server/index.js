@@ -46,7 +46,7 @@ import { normWord } from '../public/jelly-draw/js/prompts.js';
 import { complete } from './jelly-city/llm.js';
 import { Records } from './shared/records.js';
 import { Cosmetics, cosApi, setNames } from './cosmetics.js';
-import { sec, clientIp, limited as rateLimited, publicPath } from './shared/guard.js';
+import { sec, clientIp, limited as rateLimited, publicPath, publicError } from './shared/guard.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
@@ -145,7 +145,9 @@ for (const [k, R] of Object.entries({ 'jelly-drift': driftRooms, 'jelly-tactical
 // 옛 주소: REDIRECT_TO 가 있으면 모든 요청을 새 주소로 보낸다
 const REDIRECT_TO = (process.env.REDIRECT_TO || '').replace(/\/$/, '');
 
+// 모든 API 응답이 여기를 지난다: 오류 문구는 publicError 로 거른다 (내부 오류 · 경로 · 키 이름이 나가지 않게)
 const json = (res, code, obj) => {
+  if (obj && typeof obj.error === 'string') obj = { ...obj, error: publicError(obj.error) };
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(obj));
 };
@@ -335,7 +337,7 @@ function handle(req, res) {
   const url = new URL(req.url, 'http://x');
   if (REDIRECT_TO && url.pathname !== '/healthz') { res.writeHead(301, { Location: REDIRECT_TO + req.url, 'Cache-Control': 'no-store' }); res.end(); return; }
   if (url.pathname.startsWith('/api/')) {
-    api(req, res, url).catch((e) => { console.warn('API 오류:', e.message); if (!res.headersSent) json(res, 400, { error: e.message }); });
+    api(req, res, url).catch((e) => { console.warn('API 오류:', url.pathname, e.message); if (!res.headersSent) json(res, e.status || 400, { error: e.message }); });
     return;
   }
   if (url.pathname === '/healthz') { res.writeHead(200); res.end('ok'); return; }
