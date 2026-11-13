@@ -265,12 +265,13 @@ export class LiveTransit {
     return y + (hg.terr ? hg.terrAt(x, z, true) : 0) + 0.4;
   }
   // 철교 가운데선으로 옮긴 자리 (복선이라 선로가 다리 가운데서 2m 쯤 비켜 있어, 탄 채로는 트러스가 칸을 뚫는다)
-  bridgeCenter(x, z, dx, dz) {
+  //   prefer: 지금 달리는 철교 바닥(tp) — 6m 안이면 그대로 (역 둘레 여러 선로 사이에서 앞 선로가 옆으로 건너뛰지 않게)
+  bridgeCenter(x, z, dx, dz, prefer = null) {
     // 8-41-1: 복선 철교는 선로마다 따로 그어진 바닥 두 줄이라, 가장 가까운 '점'(15m 간격)으로 고르면 옆 선로 바닥으로 건너뛰었다 → 가장 가까운 '조각'에 수직으로
-    const hg = this.hg; let best = null; const look = (rp) => { for (const tp of rp || []) { const f = tp.fine; for (let i = 1; i < f.length; i++) { const a = f[i - 1], c = f[i]; if (Math.abs(a[0] - x) + Math.abs(a[1] - z) > 45) continue; const ex = c[0] - a[0], ez = c[1] - a[1], t = clamp(((x - a[0]) * ex + (z - a[1]) * ez) / (ex * ex + ez * ez || 1), 0, 1), px = a[0] + ex * t, pz = a[1] + ez * t, d = Math.hypot(x - px, z - pz); if (d < 12 && (!best || d < best.d)) { const l = Math.sqrt(ex * ex + ez * ez) || 1, sg = ex * dx + ez * dz < 0 ? -1 : 1; best = { d, px, pz, w: tp.w, ux: (sg * ex) / l, uz: (sg * ez) / l }; } } } };
-    look(hg.railPaths); if (hg.chunks) for (const c of hg.chunks.values()) look(c.railPaths); if (!best) return null;
+    const hg = this.hg; let best = null, pb = null; const look = (rp) => { for (const tp of rp || []) { const f = tp.fine; for (let i = 1; i < f.length; i++) { const a = f[i - 1], c = f[i]; if (Math.abs(a[0] - x) + Math.abs(a[1] - z) > 45) continue; const ex = c[0] - a[0], ez = c[1] - a[1], t = clamp(((x - a[0]) * ex + (z - a[1]) * ez) / (ex * ex + ez * ez || 1), 0, 1), px = a[0] + ex * t, pz = a[1] + ez * t, d = Math.hypot(x - px, z - pz); if (d < 12 && (!best || d < best.d)) { const l = Math.sqrt(ex * ex + ez * ez) || 1, sg = ex * dx + ez * dz < 0 ? -1 : 1; best = { d, px, pz, w: tp.w, ux: (sg * ex) / l, uz: (sg * ez) / l, tp }; } if (tp === prefer && d < 6 && (!pb || d < pb.d)) { const l = Math.sqrt(ex * ex + ez * ez) || 1, sg = ex * dx + ez * dz < 0 ? -1 : 1; pb = { d, px, pz, w: tp.w, ux: (sg * ex) / l, uz: (sg * ez) / l, tp }; } } } };
+    look(hg.railPaths); if (hg.chunks) for (const c of hg.chunks.values()) look(c.railPaths); if (pb) best = pb; if (!best) return null;
     // 바닥 방향도 준다 (실제 선로 자료와 OSM 철교가 몇 도 비껴 있어, 선로 방향대로 서면 운전실이 트러스를 뚫었다)
-    return [best.px, best.pz, best.w, best.ux, best.uz];
+    return [best.px, best.pz, best.w, best.ux, best.uz, best.tp];
   }
   tick(dt, px, pz) {
     this.busT -= dt; if (this.busT <= 0) { this.busT = 20; this.pollBus(); }

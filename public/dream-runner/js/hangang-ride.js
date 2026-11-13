@@ -151,14 +151,41 @@ function buildTunnel() {
   const m = new THREE.MeshBasicMaterial({ map: t.t, side: THREE.BackSide }), tube = new THREE.Mesh(new THREE.BoxGeometry(6.4, 6, 160), m); tube.position.y = 2.6; g.add(tube);
   return { g, tex: t.t };
 }
+// 승강장 (8-41-2): 오른쪽(-x) 폭 6m · 길이 120m, 높이는 열차 바닥과 같게. 그리기를 줄이려고 되풀이되는 것은 인스턴스
+//   스크린도어: 열차 문 자리(칸마다 4개)마다 미닫이 두 짝 + 사이 고정 유리, 열차가 서서 문이 열리면 양옆으로 열린다
+//   지하: 타일 벽 · 천장 / 지상 · 고가: 벽 없이 지붕 · 기둥 · 낮은 유리 난간 (서울 고가역처럼)
+const PSD_N = 32;
+function cpart(w, h, d, x, y, z, col) { const b = new THREE.BoxGeometry(w, h, d); b.translate(x, y, z); const cc = new THREE.Color(col), n = b.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) cc.toArray(a, i * 3); b.setAttribute('color', new THREE.BufferAttribute(a, 3)); b.deleteAttribute('uv'); return b.toNonIndexed(); }
 function buildPlatform() {
-  const g = new THREE.Group(), name = canvasTex(512, 128), nameM = new THREE.MeshBasicMaterial({ map: name.t, toneMapped: false }), tile = new THREE.MeshLambertMaterial({ color: '#d9d4c8', emissive: '#d9d4c8', emissiveIntensity: 0.45 }), floorM = new THREE.MeshLambertMaterial({ color: '#b8b2a6', emissive: '#b8b2a6', emissiveIntensity: 0.35 }), glass = new THREE.MeshBasicMaterial({ color: '#a8c8d8', transparent: true, opacity: 0.25 }), frame = new THREE.MeshLambertMaterial({ color: '#8d949c', emissive: '#8d949c', emissiveIntensity: 0.3 }), lightM = new THREE.MeshBasicMaterial({ color: '#fffbea' });
-  // 오른쪽(-x) 승강장: 폭 6m · 길이 120m, 높이는 열차 바닥과 같게
-  box(g, 6, 1.1, 120, floorM, -4.7, 0.55, 0); box(g, 0.3, 6, 120, tile, -7.8, 3, 0); box(g, 6.5, 0.2, 120, tile, -4.7, 5.0, 0);
-  for (let z = -57; z <= 57; z += 3.2) { box(g, 0.08, 2.2, 0.12, frame, -1.75, 2.2, z); const gp = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 1.9), glass); gp.position.set(-1.75, 2.15, z + 1.6); gp.rotation.y = Math.PI / 2; g.add(gp); box(g, 0.1, 0.25, 3.2, frame, -1.75, 3.4, z + 1.6); }
-  for (let z = -55; z <= 55; z += 6) box(g, 1.2, 0.05, 3, lightM, -4.7, 4.88, z);
-  for (const z of [-30, 0, 30]) { const p = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.8), nameM); p.position.set(-7.6, 3.0, z); p.rotation.y = Math.PI / 2; g.add(p); }
-  return { g, name };
+  const g = new THREE.Group(), name = canvasTex(512, 128), nameM = new THREE.MeshBasicMaterial({ map: name.t, toneMapped: false }), mats = [];
+  const LM = (c, e) => { const m = new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: e }); m.userData.glow = e; mats.push(m); return m; };
+  const tile = LM('#d9d4c8', 0.45), floorM = LM('#b8b2a6', 0.35), frame = LM('#8d949c', 0.3), roofM = LM('#e4e2dc', 0.3), yellow = LM('#f2c230', 0.35), lightM = new THREE.MeshBasicMaterial({ color: '#fffbea' });
+  const glass = new THREE.MeshBasicMaterial({ color: '#a8c8d8', transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide }), leafM = new THREE.MeshBasicMaterial({ color: '#8fc3d2', transparent: true, opacity: 0.38, depthWrite: false, side: THREE.DoubleSide });
+  box(g, 6, 1.1, 120, floorM, -4.7, 0.55, 0); box(g, 0.32, 0.015, 120, yellow, -2.15, 1.105, 0);
+  const wall = box(g, 0.3, 6, 120, tile, -7.8, 3, 0); box(g, 6.5, 0.2, 120, roofM, -4.7, 5.0, 0);
+  const inst = (geo, mat, n) => { const m = new THREE.InstancedMesh(geo, mat, n); m.frustumCulled = false; m.count = 0; g.add(m); return m; };
+  const o3 = new THREE.Object3D(), put = (m, x, y, z, sx = 1, sy = 1, sz = 1) => { o3.position.set(x, y, z); o3.rotation.set(0, 0, 0); o3.scale.set(sx, sy, sz); o3.updateMatrix(); m.setMatrixAt(m.count++, o3.matrix); };
+  // 천장 등 · 뒤 기둥(지붕을 받친다) · 뒤 유리 난간
+  const lights = inst(new THREE.BoxGeometry(1.2, 0.05, 3), lightM, 20); for (let z = -55; z <= 55; z += 6) put(lights, -4.7, 4.88, z);
+  const cols = inst(new THREE.BoxGeometry(0.35, 3.9, 0.35), frame, 13); for (let z = -60; z <= 60; z += 10) put(cols, -7.45, 3.05, z);
+  box(g, 0.04, 1.0, 120, glass, -7.65, 1.6, 0); box(g, 0.08, 0.06, 120, frame, -7.65, 2.12, 0);
+  for (const z of [-30, 0, 30]) { const p = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.8), nameM); p.position.set(-7.26, 3.0, z); p.rotation.y = Math.PI / 2; g.add(p); }
+  // 스크린도어: 위 머리(안내 띠) · 기둥 · 고정 유리 · 문짝(유리 + 틀)
+  box(g, 0.14, 0.36, 120, frame, -1.75, 3.33, 0);
+  const posts = inst(new THREE.BoxGeometry(0.1, 2.05, 0.12), frame, PSD_N * 2 + 2), fixedG = new THREE.PlaneGeometry(1, 1.95); fixedG.rotateY(Math.PI / 2); const fixed = inst(fixedG, glass, PSD_N + 1);
+  const leafG = new THREE.BoxGeometry(0.03, 1.92, 0.96), leaf = inst(leafG, leafM, PSD_N * 2);
+  const lfG = mergeGeoms([cpart(0.05, 1.98, 0.06, 0, 0, -0.47, '#6f777f'), cpart(0.05, 1.98, 0.06, 0, 0, 0.47, '#6f777f'), cpart(0.05, 0.07, 0.98, 0, 0.96, 0, '#6f777f'), cpart(0.05, 0.12, 0.98, 0, -0.93, 0, '#7d848c'), cpart(0.055, 0.1, 0.9, 0, 0.25, 0, '#2f9f5a')]);
+  const leafF = inst(lfG, LM('#ffffff', 0.25), PSD_N * 2); leafF.material.vertexColors = true;
+  const P = { g, name, wall, mats, doors: [], open: 0, flip: false };
+  // 문 자리(승강장 기준 z, 문 가운데) → 고정 유리 · 기둥 · 문짝 자리
+  P.lay = (doors) => {
+    P.doors = doors.slice(0, PSD_N); posts.count = fixed.count = 0; let z0 = -60;
+    for (const zc of [...P.doors, 61]) { const z1 = zc - 1.0; if (z1 - z0 > 0.05) { put(fixed, -1.8, 2.15, (z0 + z1) / 2, z1 - z0); } if (zc < 61) { put(posts, -1.75, 2.13, zc - 1.0); put(posts, -1.75, 2.13, zc + 1.0); } z0 = zc + 1.0; }
+    for (const m of [posts, fixed]) m.instanceMatrix.needsUpdate = true; P.setOpen(P.open, true);
+  };
+  P.setOpen = (a, force = false) => { if (!force && Math.abs(a - P.open) < 1e-3) return; P.open = a; leaf.count = leafF.count = 0; const k = 0.5 + 0.92 * a * a * (3 - 2 * a); for (const zc of P.doors) for (const sg of [-1, 1]) { put(leaf, -1.69, 2.15, zc + sg * k); put(leafF, -1.69, 2.15, zc + sg * k); } leaf.instanceMatrix.needsUpdate = leafF.instanceMatrix.needsUpdate = true; };
+  P.lay([]);
+  return P;
 }
 
 // ---------- 지하철 운전실 (8-40-2) ----------
@@ -211,7 +238,7 @@ function drawCab(G, o) {
 }
 
 // ---------- 운전실 앞 선로 (8-41-1) ----------
-//   다리 · 고가 위는 회색 바닥뿐이라, 운전실에서 보이는 앞 300m 에만 자갈 도상 · 콘크리트 침목 · 레일 두 줄 (복선)
+//   다리 · 고가 위는 회색 바닥뿐이라, 운전실에서 보이는 앞 300m 에만 자갈 도상 · 콘크리트 침목 · 레일 두 줄 (땅 위 구간도, 땅 밑은 터널이 따로)
 //   인스턴스 3개(그리기 3번): 도상 · 레일은 4m 조각, 침목은 60cm 마다
 const RAIL_N = 90, SLP_N = 1400;
 function buildCabRails() {
@@ -383,7 +410,7 @@ export class LiveRide {
     const I = R.cabI; I.lever.rotation.x = -thr * 0.6;
     C.gT -= dt; if (C.gT <= 0) { C.gT = 0.1; drawCab(I.gauge, { kmh: C.v * 3.6, dir: C.dir, next: nm(nextK), dist, doors: C.doors, line, color: Ln.color }); }
   }
-  // 운전실 앞 선로 다시 놓기 (16m 갈 때마다): 내 선로를 따라 4m 마다, 다리 · 고가(k 2) 조각만
+  // 운전실 앞 선로 다시 놓기 (16m 갈 때마다): 내 선로를 따라 4m 마다, 땅 밑(k 1)만 빼고
   cabRails() {
     const R = this.on, C = R?.cab, hg = this.hg, L = hg.live;
     if (!C || R.under) { if (this.cabRail) this.cabRail.g.visible = false; return; }
@@ -391,15 +418,15 @@ export class LiveRide {
     // 높이가 어긋나도(겹친 고가에서 처음 자리를 잘못 잡았을 때) 다시 놓는다 — 비탈(7%)만큼은 봐준다
     const far = K.at ? Math.hypot(K.at[0] - R.x, K.at[1] - R.z) : Infinity, moved = far > 16 || K.dir !== C.dir || Math.abs(K.y - R.y) > 0.3 + far * 0.09;
     K.g.visible = K.bed.count > 0; if (!moved) return; K.at = [R.x, R.z]; K.dir = C.dir; K.y = R.y;
-    const line = R.o.line, pts = []; let e = C.e, d = C.d - 24 * C.dir;
+    const line = R.o.line, pts = []; let e = C.e, d = C.d - 24 * C.dir, way = R.way;
     for (let n = 0; n < 82; n++, d += 4 * C.dir) {
       if (d > e.len) { const nx = this.seqNext(line, e.a, e.b), e2 = nx && L.edge(line, e.b, nx); if (!e2) break; d -= e.len; e = e2; } else if (d < 0) { const pv = this.seqNext(line, e.b, e.a), e2 = pv && L.edge(line, pv, e.a); if (!e2) break; e = e2; d += e2.len; }
-      const p = L.edgeAt(e, d); if (p.k !== 2) { pts.push(null); continue; }
-      let x = p.x - L.cx, z = p.z - L.cz; const cc = L.bridgeCenter(x, z, p.dx, p.dz); if (cc) { x = cc[0]; z = cc[1]; }
-      pts.push([x, 0, z]);
+      const p = L.edgeAt(e, d); if (p.k === 1) { pts.push(null); continue; }
+      let x = p.x - L.cx, z = p.z - L.cz; if (p.k === 2) { const cc = L.bridgeCenter(x, z, p.dx, p.dz, way); if (cc) { x = cc[0]; z = cc[1]; way = cc[5]; } }
+      pts.push([x, 0, z, p.k]);
     }
     // 높이: 운전실 자리(뒤 24m = 6번째)에서 앞뒤로 이어 가며, 겹친 고가 중 이어지는 쪽 · 4m 에 35cm 넘게 꺾이지 않게
-    const i0 = Math.min(6, pts.length - 1), fill = (i, prev) => { const q = pts[i]; if (!q) return null; const y = L.trackY(q[0], q[2], 2, prev == null ? null : prev + 0.3) - 0.3; q[1] = prev == null ? y : clamp(y, prev - 0.35, prev + 0.35); return q[1]; };
+    const i0 = Math.min(6, pts.length - 1), fill = (i, prev) => { const q = pts[i]; if (!q) return null; const y = L.trackY(q[0], q[2], q[3], prev == null || q[3] !== 2 ? null : prev + 0.3) - 0.3; q[1] = prev == null ? y : clamp(y, prev - 0.35, prev + 0.35); return q[1]; };
     if (pts[i0]) pts[i0][1] = R.y; let py = pts[i0] ? R.y : null; for (let i = i0 + 1; i < pts.length; i++) py = fill(i, py); py = pts[i0] ? R.y : null; for (let i = i0 - 1; i >= 0; i--) py = fill(i, py);
     // 철교 · 고가는 OSM 에서 선로마다 따로 그어진 폭 7m 바닥이라, 내 선로 한 줄만 (옆 선로는 옆 바닥 위에 따로 있다)
     const o3 = new THREE.Object3D(), A = new THREE.Vector3(), B = new THREE.Vector3(); let nb = 0, nr = 0, ns = 0;
@@ -422,17 +449,56 @@ export class LiveRide {
   follow(dt) {
     const hg = this.hg, R = this.on, L = hg.live; let x, z, yaw, y, under = false;
     if (R.kind === 'bus') { const o = R.o; x = o.x; z = o.z; yaw = o.yaw; y = hg.terr ? hg.terrAt(x, z) : 0; if (o.mesh) o.mesh.visible = false; }
-    else if (R.cab) { const C = R.cab, p = L.edgeAt(C.e, C.d); x = p.x - L.cx; z = p.z - L.cz; yaw = Math.atan2(p.dx, p.dz); under = p.k === 1; if (p.k === 2) { const c = L.bridgeCenter(x, z, p.dx, p.dz); if (c) { x = c[0]; z = c[1]; yaw = Math.atan2(c[3], c[4]); } } y = under ? (hg.terr ? hg.terrAt(x, z) : 0) - 30 : L.trackY(x, z, p.k, p.k === 2 && R.y != null && !R.under ? R.y + 0.3 : null) - 0.3; R.under = under; R.pose = p; }
-    else { const o = R.o, n = (L.sub.lines[o.line].cars || [8, 20])[0], p = L.carPose(o, Math.min(1, n - 1)); x = p.x - L.cx; z = p.z - L.cz; yaw = Math.atan2(p.dx, p.dz); under = p.k === 1; if (p.k === 2) { const c = L.bridgeCenter(x, z, p.dx, p.dz); if (c) { x = c[0]; z = c[1]; yaw = Math.atan2(c[3], c[4]); } } y = under ? (hg.terr ? hg.terrAt(x, z) : 0) - 30 : L.trackY(x, z, p.k) - 0.3; R.under = under; R.pose = p; }
+    else if (R.cab) { const C = R.cab, p = L.edgeAt(C.e, C.d); x = p.x - L.cx; z = p.z - L.cz; yaw = Math.atan2(p.dx, p.dz); under = p.k === 1; if (p.k === 2) { const c = L.bridgeCenter(x, z, p.dx, p.dz, R.way); if (c) { x = c[0]; z = c[1]; yaw = Math.atan2(c[3], c[4]); R.way = c[5]; } } else R.way = null; y = under ? (hg.terr ? hg.terrAt(x, z) : 0) - 30 : L.trackY(x, z, p.k, p.k === 2 && R.y != null && !R.under ? R.y + 0.3 : null) - 0.3; R.under = under; R.pose = p; }
+    else { const o = R.o, n = (L.sub.lines[o.line].cars || [8, 20])[0], p = L.carPose(o, Math.min(1, n - 1)); x = p.x - L.cx; z = p.z - L.cz; yaw = Math.atan2(p.dx, p.dz); under = p.k === 1; if (p.k === 2) { const c = L.bridgeCenter(x, z, p.dx, p.dz, R.way); if (c) { x = c[0]; z = c[1]; yaw = Math.atan2(c[3], c[4]); R.way = c[5]; } } else R.way = null; y = under ? (hg.terr ? hg.terrAt(x, z) : 0) - 30 : L.trackY(x, z, p.k) - 0.3; R.under = under; R.pose = p; }
     const g = R.cab ? R.cabI.g : R.I.g; g.position.set(x, y, z); g.rotation.y = yaw; R.x = x; R.z = z; R.y = y; R.yaw = yaw;
     hg.px = x; hg.pz = z; hg.y = 0;
     if (R.kind === 'train') {
       const T = R.cab || R.o;
       this.tun.g.visible = under; if (under) { this.tun.g.position.set(x, y, z); this.tun.g.rotation.y = yaw; this.tun.tex.offset.y -= ((T.v || 0) * (T.dir || 1) * dt) / 26.7; }
-      // 승강장: 지하 역 150m 안 (도착하는 역 · 막 떠난 역)
-      let show = false; if (under) { const e = T.e, near = e.len - T.d < 150 ? [e, e.len, e.b] : T.d < 150 ? [e, 0, e.a] : null; if (near) { const sp = L.edgeAt(near[0], near[1]), sx = sp.x - L.cx, sz = sp.z - L.cz; show = Math.hypot(sx - x, sz - z) < 160; if (show) { this.plat.g.position.set(sx, y, sz); this.plat.g.rotation.y = yaw; if (this.plat.st !== near[2]) { this.plat.st = near[2]; this.nameBoard(L.sub.lines[R.o.line].st[near[2]]?.[0] || near[2], L.sub.lines[R.o.line].color); } } } }
-      this.plat.g.visible = show;
+      // 승강장: 역 150m 안 (도착하는 역 · 막 떠난 역). 8-41-2: 지상 · 고가 역에도 (벽 대신 지붕 · 기둥)
+      let show = false; const e = T.e, near = e.len - T.d < 150 ? [e, e.len, e.b] : T.d < 150 ? [e, 0, e.a] : null, P = this.plat;
+      if (near) { const sp = L.edgeAt(near[0], near[1]); let sx = sp.x - L.cx, sz = sp.z - L.cz; show = Math.hypot(sx - x, sz - z) < 160;
+        if (show) {
+          // 승강장 가운데: 역 자리에서 들어오는 쪽으로 50m (실제 열차는 맨 앞이 역 자리에 선다 → 열차가 승강장을 다 채운다)
+          //   옆으로는 열차 축에 붙인다 (역 둘레는 선로가 여러 줄이라 따로 구하면 승강장이 열차와 겹쳤다), 앞뒤 자리는 땅에 고정
+          const fx = Math.sin(yaw), fz = Math.cos(yaw), s = (sx - x) * fx + (sz - z) * fz - 50;
+          if (P.key !== near[0].a + near[0].b + near[2]) {
+            // 역이 바뀌면: 고가에서 오른쪽에 옆 선로 바닥이 붙어 있으면 승강장을 왼쪽에
+            P.key = near[0].a + near[0].b + near[2]; P.under = under; P.wall.visible = under;
+            P.flip = sp.k === 2 && this.twinRight(x + fx * s, z + fz * s, yaw);
+            if (P.st !== near[2]) { P.st = near[2]; this.nameBoard(L.sub.lines[R.o.line].st[near[2]]?.[0] || near[2], L.sub.lines[R.o.line].color); }
+            P.at = [x + fx * s, z + fz * s]; P.ry = yaw + (P.flip ? Math.PI : 0); P.lay(this.psdDoors(R, 50)); P.open = 0; P.setOpen(0, true); P.aligned = false;
+          }
+          P.at = [x + fx * s, z + fz * s]; P.ry = yaw + (P.flip ? Math.PI : 0);
+          P.g.position.set(P.at[0], y, P.at[1]); P.g.rotation.y = P.ry;
+        } }
+      P.g.visible = show;
     }
+  }
+  // 스크린도어 문 자리 (승강장 기준 z): 열차 맨 앞이 승강장 가운데에서 f(m) 앞일 때, 칸마다 문 4개
+  psdDoors(R, f) {
+    const L = this.hg.live, [n, clen] = L.sub.lines[R.o.line].cars || [8, 20], out = [], P = this.plat;
+    // 열차가 없는 앞뒤도 같은 간격으로 이어 간다 (실제 스크린도어는 승강장 끝까지 있다)
+    for (let c = -8; c < n + 8; c++) for (const dz of [-7.3, -2.45, 2.45, 7.3]) { const zt = f - (c + 0.5) * clen + dz * (clen / 20), z = P.flip ? -zt : zt; if (Math.abs(z) < 58.5) out.push(z); }
+    return out.sort((a, b) => a - b);
+  }
+  // 열차 맨 앞이 승강장 가운데에서 몇 m 앞인지 (열차 방향으로)
+  psdFront(R) { const P = this.plat, L = this.hg.live; if (!P?.at) return 0; let fx = R.x, fz = R.z; if (!R.cab) { const p = L.edgeAt(R.o.e, R.o.d); fx = p.x - L.cx; fz = p.z - L.cz; } const f = (fx - P.at[0]) * Math.sin(P.ry) + (fz - P.at[1]) * Math.cos(P.ry); return P.flip ? -f : f; }
+  // 고가역: 오른쪽 4m 쯤에 다른 철도 바닥이 나란히 붙어 있는지 (복선 철교는 선로마다 따로 그어져 있다)
+  twinRight(x, z, ry) {
+    const hg = this.hg, px = x - Math.cos(ry) * 4.2, pz = z + Math.sin(ry) * 4.2; let hit = false;
+    const look = (rp) => { for (const tp of rp || []) { const f = tp.fine; for (let i = 1; i < f.length && !hit; i++) { const a = f[i - 1], c = f[i]; if (Math.abs(a[0] - px) + Math.abs(a[1] - pz) > 45) continue; const ex = c[0] - a[0], ez = c[1] - a[1], t = clamp(((px - a[0]) * ex + (pz - a[1]) * ez) / (ex * ex + ez * ez || 1), 0, 1); if (Math.hypot(px - a[0] - ex * t, pz - a[1] - ez * t) < 1.8) hit = true; } } };
+    look(hg.railPaths); if (hg.chunks) for (const c of hg.chunks.values()) look(c.railPaths); return hit;
+  }
+  // 스크린도어 열고 닫기: 열차가 서서 문이 열리면 (운전실은 내가 세운 자리에 문 자리를 맞춘 뒤) 1.4초에 걸쳐 열린다
+  psdTick(dt) {
+    const R = this.on, P = this.plat; if (!P?.g.visible || !R || R.kind !== 'train') return;
+    const want = R.cab ? R.cab.doors : !!R.o.dwellAt;
+    if (want && !P.aligned && P.open < 0.02) { P.lay(this.psdDoors(R, this.psdFront(R))); P.aligned = true; }
+    if (!want && P.open < 0.02) P.aligned = false;
+    P.setOpen(clamp(P.open + (want ? dt : -dt) / 1.4, 0, 1));
+    const night = this.hg.light?.night || 0; for (const m of P.mats) m.emissiveIntensity = m.userData.glow + (P.under ? 0 : night * 0.35);
   }
   nameBoard(name, color) { const { c, t } = this.plat.name; c.fillStyle = '#ffffff'; c.fillRect(0, 0, 512, 128); c.fillStyle = color; c.fillRect(0, 96, 512, 32); c.fillStyle = '#1d1d1f'; c.font = 'bold 64px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(name, 256, 52); t.needsUpdate = true; }
   // ---------- 안내 ----------
@@ -478,7 +544,7 @@ export class LiveRide {
     this.hideAbove(false); hg.live.rideId = null;
     for (const b of R.bears || []) { R.I.g.remove(b.root); }
     R.I.g.visible = false; hg.scene.remove(R.I.g); if (R.cabI) { R.cabI.g.visible = false; hg.scene.remove(R.cabI.g); }
-    if (this.tun) { this.tun.g.visible = false; this.plat.g.visible = false; }
+    if (this.tun) { this.tun.g.visible = false; this.plat.g.visible = false; this.plat.key = null; }
     if (this.cabRail) { this.cabRail.g.visible = false; this.cabRail.at = null; }
     this.on = null; this.el.led.classList.add('hidden'); this.el.seat.classList.add('hidden'); try { speechSynthesis?.cancel(); } catch { /* 없음 */ }
     if (this.camRef && this.near0) { this.camRef.near = this.near0; this.camRef.updateProjectionMatrix(); this.near0 = null; }
@@ -500,6 +566,7 @@ export class LiveRide {
     if (R.cab) this.cabStep(dt);
     this.follow(dt); R.t += dt;
     if (R.cab) this.cabRails();
+    if (R.kind === 'train') this.psdTick(dt);
     // 승객 곰 자세: 앉은 곰은 무릎을 굽혀 방석에, 선 곰은 바닥에 (자세는 곰 update 에서 정해진다)
     for (const b of R.bears || []) b.update?.(dt, 0, { noCrawl: true });
     // 문: 버스가 서 있으면 열림
