@@ -208,9 +208,18 @@ function canopyTex(season) {
   const P = { spring: ['#3a5230', ['#6a9450', '#7fa85a', '#5d8448', '#d8b4c0', '#93b870', '#4f7a40', '#73a052']], summer: ['#2c4428', ['#4a7a3e', '#5a8a48', '#3e6a3a', '#669a50', '#365e34', '#4f7f42', '#5f9248']], autumn: ['#2e281e', ['#9a4a2e', '#b07a3a', '#a8883e', '#7a3a28', '#3f5a36', '#8a5a32', '#6a6a38', '#c09848']], winter: ['#443f38', ['#5e5750', '#6a625a', '#766c62', '#33503a', '#385438', '#82786c', '#5a534c']] }[season] || ['#22361f', ['#355a33']];
   const N = 256, cv = document.createElement('canvas'); cv.width = cv.height = N; const g = cv.getContext('2d'), r = rnd(season.length * 977 + 3);
   g.fillStyle = P[0]; g.fillRect(0, 0, N, N);
-  for (let i = 0; i < 420; i++) { const x = r() * N, y = r() * N, rr = 7 + r() * 12, c = P[1][Math.floor(r() * P[1].length)];
-    for (const [ox, oy] of [[0, 0], [N, 0], [-N, 0], [0, N], [0, -N], [N, N], [-N, -N], [N, -N], [-N, N]]) { const cx = x + ox, cy = y + oy; if (cx < -rr || cx > N + rr || cy < -rr || cy > N + rr) continue;
-      const gr = g.createRadialGradient(cx - rr * 0.3, cy - rr * 0.35, rr * 0.1, cx, cy, rr); gr.addColorStop(0, c); gr.addColorStop(0.62, c); gr.addColorStop(1, 'rgba(0,0,0,0.45)'); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, rr, 0, 7); g.fill(); } }
+  // 가까이(400m 남짓)서 같은 크기 동그라미가 고르게 찍혀 점무늬로 보였다 → 큰 얼룩(나무 무리 색 차이) 위에, 크기가 제각각인 나무 꼭대기를 빽빽이 겹치고
+  //   꼭대기마다 해 쪽(왼쪽 위)은 밝게 · 반대쪽은 살짝 어둡게 (검은 테두리 없이), 작은 잎 덩이를 덧대 둥근 윤곽을 흐트러뜨린다
+  const wrapC = (x, y, rr, fn) => { for (const [ox, oy] of [[0, 0], [N, 0], [-N, 0], [0, N], [0, -N], [N, N], [-N, -N], [N, -N], [-N, N]]) { const cx = x + ox, cy = y + oy; if (cx < -rr || cx > N + rr || cy < -rr || cy > N + rr) continue; fn(cx, cy); } };
+  const shade = (hex, k) => { const n = parseInt(hex.slice(1), 16), f = (v) => Math.max(0, Math.min(255, Math.round(v * k))); return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`; };
+  for (let i = 0; i < 26; i++) { const x = r() * N, y = r() * N, rr = 30 + r() * 50, c = P[1][Math.floor(r() * P[1].length)]; wrapC(x, y, rr, (cx, cy) => { const gr = g.createRadialGradient(cx, cy, 0, cx, cy, rr); gr.addColorStop(0, shade(c, 0.9)); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.globalAlpha = 0.45; g.fillStyle = gr; g.fillRect(cx - rr, cy - rr, rr * 2, rr * 2); g.globalAlpha = 1; }); }
+  for (let i = 0; i < 1100; i++) { const x = r() * N, y = r() * N, rr = 3.5 + r() * r() * 11, c = P[1][Math.floor(r() * P[1].length)];
+    const subs = Array.from({ length: 3 }, () => { const a = r() * 6.28, d = rr * (0.55 + r() * 0.35); return [Math.cos(a) * d, Math.sin(a) * d, rr * (0.3 + r() * 0.25), shade(c, 0.85 + r() * 0.3)]; });
+    wrapC(x, y, rr * 1.3, (cx, cy) => {
+      const gr = g.createRadialGradient(cx - rr * 0.35, cy - rr * 0.4, rr * 0.05, cx, cy, rr); gr.addColorStop(0, shade(c, 1.18)); gr.addColorStop(0.55, c); gr.addColorStop(1, shade(c, 0.72)); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, rr, 0, 7); g.fill();
+      for (const [ox, oy, q, sc] of subs) { g.fillStyle = sc; g.beginPath(); g.arc(cx + ox, cy + oy, q, 0, 7); g.fill(); } }); }
+  // 잎 사이 그늘 틈 (작은 어두운 점)
+  for (let i = 0; i < 700; i++) { const x = r() * N, y = r() * N, q = 0.6 + r() * 1.4; g.fillStyle = `rgba(10,18,8,${0.12 + r() * 0.18})`; wrapC(x, y, q, (cx, cy) => { g.beginPath(); g.arc(cx, cy, q, 0, 7); g.fill(); }); }
   const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.repeat.set(0.085, 0.085); CANOPY[season] = t; return t;
 }
 // 숲 바닥 (가까이서 본 서울숲 · 동네 산 나무 밑): 흙 · 낮은 풀 · 이끼 · 떨어진 잎. 동그라미 없이 얼룩 · 잎 조각으로, 계절마다 한 장
