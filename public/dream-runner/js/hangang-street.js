@@ -48,7 +48,7 @@ export function buildStreetFurniture(hg, roads, xs, side = []) {
     // 밤: 등 아래 보도 · 찻길에 따뜻한 빛 웅덩이 (더하기 섞기, 땅에 붙인 판)
     const pool = new THREE.PlaneGeometry(15, 15); pool.rotateX(-Math.PI / 2); pool.translate(0, 0.06, 2.2);
     const poolM = new THREE.MeshBasicMaterial({ map: poolTex(), color: '#ffcf8f', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 });
-    const pools = instances(hg, pool, poolM, lamps); pools.renderOrder = -45; pools.userData.noMerge = true;
+    const pools = instances(hg, pool, poolM, lamps); pools.renderOrder = -45; pools.userData.noMerge = true; pools.userData.drapeTilt = true;
     const glow = []; for (const [x, z, ry, s] of lamps) { glow.push(x + Math.sin(ry) * 2.55, 9.15 * s, z + Math.cos(ry) * 2.55); hg.addCircle(x, z, 0.16, 9); }
     // 빛 방울은 등마다 하나 (땅 높이는 칸을 얹을 때 더해진다)
     const gp = hg.glowPoints(glow, '#ffd9a8', 2.6); gp.userData.noMerge = true;

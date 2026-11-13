@@ -180,6 +180,8 @@ export class SeoulRun {
     const zero = new THREE.Matrix4().makeScale(0, 0, 0);
     for (const T of chunk.treeGroups || []) { const A = T.arr === 'f' ? chunk.forestFill || [] : chunk.trees || [], R = T.arr === 'f' ? half + 4.5 : half + 2.5; let hit = false;
       T.idx.forEach((si, k) => { const p = A[si]; if (!p || !near(p[0], p[1], R)) return; for (const m of T.ms) m?.setMatrixAt(k, zero); hit = true; }); if (hit) for (const m of T.ms) if (m) m.instanceMatrix.needsUpdate = true; }
+    // 44-2: 골목에 세워 둔 스쿠터 · 쓰레기봉투가 차로 위(레인 폭/2 + 0.8m 안)에 있으면 숨긴다 (곰이 그 속을 지나가 숨은 장애물처럼 보였다)
+    { const M4 = new THREE.Matrix4(); chunk.scene.traverse((o) => { if (!o.isInstancedMesh || !o.userData.alleyProp) return; let hit = false; for (let i = 0; i < o.instanceMatrix.count; i++) { o.getMatrixAt(i, M4); const e = M4.elements; if (e[0] === 0 && e[5] === 0) continue; if (near(e[12], e[14], half + 0.8)) { o.setMatrixAt(i, zero); hit = true; } } if (hit) { o.instanceMatrix.needsUpdate = true; o.computeBoundingSphere?.(); } }); }
     this.cullPoles(chunk, c);
     this.carveLane(chunk, c);
   }

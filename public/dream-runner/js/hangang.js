@@ -542,7 +542,9 @@ export class Hangang {
       const p = g.attributes.position, BY = g.userData.baseY?.length === p.count ? g.userData.baseY : null; for (let k = 0; k < p.count; k++) { const b = BY ? BY[k] : NaN; p.setY(k, p.getY(k) + wet + (b === b ? b : H(p.getX(k), p.getZ(k)))); } p.needsUpdate = true; g.computeBoundingSphere(); g.computeBoundingBox();
     };
     const lift = (o) => { const b = new THREE.Box3().setFromObject(o); if (b.isEmpty()) return; b.getCenter(v); o.position.y += H(v.x, v.z); o.updateMatrixWorld(true); };
-    const inst = (o) => { o.updateWorldMatrix(true, false); m4i.copy(o.matrixWorld).invert(); const a = new THREE.Matrix4(); for (let k = 0; k < o.count; k++) { o.getMatrixAt(k, a); m4.multiplyMatrices(o.matrixWorld, a); v.setFromMatrixPosition(m4); const by = o.userData.baseY?.[k], dy = by === by && by !== undefined ? by : H(v.x, v.z); m4.elements[13] += dy; a.multiplyMatrices(m4i, m4); o.setMatrixAt(k, a); } o.instanceMatrix.needsUpdate = true; o.computeBoundingSphere?.(); };
+    // drapeTilt: 땅에 붙인 넓은 판(가로등 빛 웅덩이)은 비탈 기울기대로 눕힌다 (평평하면 비탈 아래쪽이 0.3 ~ 0.5m 떠 보였다)
+    const tq = new THREE.Quaternion(), tn = new THREE.Vector3(), up0 = new THREE.Vector3(0, 1, 0), tm = new THREE.Matrix4();
+    const inst = (o) => { o.updateWorldMatrix(true, false); m4i.copy(o.matrixWorld).invert(); const a = new THREE.Matrix4(); for (let k = 0; k < o.count; k++) { o.getMatrixAt(k, a); m4.multiplyMatrices(o.matrixWorld, a); v.setFromMatrixPosition(m4); const by = o.userData.baseY?.[k], dy = by === by && by !== undefined ? by : H(v.x, v.z); if (o.userData.drapeTilt) { const gx = (H(v.x + 3, v.z) - H(v.x - 3, v.z)) / 6, gz = (H(v.x, v.z + 3) - H(v.x, v.z - 3)) / 6; tq.setFromUnitVectors(up0, tn.set(-gx, 1, -gz).normalize()); m4.setPosition(0, 0, 0).premultiply(tm.makeRotationFromQuaternion(tq)).setPosition(v.x, v.y, v.z); } m4.elements[13] += dy; a.multiplyMatrices(m4i, m4); o.setMatrixAt(k, a); } o.instanceMatrix.needsUpdate = true; o.computeBoundingSphere?.(); };
     const visit = (o) => {
       // based = 이미 그 건물 바닥 높이에 올려 둔 것 (묶기는 그대로)
       if (o.userData.noDrape || o.userData.based) return;
@@ -1204,10 +1206,10 @@ export class Hangang {
     if (scoot.length) { const scM = vehicleMat(); scM.userData.shared = true; const c = new THREE.Color(), cells = new Map(), CS = this.isChunk ? 250 : 1e9;
       for (const sc of scoot) { const k = `${Math.floor(sc[0] / CS)},${Math.floor(sc[1] / CS)}`; if (!cells.has(k)) cells.set(k, []); cells.get(k).push(sc); }
       for (const [gk, L] of cells) { const n = L.length, g = parkedScooterGeo().clone(); g.setAttribute('iSt', new THREE.InstancedBufferAttribute(new Float32Array(n * 4), 4)); g.setAttribute('iCell', new THREE.InstancedBufferAttribute(new Float32Array(n * 2), 2));
-        const sim = mk(g, scM, L, ([x, z, ry]) => { o.position.set(x, 0, z); o.rotation.set(0, ry, 0); }); L.forEach((sc, i) => sim.setColorAt(i, c.set(['#f4f5f6', '#1a1b1f', '#c8161d', '#8f969c', '#f4f5f6'][sc[3]])));
+        const sim = mk(g, scM, L, ([x, z, ry]) => { o.position.set(x, 0, z); o.rotation.set(0, ry, 0); }); L.forEach((sc, i) => sim.setColorAt(i, c.set(['#f4f5f6', '#1a1b1f', '#c8161d', '#8f969c', '#f4f5f6'][sc[3]]))); sim.userData.alleyProp = 1;
         if (this.isChunk) { const [gx, gz] = gk.split(',').map(Number); sim.userData.lod = [(gx + 0.5) * CS, (gz + 0.5) * CS, n, 300]; sim.userData.noMerge = true; } } }
     for (const [x, z] of scoot) this.addCircle(x, z, 0.45, 1);
-    const bg = new THREE.IcosahedronGeometry(0.32, 0); bg.scale(1, 0.85, 1); bg.translate(0, 0.27, 0); const bim = mk(bg, new THREE.MeshLambertMaterial({ color: '#ffffff' }), bags.flatMap(([x, z]) => [[x, z], [x + 0.4, z + 0.2], [x - 0.1, z + 0.45]]), ([x, z]) => { o.position.set(x, 0, z); o.rotation.set(0, 0, 0); o.scale.setScalar(0.8 + Math.random() * 0.4); }); if (bim) { const c = new THREE.Color(); for (let i = 0; i < bim.count; i++) bim.setColorAt(i, c.set(i % 3 === 1 ? '#1d1d1f' : '#f2f0ea')); } o.scale.set(1, 1, 1);
+    const bg = new THREE.IcosahedronGeometry(0.32, 0); bg.scale(1, 0.85, 1); bg.translate(0, 0.27, 0); const bim = mk(bg, new THREE.MeshLambertMaterial({ color: '#ffffff' }), bags.flatMap(([x, z]) => [[x, z], [x + 0.4, z + 0.2], [x - 0.1, z + 0.45]]), ([x, z]) => { o.position.set(x, 0, z); o.rotation.set(0, 0, 0); o.scale.setScalar(0.8 + Math.random() * 0.4); }); if (bim) { bim.userData.alleyProp = 1; const c = new THREE.Color(); for (let i = 0; i < bim.count; i++) bim.setColorAt(i, c.set(i % 3 === 1 ? '#1d1d1f' : '#f2f0ea')); } o.scale.set(1, 1, 1);
   }
   // 거리 지역 간판: 길을 바라보는 낮은 상가 벽마다 1층 간판 띠 + 2 · 3층 가로 간판 (그 동네 실제 가게 이름, 스타일 여러 가지)
   // 진짜 가게 간판 (소상공인 상가정보): 가게가 실제로 있는 건물의 길 쪽 벽에, 실제 층에. 1층은 가로 간판 + 들어갈 수 있는 문, 2층 위는 창문 글씨 간판
