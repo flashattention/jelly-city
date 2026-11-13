@@ -91,6 +91,8 @@ function curvedRoof(w, d, h, o = {}) {
   // 앞면이 위를 보게 (감기는 방향 확인)
   if (g.attributes.normal.getY(M + Math.floor(N / 2)) < 0) { const ix = g.index.array; for (let i = 0; i < ix.length; i += 3) { const q = ix[i + 1]; ix[i + 1] = ix[i + 2]; ix[i + 2] = q; } g.computeVertexNormals(); }
   const list = [partUV(g)], top = h + 0.12;
+  // 돌탑 지붕처럼 장식 없는 지붕 (o.deco === false): 꼭대기만 작은 덮개
+  if (o.deco === false) { list.push(partUV(new THREE.BoxGeometry(ridge * 2 + 0.2, 0.12, 0.3), 0, h + 0.04, 0)); return mergeUV(list); }
   // 용마루 · 취두(양 끝 솟은 장식) · 합각(양옆 세모 벽, 흰 회벽)
   list.push(partUV(plainBox(ridge * 2 + 0.3, 0.32, 0.34), 0, top, 0, 0, '#8e8e8e'));
   for (const sx of [-1, 1]) {
@@ -501,3 +503,6 @@ registerAttraction({
     return E;
   },
 });
+
+// 다른 명소 파일(hangang-attr-more2.js)이 같이 쓰는 도우미
+export { cvTex, boxUV, partUV, mergeUV, plainBox, stoneTex, tileTex, latticeTex, dcTex, curvedRoof, roofMat, crookedPine, hideTrees, makeSteam, jelly, rndS, clamp, pondWaterMat };

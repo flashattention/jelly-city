@@ -24,6 +24,7 @@ import './hangang-park-in.js';
 import './hangang-tower.js';
 import './hangang-attr-river.js';
 import './hangang-attr-more.js';
+import './hangang-attr-more2.js';
 
 // 길이 0 인 법선(겹친 점 · 서로 반대로 접힌 면)을 셰이더가 normalize 하면 NaN 이 되고,
 //   빛 번짐(블룸)이 그 NaN 을 넓게 퍼뜨려 날 때 화면에 검정 사각형이 생겼다 (8-23). 모든 재질에서 막는다
