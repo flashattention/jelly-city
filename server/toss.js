@@ -8,6 +8,7 @@ import path from 'node:path';
 import https from 'node:https';
 import crypto from 'node:crypto';
 import { readJson } from './auth.js';
+import { safeEq } from './shared/guard.js';
 
 // 토스 파트너 API: 콘솔에서 받은 mTLS 인증서 · 키 (PEM 글자 그대로 또는 base64). 없으면 토스 로그인은 '준비 중'
 //   주소 · 응답 모양은 앱인토스 개발자센터 '토스 로그인' 문서로 확인해서 맞춘다
@@ -46,7 +47,7 @@ export class TossAccounts {
   }
   save() { if (!this.dirty) return; this.dirty = false; try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ users: this.users, links: this.links, secret: this.secret })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('토스 계정 저장 실패', e.message); } }
   sign(sub) { const p = `${Buffer.from(sub).toString('base64url')}.${Date.now()}`; return `${p}.${crypto.createHmac('sha256', this.secret).update(p).digest('base64url').slice(0, 32)}`; }
-  read(tok) { const s = String(tok || ''), i = s.lastIndexOf('.'); if (i < 0) return null; const p = s.slice(0, i); if (crypto.createHmac('sha256', this.secret).update(p).digest('base64url').slice(0, 32) !== s.slice(i + 1)) return null; const sub = Buffer.from(p.split('.')[0], 'base64url').toString(); return this.users[sub] ? sub : null; }
+  read(tok) { const s = String(tok || ''), i = s.lastIndexOf('.'); if (i < 0) return null; const p = s.slice(0, i); if (s.length > 512 || !safeEq(crypto.createHmac('sha256', this.secret).update(p).digest('base64url').slice(0, 32), s.slice(i + 1))) return null; const sub = Buffer.from(p.split('.')[0], 'base64url').toString(); return this.users[sub] ? sub : null; }
   // 다른 API 가 쓰는 모양 { sub, user } (드림 러너 · 치장 API 를 그대로 쓴다)
   userOf(tok) { const sub = this.read(tok); if (!sub) return null; const u = this.users[sub]; return { sub, user: { nick: u.nick || '', name: u.nick || '토스 곰돌이', toss: true } }; }
   nickOf(sub) { return this.users[sub]?.nick || null; }

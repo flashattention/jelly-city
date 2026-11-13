@@ -9,6 +9,8 @@ import path from 'node:path';
 // Fly 프록시가 붙여 주는 진짜 접속 IP (없으면 소켓 주소)
 //   Fly 앱은 프록시를 거쳐서만 닿고 프록시가 이 머리글을 새로 쓴다. 소켓 주소로만 보면 모든 사람이 프록시 주소 하나로 묶여 버린다
 export const clientIp = (req) => String(req?.headers?.['fly-client-ip'] || req?.socket?.remoteAddress || '').slice(0, 64);
+// 서명 비교: 걸리는 시간으로 맞는 글자 수를 알아내지 못하게
+export function safeEq(a, b) { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); }
 // 순위표 · 공개 응답에 나가는 사람 표시: 계정 id(익명 id 는 비밀번호와 같다)를 그대로 내보내지 않고 짧은 해시로
 export const publicId = (sub) => crypto.createHash('sha256').update(`pid:${sub}`).digest('hex').slice(0, 10);
 const kstDay = (t = Date.now()) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);

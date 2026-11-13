@@ -364,6 +364,7 @@ export async function dreamApi(req, res, url, who, board, json, isAdmin) {
     if (!who || !isAdmin?.(who.user)) return json(res, 403, { error: '관리자만 할 수 있어요' });
     if (url.pathname === '/api/dream/admin/list') return json(res, 200, board.adminList());
     const b = await readJson(req);
+    sec.note('admin', { where: url.pathname, detail: `${String(b.act || '')} ${String(b.t || '')}`.trim().slice(0, 60) });
     try { if (url.pathname === '/api/dream/admin/resolve') board.resolve(String(b.id), ['ok', 'del', 'skip'].includes(b.act) ? b.act : 'skip'); else if (url.pathname === '/api/dream/admin/verify') board.verifyRecord(String(b.sub), String(b.t)); else if (url.pathname === '/api/dream/admin/remove') board.removeRecord(String(b.sub), String(b.t)); else return json(res, 404, { error: 'not found' }); return json(res, 200, board.adminList()); } catch (e) { return json(res, 400, { error: e.message }); }
   }
   if (url.pathname === '/api/dream/score' && req.method === 'POST') {

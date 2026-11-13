@@ -312,7 +312,7 @@ async function api(req, res, url) {
     if (url.pathname.startsWith('/api/feedback/') && req.method === 'POST') {
       if (!isAdmin(who.user)) return json(res, 403, { error: '관리자만' });
       const f = world.feedback.find((x) => x.id === url.pathname.split('/')[3]);
-      if (f) { f.done = !f.done; world.dirty = true; }
+      if (f) { f.done = !f.done; world.dirty = true; sec.note('admin', { ip, where: '/api/feedback', detail: f.done ? 'done' : 'reopen' }); }
       return json(res, 200, { ok: true });
     }
   } catch (e) { return json(res, 400, { error: e.message }); }

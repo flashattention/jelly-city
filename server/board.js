@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { readJson } from './auth.js';
+import { sec } from './shared/guard.js';
 import { nickOf } from './cosmetics.js';
 import { complete, llmEnabled } from './jelly-city/llm.js';
 
@@ -172,9 +173,9 @@ export async function boardApi(req, res, url, who, board, json, isAdmin, check =
         board.comment(sub, name, pid, b); return json(res, 200, board.detail(pid, sub, admin));
       }
       case '/api/board/vote': return json(res, 200, board.vote(sub, pid, cid, b.v));
-      case '/api/board/delete': board.remove(sub, admin, pid, cid); return json(res, 200, { ok: true });
+      case '/api/board/delete': { const theirs = admin && board.item(pid, cid).sub !== sub; board.remove(sub, admin, pid, cid); if (theirs) sec.note('admin', { ip, where: '/api/board/delete', detail: cid ? 'comment' : 'post' }); return json(res, 200, { ok: true }); }
       case '/api/board/report': board.report(sub, !!who.user.guest, pid, cid, String(b.why || ''), String(b.text || '')); return json(res, 200, { ok: true });
-      case '/api/board/unhide': if (!admin) return json(res, 403, { error: '관리자만 할 수 있어요' }); board.unhide(pid, cid); return json(res, 200, { ok: true });
+      case '/api/board/unhide': if (!admin) return json(res, 403, { error: '관리자만 할 수 있어요' }); board.unhide(pid, cid); sec.note('admin', { ip, where: '/api/board/unhide', detail: cid ? 'comment' : 'post' }); return json(res, 200, { ok: true });
     }
     return json(res, 404, { error: 'not found' });
   } catch (e) { return json(res, 400, { error: e.message }); }

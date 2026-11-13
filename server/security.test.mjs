@@ -247,6 +247,22 @@ test('정상 플레이: 드림 러너 출발표 → 한 판 끝(별) · 같은 �
   assert.equal(sc.status, 400, '플레이 기록 없는 판은 순위표에 안 올린다(기존 규칙)');
 });
 
+test('7-2 · 7-3 위조 세션 · 관리자 아닌 사람은 관리자 기능을 못 쓴다', async () => {
+  const h = IP(70);
+  for (const tok of ['dG9zczp4.1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', 'x'.repeat(48), '']) assert.equal((await fetch(S.base + '/api/toss/me', { headers: { Authorization: `Bearer ${tok}`, ...h } })).status, 401);
+  const dev = await (await postJ('/api/toss/login', { device: true }, h)).json(); assert.ok(dev.session);
+  const forged = dev.session.replace(/.$/, (c) => (c === 'A' ? 'B' : 'A'));
+  assert.equal((await fetch(S.base + '/api/toss/me', { headers: { Authorization: `Bearer ${forged}`, ...h } })).status, 401, '서명이 한 글자만 달라도 거절');
+  const user = (await (await postJ('/api/login', { dev: 'plainuser' }, h)).json()).session, H = { Authorization: `Bearer ${user}`, ...h };
+  for (const [m, p] of [['GET', '/api/dream/admin/list'], ['POST', '/api/dream/admin/remove'], ['GET', '/api/feedback'], ['POST', '/api/feedback/abc'], ['GET', '/api/sw/report'], ['GET', '/api/sec/summary'], ['POST', '/api/board/unhide'], ['GET', '/api/toss/dream/admin/list']]) {
+    const r = await fetch(S.base + p, { method: m, headers: { 'Content-Type': 'application/json', ...H }, body: m === 'POST' ? '{}' : undefined });
+    assert.ok([400, 401, 403].includes(r.status) && r.status !== 200, `${m} ${p} → ${r.status}`);
+  }
+  // 로그아웃하면 세션이 사라진다
+  await fetch(S.base + '/api/logout', { method: 'POST', headers: H });
+  assert.equal((await fetch(S.base + '/api/me', { headers: H })).status, 401);
+});
+
 test('7-1 순위표에 익명 id 가 나가지 않는다', async () => {
   const anon = hex(24), h = IP(56);
   await postJ('/api/merge/record', { b: 'cup', value: 3, name: '비밀곰', anon }, h);

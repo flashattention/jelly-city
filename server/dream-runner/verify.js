@@ -2,6 +2,7 @@
 import { Worker } from 'node:worker_threads';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
+import { safeEq } from '../shared/guard.js';
 
 export const MAX_FRAMES = 500000;
 // 입력 기록: dts = "프레임 시간(0.1ms)" 쉼표 목록 · evs = "프레임:입력" 목록 (입력이 바뀔 때만). 압축해서 온다
@@ -20,7 +21,7 @@ export class Tickets {
   sign(p) { return crypto.createHmac('sha256', this.secret).update(p).digest('base64url').slice(0, 24); }
   issue(info) { const p = [Date.now(), info.seed | 0, info.diff, info.map, info.mode, crypto.randomBytes(4).toString('hex'), info.room ? 1 : 0].join('.'); return `${p}.${this.sign(p)}`; }
   read(tk) {
-    const s = String(tk || ''), i = s.lastIndexOf('.'); if (i < 0) return null; const p = s.slice(0, i); if (this.sign(p) !== s.slice(i + 1)) return null;
+    const s = String(tk || ''), i = s.lastIndexOf('.'); if (i < 0) return null; const p = s.slice(0, i); if (s.length > 300 || !safeEq(this.sign(p), s.slice(i + 1))) return null;
     const [at, seed, diff, map, mode, id, room] = p.split('.'); return { at: +at, seed: +seed, diff, map, mode, id, room: room === '1' };
   }
   // 사용한 출발표: 파일에 저장해 서버를 다시 켜도 같은 판으로 두 번 받지 못하게 (TTL 지난 것은 버린다)

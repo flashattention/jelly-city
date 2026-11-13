@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 import { readJson } from '../auth.js';
 import { clean } from './rooms.js';
 import { getCos, boardMedal, nameOf, tagChar } from '../cosmetics.js';
-import { sec, clientIp, publicId, anonOk, ANON_FULL } from './guard.js';
+import { sec, clientIp, publicId, anonOk, ANON_FULL, safeEq } from './guard.js';
 
 const ANON = /^[a-f0-9]{16,40}$/;
 const TICKET_TTL = 6 * 3600e3, HOLD_TOP = 10;
@@ -47,7 +47,7 @@ export class Records {
   issue(b, now = Date.now()) { const p = `${now}.${b}.${crypto.randomBytes(6).toString('hex')}`; return `${p}.${this.sign(p)}`; }
   readTicket(tk, now = Date.now()) {
     const s = String(tk || ''), i = s.lastIndexOf('.'); if (i < 0 || s.length > 120) return null;
-    const p = s.slice(0, i); if (this.sign(p) !== s.slice(i + 1)) return null;
+    const p = s.slice(0, i); if (!safeEq(this.sign(p), s.slice(i + 1))) return null;
     const [at, b, id] = p.split('.'); const t = { at: +at, b, id };
     return now - t.at > TICKET_TTL || t.at - now > 5000 ? null : t;
   }
