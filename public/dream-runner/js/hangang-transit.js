@@ -147,6 +147,8 @@ export class LiveTransit {
   dropBus(o) { if (o.mesh) { this.hg.scene.remove(o.mesh); o.mesh.children[1]?.geometry.dispose(); o.mesh = null; } }
   busMesh(o) {
     this.atlas ||= new PlateAtlas(); const g = new THREE.Group(); g.add(new THREE.Mesh(busGeo(o.type), this.bodyM), new THREE.Mesh(plateGeo(this.atlas, o.route || '버스'), this.atlas.mat), new THREE.Mesh(busLampGeo(), this.lampM));
+    // 8-41-3: 마을버스는 실제 크기(길이 7.2m · 폭 2.06m · 높이 2.75m)로 줄인다 (모든 버스가 11m 시내버스 모양이었다)
+    if (+o.type === 2) g.scale.set(2.06 / 2.5, 0.9, 7.2 / 11);
     g.userData.bus = o.id; this.hg.scene.add(g); return g;
   }
   tickBus(dt, px, pz) {

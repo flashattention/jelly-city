@@ -6,6 +6,8 @@
 import * as THREE from 'three';
 import { sound } from './music.js';
 import { TYPES, topAt, liveRoute } from './hangang-vehicle-models.js';
+// 실시간 버스 종류 → 길 위 차 모델 (2 마을버스 · 나머지 시내버스)
+const liveKey = (o) => (+o.type === 2 ? 'busTown' : 'busCity');
 import { BUS_COLOR } from './hangang-transit.js';
 import { buildInterior, drawGauge, seatEye } from './hangang-vehicle-interior.js';
 
@@ -107,8 +109,9 @@ export class Drive {
     // 8-40-1: 실시간 버스(hangang-transit.js)도 빼앗아 운전할 수 있다. 고르기 전엔 모양(종류)만 빌린 가짜 차로 둔다
     const LV = hg.live; if (LV) for (const o of LV.buses.values()) {
       if (!o.mesh || !o.L || o.hijack || o.id === LV.rideId) continue; const dx = hg.px - o.x, dz = hg.pz - o.z; if (Math.abs(dx) > 14 || Math.abs(dz) > 14) continue;
-      const fx = Math.sin(o.yaw), fz = Math.cos(o.yaw), lz = dx * fx + dz * fz, lx = dx * fz - dz * fx, d = Math.hypot(Math.max(0, Math.abs(lx) - 1.25), Math.max(0, Math.abs(lz) - 5.5));
-      if (d < 2.0 && (!best || d < best.d)) best = { v: { t: TYPES.busCity, live: o }, d };
+      // 8-41-3: 마을버스(종류 2)는 마을버스 모양 그대로 (빼앗으면 시내버스로 바뀌었다)
+      const t = TYPES[liveKey(o)], fx = Math.sin(o.yaw), fz = Math.cos(o.yaw), lz = dx * fx + dz * fz, lx = dx * fz - dz * fx, d = Math.hypot(Math.max(0, Math.abs(lx) - t.W / 2), Math.max(0, Math.abs(lz) - t.L / 2));
+      if (d < 2.0 && (!best || d < best.d)) best = { v: { t, live: o }, d };
     }
     return best;
   }
@@ -162,9 +165,9 @@ export class Drive {
   //   다른 자리: 승객으로 실제 노선대로 (hangang-ride.js 타기와 같다)
   takeLive(o, si) {
     const hg = this.hg, T = hg.traffic; if (!hg.live?.buses.has(o.id) || !o.L) return;
-    if (!TYPES.busCity.seats[si]?.[4]) { hg.rideL?.board({ kind: 'bus', o, d: 0 }); return; }
+    const key = liveKey(o); if (!TYPES[key].seats[si]?.[4]) { hg.rideL?.board({ kind: 'bus', o, d: 0 }); return; }
     if (!T) return;
-    const v = T.spawn(o.L, clamp(o.d ?? 0, 0, o.L.len), o.dir || 1, Math.random, { key: 'busCity' });
+    const v = T.spawn(o.L, clamp(o.d ?? 0, 0, o.L.len), o.dir || 1, Math.random, { key });
     v.x = o.x; v.z = o.z; v.yaw = o.yaw; v.init = true; v.cur = o.cur || 0; v.siren = 0; v.keep = true; v.col = new THREE.Color(BUS_COLOR[o.type] || BUS_COLOR[3]); v.route = liveRoute(o.route); v.liveId = o.id;
     o.hijack = true; this.board(v, si);
     hg.onToast?.(`🚌 실시간 ${o.route}번 버스를 빼앗았어요 · 내 화면에서만 운전해요 · 내리면 실제 자리로 돌아가요`);
