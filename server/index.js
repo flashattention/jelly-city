@@ -43,7 +43,8 @@ import { HideRooms } from './jelly-hide/rooms.js';
 import { ArenaRooms } from './jelly-arena/rooms.js';
 import { ArcadeRooms } from './jelly-arcade/rooms.js';
 import { normWord } from '../public/jelly-draw/js/prompts.js';
-import { complete } from './jelly-city/llm.js';
+import { complete, llmStats } from './jelly-city/llm.js';
+import { badOutput } from './jelly-city/llm-guard.js';
 import { Records } from './shared/records.js';
 import { Cosmetics, cosApi, setNames } from './cosmetics.js';
 import { sec, clientIp, limited as rateLimited, publicPath, publicError, DayCount, WsGuard, ROOM_SPECS, setAnonKnown } from './shared/guard.js';
@@ -248,11 +249,13 @@ async function api(req, res, url) {
       const r = await complete([
         { role: 'system', content: '너는 그림 맞히기 게임을 하는 귀여운 AI 젤리봇이다. 사람이 마우스로 대충 그린 그림을 보고 무엇을 그렸는지 한국어 명사로 맞힌다. 가장 그럴듯한 것부터 3개.' },
         { role: 'user', content: [{ type: 'text', text: '이 그림은 무엇일까? 한국어 낱말 3개와, 그림을 보고 하는 짧고 다정한 한마디(20자 이내).' }, { type: 'image_url', image_url: { url: b.img, detail: 'low' } }] },
-      ], { schema: { type: 'object', properties: { guesses: { type: 'array', items: { type: 'string' } }, comment: { type: 'string' } }, required: ['guesses', 'comment'], additionalProperties: false }, temperature: 0.4, max_tokens: 120 });
+      ], { schema: { type: 'object', properties: { guesses: { type: 'array', items: { type: 'string' } }, comment: { type: 'string' } }, required: ['guesses', 'comment'], additionalProperties: false }, temperature: 0.4, max_tokens: 120, who: ip, kind: 'draw' });
+      // 그림 속 글씨로 시키는 주입도 있으니 답을 거른다 (보안 9-3)
+      if (badOutput(r.comment) || (r.guesses || []).some((x) => badOutput(x))) { sec.note('llm', { ip, where: '/api/draw/guess', detail: 'output filtered' }); r.guesses = ['곰돌이', '젤리', '구름']; r.comment = '음... 뭔지 잘 모르겠어요 🤔'; }
       const guesses = (r.guesses || []).map((x) => String(x).slice(0, 20)).slice(0, 3), ans = normWord(b.answer);
       const hit = ans ? guesses.findIndex((x) => { const n = normWord(x); return n && (n === ans || n.includes(ans) || ans.includes(n)); }) : -1;
       return json(res, 200, { guesses, comment: String(r.comment || '').slice(0, 40), hit });
-    } catch (e) { console.warn('그림 맞히기 실패', e.message); return json(res, 502, { error: 'AI 젤리봇이 그림을 못 봤어요' }); }
+    } catch (e) { if (!e.budget) console.warn('그림 맞히기 실패', e.message); return json(res, e.budget ? 429 : 502, { error: e.budget ? 'AI 젤리봇이 오늘 너무 많이 봤어요. 잠시 후 다시 해 주세요' : 'AI 젤리봇이 그림을 못 봤어요' }); }
   }
   if (url.pathname.startsWith('/api/type/')) return typeRecords.api(req, res, url, world.userOf(sid), json, '/api/type');
   if (url.pathname.startsWith('/api/ten/')) return tenRecords.api(req, res, url, world.userOf(sid), json, '/api/ten');
@@ -273,7 +276,7 @@ async function api(req, res, url) {
       sec.note('admin', { ip, where: url.pathname, detail: `${b.act} ${b.game}.${b.b}` });
       return json(res, 200, { ok: true });
     }
-    if (url.pathname === '/api/sec/summary') return json(res, 200, sec.summary(Math.min(30, Math.max(1, +url.searchParams.get('days') || 7))));
+    if (url.pathname === '/api/sec/summary') return json(res, 200, { ...sec.summary(Math.min(30, Math.max(1, +url.searchParams.get('days') || 7))), llm: llmStats() });
     return json(res, 404, { error: 'not found' });
   }
   if (url.pathname === '/api/me') return json(res, 200, { user: world.publicUser(who.user), chars: world.charList(who.sub), admin: isAdmin(who.user), cos: cosmetics.pub(who.sub) });

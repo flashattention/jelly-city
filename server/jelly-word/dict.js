@@ -50,7 +50,7 @@ export class Dict {
         const r = await complete([
           { role: 'system', content: '너는 너그러운 한국어 끝말잇기 심판이다. 주어진 낱말이 한국어에서 실제로 쓰이는 명사이면 인정한다. 표준국어대사전 · 우리말샘의 일반 명사, 외래어 · 전문 용어(예: 사이코패스, 알고리즘), 고유명사(사람 이름 · 연예인 · 운동선수 · 역사 인물, 나라 · 도시 · 지명, 영화 · 책 · 노래 등 작품, 상표 · 회사, 게임 · 만화 · 애니 캐릭터, 리그 오브 레전드 챔피언 같은 게임 캐릭터 이름, 예: 음바페, 이순신, 서울, 피카츄, 르블랑, 아리)를 모두 인정한다. 인정하지 않는 것: 실제로 없는 지어낸 말, 오타, 동사 · 형용사 활용형(먹었다, 예쁜), 조사가 붙은 말, 욕설 · 비속어. 애매하면 인정한다.' },
           { role: 'user', content: `단어: ${w}` },
-        ], { schema: { type: 'object', properties: { valid: { type: 'boolean' } }, required: ['valid'], additionalProperties: false }, temperature: 0, max_tokens: 20 });
+        ], { schema: { type: 'object', properties: { valid: { type: 'boolean' } }, required: ['valid'], additionalProperties: false }, temperature: 0, max_tokens: 20, kind: 'word' });
         const ok = !!r.valid;
         this.cache[w] = ok; this.dirty = true;
         return ok ? { ok: true } : { ok: false, why: '쓸 수 없는 말이에요 (활용형 · 지어낸 말 · 비속어)' };
@@ -72,7 +72,7 @@ export class Dict {
         const r = await complete([
           { role: 'system', content: '한국어 끝말잇기를 한다. 표준국어대사전에 실린 일반 명사만 답한다. 고유명사 · 줄임말 · 신조어는 쓰지 않는다.' },
           { role: 'user', content: `'${starts.join("' 또는 '")}'(으)로 시작하는 두 글자 이상 명사를 8개 알려줘.` },
-        ], { schema: { type: 'object', properties: { words: { type: 'array', items: { type: 'string' } } }, required: ['words'], additionalProperties: false }, temperature: 0.7, max_tokens: 120 });
+        ], { schema: { type: 'object', properties: { words: { type: 'array', items: { type: 'string' } } }, required: ['words'], additionalProperties: false }, temperature: 0.7, max_tokens: 120, kind: 'word' });
         pool = (r.words || []).map((x) => String(x).trim()).filter((x) => isWordShape(x) && starts.includes(x[0]) && !used.has(x));
         for (const x of pool) { if (!(x in this.cache)) { this.cache[x] = true; this.dirty = true; } }
       } catch { /* 봇이 진다 */ }

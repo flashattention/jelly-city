@@ -32,7 +32,7 @@ const MOD_SCHEMA = { type: 'object', properties: { ok: { type: 'boolean' }, reas
 // { ok, reason }. AI 가 답하지 못하거나 답이 이상하면 던진다 (게시하지 않는다)
 export async function moderate(content) {
   if (!llmEnabled) throw new Error('검사 AI 없음');
-  const r = await complete([{ role: 'system', content: MOD_RULES }, { role: 'user', content: JSON.stringify(content) }], { schema: MOD_SCHEMA, temperature: 0, max_tokens: 200, model: MOD_MODEL });
+  const r = await complete([{ role: 'system', content: MOD_RULES }, { role: 'user', content: JSON.stringify(content) }], { schema: MOD_SCHEMA, temperature: 0, max_tokens: 200, model: MOD_MODEL, kind: 'board' });
   if (typeof r?.ok !== 'boolean') throw new Error('검사 답이 이상해요');
   return { ok: r.ok, reason: r.ok ? '' : oneLine(r.reason, 300) || '게시판에 어울리지 않는 내용이 있어요. 내용을 고쳐 다시 올려 주세요.' };
 }
