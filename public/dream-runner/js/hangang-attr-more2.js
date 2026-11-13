@@ -6,6 +6,8 @@ import { registerAttraction, part, merge, vcMat, LL, colored, ATTR_SKIP } from '
 import { cvTex, boxUV, partUV, mergeUV, plainBox, stoneTex, curvedRoof, crookedPine, hideTrees, jelly, rndS, clamp } from './hangang-attr-more.js';
 
 const lit = (A, fn) => A.addLit(fn);
+// 스스로 빛남을 제 색에 곱한다 (조명 받은 듯 밝아지되 흰색으로 날아가지 않게): 꼭짓점 색 · 그림 · 인스턴스 색 모두
+const glowByColor = (m) => { m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= diffuseColor.rgb;'); }; m.customProgramCacheKey = () => 'glowByColor'; return m; };
 const smooth = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
 // 실내 재질: 그림이 스스로 조금 빛나 낮 · 밤 모두 실내 조명처럼 보인다 (밤엔 조금 더)
 function inMat(map, o = {}) { const m = new THREE.MeshLambertMaterial({ map, vertexColors: true, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: o.e ?? 0.35, side: o.side || THREE.FrontSide, ...(o.extra || {}) }); m.userData.e0 = o.e ?? 0.35; return m; }
@@ -315,6 +317,120 @@ registerAttraction({
         (this.cp ||= pos.clone()).lerp(pos, 1 - Math.exp(-dt * 2.5)); camera.position.copy(this.cp); (this.lk ||= look.clone()).lerp(look, 1 - Math.exp(-dt * 2.5)); camera.lookAt(this.lk);
       },
       end() { if (hg.bear) hg.bear.root.visible = bearVis ?? true; }, where() { return '서울식물원 온실'; } };
+    return E;
+  },
+});
+
+// ============================================================
+// 2-10 잠실야구장 경기 관람 (사진: 밤 경기 · 위 아래 두 층 관중석이 내야를 감싸고, 붉은 흙 파울 지역 · 줄무늬 잔디 · 가운데 펜스 뒤 전광판 · 조명탑 여섯)
+//   지도 '잠실야구장' 둥근 자리(가운데 8108, 1970 · 반지름 약 100m)에 제자리로 짓는다. 홈은 남서쪽, 가운데 담장은 북동쪽
+// ============================================================
+const BB = [8108, 1970], BB_F = [0.7071, -0.7071], BB_HOME = [BB[0] - BB_F[0] * 52, BB[1] - BB_F[1] * 52], BB_ROT = Math.atan2(BB_F[0], BB_F[1]);
+ATTR_SKIP.add('잠실야구장');
+const fenceD = (phi) => 122 - 24 * Math.pow(Math.min(1, Math.abs(phi) / (Math.PI / 4)), 1.4);
+// 줄무늬 잔디 (깎은 결 두 가지 초록) · 흙
+const turfTex = () => cvTex(256, 256, (c, W, H) => { for (let i = 0; i < 8; i++) { c.fillStyle = i % 2 ? '#3f8a3a' : '#4a9a42'; c.fillRect(0, i * 32, W, 32); } const r = rndS(3); for (let k = 0; k < 2500; k++) { c.fillStyle = `rgba(${r() < 0.5 ? '255,255,220' : '0,40,0'},.06)`; c.fillRect(r() * W, r() * H, 2, 2); } });
+// 관중석 의자 줄 (한 장 = 한 줄 높이 · 가로 2m): 등받이 · 앉는 판 · 계단 그늘
+const seatTex = () => cvTex(64, 32, (c, W, H) => { c.fillStyle = '#5a5e64'; c.fillRect(0, 0, W, H); c.fillStyle = '#ffffff'; for (let x = 2; x < W; x += 10) { c.fillRect(x, 6, 8, 12); c.fillStyle = 'rgba(255,255,255,.75)'; c.fillRect(x, 18, 8, 6); c.fillStyle = '#ffffff'; } c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(0, 26, W, 6); });
+function scoreTex(inn = 6, h = 3, a = 2, b = 1, s = 1, o = 1) {
+  return cvTex(512, 192, (c, W, H) => { c.fillStyle = '#0a0e16'; c.fillRect(0, 0, W, H); c.fillStyle = '#16304a'; c.fillRect(6, 6, W - 12, 34); c.font = 'bold 22px sans-serif'; c.fillStyle = '#ffd84a'; c.textAlign = 'left'; c.fillText('젤리 서울 리그', 16, 31);
+    c.font = 'bold 18px sans-serif'; const cols = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'R']; cols.forEach((t, i) => { c.fillStyle = '#9ab'; c.fillText(t, 110 + i * 34, 64); });
+    const rows = [['원정', [0, 1, 0, 0, 1, 0], a], ['홈', [1, 0, 0, 2, 0, 0], h]]; rows.forEach(([nm, sc, R], j) => { const y = 96 + j * 36; c.fillStyle = j ? '#ff8a5a' : '#7ac8ff'; c.fillText(nm, 18, y); sc.forEach((v, i) => { if (i < inn) { c.fillStyle = '#fff'; c.fillText(String(v), 112 + (i + 1) * 34 - 34, y); } }); c.fillStyle = '#ffd84a'; c.fillText(String(R), 110 + 10 * 34, y); });
+    c.fillStyle = '#9ab'; c.fillText('B', 18, 172); c.fillText('S', 118, 172); c.fillText('O', 218, 172); const dot = (x, on, col) => { c.fillStyle = on ? col : '#2a3040'; c.beginPath(); c.arc(x, 166, 8, 0, 7); c.fill(); };
+    for (let i = 0; i < 3; i++) dot(44 + i * 20, i < b, '#5ae07a'); for (let i = 0; i < 2; i++) dot(144 + i * 20, i < s, '#ffd84a'); for (let i = 0; i < 2; i++) dot(244 + i * 20, i < o, '#ff5a5a');
+    c.fillStyle = '#1e3a24'; c.fillRect(300, 120, 200, 64); c.fillStyle = '#fff'; c.font = 'bold 26px sans-serif'; c.fillText('PLAY BALL', 318, 162); }, false);
+}
+function buildBallpark(A) {
+  const hg = A.hg, g = new THREE.Group(); A.root.add(g); g.position.set(BB_HOME[0], 0, BB_HOME[1]); g.rotation.y = BB_ROT;
+  const W2 = (lx, lz) => [BB_HOME[0] + lx * Math.cos(BB_ROT) + lz * Math.sin(BB_ROT), BB_HOME[1] - lx * Math.sin(BB_ROT) + lz * Math.cos(BB_ROT)];
+  let y0 = -1e9; for (let gx = -60; gx <= 60; gx += 15) for (let gz = -10; gz <= 130; gz += 15) y0 = Math.max(y0, A.H(...W2(gx, gz))); y0 += 0.05; const V = [], r = rndS(1982);
+  const flat = (pts, y, colr) => { const sh = new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, -z))); const geo = new THREE.ShapeGeometry(sh, 2); geo.rotateX(-Math.PI / 2); geo.translate(0, y, 0); return colr ? colored(geo, colr) : geo; };
+  const arc = (cx, cz, R, a0, a1, n = 24) => { const o = []; for (let i = 0; i <= n; i++) { const a = a0 + ((a1 - a0) * i) / n; o.push([cx + Math.sin(a) * R, cz + Math.cos(a) * R]); } return o; };
+  // 바깥 경계 (관중석 앞선): 외야 담장 · 파울 지역(붉은 흙) · 홈 뒤
+  const fence = []; for (let i = 0; i <= 40; i++) { const phi = -Math.PI / 4 + (i / 40) * (Math.PI / 2), d = fenceD(phi); fence.push([Math.sin(phi) * d, Math.cos(phi) * d]); }
+  const foulOut = 17, loop = [...fence.map(([x, z]) => [x * 1.012, z * 1.012])];
+  const pL = fence[fence.length - 1], pR = fence[0];
+  loop.push([pL[0] + foulOut * 0.7071, pL[1] - foulOut * 0.7071 + 2], ...arc(0, 0, 21, Math.PI / 2 + 0.25, Math.PI * 1.5 - 0.25, 18).map(([x, z]) => [x, z]), [pR[0] - foulOut * 0.7071, pR[1] - foulOut * 0.7071 + 2]);
+  // 바닥: 붉은 흙(파울 지역 · 경고 트랙) 전체 → 잔디(담장 안 페어 지역 + 파울 잔디) → 내야 흙 · 내야 잔디 · 마운드 · 베이스
+  V.push(flat(loop, y0 + 0.05, '#a8553a'));
+  const grassFan = [[0, -2], ...fence.map(([x, z]) => [x * 0.955, z * 0.955])]; const turf = flat(grassFan, y0 + 0.08); { const uv = turf.attributes.uv; const p = turf.attributes.position; for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / 24, p.getZ(i) / 12); }
+  const foulGrass = []; for (const sd of [-1, 1]) foulGrass.push(flat([[sd * 4, -2], [sd * (pL[0] * 0.95 + 0), pL[1] * 0.95], [sd * (pL[0] * 0.95 + 9), pL[1] * 0.95 - 9], [sd * 13, -6]].map(([x, z]) => [x, z]), y0 + 0.075));
+  for (const fg of foulGrass) { const uv = fg.attributes.uv, p = fg.attributes.position; for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / 24, p.getZ(i) / 12); }
+  const dirtPts = [[0, -1.5], [27.5, 27.5], ...arc(0, 18.4, 29, 1.25, -1.25, 30), [-27.5, 27.5]]; V.push(flat(dirtPts, y0 + 0.1, '#c48a58'));
+  const ig = flat([[0, 3.6], [-16.2, 19.4], [0, 35.4], [16.2, 19.4]], y0 + 0.12); { const uv = ig.attributes.uv, p = ig.attributes.position; for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / 24, p.getZ(i) / 12); }
+  V.push(part(new THREE.CylinderGeometry(4, 4, 0.06, 28), '#c48a58', 0, y0 + 0.13, 0), part(new THREE.CylinderGeometry(2.7, 2.9, 0.3, 24), '#c48a58', 0, y0 + 0.2, 18.4), part(new THREE.BoxGeometry(0.6, 0.04, 0.15), '#ffffff', 0, y0 + 0.36, 18.4));
+  for (const [x, z] of [[-19.4, 19.4], [0, 38.8], [19.4, 19.4]]) V.push(part(new THREE.CylinderGeometry(2.2, 2.2, 0.05, 20), '#c48a58', x, y0 + 0.14, z), part(new THREE.BoxGeometry(0.38, 0.08, 0.38), '#ffffff', x, y0 + 0.18, z, 0, Math.PI / 4, 0));
+  V.push(part(new THREE.CylinderGeometry(0.25, 0.25, 0.04, 5), '#ffffff', 0, y0 + 0.17, 0));
+  for (const sd of [-1, 1]) { const L = 98; V.push(part(new THREE.BoxGeometry(0.1, 0.03, L), '#ffffff', sd * L / 2 * 0.7071, y0 + 0.16, L / 2 * 0.7071, 0, sd * Math.PI / 4, 0)); V.push(part(new THREE.BoxGeometry(1.2, 0.03, 1.8), '#ffffff', sd * 1.1, y0 + 0.15, 0)); }
+  // 외야 담장 (짙은 초록 · 위 노란 줄) · 파울 폴
+  for (let i = 1; i < fence.length; i++) { const [ax, az] = fence[i - 1], [bx, bz] = fence[i], L = Math.hypot(bx - ax, bz - az); V.push(part(new THREE.BoxGeometry(0.4, 3, L + 0.05), '#1f4a3a', (ax + bx) / 2, y0 + 1.5, (az + bz) / 2, 0, Math.atan2(bx - ax, bz - az), 0), part(new THREE.BoxGeometry(0.45, 0.15, L + 0.05), '#f2c230', (ax + bx) / 2, y0 + 3.05, (az + bz) / 2, 0, Math.atan2(bx - ax, bz - az), 0)); }
+  for (const p of [pL, pR]) V.push(part(new THREE.CylinderGeometry(0.2, 0.25, 24, 8), '#f2c230', p[0], y0 + 12, p[1]));
+  // 관중석: 경계를 따라 바깥으로 층층이 (아래층 22줄 · 위층 20줄, 위층은 가파르게) · 구역마다 의자 색
+  const N = loop.length, cx0 = loop.reduce((s, p) => s + p[0], 0) / N, cz0 = loop.reduce((s, p) => s + p[1], 0) / N, nrm = loop.map(([x, z], i) => { const [ax, az] = loop[(i - 1 + N) % N], [bx, bz] = loop[(i + 1) % N]; let nx = bz - az, nz = -(bx - ax); const l = Math.hypot(nx, nz) || 1; nx /= l; nz /= l; if (nx * (x - cx0) + nz * (z - cz0) < 0) { nx = -nx; nz = -nz; } return [nx, nz]; });
+  const SP = [], SUV = [], SC = [], SI = [], rows = []; let off = 1.5, hh = 1.2; for (let k = 0; k < 44; k++) { if (k === 22) { off += 3; hh += 3.2; } rows.push([off, hh]); off += k < 22 ? 0.85 : 0.8; hh += k < 22 ? 0.42 : 0.55; }
+  const secCol = (i) => { const [x, z] = loop[i]; const behind = z < 30, out = z > 80; return out ? ['#2f7a5a', '#3a8a64'][Math.floor(i / 4) % 2] : behind ? ['#1f3f8a', '#2a5ab0', '#c8402a'][Math.floor(i / 3) % 3] : ['#e07a2a', '#2a5ab0', '#c8402a', '#1f3f8a'][Math.floor(i / 4) % 4]; };
+  for (let k = 0; k < rows.length; k++) { const [o, h] = rows[k]; let acc = 0; for (let i = 0; i <= N; i++) { const j = i % N, [x, z] = loop[j], [nx, nz] = nrm[j]; if (i) acc += Math.hypot(loop[j][0] - loop[i - 1][0], loop[j][1] - loop[i - 1][1]); for (const [dO, dH, v] of [[0, 0, 0], [0, 0.42, 0.55], [0.85, 0.42, 1]]) { SP.push(x + nx * (o + dO), y0 + h + dH, z + nz * (o + dO)); SUV.push(acc / 2, v); const c = new THREE.Color(secCol(j)); SC.push(c.r, c.g, c.b); } } }
+  const per = (N + 1) * 3; for (let k = 0; k < rows.length; k++) for (let i = 0; i < N; i++) { const b = k * per + i * 3, b2 = b + 3; for (let q = 0; q < 2; q++) SI.push(b + q, b2 + q, b + q + 1, b2 + q, b2 + q + 1, b + q + 1); }
+  const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(SP, 3)); sg.setAttribute('uv', new THREE.Float32BufferAttribute(SUV, 2)); sg.setAttribute('color', new THREE.Float32BufferAttribute(SC, 3)); sg.setIndex(SI); sg.computeVertexNormals();
+  const seatM = new THREE.MeshLambertMaterial({ map: seatTex(), vertexColors: true, side: THREE.DoubleSide }); g.add(new THREE.Mesh(sg, seatM));
+  // 관중석 앞 낮은 벽 · 위층 지붕(홈 뒤 · 내야) · 바깥 벽
+  for (let i = 0; i < N; i++) { const [ax, az] = loop[i], [bx, bz] = loop[(i + 1) % N], L = Math.hypot(bx - ax, bz - az); V.push(part(new THREE.BoxGeometry(0.3, 1.4, L + 0.1), '#2a3a5a', (ax + bx) / 2, y0 + 0.7, (az + bz) / 2, 0, Math.atan2(bx - ax, bz - az), 0)); const [nx, nz] = nrm[i], o2 = rows[43][0] + 1; V.push(part(new THREE.BoxGeometry(0.6, rows[43][1] + 3, L + 0.4), '#c9c4bc', (ax + bx) / 2 + nx * o2, y0 + (rows[43][1] + 3) / 2, (az + bz) / 2 + nz * o2, 0, Math.atan2(bx - ax, bz - az), 0)); if (az < 60 && loop[i][1] < 60) V.push(part(new THREE.BoxGeometry(12, 0.4, L + 0.4), '#3a3e46', (ax + bx) / 2 + nx * (o2 - 5), y0 + rows[43][1] + 5, (az + bz) / 2 + nz * (o2 - 5), 0, Math.atan2(bx - ax, bz - az), -0.12 * Math.sign(nx || 1) * 0)); }
+  // 관중 (젤리, 인스턴스 하나): 내야는 빽빽 · 외야는 듬성
+  const fanG = merge([part(new THREE.SphereGeometry(0.3, 6, 4), '#ffffff', 0, 0.35, 0, 0, 0, 0, 1, 1.1, 0.9), part(new THREE.SphereGeometry(0.24, 6, 4), '#ffffff', 0, 0.82, 0), part(new THREE.SphereGeometry(0.08, 4, 3), '#ffffff', -0.15, 1.02, 0), part(new THREE.SphereGeometry(0.08, 4, 3), '#ffffff', 0.15, 1.02, 0)]);
+  const fans = new THREE.InstancedMesh(fanG, vcMat(), 4200), o = new THREE.Object3D(), fc = new THREE.Color(), FC = ['#ffffff', '#1f3f8a', '#f4f0e8', '#e8e8e8', '#c8402a', '#2a2a30', '#ffd76a', '#ff9ec0', '#9ad0ff']; let nf = 0; const fanPos = [];
+  for (let k = 0; k < rows.length && nf < 4200; k++) for (let i = 0; i < N && nf < 4200; i++) { const [x, z] = loop[i], [nx, nz] = nrm[i], dens = z > 80 ? 0.22 : 0.7; const [x2, z2] = loop[(i + 1) % N]; const L = Math.hypot(x2 - x, z2 - z); for (let s = 0; s < L; s += 0.9) { if (r() > dens || nf >= 4200) continue; const t = s / L, px = x + (x2 - x) * t + nx * (rows[k][0] + 0.45), pz = z + (z2 - z) * t + nz * (rows[k][0] + 0.45); o.position.set(px, y0 + rows[k][1] + 0.42, pz); o.rotation.set(0, Math.atan2(-nx, -nz), 0); o.scale.setScalar(0.9 + r() * 0.2); o.updateMatrix(); fans.setMatrixAt(nf, o.matrix); fans.setColorAt(nf, fc.set(FC[Math.floor(r() * FC.length)])); fanPos.push([px, rows[k][1], pz, r() * 6.28, fans.instanceMatrix.array.slice(nf * 16, nf * 16 + 16)]); nf++; } }
+  fans.count = nf; fans.frustumCulled = false; fans.instanceMatrix.setUsage(THREE.DynamicDrawUsage); g.add(fans);
+  // 조명탑 여섯 (기둥 · 빛 판) · 전광판 (가운데 담장 뒤)
+  const towerM = new THREE.MeshLambertMaterial({ color: '#fffbea', emissive: '#fff6d8', emissiveIntensity: 0.3 }), TP = [], LP = [];
+  for (const i of [3, 12, 28, 37, Math.floor(N * 0.62), Math.floor(N * 0.86)]) { const [x, z] = loop[i % N], [nx, nz] = nrm[i % N], o2 = rows[43][0] + 3, px = x + nx * o2, pz = z + nz * o2, ry = Math.atan2(-nx, -nz); TP.push(part(new THREE.CylinderGeometry(0.6, 0.9, 48, 8), '#c9ccd0', px, y0 + 24, pz)); TP.push(part(new THREE.BoxGeometry(9, 4.2, 0.5), '#3a3e46', px, y0 + 49, pz, 0.35, ry, 0)); for (let a = 0; a < 4; a++) for (let b = 0; b < 8; b++) { const lx = -3.8 + b * 1.08, ly = -1.5 + a * 1.0; LP.push(part(new THREE.BoxGeometry(0.85, 0.75, 0.1), '#ffffff', px + Math.cos(ry) * lx - Math.sin(ry) * 0.3, y0 + 49 + ly * Math.cos(0.35), pz - Math.sin(ry) * lx - Math.cos(ry) * 0.3, 0.35, ry, 0)); } }
+  g.add(new THREE.Mesh(merge(TP), vcMat()), new THREE.Mesh(merge(LP), towerM));
+  const sbT = scoreTex(), sbM = new THREE.MeshBasicMaterial({ map: sbT }), sb = new THREE.Mesh(new THREE.PlaneGeometry(30, 11.25), sbM); const sbz = fenceD(0) + 24; sb.position.set(0, y0 + 22, sbz); sb.rotation.y = Math.PI; g.add(sb); V.push(part(new THREE.BoxGeometry(32, 13, 1.2), '#1a1e26', 0, y0 + 22, sbz + 0.7), part(new THREE.BoxGeometry(3, 16, 2), '#2a2e36', -8, y0 + 8, sbz + 1), part(new THREE.BoxGeometry(3, 16, 2), '#2a2e36', 8, y0 + 8, sbz + 1));
+  // 바닥 · 담장 · 관중석 벽을 한 번에, 잔디(줄무늬) 따로
+  // 밤 경기: 조명탑이 경기장을 환하게 (잔디 · 흙 · 관중석이 스스로 밝아진다)
+  const vM = vcMat({ emissive: '#fff6e0', emissiveIntensity: 0 }); g.add(new THREE.Mesh(merge(V), vM));
+  const tT = turfTex(), turfM = new THREE.MeshLambertMaterial({ map: tT, emissive: '#ffffff', emissiveMap: tT, emissiveIntensity: 0 }); g.add(new THREE.Mesh(merge([turf, ...foulGrass, ig].map((q) => { const z = q.toNonIndexed ? q : q; for (const k of Object.keys(z.attributes)) if (!['position', 'normal', 'uv'].includes(k)) z.deleteAttribute(k); return z; })), turfM));
+  seatM.emissive.set('#ffffff'); fans.material.emissive.set('#ffffff'); vM.emissive.set('#ffffff'); for (const m of [vM, seatM, fans.material]) glowByColor(m);
+  lit(A, (L) => { towerM.emissiveIntensity = 0.3 + L * 2.2; turfM.emissiveIntensity = L * 0.55; vM.emissiveIntensity = L * 0.6; seatM.emissiveIntensity = L * 0.5; fans.material.emissiveIntensity = L * 0.6; });
+  // 선수: 수비(흰 유니폼 · 남색 모자) 아홉 + 타자 · 포수 · 심판 + 주자. 한 사람 = 몸 · 머리 · 모자 묶음 하나
+  const playerM = glowByColor(vcMat({ emissive: '#ffffff', emissiveIntensity: 0 })); lit(A, (L) => { playerM.emissiveIntensity = L * 0.6; });
+  const player = (body, cap) => { const ps = jelly(body, 1.25); ps.push(part(new THREE.SphereGeometry(0.2, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), cap, 0, 1.38, 0, 0, 0, 0, 1.3, 0.7, 1.3), part(new THREE.BoxGeometry(0.28, 0.03, 0.22), cap, 0, 1.38, 0.2)); return new THREE.Mesh(merge(ps), playerM); };
+  const POS = { P: [0, 18.4], C: [0, -1.8], '1B': [-20, 24], '2B': [-9, 36], SS: [9, 36], '3B': [20, 24], LF: [44, 72], CF: [0, 92], RF: [-44, 72] };
+  const fielders = {}; for (const [k, [x, z]] of Object.entries(POS)) { const m = player('#f4f2ee', '#1a2a5a'); m.position.set(x, y0 + 0.15, z); m.rotation.y = Math.PI; g.add(m); fielders[k] = m; }
+  fielders.C.rotation.y = 0; const batter = player('#8a9ab8', '#c8402a'); batter.position.set(0.9, y0 + 0.15, 0.2); batter.rotation.y = -Math.PI / 2; g.add(batter); const ump = player('#2a2a30', '#1a1a1a'); ump.position.set(0, y0 + 0.15, -3); g.add(ump);
+  const bat = new THREE.Mesh(colored(new THREE.CylinderGeometry(0.035, 0.02, 0.85, 6), '#c8a070'), vcMat()); bat.position.set(-0.25, 1.15, 0.1); bat.rotation.set(0, 0, 0.9); batter.add(bat);
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffffff' })); ball.visible = false; g.add(ball);
+  const undo = hideTrees(hg, (x, z) => Math.hypot(x - BB[0], z - BB[1]) < 125);
+  const S = { fans, fanPos, fielders, batter, bat, ball, y0, sbM, home: { ...POS } };
+  A.ballpark = S;
+  return { group: g, tick(dt, exp) { if (!exp) return; }, dispose() { undo(); g.traverse((q) => q.geometry?.dispose?.()); } };
+}
+registerAttraction({
+  id: 'baseball', name: '잠실야구장 경기 관람', seal: '야구장', icon: '⚾', x: BB[0] - 30, z: BB[1] + 112, r: 26, buildR: 1200, verb: '경기 보기',
+  go: [BB[0] - 30, BB[1] + 118, Math.PI], intro: '관중석에 앉아 한 이닝을 봐요 · 던지고 치고 달리는 저녁 경기 · 응원 함성',
+  build: buildBallpark,
+  start(A) {
+    const hg = A.hg, S = A.ballpark; if (!S) return null; const h0 = hg.state.hour; if (h0 < 18 || h0 > 22) hg.state.hour = 19.1; const bearVis = hg.bear?.root.visible;
+    const W2 = (lx, y, lz) => new THREE.Vector3(BB_HOME[0] + lx * Math.cos(BB_ROT) + lz * Math.sin(BB_ROT), y, BB_HOME[1] - lx * Math.sin(BB_ROT) + lz * Math.cos(BB_ROT));
+    const F = S.fielders, P0 = Object.fromEntries(Object.entries(F).map(([k, m]) => [k, m.position.clone()])); let lastPitch = -1, hit = null, cheer = 0, outs = 1, balls = 0, strikes = 0, msg = '';
+    const plays = ['strike', 'ball', 'hit', 'foul', 'strike', 'hit2', 'out'];
+    const E = { title: '잠실야구장 · 6회말', lock: true,
+      status() { return this.t < 34 ? `${msg || '⚾ 투수가 던져요'} · ${Math.ceil(34 - this.t)}초` : '경기 잘 봤어요!'; },
+      tick(dt) {
+        if (hg.bear) hg.bear.root.visible = false; const t = this.t, y0 = S.y0, pitchT = 4.6, k = Math.floor((t - 1) / pitchT), ph = (t - 1) - k * pitchT; if (t > 35) { A.finish(E); return; }
+        const play = plays[Math.min(plays.length - 1, Math.max(0, k))];
+        // 투구: 0 ~ 1.2 준비 · 1.2 ~ 1.65 공이 홈으로 · 1.65 스윙
+        F.P.rotation.y = Math.PI + (ph < 1.2 ? Math.sin(ph * 2.6) * 0.5 : 0); S.bat.rotation.z = ph > 1.55 && ph < 1.9 && play !== 'ball' ? 0.9 - (ph - 1.55) * 9 : 0.9;
+        if (k !== lastPitch && k >= 0) { lastPitch = k; hit = null; if (play.startsWith('hit')) { const a = play === 'hit' ? 0.5 : -0.35, d = play === 'hit' ? 70 : 105; hit = { from: new THREE.Vector3(0, y0 + 1, 0.5), to: new THREE.Vector3(Math.sin(a) * d, y0 + 0.2, Math.cos(a) * d), t0: 1.65, fld: play === 'hit' ? 'LF' : 'RF', hr: play === 'hit2' }; } }
+        const B = S.ball; B.visible = ph > 1.2 && k >= 0;
+        if (ph > 1.2 && ph < 1.65) { const q = (ph - 1.2) / 0.45; B.position.set(0, y0 + 1.6 - q * 0.6, 18 - q * 17.6); }
+        else if (ph >= 1.65 && hit) { const q = clamp((ph - hit.t0) / 2.4, 0, 1); B.position.lerpVectors(hit.from, hit.to, q); B.position.y += Math.sin(q * Math.PI) * (hit.hr ? 34 : 18); const fm = F[hit.fld]; fm.position.lerp(new THREE.Vector3(hit.to.x * 0.92, y0 + 0.15, hit.to.z * 0.92), dt * 1.4 * (q < 1 ? 1 : 0)); S.batter.position.lerp(new THREE.Vector3(-19.4, y0 + 0.15, 19.4), dt * 0.9); if (q > 0.98 && !hit.done) { hit.done = true; cheer = 3; msg = hit.hr ? '🎉 홈런! 관중석이 들썩여요' : '안타! 1루로 달려요'; A.drum(0.7, 120, 0.3); } }
+        else if (ph >= 1.65 && ph < 1.7 && !hit) { msg = play === 'ball' ? '볼' : play === 'foul' ? '파울!' : play === 'out' ? '삼진 아웃! 이닝 끝' : '스트라이크!'; }
+        if (ph < 0.1 && k >= 0) { for (const [kk, m] of Object.entries(F)) if (kk !== 'P' && kk !== 'C') m.position.lerp(P0[kk], 0.5); if (!hit) S.batter.position.set(0.9, S.y0 + 0.15, 0.2); }
+        // 응원: 관중이 들썩 (안타 · 홈런 때 크게)
+        cheer = Math.max(0, cheer - dt); const amp = 0.05 + cheer * 0.12, arr = S.fans.instanceMatrix.array; for (let i = 0; i < S.fanPos.length; i += 1) { const fp = S.fanPos[i]; arr[i * 16 + 13] = fp[4][13] + Math.max(0, Math.sin(t * 6 + fp[3])) * amp; } S.fans.instanceMatrix.needsUpdate = true;
+      },
+      cam(camera, dt) { const pos = W2(-9, S.y0 + 15, -34), look = W2(0, S.y0 + 1, 34 + Math.sin(this.t * 0.2) * 4); if (S.ball.visible && this.t > 1 && S.ball.position.z > 30) look.lerp(W2(S.ball.position.x, S.ball.position.y, S.ball.position.z), 0.35); (this.cp ||= pos.clone()).lerp(pos, 1 - Math.exp(-dt * 3)); camera.position.copy(this.cp); (this.lk ||= look.clone()).lerp(look, 1 - Math.exp(-dt * 2)); camera.lookAt(this.lk); },
+      end() { S.ball.visible = false; for (const [kk, m] of Object.entries(F)) m.position.copy(P0[kk]); S.batter.position.set(0.9, S.y0 + 0.15, 0.2); if (hg.bear) hg.bear.root.visible = bearVis ?? true; }, where() { return '잠실야구장 관중석'; } };
     return E;
   },
 });
