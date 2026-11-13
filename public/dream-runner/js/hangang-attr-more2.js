@@ -92,8 +92,9 @@ registerAttraction({
       tick() { if (hg.bear) hg.bear.root.visible = false; if (this.t > 23) A.finish(E); },
       cam(camera, dt) {
         const t = this.t; let pos, look;
+        // 탑 둘레는 홀 폭(20m) 안에서 도는 타원 (예전엔 반지름 14.5m 원이라 옆 벽을 뚫고 나갔다)
         if (t < 14) { const k = smooth(t / 14); pos = new THREE.Vector3(MU.x + Math.sin(t * 0.3) * 1.5, 1.7, MU.z + D.L / 2 - 3 - k * 15); look = new THREE.Vector3(MU.x, 4 + k * 3.5, MU.z - 28); }
-        else { const a = (t - 14) * 0.18 - 0.2; pos = new THREE.Vector3(MU.x + Math.sin(a) * 14.5, 2.2, MU.z - 28 + Math.cos(a) * 14.5); look = new THREE.Vector3(MU.x, 6.2, MU.z - 28); }
+        else { const a = (t - 14) * 0.18 - 0.2; pos = new THREE.Vector3(MU.x + Math.sin(a) * 7.6, 2.2, MU.z - 28 + Math.cos(a) * 14.5); look = new THREE.Vector3(MU.x, 6.2, MU.z - 28); }
         (this.cp ||= pos.clone()).lerp(pos, 1 - Math.exp(-dt * 3)); camera.position.copy(this.cp); (this.lk ||= look.clone()).lerp(look, 1 - Math.exp(-dt * 3)); camera.lookAt(this.lk);
       },
       end() { g.visible = false; if (hg.bear) hg.bear.root.visible = bearVis ?? true; }, where() { return '국립중앙박물관 역사의 길'; } };

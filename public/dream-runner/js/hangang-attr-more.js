@@ -137,6 +137,22 @@ function hideTrees(hg, fn) {
   }
   return () => { const up = new Set(); for (const [m, q, M] of saved) { m.setMatrixAt(q, M); up.add(m); } for (const m of up) m.instanceMatrix.needsUpdate = true; saved.length = 0; };
 }
+// 지도 물 숨기기: 세 꼭짓점이 모두 fn(x, z) 안인 지도 물 삼각형을 뺀다 (명소가 다시 지은 연못 둘레로 지도 물이 삐져나와 보이지 않게). 돌려놓는 함수를 돌려준다
+function hideMapWater(hg, fn) {
+  const saved = [], v = new THREE.Vector3();
+  hg.scene.traverse((m) => {
+    if (!m.isMesh || m.material !== hg.waterM || m.userData.waterCut) return;
+    const G = m.geometry, P = G.attributes.position, ix = G.index?.array, n = ix ? ix.length : P.count, at = (k) => (ix ? ix[k] : k); m.updateMatrixWorld();
+    const inn = (i) => { v.fromBufferAttribute(P, i).applyMatrix4(m.matrixWorld); return fn(v.x, v.z); };
+    const keep = []; let cut = 0; for (let k = 0; k < n; k += 3) { if (inn(at(k)) && inn(at(k + 1)) && inn(at(k + 2))) cut++; else keep.push(k); }
+    if (!cut) return; m.userData.waterCut = true;
+    if (ix) { saved.push([m, 'i', G.index]); G.setIndex(keep.flatMap((k) => [ix[k], ix[k + 1], ix[k + 2]])); return; }
+    // 땅에 얹은 물(꼭짓점이 삼각형마다 따로): 남길 삼각형만 새 속성으로
+    const olds = {}; for (const [name, a] of Object.entries(G.attributes)) { olds[name] = a; const s2 = a.itemSize, arr = new a.array.constructor(keep.length * 3 * s2); keep.forEach((k, q) => arr.set(a.array.subarray(k * s2, (k + 3) * s2), q * 3 * s2)); G.setAttribute(name, new THREE.BufferAttribute(arr, s2, a.normalized)); }
+    saved.push([m, 'a', olds]);
+  });
+  return () => { for (const [m, k, o] of saved) { if (k === 'i') m.geometry.setIndex(o); else for (const [name, a] of Object.entries(o)) m.geometry.setAttribute(name, a); m.userData.waterCut = false; } saved.length = 0; };
+}
 // 곰 대신 보이는 작은 젤리 손님 (몸 · 머리 · 귀, 색만 다르게)
 function jelly(col, s = 1) { const p = []; p.push(part(new THREE.SphereGeometry(0.32, 10, 8), col, 0, 0.45, 0, 0, 0, 0, 1, 1.15, 0.9), part(new THREE.SphereGeometry(0.26, 10, 8), col, 0, 0.98, 0), part(new THREE.SphereGeometry(0.08, 6, 4), col, -0.17, 1.2, 0), part(new THREE.SphereGeometry(0.08, 6, 4), col, 0.17, 1.2, 0), part(new THREE.SphereGeometry(0.04, 6, 4), '#2a1c14', -0.08, 1.0, 0.23), part(new THREE.SphereGeometry(0.04, 6, 4), '#2a1c14', 0.08, 1.0, 0.23)); return p.map((g) => (g.scale(s, s, s), g)); }
 
@@ -477,9 +493,11 @@ function buildHuwon(A) {
   // 연못 · 집 자리의 지도 나무는 치운다
   const treeOut = (x, z) => { const dx = x - POND[0], dz = z - POND[1], lx = dx * Math.cos(HROT) - dz * Math.sin(HROT), lz = dx * Math.sin(HROT) + dz * Math.cos(HROT); return (Math.abs(lx) < PW / 2 + 3 && Math.abs(lz) < PD / 2 + 3) || (Math.abs(lx - bx) < 6 && Math.abs(lz - bz) < 7) || (Math.abs(lx - ex0) < 6 && Math.abs(lz - ez0) < 10) || (Math.abs(lx - jx) < 15 && lz < -14 && lz > -54); };
   // 칸 나무는 나중에 심기기도 해서 몇 번 더 치운다 · 멀리서는 가라앉힌 물을 끈다 (항상 그리는 물이라 언덕 너머로 비칠 수 있다)
-  const undo = [hideTrees(hg, treeOut)]; let tT = 0, tN = 0;
+  // 지도 연못 물(OSM 부용지)은 다시 지은 연못보다 커서 북쪽 끝에 하늘색 띠로 비쳤다 → 연못 둘레 45m 안의 지도 물은 뺀다
+  const waterOut = (x, z) => Math.hypot(x - POND[0], z - POND[1]) < 45;
+  const undo = [hideTrees(hg, treeOut), hideMapWater(hg, waterOut)]; let tT = 0, tN = 0;
   A.huwonY = { y0, wy, by, jy, ey };
-  return { group: g, tick(dt) { tT += dt; if (tT > 2 && tN < 12) { tT = 0; tN++; undo.push(hideTrees(hg, treeOut)); } water.visible = lid.visible = Math.hypot(hg.px - POND[0], hg.pz - POND[1]) < 220; water.material.userData.U.uT.value += dt; }, dispose() { for (const u of undo.reverse()) u(); g.traverse((q) => q.geometry?.dispose?.()); } };
+  return { group: g, tick(dt) { tT += dt; if (tT > 2 && tN < 12) { tT = 0; tN++; undo.push(hideTrees(hg, treeOut), hideMapWater(hg, waterOut)); } water.visible = lid.visible = Math.hypot(hg.px - POND[0], hg.pz - POND[1]) < 220; water.material.userData.U.uT.value += dt; }, dispose() { for (const u of undo.reverse()) u(); g.traverse((q) => q.geometry?.dispose?.()); } };
 }
 registerAttraction({
   id: 'huwon', name: '창덕궁 후원 부용지', seal: '후원', icon: '🪷', x: hw2(4, 21)[0], z: hw2(4, 21)[1], r: 26, buildR: 900, verb: '연못가 거닐기',
