@@ -80,7 +80,7 @@ export class ArcadeRooms extends BaseRooms {
     if (m.t === 'bomb') {
       if (S.t <= 0) return; // 시작 전
       if (Number.isFinite(Number(m.x))) this.takeMove(r, c, p, { x: Number(m.x), y: Number(m.y), d: p.dir, m: p.moving ? 1 : 0 }, Date.now());
-      const inp = r.inputs.get(c.id); if (inp) inp.bomb = true;
+      const inp = r.inputs.get(c.id); if (inp) inp.bomb = 0.25; // 못 놓는 순간이면 0.25초 동안 다시 시도
     }
   }
   takeMove(r, c, p, mv, now) {

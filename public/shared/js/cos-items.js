@@ -135,6 +135,7 @@ export const GAMES = {
   'jelly-ten': { name: '젤리텐', emoji: '🍎', color: '#ff6b6b' }, 'jelly-ding': { name: '젤리 땡', emoji: '🔔', color: '#ffc93c' }, 'jelly-court': { name: '젤리궁정', emoji: '👑', color: '#c77dff' },
   'jelly-merge': { name: '젤리 머지', emoji: '🍬', color: '#ff9ed1' }, 'jelly-slide': { name: '젤리 슬라이드', emoji: '🧩', color: '#7fe9ff' }, 'jelly-type': { name: '젤리 타자연습', emoji: '⌨️', color: '#b6c4ff' },
   'jelly-word': { name: '젤리 끝말잇기', emoji: '🔤', color: '#ffb7d2' }, 'jelly-draw': { name: '젤리 그림릴레이', emoji: '🎨', color: '#ffa94d' }, 'jelly-sketch': { name: '젤리 스케치퀴즈', emoji: '✏️', color: '#69db7c' },
+  'jelly-arcade': { name: '젤리 아케이드', emoji: '💣', color: '#ff8fc0' },
 };
 // 기록판이 있는 게임: board(판) 이름 · 값 문턱. lower: 작을수록 좋은 기록 / unit: 단위
 const RECORD_GAMES = {

@@ -237,3 +237,19 @@ test('봇: 보통이 쉬움보다 세다 · 팀전도 끝난다', () => {
   assert.ok(decided >= 15, `승부가 난 판 ${decided}`);
   assert.ok(normalWins >= decided * 0.6, `보통 팀 승 ${normalWins} / ${decided}`);
 });
+
+test('폭탄 누름 버퍼: 지금 칸에 못 놓으면 0.25초 안에 놓을 수 있게 되는 순간 놓는다', () => {
+  const S = blank(); const p = at(S, 1, 2, 2);
+  p.bombs = 2;
+  G.step(S, 1 / 60, new Map([[1, { x: 0, y: 0, bomb: true }]]));
+  assert.equal(S.bombs.length, 1);
+  // 같은 칸(폭탄 위)에서 다시 누르고 옆 칸으로 걸어가면, 옆 칸 가운데에 닿을 때 놓인다
+  const inp = { x: 1, y: 0, bomb: 0.25 }, m = new Map([[1, inp]]);
+  for (let i = 0; i < 15; i++) G.step(S, 1 / 60, m);
+  assert.equal(S.bombs.length, 2);
+  assert.equal(inp.bomb, false);
+  // 끝내 못 놓으면 0.25초 뒤 사라진다 (폭탄 다 씀)
+  const inp2 = { x: 0, y: 0, bomb: 0.25 };
+  for (let i = 0; i < 20; i++) G.step(S, 1 / 60, new Map([[1, inp2]]));
+  assert.equal(inp2.bomb, false); assert.equal(S.bombs.length, 2);
+});

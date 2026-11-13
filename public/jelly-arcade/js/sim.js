@@ -278,7 +278,12 @@ export function step(S, dt, inputs) {
     if (p.out) continue;
     const inp = inputs?.get(p.id);
     if (inp && !inp.net) movePlayer(S, p, inp.x | 0, inp.y | 0, dt);
-    if (inp?.bomb) { placeBomb(S, p, ev); inp.bomb = false; }
+    // bomb: true = 이번 한 번, 숫자 = 그 시간(초) 동안 놓일 때까지 다시 시도 (눌렀는데 씹히지 않게)
+    if (inp?.bomb) {
+      const trapped = p.trap > 0, ok = placeBomb(S, p, ev);
+      if (ok || trapped || typeof inp.bomb !== 'number') inp.bomb = false;
+      else { inp.bomb -= dt; if (inp.bomb <= 0) inp.bomb = false; }
+    }
     if (p.safe > 0) p.safe -= dt;
   }
   // 폭탄 심지

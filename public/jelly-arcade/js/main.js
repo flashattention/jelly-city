@@ -264,7 +264,7 @@ function setTheme(map) {
 }
 function beginGame(S, members, { net, startIn = 3000 }) {
   clearGame();
-  game.S = S; game.net = net; game.members = new Map(members.map((m) => [m.id, m]));
+  game.S = S; game.myInp = null; game.net = net; game.members = new Map(members.map((m) => [m.id, m]));
   setTheme(S.map);
   game.board = new Board(scene, S, { phone: isPhone }); fogFit();
   for (const p of S.players) game.bears.set(p.id, new Bear(game.members.get(p.id) || { id: p.id, name: '곰돌이' }, p.id === game.myId));
@@ -296,7 +296,7 @@ function titleScene() {
   clearGame();
   const map = G.MAPS[game.map] ? game.map : 'candy';
   const S = G.createGame({ map, seed: 7, players: [] });
-  game.S = S; setTheme(map); game.board = new Board(scene, S, { phone: isPhone }); fogFit();
+  game.S = S; game.myInp = null; setTheme(map); game.board = new Board(scene, S, { phone: isPhone }); fogFit();
 }
 
 // ---------- 같이 하기 ----------
@@ -495,14 +495,14 @@ function playFrame(dt) {
       game.acc += dt;
       const inp = autoInput(readInput(), me, dt);
       const inputs = new Map();
-      inputs.set(game.myId, { x: inp.x, y: inp.y, bomb: inp.bomb });
-      let first = true;
+      // 내 입력은 판 사이에도 이어진다: 이번 화면에서 판이 안 돌아도(화면이 빠른 모니터) 누른 폭탄이 사라지지 않고, 못 놓으면 0.25초 동안 다시 시도
+      const mi = game.myInp ||= { x: 0, y: 0, bomb: false };
+      mi.x = inp.x; mi.y = inp.y; if (inp.bomb) mi.bomb = 0.25;
+      inputs.set(game.myId, mi);
       while (game.acc >= DT) {
         game.acc -= DT;
-        if (!first) { const i = inputs.get(game.myId); i.bomb = false; }
         for (const p of S.players) if (p.bot) inputs.set(p.id, think(S, p, game.brains.get(p.id), DT));
         for (const e of G.step(S, DT, inputs)) onEvent(e);
-        first = false;
         if (S.over) break;
       }
       if (S.over && !game.resultAt) game.resultAt = now + 1200;
