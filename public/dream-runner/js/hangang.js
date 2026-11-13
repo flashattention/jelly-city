@@ -474,7 +474,9 @@ export class Hangang {
     if (!raw && (this.inside || this.inShop || this.inMall)) return 0;
     // 격자 밖(서울 바깥 · 가게 안 장면이 있는 먼 곳)은 0
     let fx = (x - T.x0) / T.step, fz = (z - T.z0) / T.step; if (fx < 0 || fz < 0 || fx > T.nx - 1 || fz > T.nz - 1) return 0; fx = Math.min(fx, T.nx - 1.001); fz = Math.min(fz, T.nz - 1.001); const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j, k = j * T.nx + i, h = raw === 'orig' ? T.h0 || T.h : T.h;
-    return (h[k] * (1 - u) + h[k + 1] * u) * (1 - v) + (h[k + T.nx] * (1 - u) + h[k + T.nx + 1] * u) * v;
+    // 8-4: 땅 격자(PlaneGeometry)가 칸마다 (0,1)-(1,0) 대각선의 세모 두 개로 그려지니, 높이도 같은 세모로 (네 점 섞기로 재면 가파른 산에서 곰이 1m 넘게 땅에 묻혔다)
+    const h00 = h[k], h10 = h[k + 1], h01 = h[k + T.nx], h11 = h[k + T.nx + 1];
+    return u + v <= 1 ? h00 + (h10 - h00) * u + (h01 - h00) * v : h11 + (h01 - h11) * (1 - u) + (h10 - h11) * (1 - v);
   }
   // 칸 안 격자점 중 물 위인 곳은 높이 0 (지형 자료는 상류 강물이 기준보다 높게 나온다)
   maskWater(key) {
@@ -540,7 +542,9 @@ export class Hangang {
     // 땅: 칸마다 지형 격자 그대로 (바탕 도시 땅은 높이 0 이라 언덕 아래로 숨는다)
     const S = this.world0.tile, [ti, tj] = c.chunkKey.split('_').map(Number), n = Math.round(S / this.terr.step), g = new THREE.PlaneGeometry(S, S, n, n); g.rotateX(-Math.PI / 2); g.translate((ti + 0.5) * S, 0, (tj + 0.5) * S);
     { const p = g.attributes.position; for (let k = 0; k < p.count; k++) p.setY(k, H(p.getX(k), p.getZ(k)) - 0.05); g.computeVertexNormals(); }
-    if (!this.terrLandM) { const tx = groundTex('city'); tx.repeat.set(S / 9, S / 9); this.terrLandM = new THREE.MeshLambertMaterial({ color: '#a3a39f', map: tx }); }
+    // 8-4: 산(북악 · 인왕 · 관악 등) 비탈의 맨땅이 도시 바닥처럼 회색이었다 → 높고(60m 위) 가파른 곳일수록 숲 바닥 빛(어두운 올리브)으로 꼭짓점 색을 섞는다
+    { const p = g.attributes.position, st = this.terr.step, col = new Float32Array(p.count * 3); for (let k = 0; k < p.count; k++) { const x = p.getX(k), z = p.getZ(k), h = H(x, z), sl = Math.hypot(H(x + st, z) - H(x - st, z), H(x, z + st) - H(x, z - st)) / (2 * st), sm = (a, b, v) => clamp((v - a) / (b - a), 0, 1), f = Math.max(sm(60, 130, h), sm(0.1, 0.22, sl) * sm(35, 70, h)); col[k * 3] = 1 - f * 0.3; col[k * 3 + 1] = 1 - f * 0.18; col[k * 3 + 2] = 1 - f * 0.46; } g.setAttribute('color', new THREE.BufferAttribute(col, 3)); }
+    if (!this.terrLandM) { const tx = groundTex('city'); tx.repeat.set(S / 9, S / 9); this.terrLandM = new THREE.MeshLambertMaterial({ color: '#a3a39f', map: tx, vertexColors: true }); }
     const land = new THREE.Mesh(g, this.terrLandM); land.receiveShadow = true; land.renderOrder = -61; land.userData.noDrape = true; c.scene.add(land);
     // 바닥 층은 깊이를 보도록 (언덕 뒤의 길이 앞 언덕 위에 그려지지 않게), 땅보다 살짝 앞으로
     c.scene.traverse((o) => { const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of ms) if (m.userData?.order !== undefined && !m.depthTest) { m.depthTest = true; m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -4; m.needsUpdate = true; } });
@@ -2483,7 +2487,9 @@ float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y
     else { cx = bx - fx * 26; cy = 22 + tb; cz = bz - fz * 26; lx = bx + fx * 30; ly = tb; lz = bz + fz * 30; }
     if (!this.camInit) { camera.position.set(cx, cy, cz); this.camInit = true; }
     const ky = this.climb || Math.abs(cy - camera.position.y) > 3 ? 1 - Math.exp(-dt * 12) : k; camera.position.x += (cx - camera.position.x) * k; camera.position.y += (cy - camera.position.y) * ky; // 높이: 벽 타기나 크게 벌어졌을 땐 빨리 따라간다 (작은 점프는 부드럽게)
-    camera.position.z += (cz - camera.position.z) * k; camera.position.y = Math.max(0.3 + (tb ? Math.max(tb, this.terrAt(camera.position.x, camera.position.z)) : 0), camera.position.y); { const dg = this.deckAt(camera.position.x, camera.position.z, this.y + 0.5); if (dg > 0.5 && this.y >= dg - 0.3) camera.position.y = Math.max(camera.position.y, dg + tb + 0.6); } // 다리 위에 있을 땐 카메라가 다리 밑으로 안 내려간다
+    camera.position.z += (cz - camera.position.z) * k; camera.position.y = Math.max(0.3 + (tb ? Math.max(tb, this.terrAt(camera.position.x, camera.position.z)) : 0), camera.position.y);
+    // 8-4: 가파른 산비탈(인왕산 · 북악산)에서 낮게 올려다보면 곰과 카메라 사이 땅이 솟아 곰 몸이 땅에 묻혀 보였다 → 사이 땅(1/3 · 2/3 지점)보다도 0.6m 위
+    if (tb && !this.inside && !this.inShop && !this.inMall) { const ex = camera.position.x, ez = camera.position.z, cy0 = camera.position.y, by = y + 0.5; let lift = cy0; for (const t of [0.33, 0.66]) { const g = this.terrAt(ex + (bx - ex) * t, ez + (bz - ez) * t); if (g + 0.3 > cy0 + (by - cy0) * t) lift = Math.max(lift, g + 0.6); } camera.position.y = lift; } { const dg = this.deckAt(camera.position.x, camera.position.z, this.y + 0.5); if (dg > 0.5 && this.y >= dg - 0.3) camera.position.y = Math.max(camera.position.y, dg + tb + 0.6); } // 다리 위에 있을 땐 카메라가 다리 밑으로 안 내려간다
     if (this.inside) camera.position.y = Math.min(camera.position.y, (this.ride ? 2.2 : 4.1) + (this.ride ? 0 : this.y > 3 ? (this.inside.S.LV || 0) : 0));
     if (this.inShop) camera.position.y = Math.min(camera.position.y, 3.1);
     // 실내가 알려 주는 천장 높이 (롯데월드타워 층마다)
