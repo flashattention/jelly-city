@@ -44,6 +44,9 @@ class RoutePath {
     // 높은 쪽으로 올린 뒤 앞뒤 4m 만 한 번 더 고르게 (계단처럼 튀지 않게, 그래도 땅 위)
     for (let i = 0; i < this.n; i++) h[i] = Math.max(h[i], top[i]);
     const h2 = new Float32Array(this.n); for (let i = 0; i < this.n; i++) h2[i] = Math.max(top[i], (h[Math.max(0, i - 1)] + h[i] * 2 + h[Math.min(this.n - 1, i + 1)]) / 4);
+    // 6-11: 칸을 지을 때 물가 지형(lowerLakes · maskWater)이 바뀌어도 이미 지어 둔 길 · 땅 그물은 예전 높이에 남는다.
+    //   길 높이는 한 번 올라간 곳에서 내려가지 않게 (내려가면 곰 · 장애물이 그 그물 속에 묻혔다 · 청계천 1.9m)
+    if (this.h && this.h.length === h2.length) for (let i = 0; i < this.n; i++) h2[i] = Math.max(h2[i], this.h[i]);
     this.h = h2;
   }
 }
@@ -161,6 +164,9 @@ export class SeoulRun {
     hw.tickEnv(dt, camera, px, pz); hw.tickSignals(hw.time);
     // 먼 나무 칸 · 작은 것 숨기기 (서울 산책 tickWorld 와 같은 거리)
     this.lodT = (this.lodT || 0) - dt; if (this.lodT <= 0) { this.lodT = 0.4; const R = 1100;
+      // 6-11: 먼 땅(200m 성긴 격자 · 초록)을 지금 코스 칸이 있는 곳에서는 40m 내린다 (서울 산책은 tickWorld 가 한다). 안 내리면 비탈에서 길보다 3m 넘게 솟아 곰 · 장애물을 덮었다
+      if (hw.farU) { const TL = hw.world0.tile, ti = Math.floor(px / TL), tj = Math.floor(pz / TL), U = hw.farU, have = new Set(); for (const c of hw.chunks.values()) if (c.scene.visible) { const [a, b] = c.chunkKey.split('_'); have.add(`${a}_${b}`); }
+        U.uC.value.set(ti, tj); for (let b = -2; b <= 2; b++) for (let a = -2; a <= 2; a++) U.uL.value[(b + 2) * 5 + a + 2] = have.has(`${ti + a}_${tj + b}`) ? 1 : 0; }
       for (const c of hw.chunks.values()) c.scene.traverse((o) => { const L = o.userData.lod; if (L) o.count = Math.hypot(L[0] - px, L[1] - pz) < (L[3] ? L[3] : R + 360) ? L[2] : 0; const V = o.userData.lodV; if (V) o.visible = Math.hypot(V[0] - px, V[1] - pz) < V[2]; });
       const v = this.v; for (const o of hw.lodObjs || []) { const bs = o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere); v.copy(bs.center).applyMatrix4(o.matrixWorld); o.visible = Math.hypot(v.x - px, v.z - pz) - bs.radius < 400; } }
   }
@@ -172,9 +178,42 @@ export class SeoulRun {
     const P = PATHS[c], G = new Map(), GS = 20, q = { x: 0, z: 0 }; for (let u = 0; u <= P.len; u += 4) { P.pos(u, q); const k = `${Math.floor(q.x / GS)},${Math.floor(q.z / GS)}`; if (!G.has(k)) G.set(k, []); G.get(k).push([q.x, q.z]); }
     const half = seoulLaneW(c) / 2, near = (x, z, R) => { const gx = Math.floor(x / GS), gz = Math.floor(z / GS), R2 = R * R; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const [px, pz] of G.get(`${gx + a},${gz + b}`) || []) if ((px - x) ** 2 + (pz - z) ** 2 < R2) return true; return false; };
     const zero = new THREE.Matrix4().makeScale(0, 0, 0);
-    for (const T of chunk.treeGroups || []) { const A = T.arr === 'f' ? chunk.forestFill || [] : chunk.trees || [], R = T.arr === 'f' ? half + 4.5 : half + 1.2; let hit = false;
+    for (const T of chunk.treeGroups || []) { const A = T.arr === 'f' ? chunk.forestFill || [] : chunk.trees || [], R = T.arr === 'f' ? half + 4.5 : half + 2.5; let hit = false;
       T.idx.forEach((si, k) => { const p = A[si]; if (!p || !near(p[0], p[1], R)) return; for (const m of T.ms) m?.setMatrixAt(k, zero); hit = true; }); if (hit) for (const m of T.ms) if (m) m.instanceMatrix.needsUpdate = true; }
     this.cullPoles(chunk, c);
+    this.carveLane(chunk, c);
+  }
+  // 6-12: 달리는 차로 위(가운데에서 레인 폭/2 + 0.6m 안) · 길 높이 + 0.35 ~ 7m 에 걸친 면을 잘라 낸다
+  //   다리 경사로 · 낮은 상판 · 시설물이 곰 · 장애물 · 카메라를 가렸다(여의도 · 서울숲). 다리는 칸마다 한 그물로 묶여 있어 면 단위로 자른다
+  //   땅 · 길 바닥 층(renderOrder < -40)과 인스턴스(나무 · 기둥은 cullRoute · cullPoles 가 따로)는 건드리지 않는다
+  carveLane(chunk, c) {
+    const P = PATHS[c], GS = 10, G = new Map(), q = { x: 0, z: 0 };
+    for (let u = 0; u <= P.len; u += 2) { P.pos(u, q); const k = `${Math.floor(q.x / GS)},${Math.floor(q.z / GS)}`; if (!G.has(k)) G.set(k, []); G.get(k).push(q.x, q.z, u); }
+    const R = seoulLaneW(c) / 2 + 0.6, R2 = R * R;
+    // 점(x, y, z)이 차로 위 높이 창 안인가
+    const inLane = (x, y, z) => { const gx = Math.floor(x / GS), gz = Math.floor(z / GS); let bu = -1, bd = R2; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const L = G.get(`${gx + a},${gz + b}`); if (!L) continue; for (let i = 0; i < L.length; i += 3) { const d = (L[i] - x) ** 2 + (L[i + 1] - z) ** 2; if (d < bd) { bd = d; bu = L[i + 2]; } } } if (bu < 0) return false; const dy = y - P.hAt(bu); return dy > 0.35 && dy < 7; };
+    const v = new THREE.Vector3(), A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), done = (this.carved ||= new WeakMap()), uses = new Map();
+    chunk.scene.traverse((o) => { if (o.geometry) uses.set(o.geometry, (uses.get(o.geometry) || 0) + 1); });
+    let cut = 0;
+    chunk.scene.traverse((o) => {
+      if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || (o.renderOrder || 0) < -40 || !o.geometry?.attributes?.position) return; { let S = done.get(o); if (!S) done.set(o, (S = new Set())); if (S.has(c)) return; S.add(c); }
+      o.updateWorldMatrix(true, false); const g = o.geometry, pos = g.attributes.position, idx = g.index, n = idx ? idx.count : pos.count, M = o.matrixWorld;
+      if (!g.boundingBox) g.computeBoundingBox(); const bb = g.boundingBox.clone().applyMatrix4(M);
+      // 칸 안 차로와 상자가 안 겹치면 건너뛴다
+      let near = false; for (const [k, L] of G) { for (let i = 0; i < L.length && !near; i += 3) if (L[i] > bb.min.x - R && L[i] < bb.max.x + R && L[i + 1] > bb.min.z - R && L[i + 1] < bb.max.z + R) near = true; if (near) break; } if (!near) return;
+      let ia = null;
+      const at = (k, out) => out.fromBufferAttribute(pos, idx ? idx.getX(k) : k).applyMatrix4(M);
+      for (let t = 0; t + 2 < n; t += 3) {
+        at(t, A); at(t + 1, B); at(t + 2, C);
+        let hit = inLane((A.x + B.x + C.x) / 3, (A.y + B.y + C.y) / 3, (A.z + B.z + C.z) / 3);
+        if (!hit) for (const [p1, p2] of [[A, B], [B, C], [C, A], [A, A], [B, B], [C, C]]) { v.addVectors(p1, p2).multiplyScalar(0.5); if (inLane(v.x, v.y, v.z)) { hit = true; break; } }
+        if (!hit) continue;
+        if (!ia) { const own = (uses.get(g) || 0) <= 1, g2 = own ? g : g.clone(); if (!own) o.geometry = g2; if (!g2.index) { const arr = new Uint32Array(pos.count); for (let k = 0; k < arr.length; k++) arr[k] = k; g2.setIndex(new THREE.BufferAttribute(arr, 1)); } ia = g2.index; }
+        const k0 = ia.getX(t); ia.setX(t + 1, k0); ia.setX(t + 2, k0); cut++;
+      }
+      if (ia) ia.needsUpdate = true;
+    });
+    if (cut) (this.carveN = (this.carveN || 0) + cut);
   }
   // 6-9 9-1: 판정 차로(레인 폭/2 + 0.7) 안에 선 기둥(전봇대 · 가로등 · 신호등)은 차로 밖(+0.3m)으로 민다. 민 자리가 건물 안이면 숨긴다. 판정은 주지 않는다
   //   기둥에 딸린 것(팔 · 등 · 변압기 · 불빛 웅덩이 · 빛 방울 · 전깃줄 끝)도 같이 옮긴다. 도로명판 기둥(3.6m)은 판이 묶여 있어 그대로 (길 모퉁이라 차로 밖)
