@@ -9,6 +9,25 @@ const rndS = (seed) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; retur
 const lit = (A, fn) => A.addLit(fn);
 // 둥근 흐린 점 (김 · 음표 빛): 네모 점으로 보이지 않게
 let DOT = null; const dotTex = () => DOT ||= (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 32; const c = cv.getContext('2d'), gr = c.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.fillRect(0, 0, 32, 32); return new THREE.CanvasTexture(cv); })();
+// 김(수증기): 화면을 보는 둥근 판(인스턴스 하나 = 그리기 1번). 가장자리가 투명한 뭉게 모양을 셰이더로 그리고,
+//   위로 오르며 커지고 옅어진다. 시간은 셰이더 안에서 (매 프레임 CPU 일 없음). src = [[x, y, z], ...] (그룹 안 자리)
+function makeSteam(src, per = 6, o = {}) {
+  const n = src.length * per, geo = new THREE.PlaneGeometry(1, 1), seed = new Float32Array(n), U = { uT: { value: 0 }, uA: { value: o.alpha ?? 0.42 }, uC: { value: new THREE.Color(o.color || '#f1ece4') } };
+  const mat = new THREE.ShaderMaterial({ uniforms: U, transparent: true, depthWrite: false,
+    vertexShader: `attribute float aSeed; uniform float uT; varying vec2 vUv; varying float vA; varying float vS;
+      void main(){ float ph = fract(uT * ${(o.speed ?? 0.32).toFixed(3)} + aSeed); vec4 c = modelViewMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+        float rise = ph * ${(o.rise ?? 1.6).toFixed(2)}; c += viewMatrix * vec4(sin(ph * 5.0 + aSeed * 40.0) * 0.12 * ph, rise, cos(aSeed * 31.0) * 0.08 * ph, 0.0);
+        float s = ${(o.size ?? 0.22).toFixed(2)} + ph * ${(o.grow ?? 0.85).toFixed(2)}; float ang = aSeed * 6.28 + ph * 1.2; mat2 R = mat2(cos(ang), -sin(ang), sin(ang), cos(ang));
+        c.xy += R * position.xy * s; vUv = uv; vS = aSeed; vA = smoothstep(0.0, 0.18, ph) * pow(1.0 - ph, 1.6); gl_Position = projectionMatrix * c; }`,
+    fragmentShader: `uniform float uA; uniform vec3 uC; varying vec2 vUv; varying float vA; varying float vS;
+      void main(){ vec2 p = vUv - 0.5; float r = length(p) * 2.0; float a = atan(p.y, p.x);
+        float lump = 0.82 + 0.1 * sin(a * 3.0 + vS * 20.0) + 0.08 * sin(a * 5.0 - vS * 13.0);
+        float m = smoothstep(lump, lump * 0.25, r) * (0.75 + 0.25 * sin(p.x * 9.0 + vS * 7.0) * sin(p.y * 8.0 - vS * 5.0));
+        float al = m * vA * uA; if (al < 0.004) discard; gl_FragColor = vec4(uC, al); }` });
+  const im = new THREE.InstancedMesh(geo, mat, n), m4 = new THREE.Matrix4(); let k = 0;
+  for (const [x, y, z] of src) for (let j = 0; j < per; j++) { m4.makeTranslation(x + (Math.sin(k * 7.3) * 0.12), y, z + Math.cos(k * 3.1) * 0.12); im.setMatrixAt(k, m4); seed[k] = (j / per + Math.sin(k * 12.9898) * 0.07 + 1) % 1; k++; }
+  geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seed, 1)); im.frustumCulled = false; im.renderOrder = 3; im.userData.U = U; return im;
+}
 // 곰 대신 보이는 작은 젤리 손님 (몸 · 머리 · 귀, 색만 다르게)
 function jelly(col, s = 1) { const p = []; p.push(part(new THREE.SphereGeometry(0.32, 10, 8), col, 0, 0.45, 0, 0, 0, 0, 1, 1.15, 0.9), part(new THREE.SphereGeometry(0.26, 10, 8), col, 0, 0.98, 0), part(new THREE.SphereGeometry(0.08, 6, 4), col, -0.17, 1.2, 0), part(new THREE.SphereGeometry(0.08, 6, 4), col, 0.17, 1.2, 0), part(new THREE.SphereGeometry(0.04, 6, 4), '#2a1c14', -0.08, 1.0, 0.23), part(new THREE.SphereGeometry(0.04, 6, 4), '#2a1c14', 0.08, 1.0, 0.23)); return p.map((g) => (g.scale(s, s, s), g)); }
 
@@ -53,10 +72,11 @@ function buildMarketHall() {
   const bulbM = new THREE.MeshLambertMaterial({ color: '#fff1c8', emissive: '#ffcf80', emissiveIntensity: 0.9 });
   for (const S of stalls) { const sg = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.55), new THREE.MeshLambertMaterial({ map: signTex(MENU[S.mi][0], '', '#3a2418', '#ffe8b8'), emissive: '#ffffff', emissiveIntensity: 0.25, side: THREE.DoubleSide })); sg.material.emissiveMap = sg.material.map; sg.position.set(S.x + S.sd * 0.6, 2.6, S.z); sg.rotation.y = S.sd > 0 ? -Math.PI / 2 : Math.PI / 2; g.add(sg);
     for (let s = 0; s < 3; s++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), bulbM); b.position.set(S.x, 2.1, S.z - 1.5 + s * 1.5); g.add(b); } }
-  // 김 (철판 위로 오르는 하얀 점)
-  const N = 90, pos = new Float32Array(N * 3), steam = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(pos, 3)), new THREE.PointsMaterial({ color: '#ffffff', size: 0.6, map: dotTex(), transparent: true, opacity: 0.35, depthWrite: false })); steam.frustumCulled = false; g.add(steam);
+  // 김: 빈대떡 철판 · 칼국수 솥 · 떡볶이 판 위에서 오르는 둥근 김 (가장자리 투명, 오르며 커지고 옅어짐)
+  const src = []; for (const S of stalls) { if (S.mi === 0) for (let s = 0; s < 3; s++) src.push([S.x + S.sd * 0.3, 0.98, S.z - 1.4 + s * 1.4]); else if (S.mi === 5 || S.mi === 3) src.push([S.x + S.sd * 0.5, 1.02, S.z]); }
+  const steam = makeSteam(src, 5); g.add(steam);
   const pl = new THREE.PointLight('#ffd9a0', 2.2, 30, 1.6); pl.position.set(0, 4, 0); g.add(pl);
-  g.userData = { stalls, steam, pos, N };
+  g.userData = { stalls, steam };
   return g;
 }
 registerAttraction({
@@ -68,7 +88,7 @@ registerAttraction({
     const ui = document.createElement('div'); ui.style.cssText = 'position:absolute;left:50%;bottom:118px;transform:translateX(-50%);padding:12px 14px;border-radius:18px;background:rgba(14,20,36,.86);color:#fff;font-family:Jua,sans-serif;z-index:7;text-align:center;max-width:calc(100vw - 32px)';
     ui.innerHTML = `<div style="font-size:16px;margin-bottom:8px">🥘 무엇을 먹을까요?</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${MENU.map((m, i) => `<button data-i="${i}" style="border:0;border-radius:12px;padding:8px 10px;font-family:Jua,sans-serif;font-size:15px;background:#fff6e4;color:#3a2418;cursor:pointer">${m[0]}<br><small style="font:11px system-ui;opacity:.7">${m[1]}</small></button>`).join('')}</div>`;
     document.getElementById('hg-hud')?.appendChild(ui); if (document.pointerLockElement) document.exitPointerLock?.();
-    const order = (i) => { pick = i; ui.remove(); sit = D.stalls.find((S) => S.mi === i) || D.stalls[0]; food = foodMesh(i); food.scale.setScalar(1.6); food.position.set(MO.x + sit.x - sit.sd * 0.75, 0.9, MO.z + sit.z); g.parent.add(food); t0 = E.t; hg.onToast?.(`🥘 ${MENU[i][0]} 나왔어요! E 로 한 입씩`); A.drum(0.4, 300, 0.1); };
+    const order = (i) => { pick = i; ui.remove(); sit = D.stalls.find((S) => S.mi === i) || D.stalls[0]; food = foodMesh(i); if (i !== 1 && i !== 2) { const st = makeSteam([[0, 0.08, 0]], 7, { size: 0.08, grow: 0.32, rise: 0.75, alpha: 0.5, speed: 0.4 }); food.add(st); food.userData.steam = st; } food.scale.setScalar(1.6); food.position.set(MO.x + sit.x - sit.sd * 0.75, 0.9, MO.z + sit.z); g.parent.add(food); t0 = E.t; hg.onToast?.(`🥘 ${MENU[i][0]} 나왔어요! E 로 한 입씩`); A.drum(0.4, 300, 0.1); };
     for (const b of ui.querySelectorAll('button')) b.onclick = () => order(+b.dataset.i);
     const E = {
       title: '광장시장 먹거리 골목', lock: true,
@@ -78,7 +98,7 @@ registerAttraction({
       tick(dt) {
         if (pick != null && bites < 4 && this.t - t0 > 4 + bites * 2.5) this.act(); // 가만히 있어도 천천히 먹는다
         if (this.doneT != null && this.t - this.doneT > 2.5) { A.finish(E); return; }
-        const P = D.pos; for (let k = 0; k < D.N; k++) { const S = D.stalls[(k % 6) * 2], ph = (this.t * 0.6 + k * 0.137) % 1; P[k * 3] = MO.x + S.x + S.sd * 0.3 + Math.sin(k * 3.1) * 0.25 - MO.x; P[k * 3 + 1] = 1 + ph * 1.8; P[k * 3 + 2] = S.z - 1.4 + (k % 3) * 1.4 + Math.cos(k) * 0.2; } D.steam.geometry.attributes.position.needsUpdate = true;
+        D.steam.userData.U.uT.value = this.t; if (food?.userData.steam) food.userData.steam.userData.U.uT.value = this.t;
         if (hg.bear) hg.bear.root.visible = false;
       },
       cam(camera, dt) {
