@@ -253,3 +253,68 @@ registerAttraction({
     return E;
   },
 });
+
+// ============================================================
+// 2-9 서울식물원 온실 (사진: 흰 철골 · 유리 접시 지붕 아래 야자 · 파초 · 고사리 · 무화과 덤불, 돌 판 길, 둘레 높은 곳의 스카이워크)
+//   지도 온실(식물문화센터, 가운데 -12800, -4355 · 반지름 약 44m) 안에 제자리로 심는다. 동쪽 2/3 열대관 · 서쪽 지중해관(올리브 · 선인장)
+// ============================================================
+const BOT = [-12800, -4355], BOT_R = 41;
+// 잎 그림 (가장자리 투명): 야자 잎(가운데 줄기 · 양옆 가는 잎 조각) · 파초 잎(넓고 결이 찢어진)
+const frondTex = () => cvTex(64, 256, (c, W, H) => { c.clearRect(0, 0, W, H); c.strokeStyle = '#3a5a2a'; c.lineWidth = 3; c.beginPath(); c.moveTo(W / 2, H); c.lineTo(W / 2, 0); c.stroke(); for (let y = 6; y < H - 6; y += 5) { const L = (W / 2 - 2) * Math.sin((y / H) * Math.PI) ** 0.6; for (const s of [-1, 1]) { c.strokeStyle = y % 10 ? '#4f7a36' : '#5f8a40'; c.lineWidth = 2.4; c.beginPath(); c.moveTo(W / 2, y + 2); c.lineTo(W / 2 + s * L, y + 12); c.stroke(); } } }, false);
+const bananaTex = () => cvTex(128, 256, (c, W, H) => { c.clearRect(0, 0, W, H); c.fillStyle = '#4f8a3e'; c.beginPath(); c.moveTo(W / 2, H); c.bezierCurveTo(-10, H * 0.7, 4, H * 0.15, W / 2, 0); c.bezierCurveTo(W - 4, H * 0.15, W + 10, H * 0.7, W / 2, H); c.fill(); c.strokeStyle = 'rgba(200,230,170,.6)'; c.lineWidth = 3; c.beginPath(); c.moveTo(W / 2, H); c.lineTo(W / 2, 0); c.stroke(); c.strokeStyle = 'rgba(40,70,30,.35)'; c.lineWidth = 1; for (let y = 10; y < H; y += 7) { c.beginPath(); c.moveTo(W / 2, y + 6); c.lineTo(4, y); c.moveTo(W / 2, y + 6); c.lineTo(W - 4, y); c.stroke(); } c.globalCompositeOperation = 'destination-out'; const r = rndS(4); for (let i = 0; i < 7; i++) { const y = 30 + r() * (H - 60), s = r() < 0.5 ? 0 : W; c.fillRect(s - 1, y, W / 2 - 4, 1.6); } });
+// 휘어 늘어진 잎 한 장 (길이 방향으로 굽은 판)
+function droopLeaf(len, wid, bend, segs = 6) { const g = new THREE.PlaneGeometry(wid, len, 1, segs); g.translate(0, len / 2, 0); const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i), t = y / len; p.setXYZ(i, p.getX(i), Math.sin(t * Math.PI * 0.5) * len * (1 - bend * 0.5) - bend * t * t * len * 0.6, t * t * bend * len * 0.9); } g.computeVertexNormals(); return g; }
+function buildBotanic(A) {
+  const hg = A.hg, g = new THREE.Group(); A.root.add(g); const [cx, cz] = BOT, y0 = A.H(cx, cz), r = rndS(2019), V = [];
+  // 바닥: 흙 · 덤불 둔덕, 굽은 돌 판 길(두 갈래) · 작은 연못
+  V.push(part(new THREE.CylinderGeometry(BOT_R + 1, BOT_R + 1, 0.3, 48), '#4a5232', cx, y0 + 0.1, cz));
+  const pathPts = []; for (let i = 0; i <= 60; i++) { const a = -2.6 + (i / 60) * 5.4, rr = 22 + Math.sin(a * 2.3) * 9; pathPts.push([cx + Math.cos(a) * rr, cz + Math.sin(a) * rr]); }
+  for (let i = 1; i < pathPts.length; i++) { const [ax, az] = pathPts[i - 1], [bx, bz] = pathPts[i], L = Math.hypot(bx - ax, bz - az); V.push(part(new THREE.BoxGeometry(2.6, 0.08, L + 0.3), i % 2 ? '#c9c2b4' : '#bfb8aa', (ax + bx) / 2, y0 + 0.28, (az + bz) / 2, 0, Math.atan2(bx - ax, bz - az), 0)); }
+  V.push(part(new THREE.CylinderGeometry(5, 5.2, 0.12, 28), '#2f5a5a', cx + 6, y0 + 0.28, cz + 4), part(new THREE.TorusGeometry(5.1, 0.3, 6, 28), '#8a8478', cx + 6, y0 + 0.3, cz + 4, Math.PI / 2));
+  const nearPath = (x, z, m = 2.6) => pathPts.some(([px, pz]) => Math.hypot(px - x, pz - z) < m) || Math.hypot(x - cx - 6, z - cz - 4) < 6;
+  const spot = (minR = 0, maxR = BOT_R - 2, side = 0, m = 2.6) => { for (let k = 0; k < 40; k++) { const a = r() * 6.28, d = Math.sqrt(minR * minR + r() * (maxR * maxR - minR * minR)), x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d; if (nearPath(x, z, m)) continue; if (side && Math.sign(x - cx + 14) !== side) continue; return [x, z]; } return null; };
+  // 덤불 (무화과 · 몬스테라 같은 둥근 잎 덩이): 꼭짓점 색 덩이
+  for (let i = 0; i < 240; i++) { const s = 0.8 + r() * 1.4, p = spot(0, BOT_R - 1.5, 0, 2.4 + s * 1.3); if (!p) continue; for (let q = 0; q < 3; q++) V.push(part(new THREE.IcosahedronGeometry(s * (1 - q * 0.2), 1), ['#2f5a2a', '#3a6a32', '#4a7a3a', '#2a4a26'][Math.floor(r() * 4)], p[0] + (r() - 0.5) * s, y0 + 0.3 + s * 0.6 + q * 0.3, p[1] + (r() - 0.5) * s, 0, r() * 3, 0, 1, 0.75, 1)); }
+  // 지중해관(서쪽): 올리브(은빛 녹색 덩이) · 기둥 선인장
+  for (let i = 0; i < 14; i++) { const p = spot(8, BOT_R - 3, -1); if (!p) continue; V.push(part(new THREE.CylinderGeometry(0.14, 0.22, 2.2, 6), '#6a5a48', p[0], y0 + 1.3, p[1], 0, 0, (r() - 0.5) * 0.3)); for (let q = 0; q < 4; q++) V.push(part(new THREE.IcosahedronGeometry(1 + r() * 0.5, 1), ['#8a9a78', '#7a8a6a', '#9aa888'][q % 3], p[0] + (r() - 0.5) * 1.6, y0 + 2.8 + r() * 0.8, p[1] + (r() - 0.5) * 1.6, 0, 0, 0, 1, 0.6, 1)); }
+  for (let i = 0; i < 18; i++) { const p = spot(6, BOT_R - 2, -1); if (!p) continue; const h = 1 + r() * 2.2; V.push(part(new THREE.CapsuleGeometry(0.22, h, 4, 8), '#4a7a4a', p[0], y0 + 0.3 + h / 2, p[1])); if (r() < 0.6) V.push(part(new THREE.CapsuleGeometry(0.14, h * 0.4, 4, 6), '#4a7a4a', p[0] + 0.3, y0 + 0.3 + h * 0.55, p[1], 0, 0, -0.5)); }
+  // 야자: 줄기(마디 띠 색) 인스턴스 · 잎(늘어진 깃털 잎) 인스턴스 · 파초(넓은 잎) 인스턴스
+  const palms = []; for (let i = 0; i < 26; i++) { const p = spot(0, BOT_R - 4, 1, 3.4) || spot(0, BOT_R - 4, 0, 3.4); if (p) palms.push([p[0], p[1], 7 + r() * 9, r() * 0.25]); }
+  const trunkG = new THREE.CylinderGeometry(0.22, 0.34, 1, 9, 8, true); trunkG.translate(0, 0.5, 0); { const tp = trunkG.attributes.position, col = new Float32Array(tp.count * 3), c1 = new THREE.Color('#a8957a'), c2 = new THREE.Color('#7a6a54'), cc = new THREE.Color(); for (let i = 0; i < tp.count; i++) { cc.copy(Math.floor(tp.getY(i) * 16) % 2 ? c1 : c2); col.set([cc.r, cc.g, cc.b], i * 3); } trunkG.setAttribute('color', new THREE.BufferAttribute(col, 3)); }
+  const trunks = new THREE.InstancedMesh(trunkG, vcMat(), palms.length), o = new THREE.Object3D(); palms.forEach(([x, z, h, lean], i) => { o.position.set(x, y0 + 0.2, z); o.rotation.set(lean, r() * 6.28, 0); o.scale.set(1, h, 1); o.updateMatrix(); trunks.setMatrixAt(i, o.matrix); });
+  const leafM = new THREE.MeshLambertMaterial({ map: frondTex(), alphaTest: 0.45, side: THREE.DoubleSide }), fronds = new THREE.InstancedMesh(droopLeaf(4.2, 1.3, 0.9), leafM, palms.length * 11), col = new THREE.Color(); let n = 0;
+  palms.forEach(([x, z, h, lean]) => { const top = new THREE.Vector3(x, y0 + 0.2 + h * Math.cos(lean), z); for (let k = 0; k < 11; k++) { o.position.copy(top); o.rotation.set(0, (k / 11) * 6.28 + r() * 0.3, 0); o.rotateX(0.35 + r() * 0.5 + (k % 3) * 0.15); o.scale.setScalar(0.8 + r() * 0.45); o.updateMatrix(); fronds.setMatrixAt(n, o.matrix); fronds.setColorAt(n, col.setHSL(0.27 + r() * 0.05, 0.45, 0.42 + r() * 0.12)); n++; } });
+  const banM = new THREE.MeshLambertMaterial({ map: bananaTex(), alphaTest: 0.4, side: THREE.DoubleSide }), bans = []; for (let i = 0; i < 80; i++) { const p = spot(3, BOT_R - 2, 1); if (p) bans.push(p); }
+  const banana = new THREE.InstancedMesh(droopLeaf(2.6, 0.9, 0.55), banM, bans.length * 6); n = 0; bans.forEach(([x, z]) => { const s = 0.8 + r() * 0.8; for (let k = 0; k < 6; k++) { o.position.set(x, y0 + 0.3, z); o.rotation.set(0, (k / 6) * 6.28 + r(), 0); o.rotateX(0.15 + r() * 0.5); o.scale.setScalar(s); o.updateMatrix(); banana.setMatrixAt(n, o.matrix); banana.setColorAt(n, col.setHSL(0.26 + r() * 0.04, 0.4, 0.5 + r() * 0.1)); n++; } });
+  // 고사리 (낮게 퍼지는 깃털 잎)
+  const ferns = new THREE.InstancedMesh(droopLeaf(1.4, 0.6, 1.0, 4), leafM, 150 * 7); n = 0; for (let i = 0; i < 150; i++) { const p = spot(0, BOT_R - 2); if (!p) continue; for (let k = 0; k < 7; k++) { o.position.set(p[0], y0 + 0.3, p[1]); o.rotation.set(0, (k / 7) * 6.28, 0); o.rotateX(0.7 + r() * 0.4); o.scale.setScalar(0.9 + r() * 0.5); o.updateMatrix(); ferns.setMatrixAt(n, o.matrix); ferns.setColorAt(n, col.setHSL(0.25, 0.5, 0.4 + r() * 0.12)); n++; } } ferns.count = n;
+  for (const im of [trunks, fronds, banana, ferns]) { im.frustumCulled = false; g.add(im); }
+  // 스카이워크: 둘레 높은 곳(7m)의 다리길 · 유리 난간 · 흰 받침 기둥
+  const SW = 7, sr = BOT_R - 4.5; for (let i = 0; i < 64; i++) { const a = (i / 64) * 6.28, a2 = ((i + 1) / 64) * 6.28, x = cx + Math.cos((a + a2) / 2) * sr, z = cz + Math.sin((a + a2) / 2) * sr, L = sr * (a2 - a) + 0.1, ry = -(a + a2) / 2; V.push(part(new THREE.BoxGeometry(2.4, 0.25, L), '#e6e6e2', x, y0 + SW, z, 0, ry, 0), part(new THREE.BoxGeometry(0.08, 0.06, L), '#b0b4b8', x + Math.cos((a + a2) / 2) * 1.2, y0 + SW + 1.1, z + Math.sin((a + a2) / 2) * 1.2, 0, ry, 0)); if (i % 4 === 0) V.push(part(new THREE.CylinderGeometry(0.18, 0.22, SW, 8), '#f0f0ec', x, y0 + SW / 2, z)); }
+  const deco = new THREE.Mesh(merge(V), vcMat()); g.add(deco);
+  // 밤: 잎이 안 보이게 너무 어둡지 않도록 안쪽 빛
+  const mats = [leafM, banM, deco.material, trunks.material]; for (const m of mats) { m.emissive = new THREE.Color('#1a2a12'); m.emissiveIntensity = 0; } lit(A, (L) => { for (const m of mats) m.emissiveIntensity = L * 1.6; });
+  // 온실 안 지도 나무는 치운다
+  const undo = hideTrees(hg, (x, z) => Math.hypot(x - cx, z - cz) < BOT_R + 3);
+  A.botY = y0; A.botSW = { sr, h: SW }; A.botPath = pathPts;
+  return { group: g, dispose() { undo(); g.traverse((q) => q.geometry?.dispose?.()); } };
+}
+registerAttraction({
+  id: 'botanic', name: '서울식물원 온실', seal: '식물원', icon: '🌴', x: BOT[0], z: BOT[1] + 52, r: 22, buildR: 900, verb: '온실 걷기',
+  go: [BOT[0], BOT[1] + 58, Math.PI], intro: '오목한 접시 지붕 아래 열대 야자 · 파초 숲과 지중해 올리브 · 선인장 사이를 걸어요',
+  build: buildBotanic,
+  start(A) {
+    const hg = A.hg, [cx, cz] = BOT; if (A.botY == null) return null; const y0 = A.botY, S = A.botSW, bearVis = hg.bear?.root.visible;
+    const E = { title: '서울식물원 온실', lock: true,
+      status() { return this.t < 24 ? (this.t < 8 ? '열대관 돌 판 길을 걸어요' : '스카이워크에서 야자 숲을 내려다봐요') + ` · ${Math.ceil(24 - this.t)}초` : '다 둘러봤어요'; },
+      tick() { if (hg.bear) hg.bear.root.visible = false; if (this.t > 25) A.finish(E); },
+      cam(camera, dt) {
+        const t = this.t; let pos, look;
+        if (t < 8) { const P = A.botPath, f = 34 + t * 0.9, i = Math.min(P.length - 2, Math.floor(f)), q = P[Math.min(P.length - 1, i + 5)], a = P[i], b = P[i + 1], k = f - i; pos = new THREE.Vector3(a[0] + (b[0] - a[0]) * k, y0 + 1.9, a[1] + (b[1] - a[1]) * k); look = new THREE.Vector3(q[0], y0 + 3 + t * 0.5, q[1]); }
+        else { const a = 0.5 - (t - 8) * 0.06; pos = new THREE.Vector3(cx + Math.cos(a) * S.sr, y0 + S.h + 1.7, cz + Math.sin(a) * S.sr); look = new THREE.Vector3(cx + Math.cos(a - 0.5) * 10, y0 + 4, cz + Math.sin(a - 0.5) * 10); }
+        (this.cp ||= pos.clone()).lerp(pos, 1 - Math.exp(-dt * 2.5)); camera.position.copy(this.cp); (this.lk ||= look.clone()).lerp(look, 1 - Math.exp(-dt * 2.5)); camera.lookAt(this.lk);
+      },
+      end() { if (hg.bear) hg.bear.root.visible = bearVis ?? true; }, where() { return '서울식물원 온실'; } };
+    return E;
+  },
+});
