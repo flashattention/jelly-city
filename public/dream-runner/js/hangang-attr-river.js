@@ -14,6 +14,8 @@ const ROUTE = [[-3617, 515], [-3520, 380], [-3350, 280], [-3200, 300], [-3000, 4
 const curve = new THREE.CatmullRomCurve3(ROUTE.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal', 0.5);
 const ROUTE_LEN = curve.getLength();
 const DECK = 6.4;
+// 반포대교 달빛무지개분수 공연 시각 (게임 속 시계, hangang.js tickBanpo 와 같게). 시계는 건드리지 않는다
+const FOUNTAIN = [[12, 12.4], [19.5, 21.5]];
 const BRIDGE = [1480, 1760]; // 반포대교가 강을 건너는 가운데 (칸 지도 '반포대로' 다리) // 윗갑판 높이 (물 위)
 
 // 배: 흰 선체(앞이 뾰족) · 남색 띠 · 아래 유리 선실 · 위 선실 · 윗갑판 난간 · 조타실 · 깃대. 창은 따로(밤에 빛남), 갑판 줄 조명
@@ -79,16 +81,16 @@ registerAttraction({
   start(A) {
     const hg = A.hg, B = A.built.get('cruise'); if (!B) return null;
     const boat = B.boat, night = hg.state.hour >= 18 || hg.state.hour < 5, V = 38;
-    let u = 0.004, fast = false, phase = 'board', stopT = 0, yawSet = false, hourHold = null;
+    let u = 0.004, fast = false, phase = 'board', stopT = 0, yawSet = false, showOn = false, nextShow = '';
     const E = {
       title: night ? '한강 유람선 · 밤 뱃길' : '한강 유람선', lock: true,
-      status() { if (phase === 'board') return '🔔 배가 곧 떠나요 · 윗갑판으로'; if (phase === 'go') { const left = Math.max(0, (1 - u) * ROUTE_LEN); return `${fast ? '⏩ 빨리 가는 중 · ' : ''}반포대교까지 ${(left / 1000).toFixed(1)}km · 마우스로 둘러보기`; } return `🌈 반포대교 달빛무지개분수 ${night ? '밤 8시' : '낮 12시'} 공연 · ${Math.ceil(15 - stopT)}초 뒤 여의도로`; },
+      status() { if (phase === 'board') return '🔔 배가 곧 떠나요 · 윗갑판으로'; if (phase === 'go') { const left = Math.max(0, (1 - u) * ROUTE_LEN); return `${fast ? '⏩ 빨리 가는 중 · ' : ''}반포대교까지 ${(left / 1000).toFixed(1)}km · 마우스로 둘러보기`; } return showOn ? `🌈 반포대교 달빛무지개분수 공연 중 · ${Math.ceil(15 - stopT)}초 뒤 여의도로` : `반포대교 · 지금은 분수 공연이 없어요 (다음 공연 ${nextShow}) · ${Math.ceil(6 - stopT)}초 뒤 여의도로`; },
       actLabel() { return phase === 'go' ? (fast ? '천천히' : '⏩ 빨리 가기') : ''; },
       act() { if (phase === 'go') fast = !fast; },
       tick(dt) {
         if (phase === 'board' && this.t > 3) phase = 'go';
-        if (phase === 'go') { u = Math.min(1, u + (dt * V * (fast ? 3 : 1)) / ROUTE_LEN); if (u >= 1) { phase = 'stop'; hourHold = night ? 20.0 : 12.1; hg.onToast?.('🌈 분수 공연을 보러 멈췄어요'); const c = boat.position; hg.camYaw = Math.atan2(BRIDGE[0] - c.x, BRIDGE[1] - c.z); hg.camPitch = 0.05; } }
-        if (phase === 'stop') { stopT += dt; hg.state.hour = hourHold; if (stopT > 15) { A.finish(E); return; } }
+        if (phase === 'go') { u = Math.min(1, u + (dt * V * (fast ? 3 : 1)) / ROUTE_LEN); if (u >= 1) { phase = 'stop'; const h = hg.state.hour; showOn = FOUNTAIN.some(([a, b]) => h >= a && h < b); nextShow = h < 12 ? '낮 12:00' : h < 19.5 ? '밤 7:30' : '내일 낮 12:00'; hg.onToast?.(showOn ? '🌈 분수 공연을 보러 멈췄어요' : `⛲ 분수 공연 시간이 아니에요 · 다음 공연 ${nextShow}`); const c = boat.position; hg.camYaw = Math.atan2(BRIDGE[0] - c.x, BRIDGE[1] - c.z); hg.camPitch = 0.05; } }
+        if (phase === 'stop') { stopT += dt; if (stopT > (showOn ? 15 : 6)) { A.finish(E); return; } }
         const { p, t } = boatPose(boat, u); boat.position.y = 0.05 + Math.sin(hg.time * 1.1) * 0.08;
         const yaw = Math.atan2(t.x, t.z), sx = Math.cos(yaw), sz = -Math.sin(yaw);
         // 곰: 윗갑판 왼쪽 난간 앞
