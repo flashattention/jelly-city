@@ -46,7 +46,7 @@ import { normWord } from '../public/jelly-draw/js/prompts.js';
 import { complete } from './jelly-city/llm.js';
 import { Records } from './shared/records.js';
 import { Cosmetics, cosApi, setNames } from './cosmetics.js';
-import { sec, clientIp, limited as rateLimited, publicPath, publicError } from './shared/guard.js';
+import { sec, clientIp, limited as rateLimited, publicPath, publicError, DayCount } from './shared/guard.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
@@ -151,6 +151,7 @@ const json = (res, code, obj) => {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(obj));
 };
+const guestMade = new DayCount(), GUEST_PER_IP_DAY = Number(process.env.GUEST_PER_IP_DAY) || 12; // 체험판: IP 하나에 하루 12개
 // 로그인 시도 제한 (IP당 분당 20회)
 const loginHits = new Map();
 const limited = (req) => {
@@ -171,6 +172,14 @@ async function api(req, res, url) {
     }
     res.writeHead(204); return res.end();
   }
+  // 공통 속도 제한 (3-1): IP 하나 · 계정 하나가 너무 많이 부르면 429 "잠시 후 다시"
+  //   쓰기(POST · DELETE)는 IP 1초 3번(한 번에 150) + 계정 1초 2번(한 번에 60), 읽기는 IP 1초 15번(한 번에 400)
+  const ip = clientIp(req), write = req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS';
+  if (write) {
+    if (rateLimited('post', ip, { req, res, json, where: url.pathname })) return;
+    const acct = sid && (world.userOf(sid)?.sub || toss.read(sid));
+    if (acct && rateLimited('user', acct, { req, res, json, where: url.pathname })) return;
+  } else if (req.method === 'GET' && rateLimited('get', ip, { req, res, json, where: url.pathname })) return;
   // 토스 미니앱: /api/toss/... 는 토스 계정으로, 드림 러너 · 치장 API 를 토스 저장소에 그대로 쓴다
   if (url.pathname.startsWith('/api/toss/')) {
     tossCors(res);
@@ -194,6 +203,9 @@ async function api(req, res, url) {
     else if (body.guest === true) {
       // 체험판: 구글 로그인 없이 바로 (이틀 동안 접속하지 않으면 캐릭터가 사라진다)
       if (world.guestCount() >= 300) return json(res, 503, { error: '체험판 자리가 꽉 찼어요. 구글로 로그인해 주세요' });
+      // 한 곳(IP)에서 하루에 체험판을 너무 많이 만들어 자리를 다 채우지 못하게
+      if (guestMade.get(ip) >= GUEST_PER_IP_DAY) { sec.note('rate', { ip, where: '/api/login', detail: 'guest/day' }); return json(res, 429, { error: '오늘은 이곳에서 체험판을 더 만들 수 없어요. 구글로 로그인해 주세요' }); }
+      guestMade.add(ip);
       info = { sub: `guest:${crypto.randomBytes(9).toString('hex')}`, email: '', name: `체험판 손님 ${Math.floor(1000 + Math.random() * 9000)}`, picture: '', guest: true };
     }
     else return json(res, 400, { error: '구글 로그인이 필요해요' });
@@ -204,6 +216,7 @@ async function api(req, res, url) {
   if (url.pathname.startsWith('/api/cos/')) return cosApi(req, res, url, world.userOf(sid), cosmetics, json);
   if (url.pathname.startsWith('/api/board/')) return boardApi(req, res, url, world.userOf(sid), board, json, isAdmin);
   if (url.pathname.startsWith('/api/sw/')) return swMetricsApi(req, res, url, swMetrics, json, world.userOf(sid), isAdmin);
+  if (url.pathname === '/api/dream/run' && rateLimited('start', ip, { req, res, json, where: url.pathname })) return;
   if (url.pathname.startsWith('/api/dream/')) return dreamApi(req, res, url, world.userOf(sid), dreamBoard, json, isAdmin);
   if (url.pathname.startsWith('/api/merge/')) return mergeRecords.api(req, res, url, world.userOf(sid), json, '/api/merge');
   if (url.pathname.startsWith('/api/seoul/') && await seoulApi(req, res, url, json)) return;
@@ -239,11 +252,11 @@ async function api(req, res, url) {
   if (!who) return json(res, 401, { error: 'login' });
   if (url.pathname === '/api/me') return json(res, 200, { user: world.publicUser(who.user), chars: world.charList(who.sub), admin: isAdmin(who.user), cos: cosmetics.pub(who.sub) });
   // 닉네임 정하기 · 바꾸기 (구글 실명 대신 모든 게임에서 쓴다)
-  if (url.pathname === '/api/nick' && req.method === 'POST') { const b = await readJson(req); try { return json(res, 200, { user: world.setNick(who.sub, b.nick) }); } catch (e) { return json(res, 400, { error: e.message }); } }
+  if (url.pathname === '/api/nick' && req.method === 'POST') { if (rateLimited('nick', who.sub, { req, res, json, where: url.pathname })) return; const b = await readJson(req); try { return json(res, 200, { user: world.setNick(who.sub, b.nick) }); } catch (e) { return json(res, 400, { error: e.message }); } }
   const char = url.searchParams.get('char') || '';
   try {
     // 사진
-    if (url.pathname === '/api/photo' && req.method === 'POST') { const b = await readJson(req, 700 * 1024); return json(res, 200, { id: world.savePhoto(who.sub, b.char, b.data) }); }
+    if (url.pathname === '/api/photo' && req.method === 'POST') { if (rateLimited('photo', who.sub, { req, res, json, where: url.pathname })) return; const b = await readJson(req, 700 * 1024); return json(res, 200, { id: world.savePhoto(who.sub, b.char, b.data) }); }
     if (url.pathname === '/api/photos') { if (!world.ownsChar(who.sub, char)) return json(res, 403, { error: '내 캐릭터가 아니에요' }); return json(res, 200, { list: world.myPhotos(char) }); }
     if (url.pathname.startsWith('/api/photo/') && req.method === 'DELETE') {
       const id = url.pathname.slice('/api/photo/'.length);
@@ -287,6 +300,7 @@ async function api(req, res, url) {
     try { world.restyleChar(who.sub, url.pathname.split('/')[3], body); return json(res, 200, { chars: world.charList(who.sub) }); } catch (e) { return json(res, 400, { error: e.message }); }
   }
   if (/^\/api\/chars\/[0-9a-f]+\/name$/.test(url.pathname) && req.method === 'POST') {
+    if (rateLimited('nick', who.sub, { req, res, json, where: url.pathname })) return;
     const body = await readJson(req);
     try { world.renameChar(who.sub, url.pathname.split('/')[3], body.name); return json(res, 200, { chars: world.charList(who.sub) }); } catch (e) { return json(res, 400, { error: e.message }); }
   }

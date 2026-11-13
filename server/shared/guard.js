@@ -7,6 +7,7 @@ import path from 'node:path';
 
 // ---------- 누가 보냈나 ----------
 // Fly 프록시가 붙여 주는 진짜 접속 IP (없으면 소켓 주소)
+//   Fly 앱은 프록시를 거쳐서만 닿고 프록시가 이 머리글을 새로 쓴다. 소켓 주소로만 보면 모든 사람이 프록시 주소 하나로 묶여 버린다
 export const clientIp = (req) => String(req?.headers?.['fly-client-ip'] || req?.socket?.remoteAddress || '').slice(0, 64);
 const kstDay = (t = Date.now()) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);
 let salt = crypto.randomBytes(16).toString('hex');
