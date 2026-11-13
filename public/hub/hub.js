@@ -125,7 +125,7 @@ function renderChars() {
   el.querySelectorAll('[data-name]').forEach((b) => {
     b.onclick = async () => {
       const c = chars.find((x) => x.token === b.dataset.name), max = c.local ? 12 : 8;
-      const v = prompt(`'${c.name}' 의 새 이름 (1~${max}글자) · 돈 · 집 · 친구는 그대로예요`, c.name);
+      const v = prompt(`'${c.name}' 의 새 이름 (1~${max}글자)`, c.name);
       const n = (v || '').trim().replace(/\s+/g, ' ').slice(0, max);
       if (!n || n === c.name) return;
       try {
@@ -204,5 +204,12 @@ function fitBoard() {
 { const ro = new ResizeObserver(() => fitBoard()); ro.observe(document.getElementById('chars-sec')); ro.observe(document.querySelector('#board-sec .bd-head')); }
 document.fonts?.ready.then(fitBoard);
 addEventListener('resize', fitBoard);
+
+// NEW 딱지: 게임이 나온 날(data-since)부터 14일 동안만
+const NEW_DAYS = 14;
+for (const el of document.querySelectorAll('.new[data-since]')) {
+  const t = Date.parse(el.dataset.since + 'T00:00:00+09:00');
+  if (!(Date.now() - t < NEW_DAYS * 86400e3)) el.remove();
+}
 
 boot();
