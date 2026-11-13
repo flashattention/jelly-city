@@ -204,6 +204,8 @@ registerAttraction({
   },
   start(A) {
     const hg = A.hg, gy = A.H(B63.x, B63.z), top = gy + B63.top, frame = buildObsFrame(); frame.position.set(B63.x, top - 1.7, B63.z); frame.visible = false; A.root.add(frame);
+    // 외벽 바깥에 내민 유리 바닥 판 (유리 바닥 볼 때만, 보는 쪽으로): 짙은 틀 + 옅은 유리
+    const gp = new THREE.Group(); gp.add(new THREE.Mesh(merge([part(new THREE.BoxGeometry(3.4, 0.12, 0.14), '#2a2e33', 0, 0, -1.7), part(new THREE.BoxGeometry(3.4, 0.12, 0.14), '#2a2e33', 0, 0, 1.7), part(new THREE.BoxGeometry(0.14, 0.12, 3.4), '#2a2e33', -1.7, 0, 0), part(new THREE.BoxGeometry(0.14, 0.12, 3.4), '#2a2e33', 1.7, 0, 0)]), vcMat())); { const gl = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4), new THREE.MeshPhongMaterial({ color: '#d6eef6', transparent: true, opacity: 0.18, shininess: 120, side: THREE.DoubleSide, depthWrite: false })); gl.rotation.x = -Math.PI / 2; gp.add(gl); } gp.visible = false; A.root.add(gp);
     const bearVis = hg.bear?.root.visible; let phase = 'up', glassView = false, look = { yaw: 2.4, pitch: -0.05 }, h0 = hg.state.hour, nightSet = false;
     // 엘리베이터: 건물 남동쪽 모서리 바깥을 따라 오른다 (바깥 유리 엘리베이터)
     const ex = B63.x + 22, ez = B63.z + 14, ELV = 22;
@@ -224,11 +226,12 @@ registerAttraction({
       setNight(v) { nightSet = v; hg.state.hour = v ? 21.2 : 12; },
       cam(camera, dt) {
         if (phase === 'up') { const k = clamp(this.t / ELV, 0, 1), e = k * k * (3 - 2 * k), y = gy + 3 + e * (B63.top - 3); camera.position.set(ex, y, ez); const a = 2.2 + e * 0.9; camera.lookAt(ex + Math.sin(a) * 40, y - 6 - e * 10, ez + Math.cos(a) * 40); return; }
-        const yaw = hg.camYaw, rr = glassView ? 1.2 : 9, eye = new THREE.Vector3(B63.x + Math.sin(yaw) * rr, glassView ? top - 0.2 : top, B63.z + Math.cos(yaw) * rr); // 유리 바닥: 가운데 유리판 바로 위에서 발밑으로
+        const yaw = hg.camYaw, rr = glassView ? 21 : 9, eye = new THREE.Vector3(B63.x + Math.sin(yaw) * rr, glassView ? top - 0.6 : top, B63.z + Math.cos(yaw) * rr); // 유리 바닥: 외벽 바로 바깥에 내민 유리판 위에서 발밑으로 (금빛 외벽이 비스듬히 내려가는 모습)
         camera.position.copy(eye);
-        if (glassView) camera.lookAt(eye.x + Math.sin(yaw) * 6, eye.y - 40, eye.z + Math.cos(yaw) * 6); else camera.lookAt(eye.x + Math.sin(yaw) * 30, eye.y - 4 + look.pitch * 30, eye.z + Math.cos(yaw) * 30);
+        gp.visible = glassView; if (glassView) { gp.position.set(B63.x + Math.sin(yaw) * 22, top - 1.75, B63.z + Math.cos(yaw) * 22); gp.rotation.y = yaw; }
+        if (glassView) camera.lookAt(eye.x + Math.sin(yaw) * 9, eye.y - 40, eye.z + Math.cos(yaw) * 9); else camera.lookAt(eye.x + Math.sin(yaw) * 30, eye.y - 4 + look.pitch * 30, eye.z + Math.cos(yaw) * 30);
       },
-      end() { frame.parent?.remove(frame); frame.traverse((q) => q.geometry?.dispose?.()); this.bt?.remove(); this.dn?.remove(); if (hg.bear) hg.bear.root.visible = bearVis !== false; if (nightSet) hg.state.hour = h0; hg.placeAt(B63.ent[0], B63.ent[1] + 8, Math.PI); },
+      end() { gp.parent?.remove(gp); frame.parent?.remove(frame); frame.traverse((q) => q.geometry?.dispose?.()); this.bt?.remove(); this.dn?.remove(); if (hg.bear) hg.bear.root.visible = bearVis !== false; if (nightSet) hg.state.hour = h0; hg.placeAt(B63.ent[0], B63.ent[1] + 8, Math.PI); },
       where() { return phase === 'up' ? '63빌딩 유리 엘리베이터' : '63빌딩 60층 전망대'; },
     };
     // 전망대에서 E 두 번이 아니라 띠의 [그만하기]로 내려온다. 20초 넘게 있어야 도장(서버 최소 시간)

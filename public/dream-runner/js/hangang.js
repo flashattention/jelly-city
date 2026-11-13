@@ -2781,7 +2781,7 @@ const GATE_SN = { facade: 'hanok', gate: { base: 7, tiers: 2 } };
 const NO_LM = {};
 export const LANDMARKS = {
   //   63빌딩: 금빛 반사 유리 · 넓은 면이 위로 갈수록 좁아지는 사다리꼴 옆모습 · 꼭대기 왕관(63스퀘어)도 그만큼 작게
-  '63빌딩': { facade: 'gold', color: '#f0bf5c', taper: { long: 0.6, short: 0.92, minH: 150 } },
+  '63빌딩': { facade: 'gold', color: '#f0bf5c', taper: { long: 0.6, short: 0.92, minH: 150 }, goldShell: true },
   '63스퀘어': { facade: 'gold', color: '#f0bf5c', scale: { long: 0.6, short: 0.92 } },
   'One IFC': { facade: 'glass', color: '#9cc8de', crown: { rise: 16, dir: [1, 0.3] }, rimLight: true },
   'Two IFC': { facade: 'glass', color: '#a6d0e2', crown: { rise: 14, dir: [-1, 0.2] }, rimLight: true },
@@ -3001,6 +3001,32 @@ function buildPeaceGate(hg, ring, G) {
   for (const a of [-0.3, 0.3]) for (const b of [-0.62, 0.62]) { const [x, z] = W2(a * A, b * B), pg = new THREE.CylinderGeometry(1.8, 2.3, base + 0.6, 4, 1); pg.rotateY(Math.PI / 4 - ax.ang); const p = new THREE.Mesh(pg, pm); p.position.set(x, (base + 0.6) / 2, z); hg.scene.add(p);
     const w = 2.6, rr = [W2(a * A - w, b * B - w), W2(a * A + w, b * B - w), W2(a * A + w, b * B + w), W2(a * A - w, b * B + w)], xs = rr.map((q) => q[0]), zs = rr.map((q) => q[1]); hg.addFoot({ ring: rr, h: base, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), name: '세계평화의문', type: 'stone', noClimb: true }); }
 }
+// 63빌딩 금빛 반사 유리 껍질: 몸통(위로 갈수록 좁아짐) · 낮은 두 날개를 원래 상자보다 0.3m 바깥에 한 겹 더 (금빛 유리판 · 층 띠 · 세로 틀, 위쪽이 하늘빛을 받아 밝게)
+//   밤엔 층마다 불 켜진 창 줄 (밤에만 밝아지는 재질 목록). 지붕은 짙은 금빛
+function buildGoldShell(hg, parts, L) {
+  const cvM = document.createElement('canvas'); cvM.width = 128; cvM.height = 128; const g = cvM.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 128, 128); gr.addColorStop(0, '#ffe39a'); gr.addColorStop(0.5, '#f4c552'); gr.addColorStop(1, '#ffd977'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  for (let i = 0; i < 4; i++) { g.fillStyle = 'rgba(255,248,220,.22)'; g.fillRect(0, i * 32 + 2, 128, 10); g.fillStyle = 'rgba(150,105,30,.7)'; g.fillRect(0, i * 32 + 30, 128, 2); }
+  g.fillStyle = 'rgba(150,105,30,.3)'; for (let x = 0; x < 128; x += 16) g.fillRect(x, 0, 1, 128);
+  const cvE = document.createElement('canvas'); cvE.width = 128; cvE.height = 128; const e = cvE.getContext('2d'); e.fillStyle = '#000'; e.fillRect(0, 0, 128, 128); const r = rnd(63);
+  for (let i = 0; i < 4; i++) for (let x = 0; x < 128; x += 16) { if (r() < 0.55) { e.fillStyle = r() < 0.7 ? '#ffd890' : '#fff4dc'; e.fillRect(x + 2, i * 32 + 6, 12, 20); } }
+  const tM = new THREE.CanvasTexture(cvM), tE = new THREE.CanvasTexture(cvE); for (const t of [tM, tE]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; }
+  const mat = new THREE.MeshPhongMaterial({ map: tM, color: '#ffffff', specular: '#fff4cc', shininess: 70, emissive: '#ffffff', emissiveMap: tE, emissiveIntensity: 0, vertexColors: true });
+  const roofM = new THREE.MeshPhongMaterial({ color: '#8a6a2e', specular: '#ffe6a0', shininess: 60 });
+  const P = [], UV = [], C = [], I = [], RP = [], RI = [];
+  for (const q of parts) {
+    const ring = q.ring, h = q.h; let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length;
+    const out = (p) => { const dx = p[0] - cx, dz = p[1] - cz, d = Math.hypot(dx, dz) || 1; return [p[0] + (dx / d) * 0.3, p[1] + (dz / d) * 0.3]; };
+    const tp = L.taper && h > (L.taper.minH || 0), top = tp ? scaleRing(ring, L.taper.long, L.taper.short) : ring, B = ring.map(out), T = top.map(out), N = ring.length;
+    let acc = 0; const k0 = P.length / 3;
+    for (let i = 0; i <= N; i++) { const a = B[i % N], b = T[i % N]; if (i) acc += Math.hypot(a[0] - B[i - 1][0], a[1] - B[i - 1][1]); P.push(a[0], 0, a[1], b[0], h, b[1]); UV.push(acc / 24, 0, acc / 24, h / 14); C.push(1.0, 0.95, 0.85, 1.35, 1.3, 1.18); if (i < N) { const k = k0 + i * 2, a0 = B[i], c0 = B[(i + 1) % N], ex = c0[0] - a0[0], ez = c0[1] - a0[1], mx = (a0[0] + c0[0]) / 2 - cx, mz = (a0[1] + c0[1]) / 2 - cz; /* (위 방향) × (옆 방향) 의 바깥 성분 */ const outw = -ez * mx + ex * mz; if (outw < 0) I.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); else I.push(k, k + 2, k + 1, k + 1, k + 2, k + 3); } }
+    let tris; try { tris = THREE.ShapeUtils.triangulateShape(T.map(([x, z]) => new THREE.Vector2(x, z)), []); } catch { tris = []; } const r0 = RP.length / 3; for (const [x, z] of T) RP.push(x, h + 0.08, z); for (const t of tris) RI.push(r0 + t[0], r0 + t[2], r0 + t[1]);
+  }
+  const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); wg.setAttribute('uv', new THREE.Float32BufferAttribute(UV, 2)); wg.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); wg.setIndex(I); wg.computeVertexNormals();
+  const walls = new THREE.Mesh(wg, mat); hg.scene.add(walls); (hg.lmCrowns ||= []).push(mat);
+  const rg = geoOf(RP, RI); rg.computeVertexNormals(); const roof = new THREE.Mesh(rg, roofM); roofM.side = THREE.DoubleSide; hg.scene.add(roof);
+  hg.gold63 = { walls };
+}
 function buildLandmarkExtras(hg, { name, ring, h, L }) {
   let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length;
   // 본관 조각들(랜드마크를 감싸는 건물)까지 합쳐서: 테두리 조명은 조각마다 지붕선에, 정면 탑은 전체의 바깥 끝에
@@ -3014,6 +3040,7 @@ function buildLandmarkExtras(hg, { name, ring, h, L }) {
     const cm = hg.crossM || new THREE.MeshLambertMaterial({ color: '#f4f1ea' }); const pole = new THREE.Mesh(new THREE.BoxGeometry(0.4, 3, 0.4), cm); pole.position.set(tx, L.spire.h + 1.5, tz); const bar = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.4, 0.4), cm); bar.position.set(tx, L.spire.h + 2, tz); hg.scene.add(pole, bar);
     hg.addFoot({ ring: [[tx - W / 2, tz - W / 2], [tx + W / 2, tz - W / 2], [tx + W / 2, tz + W / 2], [tx - W / 2, tz + W / 2]], h: h + 10, x0: tx - W / 2, x1: tx + W / 2, z0: tz - W / 2, z1: tz + W / 2, name: '', type: 'brick' }); }
   if (L.jbug) buildJBug(hg, ring);
+  if (L.goldShell) buildGoldShell(hg, parts, L);
   if (L.gat) buildGatRoof(hg, ring, h, L.gat);
   if (L.dish) buildDishHouse(hg, ring, L.dish);
   if (L.peaceGate) buildPeaceGate(hg, ring, L.peaceGate);
