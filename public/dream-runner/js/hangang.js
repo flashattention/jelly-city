@@ -2845,7 +2845,7 @@ export const LANDMARKS = {
   월드컵주경기장: { facade: 'panels', stadium: { h: 32, roof: '#f4f4f0', mast: true } }, 목동주경기장: { facade: 'stone', stadium: { h: 18, roof: '#e8e4dc' } }, '올림픽 주경기장': { facade: 'stone', stadium: { h: 30, roof: '#ece8e0' } }, 잠실야구장: { facade: 'stone', stadium: { h: 22, roof: '#d8d4cc' } }, 목동야구장: { facade: 'stone', stadium: { h: 16, roof: '#d8d4cc' } },
   // 예술의전당 오페라하우스(김석철, 1993): 둥근 몸통 위에 갓을 얹은 모양의 지붕 — 넓고 낮게 휜 챙 + 가운데 둥근 갓 머리. 밝은 돌 외벽, 지붕은 짙은 회색
   //   '오페라하우스' 이름 아파트 · 빌라가 서울에 10곳 넘어 위치(서초동 예술의전당)로만
-  오페라하우스: { at: [2998, 5609, 160], facade: 'stone', color: '#d9cfbd', height: 24, gat: { colH: 7, out: 9, rise: 6, crown: 13, crownH: 9, c: '#3a3d42', brim: '#d4d8db', stone: '#ddd3c2' } },
+  오페라하우스: { at: [2998, 5609, 160], facade: 'assembly', color: '#e4dccb', height: 24, gat: { colH: 7, out: 9, rise: 6, crown: 13, crownH: 9, c: '#3a3d42', brim: '#d4d8db', stone: '#ddd3c2' } },
   '예술의전당 음악당': { facade: 'stone', color: '#e6dfd2' },
   // 코엑스(삼성동 무역센터): 길고 낮은 은회색 금속판 · 유리 띠 전시장 (지도 높이 10.9m 는 층수 없는 기본값, 실제 4층 남짓)
   코엑스: { at: [7041, 2016, 400], facade: 'panels', color: '#c3cad0', height: 22, roof: '#8d959b', rimLight: true },
