@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>젤리 아케이드</title>
+  <meta name="description" content="젤리 곰들이 격자 미로에 젤리 폭탄을 놓아 겨루는 3D 대전 게임. 혼자 젤리봇과, 또는 친구와 최대 8명." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/css/shell.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
+  <link rel="icon" href="/favicon-192.png" type="image/png" sizes="192x192" />
+  <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <script src="/shared/js/playtime.js" defer></script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <!-- 경기 중 -->
+  <div id="hud" class="hidden">
+    <div id="h-time"><span id="h-clock">3:00</span><small id="h-map"></small></div>
+    <div id="h-players"></div>
+    <div class="hud-r"><button id="b-mute" title="소리 (M)">🔊</button><button id="b-quit" title="그만하기">✕</button></div>
+    <div id="h-me"></div>
+    <div id="h-keys"><kbd>←↑↓→</kbd> / <kbd>WASD</kbd> 움직이기 · <kbd>Space</kbd> 젤리 폭탄 (갇혔을 때 = 탈출 젤리)</div>
+    <div id="t-btns"><button id="t-bomb" aria-label="젤리 폭탄"><i></i></button></div>
+  </div>
+  <div id="pad" class="hidden"><i></i></div>
+  <div id="count" class="hidden"></div>
+  <div id="banner" class="hidden"></div>
+  <div id="feed"></div>
+  <!-- 결과 -->
+  <div id="over" class="screen hidden"><div class="card wide">
+    <h2 id="ov-title"></h2>
+    <div id="ov-me" class="sub"></div>
+    <div id="ov-rank" class="ranks"></div>
+    <div class="row2"><button id="again-btn" class="btn big">🔁 다시 하기</button><button id="home-btn" class="btn ghost">처음으로</button></div>
+  </div></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
