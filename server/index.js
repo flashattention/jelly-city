@@ -46,7 +46,7 @@ import { normWord } from '../public/jelly-draw/js/prompts.js';
 import { complete } from './jelly-city/llm.js';
 import { Records } from './shared/records.js';
 import { Cosmetics, cosApi, setNames } from './cosmetics.js';
-import { sec, clientIp, limited as rateLimited } from './shared/guard.js';
+import { sec, clientIp, limited as rateLimited, publicPath } from './shared/guard.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
@@ -366,8 +366,8 @@ function handle(req, res) {
   }
   // 웹 워커용 모듈(?w=1): 워커에선 import map 이 안 되므로 'three' · 'three/addons/…' 를 jsDelivr ESM 주소로 바꾸고, 상대 import 에도 ?w=1 을 붙여 준다 (젤리 서울 러너 랜딩의 3D 를 워커에서 그리려고)
   if (url.searchParams.has('w') && url.pathname.endsWith('.js')) {
-    const wf = path.normalize(path.join(PUBLIC, decodeURIComponent(url.pathname)));
-    if (!wf.startsWith(PUBLIC) || !fs.existsSync(wf)) { res.writeHead(404); res.end('not found'); return; }
+    const wf = publicPath(PUBLIC, url.pathname);
+    if (!wf || !fs.existsSync(wf)) { res.writeHead(404); res.end('not found'); return; }
     const key = wf + ':' + fs.statSync(wf).mtimeMs; let code = WMOD.get(key);
     if (!code) {
       const T = 'https://cdn.jsdelivr.net/npm/three@0.169.0';
@@ -376,8 +376,9 @@ function handle(req, res) {
     }
     res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(code); return;
   }
-  let file = path.normalize(path.join(PUBLIC, decodeURIComponent(url.pathname)));
-  if (!file.startsWith(PUBLIC)) { res.writeHead(403); res.end(); return; }
+  // public 밖 · 숨김 파일(.env · .git) · 이상한 글자는 없는 파일처럼 404
+  let file = publicPath(PUBLIC, url.pathname);
+  if (!file) { if (/\.\.|%2e|%00|\\|%5c|\/\./i.test(url.pathname)) sec.note('path', { ip: clientIp(req), where: 'static', detail: url.pathname.slice(0, 80) }); res.writeHead(404); res.end('not found'); return; }
   if (fs.existsSync(file) && fs.statSync(file).isDirectory()) {
     // /jelly-city → /jelly-city/ (게임 안의 상대 경로가 맞게)
     if (!url.pathname.endsWith('/')) { res.writeHead(301, { Location: url.pathname + '/' + url.search }); res.end(); return; }

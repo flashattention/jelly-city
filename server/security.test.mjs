@@ -40,3 +40,15 @@ test('급한 버그: 깨진 주소 · 이상한 요청 줄에도 서버가 죽�
   await raw(S.port, 'GET http://[ HTTP/1.1\r\nHost: x\r\n\r\n');
   assert.equal((await fetch(S.base + '/healthz')).status, 200);
 });
+
+test('2-2 정적 파일: public 밖 · 숨김 파일을 읽을 수 없다', async () => {
+  const bad = ['/..%2f..%2f.env', '/..%2fpackage.json', '/%2e%2e/%2e%2e/.env', '/..%5c..%5cserver%5cindex.js', '/dream-runner/..%2f..%2fserver/index.js', '/.env', '/.git/config', '/%2egit/config', '/shared/%00.js', '/x.js%00.html', '/..%2f..%2fserver/index.js?w=1', '/.well-known/../../.env'];
+  for (const p of bad) {
+    const r = await raw(S.port, `GET ${p} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n`);
+    const code = Number(r.split(' ')[1]);
+    assert.ok(code >= 400 && code < 500, `${p} → ${code}`);
+    assert.doesNotMatch(r, /GOOGLE_CLIENT_ID|"dependencies"|import http|\[core\]/, p);
+  }
+  assert.equal((await fetch(S.base + '/dream-runner/')).status, 200);
+  assert.equal((await fetch(S.base + '/shared/patchnotes.json')).status, 200);
+});

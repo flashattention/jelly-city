@@ -115,7 +115,7 @@ export function cleanText(s, n, { lines = false } = {}) {
 // 이름: 한 줄 · <> 없음 · 보이지 않는 글자 없음
 export const cleanName = (s, n) => cleanText(String(s ?? '').replace(/[<>]/g, ''), n);
 // 운영자 흉내: 비슷한 모양 글자 · 띄어쓰기 · 기호를 걷어 내고 본다
-const FOLD = { 0: 'o', 1: 'l', 3: 'e', 4: 'a', 5: 's', 7: 't', '@': 'a', '$': 's', 'ⓐ': 'a', 'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'х': 'x', 'і': 'i', 'ı': 'i' };
+const FOLD = { 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', 7: 't', '@': 'a', '$': 's', 'ⓐ': 'a', 'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'х': 'x', 'і': 'i', 'ı': 'i' };
 const RESERVED = /운영자|운영진|관리자|관리팀|젤리게임즈|젤리게임스|젤리겜즈|공식|gm|admin|administrator|moderator|operator|official|jellygames|staff|system|시스템|개발자|developer/;
 export function impersonates(name) {
   const t = String(name || '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}@$]/gu, '').replace(/[0-9@$ⓐаеорсхіı]/g, (c) => FOLD[c] || c);
@@ -130,3 +130,14 @@ export function parseSafe(text) {
 }
 // 객체에서 정한 키만 골라 옮긴다
 export const pick = (o, keys) => { const out = {}; if (!o || typeof o !== 'object') return out; for (const k of keys) if (Object.hasOwn(o, k)) out[k] = o[k]; return out; };
+
+// ---------- 정적 파일 경로 ----------
+// 주소 → public 안의 진짜 파일 경로. 밖으로 나가거나(..) · 숨김 파일(.env · .git) · 역슬래시 · 널 문자 · 깨진 인코딩이면 null
+export function publicPath(root, pathname) {
+  let p; try { p = decodeURIComponent(pathname); } catch { return null; }
+  if (p.includes('\0') || p.includes('\\')) return null;
+  const parts = p.split('/');
+  if (parts.some((s) => s === '..' || (s.startsWith('.') && s !== '.well-known'))) return null;
+  const file = path.normalize(path.join(root, p)), base = path.resolve(root);
+  return file === base || file.startsWith(base + path.sep) ? file : null;
+}
