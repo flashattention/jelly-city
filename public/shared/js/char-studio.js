@@ -72,8 +72,9 @@ export class Creator {
   }
   // 서버에 보낼 값
   profile() { const d = this.draft; return { name: (d.name || '').trim(), gender: d.gender, age: d.age, personality: d.personality, color: d.color, look: d.look }; }
+  // 🚀 부스터(가속 불꽃 모양)는 꾸미기 › 옷장 › 🚀 부스터 칸에서 고른다 (허브 10, 흩날리는 효과와 한곳에)
   renderTabs() {
-    const all = Roach.style === 'roach' ? { basic: '📝 기본', body: '🎨 몸·날개', face: '😊 얼굴', antenna: '📡 더듬이', wear: '👒 옷·모자', booster: '🚀 부스터', acc: '🎀 악세서리' } : { basic: '📝 기본', body: '🎨 젤리 색·날개', face: '😊 얼굴', wear: '👒 옷·모자', booster: '🚀 부스터', acc: '🎀 악세서리' };
+    const all = Roach.style === 'roach' ? { basic: '📝 기본', body: '🎨 몸·날개', face: '😊 얼굴', antenna: '📡 더듬이', wear: '👒 옷·모자', acc: '🎀 악세서리' } : { basic: '📝 기본', body: '🎨 젤리 색·날개', face: '😊 얼굴', wear: '👒 옷·모자', acc: '🎀 악세서리' };
     const tabs = this.edit ? Object.fromEntries(Object.entries(all).filter(([k]) => k !== 'basic' && k !== 'acc')) : all;
     const { tabs: tabsEl, body } = this.els;
     tabsEl.innerHTML = Object.entries(tabs).map(([k, v]) => `<button class="${k === this.tab ? 'active' : ''}" data-tab="${k}">${v}</button>`).join('');

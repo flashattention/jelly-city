@@ -2,7 +2,7 @@
 //   상점 아이템: 드림 러너에서 모은 별로 산다 · 업적 아이템: 그 업적을 달성해야만 쓸 수 있다
 export const SLOTS = {
   aura: { name: '오라', emoji: '✨', sub: '몸을 감싸는 빛' }, shoes: { name: '신발', emoji: '👟', sub: '발에 신는 것' }, back: { name: '등 장식', emoji: '🪽', sub: '날개와 빛' },
-  trail: { name: '발자취', emoji: '🐾', sub: '달리면 남는 자국' }, jump: { name: '2단 점프', emoji: '🌟', sub: '드림 러너 2단 점프 효과' }, boost: { name: '가속', emoji: '🚀', sub: '드림 러너 가속 효과' }, land: { name: '착지', emoji: '💥', sub: '드림 러너 착지 효과' },
+  trail: { name: '발자취', emoji: '🐾', sub: '달리면 남는 자국' }, jump: { name: '2단 점프', emoji: '🌟', sub: '드림 러너 2단 점프 효과' }, boost: { name: '부스터', emoji: '🚀', sub: '드림 러너에서 가속할 때 등 뒤 불꽃과 흩날리는 효과' }, land: { name: '착지', emoji: '💥', sub: '드림 러너 착지 효과' },
   sash: { name: '휘장', emoji: '🎗️', sub: '업적으로만 얻는 어깨띠' }, crown: { name: '왕관', emoji: '👑', sub: '지금 1위인 동안만 쓰는 왕관' }, medal: { name: '훈장', emoji: '🎖️', sub: '지금 가장 높은 순위(🥇 1위 → 🥈 2위 → 🥉 3위 → 상위 1% → 5% → 10%)가 이름 옆에 저절로 붙어요', auto: true }, title: { name: '칭호', emoji: '🏷️', sub: '이름 옆에 빛나는 글자' },
 };
 export const RARITY = {

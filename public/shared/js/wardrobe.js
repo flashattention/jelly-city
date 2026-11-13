@@ -1,5 +1,6 @@
 // 업적 · 옷장 · 별 상점 창 (메인 · 모든 게임 공용). 치장은 계정에 저장되어 모든 게임에서 쓴다
 import { account, store } from './account.js';
+import { LOOK_PARTS } from './look.js';
 import { SLOTS, SHOP, RARITY, TIERS, ACHIEVEMENTS, achById, GAMES, itemById, reqText, cleanCos, TOP3_TRAILS, TOP1_TRAILS, liveTrailText } from './cos-items.js';
 
 const CSS = `
@@ -8,7 +9,8 @@ const CSS = `
 .cw-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.1)}.cw-head h2{margin:0;font-size:22px;font-weight:normal;flex:1}.cw-stars{padding:5px 14px;border-radius:999px;background:rgba(255,201,60,.18);color:#ffe27a;font-size:17px}.cw-x{width:36px;height:36px;border:0;border-radius:10px;background:rgba(255,255,255,.1);color:#fff;font-size:16px;cursor:pointer}
 .cw-tabs{display:flex;gap:6px;padding:10px 16px 0;flex-wrap:wrap}.cw-tabs button,.cw-chips button{padding:6px 13px;border:1px solid transparent;border-radius:999px;background:rgba(255,255,255,.08);color:#d9dcef;font:inherit;font-size:15px;cursor:pointer}.cw-tabs button.on,.cw-chips button.on{background:#fff;color:#2b1d5c}
 .cw-body{flex:1;display:flex;min-height:0}.cw-left{width:270px;flex:none;display:flex;flex-direction:column;align-items:center;padding:10px;border-right:1px solid rgba(255,255,255,.08)}.cw-pv{width:250px;height:330px;border-radius:14px;background:radial-gradient(circle at 50% 40%,#3a2f6a,#14102a);cursor:grab;touch-action:none}.cw-pv:active{cursor:grabbing}.cw-spin{display:flex;align-items:center;gap:8px;width:100%;margin-top:6px;font-size:12px;color:#b9bcd2}.cw-spin button{flex:none;padding:3px 10px;border:0;border-radius:999px;background:rgba(255,255,255,.14);color:#fff;font:inherit;font-size:13px;cursor:pointer}.cw-eq{width:100%;margin-top:8px;font-size:13px;line-height:1.7;overflow:auto;color:#c9cce0}.cw-eq b{color:#fff;font-weight:normal}.cw-eq button{margin-left:4px;padding:0 6px;border:0;border-radius:6px;background:rgba(255,255,255,.12);color:#fff;font:inherit;font-size:11px;cursor:pointer}
-.cw-right{flex:1;min-width:0;display:flex;flex-direction:column}.cw-chips{display:flex;gap:6px;padding:10px 14px;overflow-x:auto;flex:none}.cw-chips button{flex:none;font-size:13px;padding:4px 10px}.cw-list{flex:1;min-height:0;overflow-y:auto;scrollbar-gutter:stable;padding:0 8px 14px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));grid-auto-rows:minmax(104px,max-content);gap:8px;align-content:start;align-items:stretch}
+.cw-right{flex:1;min-width:0;display:flex;flex-direction:column}.cw-chips{display:flex;gap:6px;padding:10px 14px;overflow-x:auto;flex:none}.cw-chips button{flex:none;font-size:13px;padding:4px 10px}.cw-list{flex:1;min-height:0;overflow-y:auto;scrollbar-gutter:stable;padding:0 8px 14px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));grid-auto-rows:max-content;gap:8px;align-content:start;align-items:stretch}
+.cw-it.cw-wide{grid-column:1/-1;min-height:0;cursor:default;background:rgba(255,255,255,.03)}.cw-it.cw-mini{min-height:0;flex-direction:row;align-items:center;gap:8px;padding:8px 10px}.cw-it.cw-mini .cw-n{flex:1;min-width:0}.cw-it.cw-mini .cw-b{width:auto;margin:0;padding:5px 12px;flex:none}
 .cw-it{display:flex;flex-direction:column;gap:3px;padding:10px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);min-height:104px;min-width:0;cursor:pointer}.cw-it:hover{background:rgba(255,255,255,.1)}.cw-it.lock{opacity:.5}.cw-it.on{border-color:#ffe27a;box-shadow:0 0 0 1px #ffe27a inset}.cw-n{flex:none;font-size:15px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:2px 0}.cw-it>*{flex-shrink:0}.cw-s{font-size:12px;color:#b9bcd2;font-family:'Noto Sans KR',sans-serif;line-height:1.4}.cw-r{font-size:12px;line-height:1.4;margin-top:auto;padding-top:2px}.cw-s+.cw-b,.cw-r+.cw-b,.cw-n+.cw-b{margin-top:auto}.cw-b{padding:5px;border:0;border-radius:8px;background:#fff;color:#2b1d5c;font:inherit;font-size:13px;cursor:pointer}.cw-b:disabled{background:rgba(255,255,255,.14);color:#9a9db4;cursor:default}
 .cw-sum{padding:10px 14px 0;color:#c9cce0;font-size:14px}.cw-bar{height:8px;margin-top:5px;border-radius:5px;background:rgba(255,255,255,.12);overflow:hidden}.cw-bar i{display:block;height:100%;background:linear-gradient(90deg,#ff5c8a,#ffc93c,#7fe9ff)}
 .cw-msg{padding:0 16px 8px;min-height:18px;color:#ffb3b3;font-size:13px}
@@ -96,8 +98,11 @@ export async function openWardrobe(tab = 'ach', onChange, opt = {}) {
       const r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); r.setPixelRatio(1); r.setSize(cv.width, cv.height, false);
       const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(32, cv.width / cv.height, 0.1, 50); cam.position.set(0, 1.5, 6); cam.lookAt(0, 1.25, 0); sc.add(new THREE.HemisphereLight('#ffffff', '#6a6090', 2.4)); const dl = new THREE.DirectionalLight('#ffffff', 1.6); dl.position.set(2, 4, 3); sc.add(dl);
       let b = null, eq = C.equip;
-      const make = () => { const L = lookOf(), y = b?.root.rotation.y || 0; if (b) sc.remove(b.root); b = new Roach({ own: true, cosPreview: true, seed: 'pv', color: L.color, age: L.age || 25, gender: L.gender, look: L.look, accessories: L.accessories }); b.root.rotation.y = y; sc.add(b.root); b.setCos(eq); pv.bear = b; };
-      pv = { set: (e) => { eq = e; b.setCos(e); }, remake: make }; make(); let last = performance.now(), T = 0, alive = true; pv.stop = () => { alive = false; r.dispose(); };
+      const { Booster } = await import('./booster.js'); let bst = null;
+      const make = () => { const L = lookOf(), y = b?.root.rotation.y || 0; if (b) sc.remove(b.root); b = new Roach({ own: true, cosPreview: true, seed: 'pv', color: L.color, age: L.age || 25, gender: L.gender, look: L.look, accessories: L.accessories }); b.root.rotation.y = y; sc.add(b.root); b.setCos(eq); pv.bear = b;
+        // 🚀 부스터 불꽃 (허브 10): 부스터 칸을 볼 때만 뿜는다
+        bst ||= new Booster(sc); bst.attach(b); bst.setStyle(L.look.booster | 0); };
+      pv = { set: (e) => { eq = e; b.setCos(e); }, remake: make, flame: (i) => bst?.setStyle(i ?? (lookOf().look.booster | 0)) }; make(); let last = performance.now(), T = 0, alive = true; pv.stop = () => { alive = false; r.dispose(); };
       // 돌리기: 저절로 천천히 돌고, 단추로 멈추거나 끌어서 직접 돌린다
       const spinB = $('.cw-spin-b'); let auto = true, drag = null, yaw = 0; const label = () => { spinB.textContent = auto ? '⏸ 멈추기' : '▶ 돌리기'; };
       spinB.onclick = () => { auto = !auto; label(); };
@@ -105,7 +110,7 @@ export async function openWardrobe(tab = 'ach', onChange, opt = {}) {
       cv.onpointermove = (e) => { if (drag) yaw = drag.yaw + (e.clientX - drag.x) * 0.012; };
       cv.onpointerup = cv.onpointercancel = () => { drag = null; };
       pv.state = () => ({ auto, yaw, drag: !!drag });
-      const loop = () => { if (!alive) return; const n = performance.now(), dt = Math.min(0.05, (n - last) / 1000); last = n; T += dt; if (auto && !drag) yaw += dt * 0.6; const bb = pv.bear; bb.root.rotation.y = yaw; bb.cosBoost = 1; bb.update(dt, 3, { noCrawl: true }); if ((T % 1.6) < dt) { bb.cos?.fire('jump'); bb.cos?.fire('land'); } r.render(sc, cam); requestAnimationFrame(loop); }; loop();
+      const loop = () => { if (!alive) return; const n = performance.now(), dt = Math.min(0.05, (n - last) / 1000); last = n; T += dt; if (auto && !drag) yaw += dt * 0.6; const bb = pv.bear; bb.root.rotation.y = yaw; bb.cosBoost = 1; bb.update(dt, 3, { noCrawl: true }); const bOn = S.tab !== 'look' && S.tab !== 'ach' && S.slot === 'boost'; if (bOn && !pv.wasB && !drag) { yaw = Math.PI + 0.55 + Math.round((yaw - Math.PI) / (Math.PI * 2)) * Math.PI * 2; } pv.wasB = bOn; bst?.update(dt, bOn ? 1 : 0, T); if ((T % 1.6) < dt) { bb.cos?.fire('jump'); bb.cos?.fire('land'); } r.render(sc, cam); requestAnimationFrame(loop); }; loop();
     } catch (e) { console.warn('미리보기', e); }
   };
   startPv();
@@ -143,6 +148,22 @@ export async function openWardrobe(tab = 'ach', onChange, opt = {}) {
     const e = C.equip || {}; $('.cw-eq').innerHTML = Object.entries(SLOTS).filter(([s]) => e[s]).map(([s, v]) => `${v.emoji} ${v.name}: <b>${esc(itemById.get(e[s])?.name || '')}</b>${SLOTS[s].auto ? '' : `<button data-off="${s}">벗기</button>`}`).join('<br>') || '<div style="text-align:center">아직 입은 게 없어요</div>';
     for (const b of $('.cw-eq').querySelectorAll('[data-off]')) b.onclick = () => post('/api/cos/equip', { slot: b.dataset.off, id: null });
   }
+  // 🚀 부스터 불꽃 모양 (무료 · 지금 캐릭터 모습에 저장): 예전 모습 › 부스터 탭 (허브 10)
+  async function setFlame(i) {
+    if (!ch) return; const p = ch.profile || {}, look = { ...(p.look || {}), booster: i };
+    try {
+      if (account.session && !isLocal(ch.token)) account.chars = (await account.api(`/api/chars/${ch.token}/look`, { method: 'POST', body: { color: p.color, look } })).chars;
+      else updateLocal(ch.token, { color: p.color, look });
+      ch = charList().find((c) => c.token === ch.token) || ch; if (draft) draft.look.booster = i; opt.onLook?.(ch); onChange?.(C); pv?.remake(); draw();
+    } catch (e) { msg(e.message); }
+  }
+  function boosterFlames(list) {
+    const cur = (ch?.profile?.look?.booster) | 0;
+    list.append(card(`<div class="cw-s">🔥 <b>불꽃 모양</b> · 무료 · ${ch ? esc(ch.name) + ' 에게 저장' : '캐릭터를 만들면 고를 수 있어요'} — 가속할 때 등 뒤로 뿜어요. 아래 ✨ 흩날리는 효과와 함께 나와요</div>`, 'cw-wide'));
+    LOOK_PARTS.booster.options.forEach((name, i) => { const on = cur === i; const d = card(`<div class="cw-n">${esc(name)}</div><button class="cw-b" ${ch ? '' : 'disabled'}>${on ? '✅ 쓰는 중' : '고르기'}</button>`, `cw-mini ${on ? 'on' : ''}`);
+      d.onmouseenter = () => pv?.flame(i); d.onmouseleave = () => pv?.flame(); d.querySelector('button').onclick = () => { if (!on) setFlame(i); }; list.append(d); });
+    list.append(card(`<div class="cw-s">✨ <b>흩날리는 효과</b> · 별 상점에서 사요 · 모든 캐릭터가 같이 써요</div>`, 'cw-wide'));
+  }
   function draw() {
     $('.cw-stars').textContent = stars(C.stars || 0); for (const b of $('.cw-tabs').children) b.classList.toggle('on', b.dataset.t === S.tab); drawEq();
     const list = $('.cw-list'); list.innerHTML = ''; const sum = $('.cw-sum'), isLook = S.tab === 'look';
@@ -162,7 +183,8 @@ export async function openWardrobe(tab = 'ach', onChange, opt = {}) {
       if (S.slot === 'medal') { list.append(card(`<div class="cw-s">🎖️ 메달은 고르지 않아도 돼요. 지금 가장 높은 순위 하나가 이름 옆에 저절로 붙어요 (🥇 1위 → 🥈 2위 → 🥉 3위 → 상위 1% → 5% → 10%, 같으면 더 어려운 순위표). 자리를 내주면 다음 메달로 바뀌어요</div>`, ''));
         for (const it of mine) list.append(card(`<div class="cw-n">${medalHtml(it.id)}</div><div class="cw-r">${C.equip?.medal === it.id ? '✅ 지금 붙어 있어요' : '지금 자리에 있어요'}</div>`, C.equip?.medal === it.id ? 'on' : ''));
         if (!mine.length) list.append(card(`<div class="cw-s">아직 없어요. 순위표 3위 안에 들거나 상위 10% 업적을 달성하면 생겨요</div>`, '')); return; }
-      if (!mine.length) list.append(card(`<div class="cw-s">아직 없어요. ${SLOTS[S.slot].sub}${S.slot === 'crown' ? ' · 지금 1위인 순위표의 왕관만 쓸 수 있어요' : ['sash', 'title'].includes(S.slot) ? ' · 업적을 달성하면 얻어요 (1위 칭호는 1위인 동안만)' : ' · 별 상점에서 살 수 있어요'}</div>`, ''));
+      if (S.slot === 'boost') boosterFlames(list);
+      if (!mine.length) list.append(card(`<div class="cw-s">아직 없어요. ${S.slot === 'boost' ? '흩날리는 효과는 별 상점에서 살 수 있어요' : SLOTS[S.slot].sub}${S.slot === 'crown' ? ' · 지금 1위인 순위표의 왕관만 쓸 수 있어요' : ['sash', 'title'].includes(S.slot) ? ' · 업적을 달성하면 얻어요 (1위 칭호는 1위인 동안만)' : S.slot === 'boost' ? '' : ' · 별 상점에서 살 수 있어요'}</div>`, ''));
       for (const it of mine) { const on = C.equip?.[S.slot] === it.id, rc = RARITY[it.rarity]?.color || TIERS[it.rarity]?.color; const d = card(`<div class="cw-n">${it.emoji} ${esc(it.name)}</div><div class="cw-r" style="color:${rc}">${RARITY[it.rarity]?.name || TIERS[it.rarity]?.name}</div>${it.top3 || it.top1 ? `<div class="cw-s">${it.top1 ? '' : '🏆 '}${esc(liveTrailText(it))}</div>` : ''}<button class="cw-b">${on ? '벗기' : '입기'}</button>`, on ? 'on' : ''); d.querySelector('button').onclick = () => post('/api/cos/equip', { slot: S.slot, id: on ? null : it.id }); list.append(d); }
     } else {
       sum.textContent = '별은 드림 러너를 달리면 모여요. 어려운 난이도와 랜덤 지옥일수록 많이 받아요';
