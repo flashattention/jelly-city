@@ -1400,7 +1400,7 @@ export class Hangang {
     const box = (x, y, z, w, h, d, c, rotY = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.rotateY(rotY); g.translate(x, y, z); const k = extras.P.length / 3, p = g.attributes.position, n = g.attributes.normal; for (let i = 0; i < p.count; i++) { extras.P.push(p.getX(i), p.getY(i), p.getZ(i)); extras.N.push(n.getX(i), n.getY(i), n.getZ(i)); extras.Cl.push(c.r, c.g, c.b); } for (const ix of g.index.array) extras.I.push(k + ix); };
     // 벽에 붙이는 얇은 판 (1층 필로티 · 화강석 띠 · 가게 유리 · 아파트 색 띠): extras 한 덩어리에 꼭짓점 색으로 (그리기 호출이 늘지 않는다)
     const wq = (a, c2, nx, nz, s, o, y0, y1, cc, t0 = 0, t1 = 1) => { const dx = c2[0] - a[0], dz = c2[1] - a[1], x0 = a[0] + dx * t0 + nx * o, z0 = a[1] + dz * t0 + nz * o, x1 = a[0] + dx * t1 + nx * o, z1 = a[1] + dz * t1 + nz * o, q0 = extras.P.length / 3; extras.P.push(x0, y0, z0, x1, y0, z1, x1, y1, z1, x0, y1, z0); for (let t = 0; t < 4; t++) { extras.N.push(nx, 0, nz); extras.Cl.push(cc.r, cc.g, cc.b); } if (s < 0) extras.I.push(q0, q0 + 1, q0 + 2, q0, q0 + 2, q0 + 3); else extras.I.push(q0, q0 + 2, q0 + 1, q0, q0 + 3, q0 + 2); };
-    const C_PIL = new THREE.Color('#2a2c30'), C_BEAM = new THREE.Color('#d2cfc8'), C_SHOP = new THREE.Color('#38414c'), C_SHOPF = new THREE.Color('#2a2a2e'), GRANITE = ['#c9b9b0', '#a9a59e', '#d6d0c6', '#8f8a84', '#bfb2a6'].map((h2) => new THREE.Color(h2));
+    const C_ARC = new THREE.Color('#f2ead2').multiplyScalar(1.7), C_PIL = new THREE.Color('#2a2c30'), C_BEAM = new THREE.Color('#d2cfc8'), C_SHOP = new THREE.Color('#38414c'), C_SHOPF = new THREE.Color('#2a2a2e'), GRANITE = ['#c9b9b0', '#a9a59e', '#d6d0c6', '#8f8a84', '#bfb2a6'].map((h2) => new THREE.Color(h2));
     const campus = []; for (const [nm, L] of Object.entries(LANDMARKS)) { if (!L.campus) continue; const ni2 = M.names.indexOf(nm); const b2 = M.buildings.find((q) => q[4] === ni2); if (!b2) continue; let x = 0, z = 0, n = 0; for (let k = 7; k < b2.length; k += 2) { x += b2[k] * M.scale; z += b2[k + 1] * M.scale; n++; } campus.push({ x: x / n, z: z / n, r: L.campus, L, nm, kind: b2[2] >> 1, ring: P2(b2.slice(7)), self: b2 }); }
     this.lmParts = {}; const touches = (cp, b, ring) => cp.self !== b && (ring.some(([x, z]) => inRing(x, z, cp.ring)) || cp.ring.some(([x, z]) => inRing(x, z, ring)));
     // 남산 정상 둘레(서울 전체 칸): 높이 자료가 잘못된 건물이 많아 정상 지도처럼 낮게 (타워 · 따로 만든 것 빼고)
@@ -1413,6 +1413,9 @@ export class Hangang {
     const palaces = []; { const PN = /^(경복궁|창덕궁|덕수궁|창경궁|경희궁|종묘)/; for (const b2 of M.buildings) { const nm = M.names[b2[4]] || ''; if (PN.test(nm)) palaces.push([b2[7] * M.scale, b2[8] * M.scale]); } }
     // 1층에 가게가 있는 건물 (상가주택: 필로티 대신 1층 가게)
     const shopG = new Set(); for (const s2 of M.shops2 || []) if (s2[3] <= 1) shopG.add(s2[2]);
+    // 전통시장 아케이드: 지도 도구는 시장 건물 안을 골목이 20m 넘게 지날 때만 아케이드로 만들어(5곳) 나머지는 상자로 막혀 있었다
+    //   1층짜리(4.6m 아래) 이름 있는 동네 시장(도매 · 수산 · 전시장 · 센터 빼고, 300㎡ 넘음)은 실제로 골목 위에 지붕을 덮은 시장이라 같은 아케이드로 (연서시장 · 노룬산시장 · 봉천중앙시장 · 숭인시장 · 대림시장 · 증산종합시장 · 동진시장)
+    if (M.kind === 'tile' && !M.arcFix) { M.arcFix = true; for (const b of M.buildings) { const nm = M.names[b[4]] || ''; if (b[1] === 0 && b[0] <= 4.6 && /시장$/.test(nm) && !/도매|수산|농산|청과|전시|자동차|매매|센터|유통|공판/.test(nm) && Math.abs(ringArea(P2(b.slice(7)))) > 300) { b[0] = 6; b[1] = 4.2; } } }
     for (const [bi, b] of M.buildings.entries()) {
       if (performance.now() - t0 > 8) { yield; t0 = performance.now(); }
       fillY(); curY = NaN;
@@ -1512,6 +1515,9 @@ export class Hangang {
       let tris; try { tris = THREE.ShapeUtils.triangulateShape(ring.map(([x, z]) => new THREE.Vector2(x, z)), []); } catch { tris = []; }
       const k = base(); for (const [x, z] of top) { set.P.push(x, h, z); set.N.push(0, 1, 0); set.U.push(0.003, 0.003); set.Cl.push(roofC.r, roofC.g, roofC.b); }
       for (const t of tris) { const [A, B, Cc] = t.map((v) => ring[v]); const up = (B[1] - A[1]) * (Cc[0] - A[0]) - (B[0] - A[0]) * (Cc[1] - A[1]); if (up > 0) set.I.push(k + t[0], k + t[1], k + t[2]); else set.I.push(k + t[0], k + t[2], k + t[1]); }
+      // 떠 있는 건물(아케이드 · 필로티 위 · 고가 밑)은 아랫면도: 지붕은 윗면만 있어 밑에서 올려다보면 하늘이 보였다 (시장 아케이드 안). 시장 지붕은 밝은 크림색 채광판
+      if (mh > 2.5) { const k3 = base(), cc = /시장/.test(name) && h - mh < 3 ? C_ARC : roofC.clone().multiplyScalar(0.62); for (const [x, z] of ring) { set.P.push(x, mh, z); set.N.push(0, -1, 0); set.U.push(0.003, 0.003); set.Cl.push(cc.r, cc.g, cc.b); }
+        for (const t of tris) { const [A, B, Cc] = t.map((v) => ring[v]); const up = (B[1] - A[1]) * (Cc[0] - A[0]) - (B[0] - A[0]) * (Cc[1] - A[1]); if (up > 0) set.I.push(k3 + t[0], k3 + t[2], k3 + t[1]); else set.I.push(k3 + t[0], k3 + t[1], k3 + t[2]); } }
       let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x; cz += z; } cx /= ring.length; cz /= ring.length;
       { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } const fi = (this.foot ||= []).length; this.foot.push({ ring: LM?.scale ? top : ring, h, x0, x1, z0, z1, name, type, bi, mh: mh > 2.5 ? mh : undefined, base: curY === curY ? curY : undefined, tp: LM?.taper && top !== ring ? tp : undefined }); this.footGrid ||= new Map(); for (let gx = Math.floor(x0 / 40); gx <= Math.floor(x1 / 40); gx++) for (let gz = Math.floor(z0 / 40); gz <= Math.floor(z1 / 40); gz++) { const k = `${gx},${gz}`; if (!this.footGrid.has(k)) this.footGrid.set(k, []); this.footGrid.get(k).push(fi); } }
       // 옥상 설비 (높은 건물)
