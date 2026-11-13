@@ -111,7 +111,6 @@ function renderChars() {
       ${c.token === main ? '<span class="badge">⭐ 대표</span>' : ''}${c.local ? '<span class="badge local">📱 이 기기</span>' : ''}
       <img data-thumb="${c.token}" alt="">
       <div class="nm">${esc(c.name)}</div>
-      <div class="meta">${c.profile?.gender === '남' ? '♂' : '♀'} ${c.profile?.age || 25}살 · ${esc(c.profile?.personality || '')}</div>
       <div class="acts">
         ${c.token === main ? '' : `<button class="btn mini" data-main="${c.token}">⭐ 대표로</button>`}
         <button class="btn ghost mini" data-style="${c.token}">🎨 꾸미기</button>
