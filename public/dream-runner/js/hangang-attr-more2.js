@@ -112,7 +112,8 @@ const inRing = (x, z, r) => { let c = false; for (let i = 0, j = r.length - 1; i
 function chaikin(pts, n = 2) { let p = pts; for (let k = 0; k < n; k++) { const q = []; for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; q.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25], [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]); } p = q; } return p; }
 // 은빛 알루미늄 판 (크기 · 밝기가 조금씩 다른 판, 가는 이음매) · 밤에 빛나는 이음매와 작은 구멍 점
 const panelTex = () => cvTex(256, 256, (c, W, H) => { const r = rndS(45133); for (let y = 0; y < H; y += 32) { let x = -r() * 40; while (x < W) { const w = 50 + r() * 60, l = 208 + r() * 14; c.fillStyle = `rgb(${l - 4},${l},${l + 6})`; c.fillRect(x, y, w, 32); const g = c.createLinearGradient(x, y, x + w, y + 32); g.addColorStop(0, 'rgba(255,255,255,.12)'); g.addColorStop(1, 'rgba(0,0,0,.08)'); c.fillStyle = g; c.fillRect(x, y, w, 32); c.fillStyle = 'rgba(90,96,104,.18)'; c.fillRect(x, y, 1, 32); x += w; } c.fillStyle = 'rgba(90,96,104,.2)'; c.fillRect(0, y, W, 1); } });
-const panelEm = () => cvTex(256, 256, (c, W, H) => { const r = rndS(7); c.fillStyle = '#000'; c.fillRect(0, 0, W, H); c.fillStyle = 'rgba(150,190,255,.55)'; for (let y = 0; y < H; y += 32) c.fillRect(0, y, W, 1.5); for (let i = 0; i < 420; i++) { c.fillStyle = `rgba(220,235,255,${0.25 + r() * 0.5})`; c.fillRect(r() * W, r() * H, 1.6, 1.6); } });
+// 밤 빛 그림: 판 배치를 은빛 판 그림과 같은 씨앗으로 다시 그려, 판 사이 이음매(가로 · 세로)가 가는 빛줄로 · 판 면은 은은한 은빛 · 작은 구멍 점
+const panelEm = () => cvTex(256, 256, (c, W, H) => { const r = rndS(45133), r2 = rndS(7); c.fillStyle = '#000'; c.fillRect(0, 0, W, H); for (let y = 0; y < H; y += 32) { let x = -r() * 40; while (x < W) { const w = 50 + r() * 60, l = 208 + r() * 14, k = (l - 208) / 14; c.fillStyle = `rgb(${50 + k * 26},${56 + k * 26},${68 + k * 26})`; c.fillRect(x, y, w, 32); c.fillStyle = 'rgba(205,226,255,.6)'; c.fillRect(x, y, 1.5, 32); x += w; } c.fillStyle = 'rgba(205,226,255,.6)'; c.fillRect(0, y, W, 1.5); } for (let i = 0; i < 420; i++) { c.fillStyle = `rgba(230,240,255,${0.3 + r2() * 0.5})`; c.fillRect(r2() * W, r2() * H, 1.6, 1.6); } });
 function buildDDP(A) {
   const hg = A.hg, g = new THREE.Group(); A.root.add(g); const ring = chaikin(DDP_RING, 2), N = ring.length, base = Math.min(...DDP_RING.map(([x, z]) => A.H(x, z))) - 0.3;
   let per = 0; const acc = [0]; for (let i = 1; i <= N; i++) { per += Math.hypot(ring[i % N][0] - ring[i - 1][0], ring[i % N][1] - ring[i - 1][1]); acc.push(per); }
@@ -136,14 +137,16 @@ function buildDDP(A) {
   // 빛 띠: 아래 둘레(환한 띠) · 지붕 곡선을 따라 흐르는 빛 (더하기 섞기, 셰이더 안에서 흐름)
   const U = { uT: { value: 0 }, uN: { value: 0 } }, ribbons = [], RP = [], RU = [], RI = [];
   const ribbon = (k, h, out, kind) => { const rg = rings[k], o = RP.length / 3; for (let i = 0; i <= N; i++) { const p = rg[i % N], [nx, nz] = nrm[i % N]; RP.push(p[0] + nx * out, p[1], p[2] + nz * out, p[0] + nx * out, p[1] + h, p[2] + nz * out); RU.push(acc[i], kind, acc[i], kind + 0.5); } for (let i = 0; i < N; i++) { const a = o + i * 2; RI.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); } };
-  ribbon(0, 0.7, 0.12, 0); ribbon(1, 0.5, 0.15, 2); ribbon(3, 0.4, 0.1, 4); ribbon(5, 0.35, 0.08, 6);
+  // 아래 둘레: 환한 띠(1.2m) + 그 위로 벽을 타고 올라가며 옅어지는 따뜻한 빛 자국(7m) · 지붕 곡선 세 줄
+  ribbon(0, 1.2, 0.12, 0); ribbon(0, 7, 0.06, 8); ribbon(1, 0.5, 0.15, 2); ribbon(3, 0.4, 0.1, 4); ribbon(5, 0.35, 0.08, 6);
   const rgeo = new THREE.BufferGeometry(); rgeo.setAttribute('position', new THREE.Float32BufferAttribute(RP, 3)); rgeo.setAttribute('uv', new THREE.Float32BufferAttribute(RU, 2)); rgeo.setIndex(RI);
   const rmat = new THREE.ShaderMaterial({ uniforms: U, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: `uniform float uT, uN; varying vec2 vUv;
       void main(){ float kind = floor(vUv.y); float v = fract(vUv.y) * 2.0; float edge = smoothstep(0.0, 0.35, v) * smoothstep(1.0, 0.65, v);
         vec3 col; float a;
-        if (kind < 1.0) { col = vec3(1.0, 0.93, 0.8); a = 0.85; }
+        if (kind < 1.0) { col = vec3(1.0, 0.94, 0.82); a = 1.25; }
+        else if (kind > 7.5) { col = vec3(1.0, 0.9, 0.74); a = 0.9 * pow(1.0 - v, 1.8); edge = 1.0; }
         else { float s = vUv.x / 60.0 - uT * (0.12 + kind * 0.01) + kind * 0.37; float pulse = pow(0.5 + 0.5 * sin(s * 6.2832), 10.0); col = mix(vec3(0.55, 0.75, 1.0), vec3(1.0, 1.0, 1.0), pulse); a = 0.12 + pulse * 0.9; }
         gl_FragColor = vec4(col * a * edge * uN, 1.0); }` });
   const rib = new THREE.Mesh(rgeo, rmat); rib.renderOrder = 3; g.add(rib);
@@ -153,7 +156,7 @@ function buildDDP(A) {
   const fmat = new THREE.ShaderMaterial({ uniforms: FU, vertexShader: 'uniform float uT; varying float vB; varying vec3 vN; void main(){ vec4 ip = instanceMatrix * vec4(0.0,0.0,0.0,1.0); vB = 0.6 + 0.4 * sin(uT * 1.6 + ip.x * 0.9 + ip.z * 0.7); vN = normal; gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0); }', fragmentShader: 'uniform float uN; varying float vB; varying vec3 vN; void main(){ float day = 0.55 + 0.35 * max(0.0, vN.y); vec3 c = mix(vec3(day), vec3(1.0, 0.98, 0.92) * (0.7 + vB * 0.9), uN); gl_FragColor = vec4(c, 1.0); }' });
   const flowers = new THREE.InstancedMesh(fg, fmat, fl.length), m4 = new THREE.Matrix4(); fl.forEach(([x, y, z], i) => flowers.setMatrixAt(i, m4.makeTranslation(x, y, z))); flowers.frustumCulled = false; g.add(flowers);
   const stems = []; for (let i = 0; i < fl.length; i += 1) { const [x, y, z] = fl[i]; stems.push(part(new THREE.CylinderGeometry(0.015, 0.015, y - A.H(x, z), 3), '#3a4a2a', x, (y + A.H(x, z)) / 2, z)); } g.add(new THREE.Mesh(merge(stems), vcMat()));
-  lit(A, (L) => { U.uN.value = L; shellM.emissiveIntensity = L * 0.55; });
+  lit(A, (L) => { U.uN.value = L; shellM.emissiveIntensity = L * 1.1; });
   const undo = hideTrees(hg, (x, z) => inRing(x, z, DDP_RING));
   A.ddp = { ring, nrm, Hs, base, per, acc };
   return { group: g, tick(dt) { U.uT.value += dt; }, dispose() { undo(); g.traverse((q) => q.geometry?.dispose?.()); } };

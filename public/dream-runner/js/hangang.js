@@ -2514,8 +2514,8 @@ float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y
   }
   project0(x, z) { let best = Infinity, bs = 0, bl = 0; for (let i = 0; i < this.rp.length - 1; i += 2) { const a = this.rp[i], d = (a[0] - x) ** 2 + (a[1] - z) ** 2; if (d < best) { best = d; bs = i * this.step; } } const p = this.at(bs); bl = (x - p.x) * p.rx + (z - p.z) * p.rz; return { s: bs, lat: bl }; }
   tickLabels(dt, camera, px, pz) {
-    // 버스 · 지하철을 타고 있는 동안은 건물 이름표를 띄우지 않는다 (창밖을 가린다), 내리면 다시
-    if (this.rideL?.on) { this.activeLabels = []; return; }
+    // 버스 · 지하철을 타고 있는 동안 · 명소 체험 중엔 건물 이름표를 띄우지 않는다 (창밖 · 명소 풍경을 가린다), 끝나면 다시
+    if (this.rideL?.on || this.attr?.exp) { this.activeLabels = []; return; }
     { const lk = this.chunks ? [...this.chunks.keys()].join() : ''; if (!this.labels || lk !== this.labKey) { this.labKey = lk; this.setupLabels(); } }
     // 바라보는 건물에 이름표: 화면 가운데 쪽에 들어온 건물 (높을수록 멀리서도) · 시선을 돌리면 서서히 사라지고 다시 보면 또 뜬다
     this.activeLabels ||= []; this.labT = (this.labT || 0) - dt;
