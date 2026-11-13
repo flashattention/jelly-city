@@ -2023,13 +2023,24 @@ float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y
     const st0 = (M.stations || []).map(([n, x, z]) => { const x2 = x * S, z2 = z * S, old = H.stations.find((q) => q.name === n && Math.hypot(q.x - x2, q.z - z2) < 400); if (old) return old; const st = { name: n, x: x2, z: z2, lines: STATION_LINES[n] || [] }; H.stations.push(st); return st; });
     this.stations = st0; const mine = [];
     const glass = new THREE.MeshPhongMaterial({ color: '#cfe6f0', transparent: true, opacity: 0.38, shininess: 90, side: THREE.DoubleSide }), frame = new THREE.MeshLambertMaterial({ color: '#5a636e' }), pit = new THREE.MeshBasicMaterial({ color: '#2a2a30' }), stepM = new THREE.MeshLambertMaterial({ color: '#9a9690' }), noseM = new THREE.MeshLambertMaterial({ color: '#e0b830' }), granite = new THREE.MeshLambertMaterial({ color: '#8f8a84' }), steel = new THREE.MeshPhongMaterial({ color: '#d8dce0', shininess: 80 }), exitLightM = new THREE.MeshLambertMaterial({ color: '#fff6e0', emissive: '#fff2d0', emissiveIntensity: 0.3 }), exitGlowM = new THREE.MeshBasicMaterial({ color: '#ffe2a8', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }); this.exitLightM = exitLightM; this.exitGlowM = exitGlowM;
+    // 출구 자리 살피기: 이 칸 건물 + 이미 불러온 이웃 칸 건물(주인 목록), 찻길(차로 폭 + 0.3m). 다리 · 고가 바닥은 건물이 아니다
+    const entFootAt = (px, pz) => { for (const [F, G] of [[this.foot, this.footGrid], ...(H !== this ? [[H.foot, H.footGrid]] : [])]) { for (const fi of G?.get(`${Math.floor(px / 40)},${Math.floor(pz / 40)}`) || []) { const f = F[fi]; if (!f || f.deck || f.deckWall || px < f.x0 || px > f.x1 || pz < f.z0 || pz > f.z1) continue; if (inRing(px, pz, f.ring)) return true; } } return false; };
+    let entRG = null; const entRoadAt = (px, pz) => { if (!entRG) { entRG = new Map(); for (const rd of M.roads || []) { const w = rd[0], pts = unpack(rd.slice(2), S); for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k], e = w / 2 + 0.3; for (let gx = Math.floor((Math.min(a[0], b[0]) - e) / 30); gx <= Math.floor((Math.max(a[0], b[0]) + e) / 30); gx++) for (let gz = Math.floor((Math.min(a[1], b[1]) - e) / 30); gz <= Math.floor((Math.max(a[1], b[1]) + e) / 30); gz++) { const kk = `${gx},${gz}`; if (!entRG.has(kk)) entRG.set(kk, []); entRG.get(kk).push([a, b, e]); } } } }
+      for (const [a, b, hw] of entRG.get(`${Math.floor(px / 30)},${Math.floor(pz / 30)}`) || []) { const dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1, t = clamp(((px - a[0]) * dx + (pz - a[1]) * dz) / L2, 0, 1); if (Math.hypot(a[0] + dx * t - px, a[1] + dz * t - pz) < hw) return true; } return false; };
+    let entTurn = 0;
     for (const [x0, z0, si, ref] of M.entrances || []) {
       const st = this.stations[si]; if (!st) continue; let x = x0 * S, z = z0 * S; if (this.inWater(x, z)) continue;
       // 출구가 건물 바닥 안에 있으면(건물 1층에 붙은 출구) 가장 가까운 벽 바깥으로 옮긴다 (벽에 막혀 들어갈 수 없었다)
       { const inF = (px, pz) => (this.foot || []).find((f) => !f.deck && px >= f.x0 && px <= f.x1 && pz >= f.z0 && pz <= f.z1 && inRing(px, pz, f.ring)), f = inF(x, z);
         if (f) { const r2 = f.ring, sg = ringArea(r2) > 0 ? 1 : -1; let best = Infinity, nx2 = 0, nz2 = 0, bx = x, bz = z; for (let k = 0; k < r2.length; k++) { const A = r2[k], B = r2[(k + 1) % r2.length], dx = B[0] - A[0], dz = B[1] - A[1], L = Math.hypot(dx, dz); if (L < 0.5) continue; const t = clamp(((x - A[0]) * dx + (z - A[1]) * dz) / (L * L), 0, 1), qx = A[0] + dx * t, qz = A[1] + dz * t, d = Math.hypot(qx - x, qz - z); if (d < best) { best = d; bx = qx; bz = qz; nx2 = (sg > 0 ? dz : -dz) / L; nz2 = (sg > 0 ? -dx : dx) / L; } }
           const X2 = bx + nx2 * 3.4, Z2 = bz + nz2 * 3.4; if (best < 30 && !inF(X2, Z2) && !this.inWater(X2, Z2)) { x = X2; z = Z2; } } }
-      const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = Math.atan2(st.x - x, st.z - z);
+      // 가운데는 밖이어도 출구 몸(3 × 5.2m)이 건물에 걸치면 묻혀 보였다 (홍대입구 3번 · 서울역 13번): 몸 전체가 건물 · 물 · 찻길 밖인 가장 가까운 자리(30m 안)로
+      //   이미 불러온 이웃 칸 건물도 본다. 방향은 역 쪽 그대로, 안 되면 옆으로 돌려서
+      { const blocked = (cx, cz, th) => { const c = Math.cos(th), s2 = Math.sin(th); for (let a = -1.5; a <= 1.51; a += 0.75) for (let b = -2.6; b <= 2.61; b += 0.65) { const px = cx + a * c + b * s2, pz = cz - a * s2 + b * c; if (entFootAt(px, pz) || this.inWater(px, pz) || entRoadAt(px, pz)) return true; } return false; };
+        const th0 = Math.atan2(st.x - x, st.z - z);
+        if (blocked(x, z, th0)) { let hit = null; for (let r = 1; r <= 30 && !hit; r++) { const n = Math.max(8, Math.round(r * 2 * Math.PI)); for (let k = 0; k < n && !hit; k++) { const an = (k / n) * Math.PI * 2, cx = x + Math.cos(an) * r, cz = z + Math.sin(an) * r; for (const dth of [0, Math.PI / 2, -Math.PI / 2]) { const th = Math.atan2(st.x - cx, st.z - cz) + dth; if (!blocked(cx, cz, th)) { hit = [cx, cz, dth]; break; } } } } if (hit) { x = hit[0]; z = hit[1]; entTurn = hit[2]; } }
+      }
+      const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = Math.atan2(st.x - x, st.z - z) + entTurn; entTurn = 0;
       // 서울 지하철 출구: 내려가는 계단 구덩이 · 화강석 낮은 벽 + 유리벽 · 둥근 유리 지붕과 금속 틀 · 지붕 앞 노란 출구 번호 · 옆에 안내 기둥
       const p = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 4.2), pit); p.rotation.x = -Math.PI / 2; p.position.y = 0.04; g.add(p);
       for (let k = 0; k < 7; k++) { const s2 = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.06, 0.45), stepM); s2.position.set(0, 0.05 - k * 0.0, -1.7 + k * 0.55); s2.scale.y = 1; g.add(s2); const nose = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.02, 0.05), noseM); nose.position.set(0, 0.09, -1.48 + k * 0.55); g.add(nose); }
@@ -2051,7 +2062,7 @@ float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y
       // 안내 기둥: 몸통 상자 + 앞 · 뒤 글씨판 (글씨는 칸마다 한 장에 모은 그림)
       const totem = new THREE.Mesh(new THREE.BoxGeometry(0.62, 2.7, 0.2), frame); totem.position.set(1.95, 1.35, -2.2); g.add(totem);
       { const tc = exitTotemTex(st.name, st.lines, ref).image; for (const sd of [1, -1]) { const pl = EA.plane(0.6, 2.68, 'totem', tc); pl.position.set(1.95, 1.35, -2.2 + sd * 0.102); if (sd < 0) pl.rotation.y = Math.PI; g.add(pl); } }
-      this.scene.add(g); const E = { x, z, st, ref, g, key: this.chunkKey }; H.entrances.push(E); mine.push(E);
+      this.scene.add(g); const E = { x, z, st, ref, g, key: this.chunkKey, ox: x0 * S, oz: z0 * S }; H.entrances.push(E); mine.push(E);
       // 부딪힘: 양옆 화강석 벽 · 뒤 벽 · 안내 기둥 (가운데 계단으로는 걸어 내려갈 수 있다)
       //   출구 벽은 타고 오를 수 없다 (옆 · 뒤에서 타고 올라 계단 구덩이로 떨어져 역 안 벽에 끼던 것)
       { const th = g.rotation.y, W = (lx, lz) => [x + lx * Math.cos(th) + lz * Math.sin(th), z - lx * Math.sin(th) + lz * Math.cos(th)], rect = (a0, b0, a1, b1) => { const ring = [W(a0, b0), W(a1, b0), W(a1, b1), W(a0, b1)], xs = ring.map((q) => q[0]), zs = ring.map((q) => q[1]); this.addFoot({ ring, h: 2.6, x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), name: `${st.name}역 ${ref || ''}번 출구`, type: 'stone', noClimb: true }); }; rect(-1.45, -2.3, -1.15, 2.4); rect(1.15, -2.3, 1.45, 2.4); rect(-1.45, 2.3, 1.45, 2.6); this.addCircle(W(1.95, -2.2)[0], W(1.95, -2.2)[1], 0.4, 2.7); }
@@ -2743,6 +2754,8 @@ export const LANDMARKS = {
   'One IFC': { facade: 'glass', color: '#9cc8de', crown: { rise: 16, dir: [1, 0.3] }, rimLight: true },
   'Two IFC': { facade: 'glass', color: '#a6d0e2', crown: { rise: 14, dir: [-1, 0.2] }, rimLight: true },
   'Three IFC': { facade: 'glass', color: '#92c0da', crown: { rise: 22, dir: [0.4, 1] }, rimLight: true },
+  //   IFC몰 남문 · 북문: 지하 몰로 내려가는 낮은 유리 상자 (지도 높이 284m · 175m 는 옆 타워 값이 잘못 붙은 것)
+  'IFC mall (South Gate)': { facade: 'glass', color: '#b9d3e0', height: 9 }, 'IFC mall (North Gate)': { facade: 'glass', color: '#b9d3e0', height: 9 },
   전경련회관: { facade: 'glass', color: '#9bb0aa', crown: { rise: 18, dir: [0, -1] }, rimLight: true },
   LG트윈타워: { facade: 'gold', color: '#d9b27c', topSign: { text: 'LG', color: '#c4003a', bg: '#ffffff' } },
   'KBS 본관': { facade: 'stone', color: '#bfae92' },
