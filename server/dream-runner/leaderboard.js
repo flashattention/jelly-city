@@ -8,7 +8,7 @@ import { getCos, boardMedal, nameOf, tagChar } from '../cosmetics.js';
 import crypto from 'node:crypto';
 import { Tickets, ReplayPool, decodeReplay } from './verify.js';
 import { codeVer, archiveCode, hasVer, VER_RE } from './codever.js';
-import { publicId, sec } from '../shared/guard.js';
+import { publicId, sec, anonOk, ANON_FULL } from '../shared/guard.js';
 // 죽은 이유 종류 → 이름 (runner.js die 의 code)
 export const DIE_LABEL = { step: '높은 턱 · 벽', fall: '떨어짐', hurdle: '낮은 장애물', wall: '높은 장애물', bar: '머리 위 가로대', meteor: '운석', laser: '빛줄기', slam: '괴물의 일격', car: '승용차', suv: 'SUV', taxi: '택시', bus: '버스', moto: '배달 오토바이', bike: '자전거', ped: '행인 젤리', cones: '공사 고깔', barrier: '공사 가림막', banner: '현수막' };
 import { itemById } from '../../public/shared/js/cos-items.js';
@@ -335,6 +335,7 @@ export async function dreamApi(req, res, url, who, board, json, isAdmin) {
       if (hits.length >= 20) return json(res, 429, { error: '잠시 후 다시 시도해 주세요' });
       hits.push(now); board.ipHits.set('p:' + ip, hits);
     }
+    if (!who && !anonOk(req, b.anon)) return json(res, 429, { error: ANON_FULL });
     try { return json(res, 200, { ok: true, ...board.played(who?.sub || 'anon:' + b.anon, b) }); } catch (e) { return json(res, 400, { error: e.message }); }
   }
   // 한강 러닝: 시작 · 달린 거리 보내기 (로그인 없이도 이 기기 아이디로)
@@ -342,12 +343,14 @@ export async function dreamApi(req, res, url, who, board, json, isAdmin) {
   if (url.pathname === '/api/dream/hangang/run' && req.method === 'POST') {
     const b = await readJson(req);
     if (!who && !ANON.test(String(b.anon || ''))) return json(res, 401, { error: 'login' });
+    if (!who && !anonOk(req, b.anon)) return json(res, 429, { error: ANON_FULL });
     try { return json(res, 200, board.hgRun(who?.sub || 'anon:' + b.anon, b)); } catch (e) { return json(res, 400, { error: e.message }); }
   }
   // 서울 명소 도장 (로그인 없이도 이 기기 아이디로)
   if (url.pathname === '/api/dream/hangang/stamp' && req.method === 'POST') {
     const b = await readJson(req);
     if (!who && !ANON.test(String(b.anon || ''))) return json(res, 401, { error: 'login' });
+    if (!who && !anonOk(req, b.anon)) return json(res, 429, { error: ANON_FULL });
     try { return json(res, 200, board.hgStamp(who?.sub || 'anon:' + b.anon, b)); } catch (e) { return json(res, 400, { error: e.message }); }
   }
   if (url.pathname === '/api/dream/hangang/stamps') { const sub = who?.sub || (ANON.test(anonId || '') ? 'anon:' + anonId : null); if (!sub) return json(res, 401, { error: 'login' }); return json(res, 200, { stamps: board.hg[sub]?.stamps || {} }); }
@@ -373,6 +376,7 @@ export async function dreamApi(req, res, url, who, board, json, isAdmin) {
       const now = Date.now(), hits = (board.ipHits.get(ip) || []).filter((t) => now - t < 60000);
       if (hits.length >= 20) return json(res, 429, { error: '잠시 후 다시 시도해 주세요' });
       hits.push(now); board.ipHits.set(ip, hits);
+      if (!anonOk(req, b.anon)) return json(res, 429, { error: ANON_FULL });
       who = { sub: 'anon:' + b.anon, user: { name: '', anon: true } };
     }
     try { return json(res, 200, await board.submit(who, b)); } catch (e) { return json(res, e.status || 400, { error: e.message }); }

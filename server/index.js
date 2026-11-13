@@ -46,7 +46,7 @@ import { normWord } from '../public/jelly-draw/js/prompts.js';
 import { complete } from './jelly-city/llm.js';
 import { Records } from './shared/records.js';
 import { Cosmetics, cosApi, setNames } from './cosmetics.js';
-import { sec, clientIp, limited as rateLimited, publicPath, publicError, DayCount, WsGuard, ROOM_SPECS } from './shared/guard.js';
+import { sec, clientIp, limited as rateLimited, publicPath, publicError, DayCount, WsGuard, ROOM_SPECS, setAnonKnown } from './shared/guard.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
@@ -148,6 +148,8 @@ const driftRecords = new Records(DATA_DIR, 'jelly-drift', {
   // 경주 시간보다 실제 시간이 짧을 수는 없다 (출발 전 4초 카운트다운도 있다)
   timing: (b, body, s) => (s < Number(body.time) - 5 ? { reject: '기록이 이상해요' } : s < Number(body.time) + 2 ? { flag: 'fast' } : null),
 });
+// 익명 id 농사 막기 (6-2): 이미 별 · 기록이 있는 익명 id 는 '아는 사람'
+setAnonKnown((id) => { const k = 'anon:' + id; return !!(cosmetics.users[k] || dreamBoard.stats[k] || dreamBoard.hg[k] || [tenRecords, survRecords, typeRecords, mergeRecords, slideRecords, driftRecords].some((R) => R.boards.some((b) => R.data[b]?.[k]))); });
 // 업적: 기록판 · 방 경기 결과를 치장 쪽에 잇는다
 Object.assign(cosmetics.records, { 'jelly-ten': tenRecords, 'jelly-survivor': survRecords, 'jelly-type': typeRecords, 'jelly-merge': mergeRecords, 'jelly-slide': slideRecords, 'jelly-drift': driftRecords });
 for (const [k, R] of Object.entries({ 'jelly-drift': driftRooms, 'jelly-tactical': tacticalRooms, 'jelly-drop': dropRooms, 'jelly-guard': guardRooms, 'jelly-ten': tenRooms, 'jelly-survivor': survRooms, 'jelly-word': wordRooms, 'jelly-draw': drawRooms, 'jelly-sketch': sketchRooms, 'jelly-type': typeRooms, 'jelly-rumble': rumbleRooms, 'jelly-merge': mergeRooms, 'jelly-court': courtRooms, 'jelly-ding': dingRooms, 'jelly-slide': slideRooms, 'jelly-hide': hideRooms, 'jelly-arena': arenaRooms, 'jelly-arcade': arcadeRooms })) R.gameKey = k;

@@ -219,6 +219,34 @@ test('5-1 기록판: 실제로 지난 시간보다 긴 기록은 거절', async 
   assert.equal(j.hold, true);
 });
 
+test('6-2 익명 id 농사: 한 IP 가 새 익명 id 를 하루 40개 넘게 만들면 막는다 (이미 있는 id 는 그대로)', async () => {
+  const h = IP(60), ids = [];
+  const codes = [];
+  for (let i = 0; i < 42; i++) { const a = hex(24); ids.push(a); codes.push((await postJ('/api/cos/attend', { anon: a }, h)).status); }
+  assert.deepEqual(codes.slice(0, 40), Array(40).fill(200));
+  assert.equal(codes[40], 429);
+  assert.equal((await postJ('/api/cos/seen', { anon: ids[0] }, h)).status, 200, '이미 쓰던 익명 id 는 된다');
+  assert.equal((await postJ('/api/cos/attend', { anon: ids[0] }, h)).status, 400, '출석은 하루 한 번 (두 번 주기 금지)');
+  assert.equal((await postJ('/api/cos/attend', { anon: hex(24) }, IP(61))).status, 200, '다른 IP 는 된다');
+});
+
+test('6-3 혼자 하기 끝 알림: 시작 없이 끝만 오면 버린다', async () => {
+  const r = await (await postJ('/api/cos/solo', { anon: hex(24), game: 'jelly-arcade', end: true, win: true }, IP(62))).json();
+  assert.equal(r.ok, false);
+});
+
+test('정상 플레이: 드림 러너 출발표 → 한 판 끝(별) · 같은 판 두 번은 한 번만', async () => {
+  const h = IP(63), anon = hex(24);
+  const { tk } = await (await postJ('/api/dream/run', { seed: 1, diff: 'easy', map: 'dream', mode: 'speed' }, h)).json();
+  await new Promise((r) => setTimeout(r, 3600));
+  const a = await (await postJ('/api/dream/played', { anon, tk, time: 3.2, diff: 'easy', map: 'dream', dist: 200, stars: 5, die: 'hurdle' }, h)).json();
+  assert.equal(a.ok, true); assert.ok(a.earned >= 0);
+  const b = await (await postJ('/api/dream/played', { anon, tk, time: 3.2, diff: 'easy', map: 'dream', dist: 200, stars: 5 }, h)).json();
+  assert.deepEqual(b.earned, a.earned, '재전송은 처음 결과 그대로');
+  const sc = await postJ('/api/dream/score', { anon, tk, name: '달리곰', time: 3.2, diff: 'easy', map: 'dream', dist: 200, stars: 5, themes: 1 }, h);
+  assert.equal(sc.status, 400, '플레이 기록 없는 판은 순위표에 안 올린다(기존 규칙)');
+});
+
 test('7-1 순위표에 익명 id 가 나가지 않는다', async () => {
   const anon = hex(24), h = IP(56);
   await postJ('/api/merge/record', { b: 'cup', value: 3, name: '비밀곰', anon }, h);

@@ -94,6 +94,24 @@ const LIMITS = {
 };
 const buckets = Object.fromEntries(Object.entries(LIMITS).map(([k, v]) => [k, new Bucket(v)]));
 export const TOO_FAST = '요청이 너무 많아요. 잠시 후 다시 해 주세요';
+
+// ---------- 익명 id 농사 (6-2) ----------
+// 익명 id 는 브라우저가 스스로 만든다. 처음 보는 익명 id 는 IP 하나에 하루 ANON_PER_IP_DAY 개까지만 받는다
+//   이미 기록 · 별이 있는 익명 id(setAnonKnown 으로 알려 준다)와 오늘 본 것은 그대로 통과
+export const ANON_PER_IP_DAY = Number(process.env.ANON_PER_IP_DAY) || 40;
+export const ANON_FULL = '오늘은 이곳에서 새로 기록을 시작할 수 없어요. 로그인하면 바로 남길 수 있어요';
+const anonSeen = new Map(), anonNew = new DayCount();
+let anonKnown = () => false;
+export const setAnonKnown = (f) => { anonKnown = f; };
+export function anonOk(req, id) {
+  id = String(id || '');
+  if (anonSeen.has(id)) return true;
+  const remember = () => { anonSeen.set(id, 1); if (anonSeen.size > 300000) { let n = 100000; for (const k of anonSeen.keys()) { if (n-- <= 0) break; anonSeen.delete(k); } } return true; };
+  try { if (anonKnown(id)) return remember(); } catch { /* 모름 */ }
+  const ip = clientIp(req);
+  if (anonNew.get(ip) >= ANON_PER_IP_DAY) { sec.note('anon', { ip, where: String(req.url || '').split('?')[0].slice(0, 40), detail: 'new anon ids/day' }); return false; }
+  anonNew.add(ip); return remember();
+}
 // 넘쳤으면 429 를 보내고 true. key 가 비면 검사하지 않는다
 export function limited(name, key, { res, json, req, where } = {}) {
   if (!key) return false;

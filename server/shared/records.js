@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 import { readJson } from '../auth.js';
 import { clean } from './rooms.js';
 import { getCos, boardMedal, nameOf, tagChar } from '../cosmetics.js';
-import { sec, clientIp, DayCount, publicId } from './guard.js';
+import { sec, clientIp, publicId, anonOk, ANON_FULL } from './guard.js';
 
 const ANON = /^[a-f0-9]{16,40}$/;
 const TICKET_TTL = 6 * 3600e3, HOLD_TOP = 10;
@@ -85,6 +85,7 @@ export class Records {
       if (!who) {
         if (!ANON.test(String(body.anon || ''))) return json(res, 401, { error: 'login' });
         if (!clean(body.name, 14)) return json(res, 400, { error: '닉네임을 정해 주세요' });
+        if (!anonOk(req, body.anon)) return json(res, 429, { error: ANON_FULL });
         const now = Date.now(), hits = (this.ipHits.get(ip) || []).filter((t) => now - t < 60000);
         if (hits.length >= 20) return json(res, 429, { error: '잠시 후 다시 시도해 주세요' });
         hits.push(now); this.ipHits.set(ip, hits); if (this.ipHits.size > 20000) this.ipHits.clear();

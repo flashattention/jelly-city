@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { readJson } from './auth.js';
+import { anonOk, ANON_FULL, sec } from './shared/guard.js';
 import { ACHIEVEMENTS, achById, SHOP, ITEMS, PCT_MIN, itemById, cleanCos, starsEarned, reqText } from '../public/shared/js/cos-items.js';
 
 const ANON = /^[a-f0-9]{16,40}$/, MAX_STARS_RUN = 6000;
@@ -78,8 +79,12 @@ export class Cosmetics {
   soloStart(sub, game) { if (!SOLO_GAMES.has(game)) throw new Error('game'); this.u(sub).solo = { game, at: Date.now() }; }
   soloEnd(sub, game, won) {
     const u = this.u(sub), s = u.solo; u.solo = null;
-    if (!s || s.game !== game) return false;
+    if (!s || s.game !== game) return false; // 시작 없이 끝만 온 것은 버린다
     const el = Date.now() - s.at; if (el < 30e3 || el > 30 * 60e3) return false;
+    // 하루 상한 (6-3): 30초짜리 판을 쉬지 않고 해도 닿기 어려운 만큼
+    const d = kstDay(Date.now()); if (u.soloDay?.d !== d) u.soloDay = { d, n: 0 };
+    if (u.soloDay.n >= SOLO_PER_DAY) { sec.note('record', { where: '/api/cos/solo', detail: 'solo/day cap' }); return false; }
+    u.soloDay.n++;
     this.noteGame(game, sub, !!won, false); return true;
   }
   noteGame(game, sub, won, pvp) { const u = this.u(sub); u.plays[game] = (u.plays[game] || 0) + 1; if (won) { u.wins[game] = (u.wins[game] || 0) + 1; if (pvp) u.pvp[game] = (u.pvp[game] || 0) + 1; } this.dirty = true; this.refresh(sub); }
@@ -190,13 +195,14 @@ export function noteRoomEnd(game, r, payload) {
     for (const p of humans) inst.noteGame(game, p.who.sub, win.has(p.id), pvp);
   } catch (e) { console.warn('경기 기록 실패', game, e.message); }
 }
-const SOLO_GAMES = new Set(['jelly-arcade']);
+const SOLO_GAMES = new Set(['jelly-arcade']), SOLO_PER_DAY = 150;
 export async function cosApi(req, res, url, who, cos, json) {
   const sub0 = who?.sub || null, anonQ = url.searchParams.get('anon');
   if (url.pathname === '/api/cos/me') return json(res, 200, cos.pub(sub0 || (ANON.test(anonQ || '') ? 'anon:' + anonQ : null)));
   if (req.method !== 'POST') return json(res, 404, { error: 'not found' });
   const b = await readJson(req), sub = sub0 || (ANON.test(String(b.anon || '')) ? 'anon:' + b.anon : null);
   if (!sub) return json(res, 401, { error: 'login' });
+  if (!sub0 && !anonOk(req, b.anon)) return json(res, 429, { error: ANON_FULL });
   try {
     if (url.pathname === '/api/cos/buy') { cos.buy(sub, String(b.id || '')); return json(res, 200, cos.pub(sub)); }
     if (url.pathname === '/api/cos/equip') { cos.equip(sub, String(b.slot || ''), b.id ? String(b.id) : null); return json(res, 200, cos.pub(sub)); }
