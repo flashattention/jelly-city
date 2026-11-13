@@ -583,15 +583,15 @@
 ### 2026-10 · 게임 이름 바꾸기
 몇몇 게임 이름을 젤리 세계 이름으로 바꿨어요. 옛 주소로 와도 새 주소로 넘어가고(초대 코드 `?room=` 그대로), 이 기기에 저장된 캐릭터 · 닉네임 · 설정과 서버의 기록판도 그대로 이어져요.
 
-| 예전 이름 | 새 이름 | 옛 주소 → 새 주소 |
-|---|---|---|
-| 젤리배그 | 🪂 젤리드롭 | `/jelly-bg/` · `/jelly-attack/bg/` → `/jelly-drop/` |
-| 젤리워치 | ⚡ 젤리수호대 | `/jelly-watch/` → `/jelly-guard/` |
-| 젤리라이더 | 🏁 젤리드리프트 | `/jelly-rider/` → `/jelly-drift/` (기록 API `/api/rider/` → `/api/drift/`) |
-| 젤리어택 | 🔫 젤리택티컬 | `/jelly-attack/` → `/jelly-tactical/` |
-| 젤리 가이즈 | 🎉 젤리대소동 | `/jelly-guys/` → `/jelly-rumble/` |
-| 젤리뱅 | 🍮 젤리궁정 | `/jelly-bang/` → `/jelly-court/` |
-| 젤리 사과게임 | 🔟 젤리텐 | `/jelly-apple/` → `/jelly-ten/` (기록 API `/api/apple/` → `/api/ten/`) |
+| 새 이름 | 옛 주소 → 새 주소 |
+|---|---|
+| 🪂 젤리드롭 | `/jelly-bg/` · `/jelly-attack/bg/` → `/jelly-drop/` |
+| ⚡ 젤리수호대 | `/jelly-watch/` → `/jelly-guard/` |
+| 🏁 젤리드리프트 | `/jelly-rider/` → `/jelly-drift/` (기록 API `/api/rider/` → `/api/drift/`) |
+| 🔫 젤리택티컬 | `/jelly-attack/` → `/jelly-tactical/` |
+| 🎉 젤리대소동 | `/jelly-guys/` → `/jelly-rumble/` |
+| 🍮 젤리궁정 | `/jelly-bang/` → `/jelly-court/` |
+| 🔟 젤리텐 | `/jelly-apple/` → `/jelly-ten/` (기록 API `/api/apple/` → `/api/ten/`) |
 
 - WebSocket 옛 주소(`/bg-ws` · `/watch-ws` · `/rider-ws` · `/attack-ws` · `/guys-ws` · `/bang-ws` · `/apple-ws`)도 계속 받아요.
 - 기록 파일 `jelly-apple.json` → `jelly-ten.json`, `jelly-rider.json` → `jelly-drift.json` 은 서버가 시작할 때 한 번 옮겨요.
