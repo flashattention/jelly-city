@@ -251,18 +251,26 @@ export class LiveTransit {
     this.winM.emissiveIntensity = 0.15 + (hg.light?.night || 0) * 1.4;
   }
   // 선로 높이: 다리 · 고가면 가까운 철교 선로(그 높이), 아니면 땅
-  trackY(x, z, k) {
+  //   want: 바로 앞 높이를 알면 (운전실), 겹친 고가(위아래 두 층) 중 그 높이에 가까운 쪽을 고른다
+  trackY(x, z, k, want = null) {
     const hg = this.hg, ground = hg.terr ? hg.terrAt(x, z) : 0; if (k !== 2) return ground + 0.3;
-    let best = null; const look = (rp) => { for (const tp of rp || []) { const f = tp.fine; for (let i = 0; i < f.length; i += 1) { const d = Math.abs(f[i][0] - x) + Math.abs(f[i][1] - z); if (d < 25 && (!best || d < best.d)) best = { d, y: tp.ys[i] }; } } };
+    const base = want == null ? 0 : (hg.terr ? hg.terrAt(x, z, true) : 0) + 0.4;
+    let best = null; const look = (rp) => { for (const tp of rp || []) { const f = tp.fine; for (let i = 0; i < f.length; i += 1) { let d = Math.abs(f[i][0] - x) + Math.abs(f[i][1] - z); if (d >= 25) continue; if (want != null) d += 3 * Math.abs(tp.ys[i] + base - want); if (!best || d < best.d) best = { d, tp, i }; } } };
     look(hg.railPaths); if (hg.chunks) for (const c of hg.chunks.values()) look(c.railPaths);
+    if (!best) return ground + 6.5;
+    // 8-41-1: 가장 가까운 점 높이 그대로면 15m 마다 계단이 져서, 이웃 조각에 투영해 높이를 잇는다
+    const f = best.tp.fine, ys = best.tp.ys, i = best.i; let y = ys[i], bd = Infinity;
+    for (const j of [i - 1, i + 1]) { if (j < 0 || j >= f.length) continue; const ex = f[j][0] - f[i][0], ez = f[j][1] - f[i][1], l2 = ex * ex + ez * ez || 1, t = clamp(((x - f[i][0]) * ex + (z - f[i][1]) * ez) / l2, 0, 1); if (t <= 0) continue; const dd = Math.hypot(x - f[i][0] - ex * t, z - f[i][1] - ez * t); if (dd < bd) { bd = dd; y = ys[i] + (ys[j] - ys[i]) * t; } }
     // 서울 전체 칸의 다리는 땅 높이(원래 지형) 위에 얹혀 있다
-    return best ? best.y + (hg.terr ? hg.terrAt(x, z, true) : 0) + 0.4 : ground + 6.5;
+    return y + (hg.terr ? hg.terrAt(x, z, true) : 0) + 0.4;
   }
   // 철교 가운데선으로 옮긴 자리 (복선이라 선로가 다리 가운데서 2m 쯤 비켜 있어, 탄 채로는 트러스가 칸을 뚫는다)
   bridgeCenter(x, z, dx, dz) {
-    const hg = this.hg; let best = null; const look = (rp) => { for (const tp of rp || []) for (const f of tp.fine) { const d = Math.abs(f[0] - x) + Math.abs(f[1] - z); if (d < 25 && (!best || d < best.d)) best = { d, f }; } };
+    // 8-41-1: 복선 철교는 선로마다 따로 그어진 바닥 두 줄이라, 가장 가까운 '점'(15m 간격)으로 고르면 옆 선로 바닥으로 건너뛰었다 → 가장 가까운 '조각'에 수직으로
+    const hg = this.hg; let best = null; const look = (rp) => { for (const tp of rp || []) { const f = tp.fine; for (let i = 1; i < f.length; i++) { const a = f[i - 1], c = f[i]; if (Math.abs(a[0] - x) + Math.abs(a[1] - z) > 45) continue; const ex = c[0] - a[0], ez = c[1] - a[1], t = clamp(((x - a[0]) * ex + (z - a[1]) * ez) / (ex * ex + ez * ez || 1), 0, 1), px = a[0] + ex * t, pz = a[1] + ez * t, d = Math.hypot(x - px, z - pz); if (d < 12 && (!best || d < best.d)) { const l = Math.sqrt(ex * ex + ez * ez) || 1, sg = ex * dx + ez * dz < 0 ? -1 : 1; best = { d, px, pz, w: tp.w, ux: (sg * ex) / l, uz: (sg * ez) / l }; } } } };
     look(hg.railPaths); if (hg.chunks) for (const c of hg.chunks.values()) look(c.railPaths); if (!best) return null;
-    const t = (x - best.f[0]) * dx + (z - best.f[1]) * dz; return [best.f[0] + dx * t, best.f[1] + dz * t];
+    // 바닥 방향도 준다 (실제 선로 자료와 OSM 철교가 몇 도 비껴 있어, 선로 방향대로 서면 운전실이 트러스를 뚫었다)
+    return [best.px, best.pz, best.w, best.ux, best.uz];
   }
   tick(dt, px, pz) {
     this.busT -= dt; if (this.busT <= 0) { this.busT = 20; this.pollBus(); }

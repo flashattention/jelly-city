@@ -1316,6 +1316,9 @@ export class Hangang {
     for (const w of ways) w.big = w.wet && wetLen(w) > 150;
     const linkedBig = (self) => ways.some((w) => w !== self && w.big && (w.pts.some((q) => Math.hypot(q[0] - self.pts[0][0], q[1] - self.pts[0][1]) < 2.5 || Math.hypot(q[0] - self.pts[self.pts.length - 1][0], q[1] - self.pts[self.pts.length - 1][1]) < 2.5)));
     for (const w of ways) { w.free0 = !nearAny(w.pts[0], w); w.free1 = !nearAny(w.pts[w.pts.length - 1], w); w.top = w.big || linkedBig(w) ? 14 : w.wet || linkedWet(w) ? 5.2 : 7.5; }
+    // 8-41-1: 복선 철교는 OSM 에서 선로마다 따로 그어져, 한쪽만 14m · 옆 선로는 7.5m 로 위아래 두 층이 됐다(당산철교) → 나란히(12m 안) 가는 철도 고가가 14m 면 같이 14m
+    const segD = (p, pts) => { let m = Infinity; for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], c = pts[i], ex = c[0] - a[0], ez = c[1] - a[1], t = clamp(((p[0] - a[0]) * ex + (p[1] - a[1]) * ez) / (ex * ex + ez * ez || 1), 0, 1); m = Math.min(m, Math.hypot(p[0] - a[0] - ex * t, p[1] - a[1] - ez * t)); } return m; };
+    for (let pass = 0; pass < 2; pass++) for (const w of ways) { if (!w.b.rail || w.top === 14) continue; const tall = ways.filter((o) => o !== w && o.b.rail && o.top === 14); if (!tall.length) continue; let n = 0; for (const p of w.pts) if (tall.some((o) => segD(p, o.pts) < 12)) n++; if (n >= w.pts.length * 0.5) w.top = 14; }
     for (const w of ways) {
       const b = w.b, pts = w.pts;
       const fine = []; for (let i = 1; i < pts.length; i++) { const [a, c] = [pts[i - 1], pts[i]], L = Math.hypot(c[0] - a[0], c[1] - a[1]), n = Math.max(1, Math.ceil(L / 15)); for (let k = 0; k < n; k++) fine.push([lerp(a[0], c[0], k / n), lerp(a[1], c[1], k / n)]); } fine.push(pts[pts.length - 1]);
@@ -1338,7 +1341,7 @@ export class Hangang {
       for (let i = 1; i < fine.length; i++) { const sg = { ax: fine[i - 1][0], az: fine[i - 1][1], cx: fine[i][0], cz: fine[i][1], ya: ys[i - 1], yc: ys[i], hw: b.w / 2 }, si = (this.decks ||= []).push(sg) - 1; this.deckGrid ||= new Map(); for (let gx = Math.floor((Math.min(sg.ax, sg.cx) - sg.hw) / 40); gx <= Math.floor((Math.max(sg.ax, sg.cx) + sg.hw) / 40); gx++) for (let gz = Math.floor((Math.min(sg.az, sg.cz) - sg.hw) / 40); gz <= Math.floor((Math.max(sg.az, sg.cz) + sg.hw) / 40); gz++) { const k = `${gx},${gz}`; if (!this.deckGrid.has(k)) this.deckGrid.set(k, []); this.deckGrid.get(k).push(si); } }
       ribbonInto(side.P, side.I, fine, b.w + 0.4, (i) => ys[i] - 1.6);
       // 난간 (양쪽 낮은 벽)
-      for (const sgn of [-1, 1]) { const off = fine.map((p, i) => { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1; return [p[0] - dz / L * (b.w / 2) * sgn, p[1] + dx / L * (b.w / 2) * sgn]; }); rails2.push({ off, ys }); }
+      for (const sgn of [-1, 1]) { const off = fine.map((p, i) => { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1; return [p[0] - dz / L * (b.w / 2) * sgn, p[1] + dx / L * (b.w / 2) * sgn]; }); rails2.push({ off, ys, rail: !!b.rail, fine }); }
       // 철교 트러스는 물 위(와 그 바로 옆)에만 — 땅 위 지하철 고가는 콘크리트 상판이라 트러스가 없다
       if (b.rail) rails.push({ fine, ys, w: b.w, n: b.n || '', wetR: fine.map((_, i) => wet[i] || wet[i - 1] || wet[i + 1] || wet[i - 2] || wet[i + 2]) });
       for (let i = 0; i < fine.length; i += 2) { const a = fine[Math.max(0, i - 1)], c = fine[Math.min(fine.length - 1, i + 1)], ang = Math.atan2(c[1] - a[1], c[0] - a[0]) + Math.PI / 2; if (ys[i] < 3) continue; if (wet[i]) { if (i % 4 === 0) piers.push([fine[i][0], fine[i][1], ys[i], b.w, ang]); } else piers.push([fine[i][0], fine[i][1], ys[i], b.w * 0.6, ang]); }
@@ -1346,6 +1349,8 @@ export class Hangang {
     }
     const dm = new THREE.MeshLambertMaterial({ color: '#77746f', side: THREE.DoubleSide }), sm = new THREE.MeshLambertMaterial({ color: '#d9d2c6', side: THREE.DoubleSide });
     this.scene.add(new THREE.Mesh(geoOf(deck.P, deck.I), dm), new THREE.Mesh(geoOf(side.P, side.I), sm));
+    // 8-41-1: 선로마다 따로 그어진 복선 철교는 두 바닥 사이 난간(가운데 흰 벽)을 뺀다 — 난간 반쯤이 옆 철도 바닥 가운데선 3m 안이면
+    { const railFines = rails2.filter((r) => r.rail).map((r) => r.fine); for (let k = rails2.length - 1; k >= 0; k--) { const r = rails2[k]; if (!r.rail) continue; let n = 0; for (const p of r.off) if (railFines.some((f) => f !== r.fine && f.some((q, j) => j > 0 && Math.abs(q[0] - p[0]) < 30 && Math.abs(q[1] - p[1]) < 30 && segD(p, [f[j - 1], q]) < 3))) n++; if (n > r.off.length * 0.5) rails2.splice(k, 1); } }
     // 난간: 얇은 벽 (아래 · 위 두 줄)
     { const P = [], I = []; for (const { off, ys } of rails2) for (let i = 1; i < off.length; i++) { const a = off[i - 1], c = off[i], k = P.length / 3; P.push(a[0], ys[i - 1], a[1], c[0], ys[i], c[1], c[0], ys[i] + 1.15, c[1], a[0], ys[i - 1] + 1.15, a[1]); I.push(k, k + 1, k + 2, k, k + 2, k + 3); } this.scene.add(new THREE.Mesh(geoOf(P, I), new THREE.MeshLambertMaterial({ color: '#7d8a99', side: THREE.DoubleSide, transparent: true, opacity: 0.55 })));
       const posts = []; for (const { off, ys } of rails2) for (let i = 0; i < off.length; i++) posts.push([off[i][0], ys[i], off[i][1]]);
@@ -1377,7 +1382,9 @@ export class Hangang {
         o4.position.set((A[0] + Bp[0]) / 2, y - 2.0, (A[1] + Bp[1]) / 2); o4.rotation.set(0, -Math.atan2(Bp[1] - A[1], Bp[0] - A[0]), 0); o4.scale.set(Math.hypot(Bp[0] - A[0], Bp[1] - A[1]) + 1.2, 1, 1); o4.updateMatrix(); pb.setMatrixAt(i, o4.matrix); });
       this.scene.add(pc2, pb); this.pierPortal = (this.pierPortal || 0) + portals.length; }
     // 철교: 트러스 (선)
-    const tP = []; for (const { fine, ys, w, wetR } of rails) for (let i = 1; i < fine.length; i++) { if (wetR && !wetR[i] && !wetR[i - 1]) continue; const a = fine[i - 1], c = fine[i], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1, nx = -dz / L * w / 2, nz = dx / L * w / 2; for (const sgn of [-1, 1]) { const ax = a[0] + nx * sgn, az = a[1] + nz * sgn, cx = c[0] + nx * sgn, cz = c[1] + nz * sgn, y0 = ys[i - 1], y1 = ys[i]; tP.push(ax, y0, az, cx, y1 + 7, cz, ax, y0 + 7, az, cx, y1 + 7, cz, ax, y0, az, ax, y0 + 7, az); } }
+    // 8-41-1: 복선이 선로마다 따로 그어진 철교(4m 남짓 떨어진 두 줄)는 안쪽 트러스가 옆 선로 한가운데를 지나 운전실을 뚫었다 → 옆에 나란한 철도 바닥이 있는 쪽 트러스는 뺀다
+    const twin = (self, x, z) => rails.some((o) => o !== self && o.fine.some((q, k) => k > 0 && Math.abs(q[0] - x) < 30 && Math.abs(q[1] - z) < 30 && segD([x, z], [o.fine[k - 1], q]) < 2.6));
+    const tP = []; for (const rr of rails) { const { fine, ys, w, wetR } = rr; for (let i = 1; i < fine.length; i++) { if (wetR && !wetR[i] && !wetR[i - 1]) continue; const a = fine[i - 1], c = fine[i], dx = c[0] - a[0], dz = c[1] - a[1], L = Math.hypot(dx, dz) || 1, nx = -dz / L * w / 2, nz = dx / L * w / 2; for (const sgn of [-1, 1]) { if (twin(rr, (a[0] + c[0]) / 2 + nx * sgn, (a[1] + c[1]) / 2 + nz * sgn)) continue; const ax = a[0] + nx * sgn, az = a[1] + nz * sgn, cx = c[0] + nx * sgn, cz = c[1] + nz * sgn, y0 = ys[i - 1], y1 = ys[i]; tP.push(ax, y0, az, cx, y1 + 7, cz, ax, y0 + 7, az, cx, y1 + 7, cz, ax, y0, az, ax, y0 + 7, az); } } }
     this.railPaths = rails;
     if (tP.length) { const beams = []; for (let i = 0; i < tP.length; i += 6) beams.push([tP[i], tP[i + 1], tP[i + 2], tP[i + 3], tP[i + 4], tP[i + 5]]); const bg = new THREE.BoxGeometry(0.5, 0.5, 1); bg.translate(0, 0, 0.5); const bm = new THREE.InstancedMesh(bg, new THREE.MeshLambertMaterial({ color: '#5b6672' }), beams.length), o2 = new THREE.Object3D(), A = new THREE.Vector3(), B = new THREE.Vector3(); beams.forEach(([x1, y1, z1, x2, y2, z2], i) => { A.set(x1, y1, z1); B.set(x2, y2, z2); o2.position.copy(A); o2.lookAt(B); o2.scale.set(1, 1, A.distanceTo(B)); o2.updateMatrix(); bm.setMatrixAt(i, o2.matrix); }); this.scene.add(bm); }
     // 아치 (서강대교)
