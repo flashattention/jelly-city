@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>보안 요약</title>
+  <style>
+    :root { --bg: #fff8ef; --card: #ffffff; --ink: #4a3428; --soft: #8a6f5f; --accent: #ff8a65; --line: rgba(74,52,40,.12); --warn: #e0573b; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #1f1a22; --card: #2e2630; --ink: #fbeee4; --soft: #cdb7a8; --line: rgba(255,255,255,.12); } }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'Apple SD Gothic Neo', sans-serif; }
+    main { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+    h1 { font-size: 24px; margin: 0 0 4px; } h2 { font-size: 18px; margin: 26px 0 8px; }
+    .sub { color: var(--soft); font-size: 14px; margin-bottom: 12px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    th { color: var(--soft); font-weight: 600; }
+    td.n { text-align: right; font-variant-numeric: tabular-nums; }
+    .hot { color: var(--warn); font-weight: 700; }
+    button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 4px 10px; font-size: 13px; cursor: pointer; }
+    button.ghost { background: var(--line); color: var(--ink); }
+    code { font-size: 12px; }
+  </style>
+  <link rel="icon" href="/favicon-192.png" type="image/png" sizes="192x192" />
+</head>
+<body>
+<main>
+  <h1>🛡️ 보안 요약</h1>
+  <div class="sub" id="sub">불러오는 중...</div>
+  <h2>날마다 사건 수</h2>
+  <div class="card" id="days"></div>
+  <h2>많이 걸린 곳 (IP 해시 · 하루마다 바뀜)</h2>
+  <div class="card" id="ips"></div>
+  <h2>AI 대화 사용량 (오늘)</h2>
+  <div class="card" id="llm"></div>
+  <h2>확인이 필요한 기록 (보류 = 공개 순위표에서 빠져 있음)</h2>
+  <div class="card" id="held"></div>
+  <h2>최근 사건</h2>
+  <div class="card" id="recent"></div>
+</main>
+<script>
+  // 관리자만: 서버가 ADMIN_EMAILS 로 확인한다. 개인정보는 없다 (IP 는 하루 소금 해시)
+  const session = (() => { try { return localStorage.getItem('roachcity.session'); } catch { return null; } })();
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const KIND = { rate: '속도 제한', origin: '출처 거절', ws: '웹소켓', record: '기록', llm: 'AI 대화', anon: '익명 id', path: '경로', json: '오염 본문', csp: 'CSP', admin: '관리자 행동', text: '글 · 신고' };
+  const api = async (p, o = {}) => { const r = await fetch(p, { ...o, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session}` } }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status); return j; };
+  async function load() {
+    if (!session) { document.getElementById('sub').textContent = '먼저 게임 첫 화면에서 관리자 구글 계정으로 로그인하세요.'; return; }
+    let s, h;
+    try { [s, h] = await Promise.all([api('/api/sec/summary?days=7'), api('/api/sec/held')]); } catch (e) { document.getElementById('sub').textContent = `볼 수 없어요 (${e.message})`; return; }
+    const kinds = Object.keys(KIND);
+    document.getElementById('sub').textContent = `오늘 ${s.days[0].total}건 · 7일 ${s.days.reduce((a, d) => a + d.total, 0)}건 · 보류 기록 ${h.list.filter((x) => x.hold).length}건`;
+    document.getElementById('days').innerHTML = `<table><tr><th>날짜</th>${kinds.map((k) => `<th>${KIND[k]}</th>`).join('')}<th>합</th></tr>${s.days.map((d) => `<tr><td>${esc(d.day)}</td>${kinds.map((k) => `<td class="n${(d.kinds[k] || 0) > 100 ? ' hot' : ''}">${d.kinds[k] || ''}</td>`).join('')}<td class="n">${d.total}</td></tr>`).join('')}</table>`;
+    document.getElementById('ips').innerHTML = `<table><tr><th>날짜</th><th>IP 해시 · 건수 (많은 순 10)</th></tr>${s.days.filter((d) => d.top.length).map((d) => `<tr><td>${esc(d.day)}</td><td>${d.top.map((t) => `<code>${esc(t.ip)}</code> ${t.n}`).join(' · ')}</td></tr>`).join('') || '<tr><td colspan="2">없어요</td></tr>'}</table>`;
+    const L = s.llm || {};
+    document.getElementById('llm').innerHTML = `<table><tr><th>부른 수</th><th>막힘(예산)</th><th>주입 의심</th><th>거른 답</th><th>쓰임</th><th>상한</th></tr><tr><td class="n">${L.calls ?? 0}</td><td class="n">${L.blocked ?? 0}</td><td class="n">${L.inject ?? 0}</td><td class="n">${L.filtered ?? 0}</td><td>${esc(Object.entries(L.kinds || {}).map(([k, v]) => `${k} ${v}`).join(' · '))}</td><td>${esc(L.limit ? `사람 분당 ${L.limit.perMin} · 하루 ${L.limit.perDay} / 전체 분당 ${L.limit.allMin} · 하루 ${L.limit.allDay}` : '')}</td></tr></table>`;
+    document.getElementById('held').innerHTML = h.list.length ? `<table><tr><th>게임</th><th>판</th><th>이름</th><th>값</th><th>이유</th><th>출발표 뒤 초</th><th>언제</th><th></th></tr>${h.list.map((x, i) => `<tr><td>${esc(x.game)}</td><td>${esc(x.b)}</td><td>${esc(x.name)}</td><td class="n">${esc(x.value)}</td><td>${esc(x.why)}${x.hold ? ' · <b>보류</b>' : ''}</td><td class="n">${x.sec ?? '-'}</td><td>${new Date(x.at).toLocaleString('ko-KR')}</td><td><button data-i="${i}" data-act="ok">인정</button> <button class="ghost" data-i="${i}" data-act="del">지우기</button></td></tr>`).join('')}</table>` : '확인할 기록이 없어요 🎉';
+    document.querySelectorAll('#held [data-act]').forEach((b) => { b.onclick = async () => { const x = h.list[+b.dataset.i]; if (b.dataset.act === 'del' && !confirm(`${x.name} 의 기록을 지울까요?`)) return; try { await api('/api/sec/held', { method: 'POST', body: JSON.stringify({ game: x.game, b: x.b, key: x.key, act: b.dataset.act }) }); } catch (e) { alert(e.message); } load(); }; });
+    document.getElementById('recent').innerHTML = `<table><tr><th>시각</th><th>종류</th><th>어디</th><th>내용</th><th>IP 해시</th></tr>${s.recent.map((e) => `<tr><td>${new Date(e.at).toLocaleString('ko-KR')}</td><td>${esc(KIND[e.kind] || e.kind)}</td><td>${esc(e.where)}</td><td>${esc(e.detail)}</td><td><code>${esc(e.ip)}</code></td></tr>`).join('') || '<tr><td colspan="5">없어요</td></tr>'}</table>`;
+  }
+  load();
+</script>
+</body>
+</html>

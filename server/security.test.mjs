@@ -312,3 +312,20 @@ test('2-2 정적 파일: public 밖 · 숨김 파일을 읽을 수 없다', asyn
   assert.equal((await fetch(S.base + '/dream-runner/')).status, 200);
   assert.equal((await fetch(S.base + '/shared/patchnotes.json')).status, 200);
 });
+
+// 맨 마지막: 위 공격들이 보안 사건으로 모였는지 · 개인정보(원래 IP)가 없는지
+test('12 보안 사건 기록 · 관리자 요약 (원래 IP 없음)', async () => {
+  const h = IP(99), admin = (await (await postJ('/api/login', { dev: 'admin' }, h)).json()).session;
+  const s = await (await fetch(S.base + '/api/sec/summary', { headers: { Authorization: `Bearer ${admin}`, ...h } })).json();
+  const k = s.days[0].kinds;
+  for (const kind of ['rate', 'origin', 'ws', 'record', 'anon', 'json', 'csp', 'admin', 'path']) assert.ok(k[kind] > 0, `${kind} 가 모였다`);
+  assert.ok(s.days[0].top.length > 0 && /^[0-9a-f]{12}$/.test(s.days[0].top[0].ip), 'IP 는 해시로');
+  assert.ok(s.llm && typeof s.llm.calls === 'number');
+  assert.ok(s.recent.length > 0);
+  assert.equal((await fetch(S.base + '/jelly-city/security.html')).status, 200);
+  // 서버를 끄면(SIGTERM) 저장된다 → 파일에 원래 IP 가 없어야 한다
+  S.child.kill('SIGTERM'); await new Promise((r) => S.child.once('exit', r));
+  const fs = await import('node:fs');
+  const file = fs.readFileSync(`${S.dir}/security.json`, 'utf8');
+  assert.doesNotMatch(file, /10\.9\.\d+\.\d+|127\.0\.0\.1/, '저장 파일에 원래 IP 가 없다');
+});

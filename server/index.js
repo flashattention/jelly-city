@@ -548,6 +548,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
     world.broadcast({ t: 'sys', text: '🔧 서버가 업데이트돼요! 잠시 후 자동으로 다시 접속해요' });
     try { const n = dreamRooms.maint(); if (n) console.log(`🌙 드림 러너: 달리던 방 ${n}개를 멈춰 적어 뒀어요`); } catch (e) { console.error('드림 러너 멈추기 실패', e); }
     try { swMetrics.flush(); } catch (e) { console.error('지표 저장 실패', e); }
+    try { sec.dirty = true; sec.save(); } catch (e) { console.error('보안 기록 저장 실패', e); }
     try { world.save(); console.log('💾 세계를 저장했어요'); } catch (e) { console.error('저장 실패', e); }
     dreamBoard.save(); dreamToss.save(); toss.save(); playtime.save(); cosmetics.save(); board.save(); driftRecords.save(); tenRecords.save(); survRecords.save(); wordDict.save(); typeRecords.save(); mergeRecords.save(); slideRecords.save(); arcadeRecords.save();
     setTimeout(() => process.exit(0), 500);

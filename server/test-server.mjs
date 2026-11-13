@@ -22,7 +22,7 @@ export async function startServer(env = {}) {
   }
   return {
     base, port, dir, child, log: () => log,
-    async stop() { child.kill('SIGKILL'); await new Promise((r) => child.once('exit', r)); fs.rmSync(dir, { recursive: true, force: true }); },
+    async stop() { if (child.exitCode === null && child.signalCode === null) { child.kill('SIGKILL'); await new Promise((r) => child.once('exit', r)); } fs.rmSync(dir, { recursive: true, force: true }); },
   };
 }
 // 개발용 이름 로그인 (구글 키가 없는 시험 서버에서만 된다)

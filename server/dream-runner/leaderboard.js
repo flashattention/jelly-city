@@ -298,7 +298,7 @@ export class DreamBoard {
     let chk; try { chk = await this.check(b, diff, map, mode, now, T[who.sub]?.score || 0); } finally { this.busy.delete(tk.id); }
     // 혼자 달린 스피드전: 플레이 기록을 다시 돌려 봐서 맞아야만 올린다 (기록이 없거나 결과가 다르면 거절, 확인을 못 했으면 잠시 뒤 다시)
     if (chk.why === 'busy') throw err('기록을 확인하는 중이에요 · 잠시 뒤 다시 올려요', 503);
-    if (['noreplay', 'mismatch', 'time', 'oldver'].includes(chk.why)) { console.warn(`드림 러너 기록 거절(${chk.why}): ${score}점 ${map} ${diff}`); throw err(chk.why === 'noreplay' ? '플레이 기록이 없는 판은 순위표에 올리지 않아요' : chk.why === 'oldver' ? '예전 버전으로 달린 판이라 확인할 수 없어요 · 앱을 업데이트해 주세요' : '플레이 기록과 점수가 맞지 않아요'); }
+    if (['noreplay', 'mismatch', 'time', 'oldver'].includes(chk.why)) { console.warn(`드림 러너 기록 거절(${chk.why}): ${score}점 ${map} ${diff}`); sec.note('record', { where: `dream-runner.${map}.${diff}`, detail: `rejected: ${chk.why} score=${score}` }); throw err(chk.why === 'noreplay' ? '플레이 기록이 없는 판은 순위표에 올리지 않아요' : chk.why === 'oldver' ? '예전 버전으로 달린 판이라 확인할 수 없어요 · 앱을 업데이트해 주세요' : '플레이 기록과 점수가 맞지 않아요'); }
     if (!this.tickets.once(tk.id, 'score')) throw err('이미 기록한 판이에요');
     this.runs++; this.dirty = true;
     const name = clean(b.name, 14) || clean(who.user.nick || (who.user.guest ? who.user.name : ''), 14) || '꿈꾸는 곰돌이'; // 구글 실명은 쓰지 않는다
