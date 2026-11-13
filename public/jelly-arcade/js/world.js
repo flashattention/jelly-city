@@ -292,7 +292,7 @@ export class Board {
     const m4 = new THREE.Matrix4(), col = new THREE.Color();
     tiles.forEach(([x, y, f], i) => {
       m4.makeTranslation(wx(x), TOP / 2, wz(y)); im.setMatrixAt(i, m4);
-      const base = f === ICE ? '#bfe9ff' : (x + y) % 2 ? th.tileA : th.tileB;
+      const base = f === ICE ? '#93d6fb' : (x + y) % 2 ? th.tileA : th.tileB;
       col.set(base); const n = ((hash(x, y) % 100) / 100 - 0.5) * 0.04; col.offsetHSL(0, 0, n); im.setColorAt(i, col);
     });
     im.count = tiles.length;

@@ -137,7 +137,7 @@ class Bear {
     }
     this.shadow.position.set(this.pos.x, TOP + 0.02, this.pos.z);
     if (this.ring) this.ring.position.set(this.pos.x, TOP + 0.03, this.pos.z);
-    this.tag.visible = true; this.tag.position.set(this.pos.x, TOP + (trapped ? 3.0 : 2.45), this.pos.z);
+    this.tag.visible = game.focus == null; this.tag.position.set(this.pos.x, TOP + (trapped ? 3.0 : 2.45), this.pos.z);
   }
   remove() { scene.remove(this.root, this.tag, this.shadow); if (this.ring) scene.remove(this.ring); this.setTrap(false); }
 }
@@ -257,7 +257,7 @@ function beginGame(S, members, { net, startIn = 3000 }) {
   setTheme(S.map);
   game.board = new Board(scene, S, { phone: isPhone }); fogFit();
   for (const p of S.players) game.bears.set(p.id, new Bear(game.members.get(p.id) || { id: p.id, name: '곰돌이' }, p.id === game.myId));
-  game.mode = 'play'; shell.playing = true; game.startAt = performance.now() + startIn; game.acc = 0; game.over = false; game.overShown = false; game.hurried = false;
+  game.mode = 'play'; shell.playing = true; game.startAt = performance.now() + startIn; game.acc = 0; game.over = false; game.overShown = false; game.hurried = false; game.focus = null; game.camT = 0; game.warned = false;
   shell.hideScreens(); $('hud').classList.remove('hidden'); $('over').classList.add('hidden');
   $('h-map').textContent = `${G.MAPS[S.map].emoji} ${G.MAPS[S.map].name}${S.mode === 'team' ? ' · 2팀전' : ''}`;
   countdown(startIn);
@@ -373,7 +373,13 @@ function onEvent(e) {
     }
     case 'warn': if (!game.warned) { game.warned = true; banner('🍮 푸딩 블록이 내려와요!', 'warn'); hurry(true); } if (Math.random() < 0.3) sfx('warn'); break;
     case 'fall': B.landed(e.x, e.y); B.fall(e.x, e.y); removeItem(e.x, e.y, true); for (const [id, g] of game.bombs) { if (Math.abs(g.position.x - wx(e.x)) < 0.1 && Math.abs(g.position.z - wz(e.y)) < 0.1) { scene.remove(g); game.bombs.delete(id); } } sfx('fall'); break;
-    case 'end': game.over = true; game.endAt = performance.now(); break;
+    case 'end': {
+      game.over = true; game.endAt = performance.now();
+      // 이긴 곰 쪽으로 카메라가 다가간다 (팀전은 남은 우리 팀 곰 중 하나)
+      const w = game.S.players.find((p) => !p.out && p.team === e.winner);
+      game.focus = w ? w.id : null;
+      break;
+    }
     default: break;
   }
 }
@@ -453,7 +459,12 @@ function frame() {
     const a = performance.now() / 1000 * 0.12, d = view.d * 0.92;
     camera.position.set(Math.sin(a) * d * 0.55, Math.sin(0.85) * d, Math.cos(a) * d * 0.8); camera.lookAt(0, 0, 0);
   } else {
-    camera.position.copy(view.base); camera.lookAt(view.look);
+    const fb = game.focus != null ? game.bears.get(game.focus) : null;
+    game.camT = Math.max(0, Math.min(1, game.camT + (fb ? dt * 0.9 : -dt * 2)));
+    const k = game.camT * game.camT * (3 - 2 * game.camT);
+    if (fb) { game.camTo = fb.pos.clone().add(view.rot ? new THREE.Vector3(8, 10, 0) : new THREE.Vector3(0, 10, 8)); game.lookTo = fb.pos.clone().add(new THREE.Vector3(0, 1.2, 0)); }
+    camera.position.copy(view.base); if (game.camTo && k > 0) camera.position.lerp(game.camTo, k);
+    const lk = view.look.clone(); if (game.lookTo && k > 0) lk.lerp(game.lookTo, k); camera.lookAt(lk);
     if (game.shake > 0) { game.shake = Math.max(0, game.shake - dt * 1.8); const k = game.shake * 0.35; camera.position.x += (Math.random() - 0.5) * k; camera.position.y += (Math.random() - 0.5) * k; }
   }
   renderer.render(scene, camera);
@@ -501,6 +512,7 @@ function playFrame(dt) {
   if (me && (game.lastTrapShown !== (me.trap > 0) || game.lastEsc !== me.escape)) { game.lastTrapShown = me.trap > 0; game.lastEsc = me.escape; renderMe(); }
 }
 
+game.startSolo = startSolo; game.shell = shell;
 renderTitleOpts();
 shell.boot();
 titleScene();
