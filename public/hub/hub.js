@@ -188,4 +188,22 @@ $('create-ok').onclick = async () => {
   $('create-ok').disabled = false;
 };
 
+// PC: 건의 게시판 네모를 내 캐릭터 카드 네모와 위아래 같은 선에 맞춘다
+function fitBoard() {
+  const B = document.getElementById('bd-box'), C = document.getElementById('char-list');
+  if (!B || !C) return;
+  B.style.marginTop = ''; B.style.height = '';
+  // 캐릭터 카드가 있고 로그인 안내가 없을 때만 (안내 글만 있으면 원래 높이)
+  const login = !document.getElementById('login-box')?.classList.contains('hidden');
+  if (innerWidth <= 860 || login || !C.querySelector('.ch')) return;
+  const c = C.getBoundingClientRect(), b = B.getBoundingClientRect();
+  const dt = Math.max(0, c.top - b.top);
+  const h = c.bottom - (b.top + dt);
+  if (h < 150) return;
+  B.style.marginTop = dt + 'px'; B.style.height = h + 'px';
+}
+{ const ro = new ResizeObserver(() => fitBoard()); ro.observe(document.getElementById('chars-sec')); ro.observe(document.querySelector('#board-sec .bd-head')); }
+document.fonts?.ready.then(fitBoard);
+addEventListener('resize', fitBoard);
+
 boot();

@@ -351,3 +351,11 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .bd-rform { margin: 6px 0 8px 22px; }
 .bd-why label { justify-content: flex-start; white-space: nowrap; }
 .bd-why input[type=radio] { width: auto; height: auto; flex: none; margin: 0; padding: 0; accent-color: #ff5c8a; }
+/* 건의 게시판 네모: 글 목록 + 쪽 넘김을 한 네모에 (PC 에선 hub.js fitBoard 가 높이를 캐릭터 카드에 맞춤) */
+.bd-box { display: flex; flex-direction: column; overflow: hidden; border-radius: 16px; background: rgba(20,12,50,.45); border: 1px solid rgba(255,255,255,.14); box-sizing: border-box; }
+.bd-box .bd-list { flex: 1; border: 0; border-radius: 0; background: none; }
+.bd-box .bd-row { flex: 1; min-height: 34px; }
+.bd-box .bd-empty { margin: auto; }
+.bd-box .bd-pages { margin: 0; padding: 4px 0 6px; border-top: 1px solid rgba(255,255,255,.08); }
+.bd-box .bd-pages.hidden { display: none; }
+@media (min-width: 861px) { #board-sec { display: flex; flex-direction: column; } }
