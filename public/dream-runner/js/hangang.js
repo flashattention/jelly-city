@@ -428,6 +428,7 @@ export class Hangang {
     // 역 · 가게 · 몰 · 열차 안은 먼 좌표에 있다: 그동안 서울 칸을 내리거나 엉뚱한 칸을 부르지 않는다 (나오면 빈 땅이었다)
     if (this.inside || this.inShop || this.inMall || this.ride) return;
     const T = this.world0.tile, ti = Math.floor(px / T), tj = Math.floor(pz / T); this.tileNow = [ti, tj];
+    if (this.farU) { const U = this.farU; U.uC.value.set(ti, tj); for (let b = -2; b <= 2; b++) for (let a = -2; a <= 2; a++) U.uL.value[(b + 2) * 5 + a + 2] = this.chunks.has(`${ti + a}_${tj + b}`) ? 1 : 0; }
     // 먼 나무 칸은 그리지 않는다 (1.1km 넘게, 날 때는 높이만큼 더 멀리까지). 0.4초마다
     if ((this.treeLodN = (this.treeLodN || 0) + 1) % 12 === 1) { const R = 1100 + Math.min(900, (this.y || 0) * 3); for (const c of this.chunks.values()) c.scene.traverse((o) => { const L = o.userData.lod; if (L) o.count = Math.hypot(L[0] - px, L[1] - pz) < (L[3] ? L[3] + Math.min(900, (this.y || 0) * 3) : R + 360) ? L[2] : 0; const V = o.userData.lodV; if (V) o.visible = Math.hypot(V[0] - px, V[1] - pz) < V[2] + Math.min(600, (this.y || 0) * 2); }); }
     // 칸을 쉬어 가며 만드는 중에는 내리지 않는다 (같이 쓰는 목록을 내리기가 새로 만들어 버리면 만드는 칸이 옛 목록에 쓴다)
@@ -1626,6 +1627,15 @@ export class Hangang {
     for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) { const a = j * nx + i, b = a + nx; I.push(a, b, a + 1, a + 1, b, b + 1); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3)); g.setIndex(I); g.computeVertexNormals();
     const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: 6, polygonOffsetUnits: 6 })); m.renderOrder = -62; m.receiveShadow = false; this.scene.add(m); this.farTerrain = m;
+    // 불러온 칸 안에서는 먼 땅을 40m 내린다: 200m 성긴 격자라 골짜기 · 칸이 평평하게 깎은 땅 위로 1m 가까이 솟아 곰이 잔디에 묻혔다 (성북구 2292, -6477)
+    //   uL = 지금 칸 둘레 5 × 5 중 불러온 칸 (tickWorld 가 채운다). 칸 경계 꼭짓점은 이웃 칸 하나라도 있으면 내린다
+    const TL = (this.world0?.tile || 2000).toFixed(1), U = (this.farU = { uC: { value: new THREE.Vector2(1e6, 1e6) }, uL: { value: new Float32Array(25) } });
+    m.material.onBeforeCompile = (sh) => { Object.assign(sh.uniforms, U);
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
+uniform vec2 uC; uniform float uL[25];
+float farIn(vec2 p) { vec2 t = floor(p / ${TL}) - uC + 2.0; if (t.x < 0.0 || t.y < 0.0 || t.x > 4.0 || t.y > 4.0) return 0.0; return uL[int(t.y) * 5 + int(t.x)]; }`).replace('#include <begin_vertex>', `#include <begin_vertex>
+{ vec2 p = position.xz; transformed.y -= 40.0 * max(max(farIn(p + vec2(1.0, 1.0)), farIn(p + vec2(-1.0, 1.0))), max(farIn(p + vec2(1.0, -1.0)), farIn(p + vec2(-1.0, -1.0)))); }`); };
+    m.material.customProgramCacheKey = () => 'farTerr';
   }
   // 나무 · 풀 · 꽃: 길 양옆에 줄지어, 공원 안에 흩어서
   buildPlants(inWater, r) {
