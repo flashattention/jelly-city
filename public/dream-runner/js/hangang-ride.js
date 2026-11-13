@@ -49,7 +49,7 @@ const CSS = `
 function ui() {
   if (document.getElementById('rd-card')) return; const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
   const host = document.getElementById('hg-hud') || document.body, d = document.createElement('div');
-  d.innerHTML = `<div id="rd-card" class="hidden"><span class="ic">🚌</span><span><b></b><small></small></span><button class="b2 bell hidden">🔔 하차벨 <kbd>B</kbd></button><button class="b1"></button></div><div id="rd-led" class="hidden"></div><div id="rd-seat" class="hidden"><div class="pg"><h3></h3><div class="sub">빈 자리를 누르면 앉아요 · 🐻 = 다른 승객</div><div class="map"></div><div class="row"><button class="stand">🧍 서서 손잡이 잡기</button><button class="auto">아무 데나</button></div></div></div>`;
+  d.innerHTML = `<div id="rd-card" class="hidden"><span class="ic">🚌</span><span><b></b><small></small></span><button class="b2 bell hidden">🔔 하차벨 <kbd>B</kbd></button><button class="b1"></button></div><div id="rd-led" class="hidden"></div><div id="rd-seat" class="hidden"><div class="pg"><h3></h3><div class="sub">빈 자리를 누르면 앉아요 · 🐻 = 다른 승객</div><div class="map"></div><div class="row"><button class="stand">🧍 서서 손잡이 잡기</button><button class="auto">아무 데나</button><button class="cab go hidden">🧑‍✈️ 맨 앞 운전실 · 직접 운전</button></div></div></div>`;
   while (d.firstChild) host.appendChild(d.firstChild);
 }
 
@@ -154,6 +154,55 @@ function buildPlatform() {
   return { g, name };
 }
 
+// ---------- 지하철 운전실 (8-40-2) ----------
+//   맨 앞 칸 앞머리: 앞 유리(가운데 기둥) · 옆 창 · 운전대(계기판 그림 · 주간제어기 손잡이) · 운전석 · 뒤 칸막이
+//   좌표는 열차 맨 앞 끝이 0, 뒤로 -z. 바닥은 레일 위 1.1m (객실과 같다)
+function buildCab(color) {
+  const g = new THREE.Group(), F = 1.1, W = 2.9, hw = W / 2, H = 2.15, LEN = 3.4, mats = [];
+  const M = (c, glow = 0.12) => { const m = lamb(c, glow); mats.push(m); return m; };
+  const body = M('#e4e6e8'), dark = M('#2a2e34', 0.04), desk = M('#3a4048', 0.06), frame = M('#1c1f24', 0.02), band = M(color, 0.2), floorM = M('#6f747b', 0.05), ceilM = M('#eeeeea', 0.2), seatM = M('#4a5160', 0.06), red = M('#c8302a', 0.15), steel = M('#c9ced4', 0.12);
+  const glass = new THREE.MeshBasicMaterial({ color: '#a9cfe0', transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide });
+  box(g, W, 0.06, LEN, floorM, 0, F - 0.03, -LEN / 2); box(g, W, 0.05, LEN, ceilM, 0, F + H, -LEN / 2);
+  box(g, 0.5, 0.03, 1.2, new THREE.MeshBasicMaterial({ color: '#fff6e0' }), 0, F + H - 0.03, -2.2);
+  // 옆벽: 창 아래 · 위, 옆 창(유리), 창틀
+  for (const sx of [1, -1]) { const x = sx * hw; box(g, 0.06, 0.95, LEN, body, x, F + 0.47, -LEN / 2); box(g, 0.065, 0.12, LEN, band, x * 1.002, F + 0.9, -LEN / 2); box(g, 0.06, 0.4, LEN, body, x, F + H - 0.2, -LEN / 2); box(g, 0.08, 1.0, 0.1, frame, x, F + 1.45, -1.6); box(g, 0.08, 1.0, 0.1, frame, x, F + 1.45, -LEN + 0.05); const gl = new THREE.Mesh(new THREE.PlaneGeometry(LEN - 0.2, 0.85), glass); gl.position.set(x * 0.99, F + 1.45, -LEN / 2); gl.rotation.y = Math.PI / 2; g.add(gl); }
+  // 앞: 아래 코(노선 색 띠) · 앞 유리 (가운데 비상문 기둥) · 위 행선 안내판 자리
+  box(g, W, 0.95, 0.08, body, 0, F + 0.47, -0.04); box(g, W + 0.01, 0.16, 0.085, band, 0, F + 0.78, -0.035);
+  box(g, W, 0.2, 0.08, frame, 0, F + H - 0.1, -0.04);
+  // 앞 유리 틀: 양끝 · 왼쪽 비상문 틀 (운전석은 오른쪽이라 앞이 트여 있다)
+  for (const x of [-hw + 0.06, -0.45, hw - 0.06]) box(g, x === -0.45 ? 0.07 : 0.14, 0.92, 0.09, frame, x, F + 1.42, -0.05);
+  { const ws = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.1, 0.9), glass); ws.position.set(0, F + 1.42, -0.06); g.add(ws); }
+  // 운전대: 비스듬한 책상 · 계기판 그림 · 손잡이
+  { const d = box(g, W - 0.2, 0.08, 0.7, desk, 0, F + 0.98, -0.42); d.rotation.x = 0.28; box(g, W - 0.2, 0.86, 0.5, dark, 0, F + 0.47, -0.36); }
+  const gauge = canvasTex(512, 256), gM = new THREE.MeshBasicMaterial({ map: gauge.t, toneMapped: false }), gp = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.31), gM); gp.position.set(0.35, F + 1.03, -0.3); gp.rotation.set(-1.15, Math.PI, 0, 'YXZ'); g.add(gp);
+  const lever = new THREE.Group(); { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.15, 6), steel); st.position.y = 0.075; lever.add(st); const kn = new THREE.Mesh(new THREE.SphereGeometry(0.032, 8, 6), red); kn.position.y = 0.16; lever.add(kn); } lever.position.set(-0.2, F + 1.0, -0.4); g.add(lever);
+  box(g, 0.08, 0.04, 0.18, dark, -0.2, F + 1.0, -0.4);
+  // 운전석 · 뒤 칸막이 (가운데 문, 작은 창)
+  box(g, 0.5, 0.1, 0.48, seatM, 0.4, F + 0.5, -1.25); box(g, 0.5, 0.6, 0.08, seatM, 0.4, F + 0.85, -1.5); box(g, 0.08, 0.45, 0.08, steel, 0.4, F + 0.25, -1.25);
+  box(g, W, H, 0.06, body, 0, F + H / 2, -LEN); box(g, 0.75, 1.9, 0.07, M('#cfd3d8', 0.1), 0, F + 0.95, -LEN + 0.02); box(g, 0.45, 0.5, 0.075, frame, 0, F + 1.4, -LEN + 0.03);
+  // 바깥 앞: 전조등 두 개 · 밤엔 선로 앞으로 퍼지는 불빛
+  const headM = new THREE.MeshBasicMaterial({ color: '#fff4d6' }); for (const sx of [-1, 1]) box(g, 0.3, 0.12, 0.04, headM, sx * 0.95, F + 0.55, 0.01);
+  const bc = canvasTex(64, 256); { const c = bc.c; for (let y = 0; y < 256; y++) { const t = y / 256, w = 64 * (0.3 + 0.7 * t), a = Math.pow(1 - t, 1.5) * Math.min(1, t * 8); const gr = c.createLinearGradient((64 - w) / 2, 0, (64 + w) / 2, 0); gr.addColorStop(0, 'rgba(255,240,210,0)'); gr.addColorStop(0.5, `rgba(255,240,210,${a})`); gr.addColorStop(1, 'rgba(255,240,210,0)'); c.fillStyle = gr; c.fillRect(0, 255 - y, 64, 1); } }
+  const beamM = new THREE.MeshBasicMaterial({ map: bc.t, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }), beam = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 46), beamM); beam.rotation.x = -Math.PI / 2; beam.position.set(0, 0.08, 23); g.add(beam);
+  return { g, mats, gauge, lever, beamM, F };
+}
+// 운전실 계기판: 속도계(바늘 · 숫자) · 방향 · 다음 역 · 남은 거리 · 문 표시
+function drawCab(G, o) {
+  const { c, t } = G; c.fillStyle = '#0d1014'; c.fillRect(0, 0, 512, 256);
+  const cx = 128, cy = 140, R = 96, max = 100, a0 = Math.PI * 0.8, a1 = Math.PI * 2.2, ang = a0 + (a1 - a0) * Math.min(1, o.kmh / max);
+  c.strokeStyle = '#2a3440'; c.lineWidth = 14; c.beginPath(); c.arc(cx, cy, R, a0, a1); c.stroke();
+  c.strokeStyle = o.kmh > 80 ? '#ff5a4a' : '#5ad0ff'; c.beginPath(); c.arc(cx, cy, R, a0, ang); c.stroke();
+  c.fillStyle = '#9fb0c0'; c.font = '16px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; for (let k = 0; k <= max; k += 20) { const a = a0 + (a1 - a0) * (k / max); c.fillText(String(k), cx + Math.cos(a) * (R - 26), cy + Math.sin(a) * (R - 26)); }
+  c.strokeStyle = '#ff4a3a'; c.lineWidth = 4; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(ang) * (R - 8), cy + Math.sin(ang) * (R - 8)); c.stroke();
+  c.fillStyle = '#ffffff'; c.font = 'bold 40px sans-serif'; c.fillText(String(Math.round(o.kmh)), cx, cy + 46); c.font = '14px sans-serif'; c.fillStyle = '#9fb0c0'; c.fillText('km/h', cx, cy + 74);
+  c.textAlign = 'left'; c.fillStyle = o.color; c.fillRect(262, 22, 230, 30); c.fillStyle = '#fff'; c.font = 'bold 20px sans-serif'; c.fillText(`${o.line} 운전`, 272, 38);
+  c.fillStyle = '#ffd25a'; c.font = 'bold 22px sans-serif'; c.fillText(o.dir > 0 ? '▲ 전진' : '▼ 후진', 272, 82);
+  c.fillStyle = '#ffffff'; c.font = 'bold 26px sans-serif'; c.fillText(`다음 ${o.next || '-'}`, 272, 124, 230);
+  c.fillStyle = '#7cd3ff'; c.font = '22px sans-serif'; c.fillText(o.dist != null ? `${o.dist < 1000 ? Math.round(o.dist) + ' m' : (o.dist / 1000).toFixed(1) + ' km'}` : '', 272, 160);
+  c.fillStyle = o.doors ? '#47e07a' : '#3a4048'; c.beginPath(); c.arc(286, 210, 12, 0, 7); c.fill(); c.fillStyle = o.doors ? '#47e07a' : '#8a96a2'; c.font = 'bold 20px sans-serif'; c.fillText(o.doors ? '문 열림' : '문 닫힘', 306, 211);
+  t.needsUpdate = true;
+}
+
 export class LiveRide {
   constructor(hg) { this.hg = hg; this.on = null; this.cand = null; this.t = 0; this.cache = new Map(); ui(); this.wire(); }
   wire() {
@@ -161,9 +210,13 @@ export class LiveRide {
     this.el = { card: $('rd-card'), led: $('rd-led'), seat: $('rd-seat') };
     this.el.card.querySelector('.b1').onclick = () => this.act(); this.el.card.querySelector('.b2').onclick = () => this.bell();
     this.el.seat.querySelector('.stand').onclick = () => this.sit(this.on?.I.stand[0]); this.el.seat.querySelector('.auto').onclick = () => this.sit(this.freeSeat());
+    this.el.seat.querySelector('.cab').onclick = () => this.cabOn();
+    // 운전실: R = 앞 · 뒤 바꾸기 (선 채로만)
+    window.addEventListener('keydown', (e) => { if (e.code === 'KeyR' && !e.repeat && this.on?.cab) this.cabFlip(); });
   }
   get lock() { return !!this.on; }
-  lockInput(inp) { return { ...inp, mx: 0, mz: 0, lat: 0, jump: false, jumpHeld: false, slide: false }; }
+  // 운전실에선 W/S(휴대폰 조이스틱 세로)를 가속 · 제동으로 쓴다 → 잠그기 전 입력을 기억해 둔다
+  lockInput(inp) { this.rawIn = inp; return { ...inp, mx: 0, mz: 0, lat: 0, jump: false, jumpHeld: false, slide: false }; }
   // ---------- 탈 수 있는 것 찾기 ----------
   findCand() {
     const hg = this.hg, L = hg.live; if (!L || hg.drive?.on) return null; let best = null;
@@ -240,6 +293,7 @@ export class LiveRide {
   openSeats() {
     const R = this.on, el = this.el.seat, map = el.querySelector('.map'), I = R.I, isBus = R.kind === 'bus';
     el.querySelector('h3').textContent = isBus ? `🚌 ${R.o.route}번 버스 · 자리를 골라요` : `🚇 ${R.o.line} ${R.o.to || ''}행 · 자리를 골라요`;
+    el.querySelector('.cab').classList.toggle('hidden', isBus || !!R.cab);
     const Wm = isBus ? 2.6 : 3.1, Lm = isBus ? 11 : 19.5, S = isBus ? 48 : 24, w = Wm * S, h = Lm * S; map.style.width = (isBus ? w : h) + 'px'; map.style.height = (isBus ? h : w) + 'px'; map.innerHTML = '';
     // 버스는 세로(앞이 위), 지하철은 가로(앞이 오른쪽)
     const P = (x, z) => (isBus ? [w / 2 - x * S, h / 2 - z * S] : [h / 2 + z * S, w / 2 - x * S]);
@@ -254,18 +308,59 @@ export class LiveRide {
     this.hg.camYaw = R.yaw0 + (s.stand ? 0 : R.kind === 'bus' ? (s.x < 0 ? 0.35 : -0.35) : 0); this.hg.camPitch = 0.3; R.pitch0 = 0.3 - (R.kind === 'bus' && !s.stand ? 0.12 : 0);
     if (R.kind === 'bus') this.say(`${R.o.route}번 버스입니다.`, true); else this.trainSay(true);
   }
+  // ---------- 지하철 운전실 (8-40-2) ----------
+  //   타고 있던 실제 열차의 지금 자리에서, 내 화면에서만 따로 달리는 열차가 된다 (실제 열차는 숨겨 둔 채 실시간대로 간다)
+  //   W 가속 · S 제동 · R 앞뒤, 선로를 따라 역 사이를 넘어간다. 역에서 서면 문이 열리고 내릴 수 있다. 내리면 실제 열차가 다시 보인다
+  cabOn() {
+    const R = this.on, hg = this.hg, L = hg.live; if (!R || R.kind !== 'train' || R.cab) return; this.el.seat.classList.add('hidden');
+    const k = `cab:${R.o.line}`, I = this.cache.get(k) || buildCab(L.sub.lines[R.o.line].color); this.cache.set(k, I); I.g.userData.noDrape = true; hg.scene.add(I.g); I.g.visible = true; R.cabI = I; R.I.g.visible = false;
+    R.cab = { e: R.o.e, d: R.o.d, v: R.o.v || 0, dir: 1, doors: !!R.o.dwellAt, at: R.o.dwellAt ? R.o.e.b : null, stopT: 0, closeT: 0, said: null, gT: 0 };
+    R.seat ||= R.I.stand[0]; hg.camYaw = R.yaw0; hg.camPitch = 0.3; R.pitch0 = 0.3;
+    hg.onToast?.(`🧑‍✈️ ${R.o.line} 운전실 · 내 화면에서만 따로 달려요 · W 가속 · S 제동 · R 앞뒤 · 역에 서면 문이 열려요`);
+    this.say(`${R.o.line} 운전실입니다.`, true, 'W 가속 · S 제동 · R 앞뒤');
+  }
+  cabFlip() { const C = this.on?.cab; if (!C) return; if (C.v > 0.3) { this.hg.onToast?.('🛑 멈춘 뒤 바꿔요 (S 제동)'); return; } C.dir *= -1; beep([[660, 0, 0.12, 'square', 0.05]]); this.hg.onToast?.(C.dir > 0 ? '▲ 앞으로' : '▼ 뒤로'); }
+  // 운행 순서에서 a → b 다음 역 (없으면 null). 고리(2호선)는 이어진다
+  seqNext(line, a, b) {
+    const Ln = this.hg.live.sub.lines[line];
+    for (const q of Ln.seqs) { const s = q.s, n = s.length; for (let i = 0; i < n; i++) { if (s[i] !== b) continue; const pv = q.loop ? s[(i - 1 + n) % n] : s[i - 1], nx = q.loop ? s[(i + 1) % n] : s[i + 1]; if (pv === a && nx) return nx; if (nx === a && pv) return pv; } }
+    return null;
+  }
+  cabStep(dt) {
+    const R = this.on, C = R.cab, L = this.hg.live, line = R.o.line, Ln = L.sub.lines[line], nm = (k) => Ln.st[k]?.[0] || k;
+    let thr = clamp(this.rawIn?.mz || 0, -1, 1);
+    // 문이 열려 있으면 W 로 닫고 1.5초 뒤 출발
+    if (C.doors && thr > 0.05) { C.doors = false; C.closeT = 1.5; beep(SND.close); this.say('출입문 닫습니다.', false); }
+    if (C.closeT > 0) { C.closeT -= dt; thr = 0; }
+    const VMAX = 80 / 3.6;
+    if (thr > 0.05) C.v = Math.min(VMAX, C.v + 1.0 * thr * dt * Math.max(0.15, 1 - C.v / VMAX)); else if (thr < -0.05) C.v = Math.max(0, C.v - 1.3 * -thr * dt); else C.v = Math.max(0, C.v - 0.05 * dt);
+    C.d += C.v * C.dir * dt;
+    // 역 사이를 넘어가기 (끝 역이면 선다)
+    if (C.d > C.e.len) { const nx = this.seqNext(line, C.e.a, C.e.b), e2 = nx && L.edge(line, C.e.b, nx); if (e2) { C.d -= C.e.len; C.e = e2; C.said = null; } else { C.d = C.e.len; C.v = 0; } }
+    else if (C.d < 0) { const pv = this.seqNext(line, C.e.b, C.e.a), e2 = pv && L.edge(line, pv, C.e.a); if (e2) { C.e = e2; C.d += e2.len; C.said = null; } else { C.d = 0; C.v = 0; } }
+    // 가는 쪽 다음 역 · 남은 거리
+    const nextK = C.dir > 0 ? C.e.b : C.e.a, dist = C.dir > 0 ? C.e.len - C.d : C.d;
+    if (dist < 500 && C.said !== nextK && !C.doors) { C.said = nextK; this.say(`이번 역은 ${nm(nextK)}역입니다.`, true, `${line} 운전실 · 다음 ${nm(nextK)}`); }
+    // 섰으면 승강장 안(앞머리가 역 60m 앞 ~ 140m 지남)인지 보고 문을 연다
+    if (C.v < 0.05 && !C.doors && C.closeT <= 0) { C.stopT += dt; const at = C.e.len - C.d < 60 ? C.e.b : C.d < 140 ? C.e.a : null; if (at && C.stopT > 0.8) { C.doors = true; C.at = at; beep(SND.door); this.say(`${nm(at)}, ${nm(at)}역입니다. 문이 열립니다.`, true, `${line} · 내리려면 E`); } } else C.stopT = 0;
+    // 손잡이 · 계기판
+    const I = R.cabI; I.lever.rotation.x = -thr * 0.6;
+    C.gT -= dt; if (C.gT <= 0) { C.gT = 0.1; drawCab(I.gauge, { kmh: C.v * 3.6, dir: C.dir, next: nm(nextK), dist, doors: C.doors, line, color: Ln.color }); }
+  }
   // ---------- 따라가기 ----------
   // 탈 것의 지금 자리 → 실내 무리 자리 · 방향 (지하철 땅 밑이면 땅에서 30m 아래 + 터널)
   follow(dt) {
     const hg = this.hg, R = this.on, L = hg.live; let x, z, yaw, y, under = false;
     if (R.kind === 'bus') { const o = R.o; x = o.x; z = o.z; yaw = o.yaw; y = hg.terr ? hg.terrAt(x, z) : 0; if (o.mesh) o.mesh.visible = false; }
+    else if (R.cab) { const C = R.cab, p = L.edgeAt(C.e, C.d); x = p.x - L.cx; z = p.z - L.cz; yaw = Math.atan2(p.dx, p.dz); under = p.k === 1; if (p.k === 2) { const c = L.bridgeCenter(x, z, p.dx, p.dz); if (c) { x = c[0]; z = c[1]; } } y = under ? (hg.terr ? hg.terrAt(x, z) : 0) - 30 : L.trackY(x, z, p.k) - 0.3; R.under = under; R.pose = p; }
     else { const o = R.o, n = (L.sub.lines[o.line].cars || [8, 20])[0], p = L.carPose(o, Math.min(1, n - 1)); x = p.x - L.cx; z = p.z - L.cz; yaw = Math.atan2(p.dx, p.dz); under = p.k === 1; if (p.k === 2) { const c = L.bridgeCenter(x, z, p.dx, p.dz); if (c) { x = c[0]; z = c[1]; } } y = under ? (hg.terr ? hg.terrAt(x, z) : 0) - 30 : L.trackY(x, z, p.k) - 0.3; R.under = under; R.pose = p; }
-    const g = R.I.g; g.position.set(x, y, z); g.rotation.y = yaw; R.x = x; R.z = z; R.y = y; R.yaw = yaw;
+    const g = R.cab ? R.cabI.g : R.I.g; g.position.set(x, y, z); g.rotation.y = yaw; R.x = x; R.z = z; R.y = y; R.yaw = yaw;
     hg.px = x; hg.pz = z; hg.y = 0;
     if (R.kind === 'train') {
-      this.tun.g.visible = under; if (under) { this.tun.g.position.set(x, y, z); this.tun.g.rotation.y = yaw; this.tun.tex.offset.y -= ((R.o.v || 0) * dt) / 26.7; }
+      const T = R.cab || R.o;
+      this.tun.g.visible = under; if (under) { this.tun.g.position.set(x, y, z); this.tun.g.rotation.y = yaw; this.tun.tex.offset.y -= ((T.v || 0) * (T.dir || 1) * dt) / 26.7; }
       // 승강장: 지하 역 150m 안 (도착하는 역 · 막 떠난 역)
-      let show = false; if (under) { const e = R.o.e, near = e.len - R.o.d < 150 ? [e, e.len, e.b] : R.o.d < 150 ? [e, 0, e.a] : null; if (near) { const sp = L.edgeAt(near[0], near[1]), sx = sp.x - L.cx, sz = sp.z - L.cz; show = Math.hypot(sx - x, sz - z) < 160; if (show) { this.plat.g.position.set(sx, y, sz); this.plat.g.rotation.y = yaw; if (this.plat.st !== near[2]) { this.plat.st = near[2]; this.nameBoard(L.sub.lines[R.o.line].st[near[2]]?.[0] || near[2], L.sub.lines[R.o.line].color); } } } }
+      let show = false; if (under) { const e = T.e, near = e.len - T.d < 150 ? [e, e.len, e.b] : T.d < 150 ? [e, 0, e.a] : null; if (near) { const sp = L.edgeAt(near[0], near[1]), sx = sp.x - L.cx, sz = sp.z - L.cz; show = Math.hypot(sx - x, sz - z) < 160; if (show) { this.plat.g.position.set(sx, y, sz); this.plat.g.rotation.y = yaw; if (this.plat.st !== near[2]) { this.plat.st = near[2]; this.nameBoard(L.sub.lines[R.o.line].st[near[2]]?.[0] || near[2], L.sub.lines[R.o.line].color); } } } }
       this.plat.g.visible = show;
     }
   }
@@ -299,20 +394,21 @@ export class LiveRide {
     { const { c, t } = I.scr; c.fillStyle = '#101418'; c.fillRect(0, 0, 512, 96); c.fillStyle = '#7cd3ff'; c.font = 'bold 22px sans-serif'; c.textAlign = 'center'; c.fillText(`${o.line} ${o.to || ''}행`, 256, 30); c.fillStyle = '#ffffff'; c.font = 'bold 36px sans-serif'; c.fillText(`이번 역  ${Ln.st[o.e.b]?.[0] || o.e.b}`, 256, 76); t.needsUpdate = true; }
   }
   hideAbove(on) {
-    const hg = this.hg, keep = new Set([this.on?.I.g, this.tun?.g, this.plat?.g, hg.bear?.root, hg.shadow]);
+    const hg = this.hg, keep = new Set([this.on?.I.g, this.on?.cabI?.g, this.tun?.g, this.plat?.g, hg.bear?.root, hg.shadow]);
     if (on) { this.hid ||= []; for (const o of hg.scene.children) if (!keep.has(o) && o.visible && !o.isLight) { o.visible = false; this.hid.push(o); } }
     else if (this.hid) { for (const o of this.hid) o.visible = true; this.hid = null; }
   }
-  canAlight() { const R = this.on; if (!R) return false; if (R.kind === 'bus') return (R.o.hold > 0 || R.o.stop) && (R.o.cur ?? 0) < 0.3 && (R.next ? R.nextD < 60 : true); return !!R.o.dwellAt && R.o.e.len - R.o.d < 40; }
+  canAlight() { const R = this.on; if (!R) return false; if (R.cab) return R.cab.doors; if (R.kind === 'bus') return (R.o.hold > 0 || R.o.stop) && (R.o.cur ?? 0) < 0.3 && (R.next ? R.nextD < 60 : true); return !!R.o.dwellAt && R.o.e.len - R.o.d < 40; }
   // ---------- 내리기 ----------
   alight(silent = false) {
     const hg = this.hg, R = this.on; if (!R) return; beep(SND.door);
     let tx = R.x, tz = R.z, face = R.yaw, enter = null;
     if (R.kind === 'bus') { const rx = -Math.cos(R.yaw), rz = Math.sin(R.yaw); tx += rx * 3.6; tz += rz * 3.6; if (R.o.mesh) R.o.mesh.visible = true; }
-    else { const L = hg.live, Ln = L.sub.lines[R.o.line], name = Ln.st[R.o.e.b]?.[0] || ''; const e = (hg.entrances || []).filter((q) => norm(q.st.name) === norm(name)).sort((a, b) => Math.hypot(a.x - R.x, a.z - R.z) - Math.hypot(b.x - R.x, b.z - R.z))[0]; if (e && Math.hypot(e.x - R.x, e.z - R.z) < 700) enter = e; else { const s = Ln.st[R.o.e.b]; if (s) { tx = s[1] - L.cx; tz = s[2] - L.cz; } } }
+    else { const L = hg.live, Ln = L.sub.lines[R.o.line], stK = R.cab ? R.cab.at || R.cab.e.b : R.o.e.b, name = Ln.st[stK]?.[0] || ''; const e = (hg.entrances || []).filter((q) => norm(q.st.name) === norm(name)).sort((a, b) => Math.hypot(a.x - R.x, a.z - R.z) - Math.hypot(b.x - R.x, b.z - R.z))[0]; if (e && Math.hypot(e.x - R.x, e.z - R.z) < 700) enter = e; else { const s = Ln.st[stK]; if (s) { tx = s[1] - L.cx; tz = s[2] - L.cz; } } }
     this.hideAbove(false); hg.live.rideId = null;
     for (const b of R.bears || []) { R.I.g.remove(b.root); }
-    R.I.g.visible = false; hg.scene.remove(R.I.g); if (this.tun) { this.tun.g.visible = false; this.plat.g.visible = false; }
+    R.I.g.visible = false; hg.scene.remove(R.I.g); if (R.cabI) { R.cabI.g.visible = false; hg.scene.remove(R.cabI.g); }
+    if (this.tun) { this.tun.g.visible = false; this.plat.g.visible = false; }
     this.on = null; this.el.led.classList.add('hidden'); this.el.seat.classList.add('hidden'); try { speechSynthesis?.cancel(); } catch { /* 없음 */ }
     if (this.camRef && this.near0) { this.camRef.near = this.near0; this.camRef.updateProjectionMatrix(); this.near0 = null; }
     // 지하철에서 내리면 그 역 승강장에 선다 (계단 · 에스컬레이터로 대합실 → 출구)
@@ -328,7 +424,9 @@ export class LiveRide {
     }
     const R = this.on, L = hg.live;
     // 탈 것이 사라지면(자료가 끊김) 그 자리에서 내린다
-    if (R.kind === 'bus' ? !L.buses.has(R.o.id) : !L.trains.has(R.o.id)) { this.alight(); return; }
+    //   운전실에선 내 열차가 실시간 열차와 따로 달리니 상관없다
+    if (!R.cab && (R.kind === 'bus' ? !L.buses.has(R.o.id) : !L.trains.has(R.o.id))) { this.alight(); return; }
+    if (R.cab) this.cabStep(dt);
     this.follow(dt); R.t += dt;
     // 승객 곰 자세: 앉은 곰은 무릎을 굽혀 방석에, 선 곰은 바닥에 (자세는 곰 update 에서 정해진다)
     for (const b of R.bears || []) b.update?.(dt, 0, { noCrawl: true });
@@ -336,13 +434,16 @@ export class LiveRide {
     // 버스: 정류장 14m 앞이면 10초 선다 (GPS 는 100초마다라 정차를 놓치기 쉬워서, 타고 있을 땐 정류소 목록으로)
     if (R.kind === 'bus' && R.next && R.nextD < 14 && R.heldAt !== R.next.seq) { R.heldAt = R.next.seq; R.o.hold = R.bell ? 12 : 8; }
     if (R.kind === 'bus') { const open = (R.o.cur ?? 0) < 0.3 && (R.o.stop || R.o.hold > 0); for (const p of R.I.doorP) p.position.z += ((open ? p.userData.openZ : p.userData.closedZ) - p.position.z) * Math.min(1, dt * 4); if (open && !R.wasOpen) { beep(SND.door); if (R.bell) { R.bell = false; this.led(); } } R.wasOpen = open; }
-    const night = hg.light?.night || 0, under = R.under; for (const m of R.I.mats) m.emissiveIntensity = m.userData.glow + (under ? 0.4 : night * 0.26);
+    const night = hg.light?.night || 0, under = R.under; for (const m of R.cab ? R.cabI.mats : R.I.mats) m.emissiveIntensity = m.userData.glow + (under ? 0.4 : night * 0.26);
+    if (R.cab) R.cabI.beamM.opacity = under ? 0.22 : clamp((night - 0.3) * 0.6, 0, 0.35);
     // 땅 밑에선 바깥 세상을 숨긴다 (터널 벽 너머라 안 보이는데 그리기만 무겁다)
     this.hideAbove(R.kind === 'train' && R.under);
+    if (R.cab) { if (this.t > 0.2) { this.t = 0; this.card(); } return; }
     if (this.t > 1) { this.t = 0; if (R.seat) { if (R.kind === 'bus') this.busNext(); else this.trainSay(); } this.card(); }
   }
   card() {
     const el = this.el.card, R = this.on, c = this.cand, b1 = el.querySelector('.b1'), b2 = el.querySelector('.b2'), ic = el.querySelector('.ic');
+    if (R?.cab) { const C = R.cab, kmh = Math.round(C.v * 3.6); ic.textContent = '🧑‍✈️'; el.querySelector('b').textContent = `${R.o.line} 운전실 · ${kmh}km/h${C.dir < 0 ? ' · 뒤로' : ''}`; el.querySelector('small').textContent = C.doors ? '문이 열렸어요 · 내릴 수 있어요 (W 로 출발하면 문이 닫혀요)' : 'W 가속 · S 제동 · R 앞뒤 바꾸기 · 역에 서면 문이 열려요'; b1.innerHTML = C.doors ? '내리기 <kbd>E</kbd>' : '⇄ 앞뒤 <kbd>R</kbd>'; b1.onclick = C.doors ? () => this.alight() : () => this.cabFlip(); b2.classList.add('hidden'); el.classList.remove('hidden'); return; }
     if (R) { const can = this.canAlight(); ic.textContent = R.kind === 'bus' ? '🚌' : '🚇'; el.querySelector('b').textContent = R.kind === 'bus' ? `${R.o.route}번 버스 안` : `${R.o.line} ${R.o.to || ''}행 열차 안`; el.querySelector('small').textContent = can ? '문이 열렸어요 · 내릴 수 있어요' : R.kind === 'bus' ? (R.bell ? '다음 정류장에서 서요' : '내리려면 하차벨을 눌러요') : '역에 서면 내릴 수 있어요'; b1.innerHTML = can ? '내리기 <kbd>E</kbd>' : '🪑 자리 바꾸기'; b1.onclick = can ? () => this.alight() : () => this.openSeats(); b2.classList.toggle('hidden', R.kind !== 'bus' || can); el.classList.remove('hidden'); return; }
     if (!c) { el.classList.add('hidden'); return; }
     // 같은 실시간 버스를 운전 카드(hangang-drive.js, 운전석 · 승객 고르기)가 보여 주고 있으면 겹치지 않게 숨긴다
@@ -356,6 +457,14 @@ export class LiveRide {
   // 카메라: 고른 자리 눈높이 (앉으면 1.15m, 서면 1.6m), 끌어서 둘러보기 · 살짝 흔들림
   cam(camera) {
     const R = this.on, hg = this.hg; if (!R) return; if (hg.bear) hg.bear.root.visible = false; if (hg.shadow) hg.shadow.visible = false;
+    if (R.cab) {
+      // 운전석 눈높이 (앞 유리 너머 선로), 끌어서 둘러보기
+      const v = new THREE.Vector3(0.35, R.cabI.F + 1.4 + Math.sin(performance.now() / 140) * 0.004 * Math.min(1, R.cab.v / 8), -1.25); R.cabI.g.localToWorld(v); camera.position.copy(v);
+      const yaw = R.yaw + (hg.camYaw - R.yaw0), pt = clamp((hg.camPitch ?? 0.3) - R.pitch0, -0.6, 0.6) + 0.2;
+      camera.up.set(0, 1, 0); camera.lookAt(v.x + Math.sin(yaw) * Math.cos(pt), v.y - Math.sin(pt), v.z + Math.cos(yaw) * Math.cos(pt));
+      if (camera.near > 0.05) { this.camRef = camera; this.near0 = camera.near; camera.near = 0.05; camera.updateProjectionMatrix(); }
+      return;
+    }
     const s = R.seat || R.I.stand[0], eye = s.stand ? 1.55 : 0.8, sh = Math.sin(performance.now() / 160) * 0.006 * Math.min(1, (R.kind === 'bus' ? R.o.cur ?? 0 : R.o.v || 0) / 6);
     // 버스 창가 자리는 눈을 통로 쪽으로 20cm (창틀 · 기둥이 화면에 들어오게)
     const ex = R.kind === 'bus' && !s.stand ? s.x - Math.sign(s.x) * 0.2 : s.x;
@@ -364,6 +473,6 @@ export class LiveRide {
     camera.up.set(0, 1, 0); camera.lookAt(v.x + Math.sin(yaw) * Math.cos(pt), v.y - Math.sin(pt), v.z + Math.cos(yaw) * Math.cos(pt));
     if (camera.near > 0.05) { this.camRef = camera; this.near0 = camera.near; camera.near = 0.05; camera.updateProjectionMatrix(); }
   }
-  where() { const R = this.on; if (!R) return null; return R.kind === 'bus' ? `🚌 ${R.o.route}번 버스 안${R.next ? ` · 다음 ${R.next.n}` : ''}` : `🚇 ${R.o.line} 열차 안 · 이번 ${this.hg.live.sub.lines[R.o.line].st[R.o.e.b]?.[0] || ''}`; }
+  where() { const R = this.on; if (!R) return null; if (R.cab) return `🧑‍✈️ ${R.o.line} 운전 중 · ${Math.round(R.cab.v * 3.6)}km/h`; return R.kind === 'bus' ? `🚌 ${R.o.route}번 버스 안${R.next ? ` · 다음 ${R.next.n}` : ''}` : `🚇 ${R.o.line} 열차 안 · 이번 ${this.hg.live.sub.lines[R.o.line].st[R.o.e.b]?.[0] || ''}`; }
   dispose() { if (this.on) this.alight(true); for (const I of this.cache.values()) this.hg.scene.remove(I.g); this.cache.clear(); }
 }
