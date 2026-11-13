@@ -284,7 +284,14 @@ async function api(req, res, url) {
   return json(res, 404, { error: 'not found' });
 }
 
+// 요청 하나가 이상해도(깨진 주소 · 이상한 글자) 서버 전체가 죽지 않게: 오류는 그 요청만 400 으로 끝낸다
 const server = http.createServer((req, res) => {
+  try { handle(req, res); } catch (e) {
+    console.warn('요청 처리 오류:', e.message);
+    if (!res.headersSent) { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('bad request'); } else res.destroy();
+  }
+});
+function handle(req, res) {
   const url = new URL(req.url, 'http://x');
   if (REDIRECT_TO && url.pathname !== '/healthz') { res.writeHead(301, { Location: REDIRECT_TO + req.url, 'Cache-Control': 'no-store' }); res.end(); return; }
   if (url.pathname.startsWith('/api/')) {
@@ -351,7 +358,7 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-cache' });
     res.end(data);
   });
-});
+}
 const GZ = new Map(); let gzBytes = 0;
 const WMOD = new Map(); // 워커용으로 바꾼 모듈 (파일이 바뀌면 다시)
 
@@ -386,7 +393,8 @@ const sketchWss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024, p
 sketchWss.on('connection', (ws) => sketchRooms.connect(ws));
 // 주소로 나눠 받는다: /ws = 젤리시티 · /dream-ws = 드림 러너
 server.on('upgrade', (req, socket, head) => {
-  const p0 = new URL(req.url, 'http://x').pathname, p = OLD_WS[p0] || p0;
+  let p0; try { p0 = new URL(req.url, 'http://x').pathname; } catch { socket.destroy(); return; }
+  const p = OLD_WS[p0] || p0;
   const target = p === '/ws' ? wss : p === '/dream-ws' ? dreamWss : p === '/drift-ws' ? driftWss : p === '/tactical-ws' ? tacticalWss : p === '/drop-ws' ? dropWss : p === '/guard-ws' ? guardWss : p === '/ten-ws' ? tenWss : p === '/word-ws' ? wordWss : p === '/draw-ws' ? drawWss : p === '/type-ws' ? typeWss : p === '/surv-ws' ? survWss : p === '/sketch-ws' ? sketchWss : p === '/rumble-ws' ? rumbleWss : p === '/merge-ws' ? mergeWss : p === '/court-ws' ? courtWss : p === '/ding-ws' ? dingWss : p === '/slide-ws' ? slideWss : p === '/hide-ws' ? hideWss : p === '/arena-ws' ? arenaWss : p === '/arcade-ws' ? arcadeWss : null;
   if (!target) { socket.destroy(); return; }
   target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
@@ -448,6 +456,10 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
     setTimeout(() => process.exit(0), 500);
   });
 }
+
+// 놓친 오류 하나로 모든 게임이 꺼지지 않게: 기록만 남기고 계속 돈다
+process.on('uncaughtException', (e) => { console.error('놓친 오류:', e?.stack || e); });
+process.on('unhandledRejection', (e) => { console.error('놓친 비동기 오류:', e?.stack || e); });
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🐻 젤리시티 서버: http://localhost:${PORT}`);
