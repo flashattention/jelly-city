@@ -154,7 +154,8 @@ export class TimeWorld {
   start(track) { this.clear(); evict(1e9); this.track = track; this.at = -80; this.last = {}; this.curD = 0; this.root.visible = true; }
   stop() { this.clear(); this.track = null; this.root.visible = false; }
   clear() { for (const c of this.cells) this.drop(c.g); this.cells = []; this.anim = []; }
-  drop(g) { this.root.remove(g); g.traverse((o) => { if (o.isMesh && o.geometry && o.geometry !== G_PLANE && o.userData.own) o.geometry.dispose(); }); }
+  // 칸을 치울 때: 나눠 쓰는 그물(shared · 캐시)은 두고, 그 칸에서만 만든 그물은 지운다 (오래 달려도 GPU 메모리가 쌓이지 않게)
+  drop(g) { this.root.remove(g); g.traverse((o) => { if ((o.isMesh || o.isInstancedMesh) && o.geometry && o.geometry !== G_PLANE && !o.geometry.userData.shared && !EDGE_SET.has(o.geometry)) o.geometry.dispose(); }); }
   // 그 거리의 시대
   eraAt(s) { const t = this.track; return t.themeOf(t.dreamAt(s)); }
   update(dt, t, ps) {
@@ -244,5 +245,7 @@ export class TimeWorld {
     }
   }
 }
+const EDGE_SET = new Set();
 const EDGE_G = { disc: new THREE.CylinderGeometry(1, 1, 0.02, 14), box: new THREE.BoxGeometry(1, 1, 1), sph: new THREE.SphereGeometry(1, 8, 6), cone: new THREE.ConeGeometry(1, 1, 5), dod: new THREE.DodecahedronGeometry(1, 0) };
+for (const g of Object.values(EDGE_G)) EDGE_SET.add(g);
 export { shade, mixC, toon };

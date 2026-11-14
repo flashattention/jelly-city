@@ -109,7 +109,7 @@ export function basic(color, opts = {}) {
 const geoCache = new Map();
 export function geo(key, fn) {
   let g = geoCache.get(key);
-  if (!g) { g = fn(); geoCache.set(key, g); }
+  if (!g) { g = fn(); g.userData.shared = true; geoCache.set(key, g); } // shared: 여러 곳이 나눠 쓰니 함부로 지우지 않는다
   return g;
 }
 export const G = {
