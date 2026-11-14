@@ -524,7 +524,7 @@ async function showOver() {
   $('ov-why').textContent = `💤 ${game.why || '꿈에서 깼어요'}`;
   const fin = game.rec || { dist: Math.floor(runner.s), stars: runner.stars }; // 쓰러진 순간의 기록 (쓰러지는 동안 조금 더 미끄러진 거리는 넣지 않는다 · 순위표와 같은 값)
   $('ov-score').textContent = (fin.dist + fin.stars * 10).toLocaleString();
-  $('ov-detail').textContent = `${fin.dist.toLocaleString()}m 달림 · 별사탕 ${fin.stars}개 (⭐ +${starsEarned(fin.stars, game.diff, game.map).toLocaleString()}) · ${game.map === 'hell' ? '지옥' : game.map === 'void' ? '이공간' : game.map === 'seoul' ? '서울 코스' : game.map === 'time' ? '시대' : '꿈'} ${game.dreamsSeen}개를 지났어요 · ${Math.floor(game.runT)}초`;
+  $('ov-detail').textContent = `${fin.dist.toLocaleString()}m 달림 · 별사탕 ${fin.stars}개 (⭐ +${starsEarned(fin.stars, game.diff, game.map).toLocaleString()}) · ${game.map === 'hell' ? '지옥' : game.map === 'void' ? '이공간' : game.map === 'seoul' ? '서울 코스' : game.map === 'time' ? '시대' : '꿈'} ${game.dreamsSeen}개를 지났어요 · ${Math.floor(game.runT)}초${game.map === 'time' && game.diedEra != null ? ` · 멈춘 곳: ${ERAS[game.diedEra].emoji} ${ERAS[game.diedEra].name} (${ERAS[game.diedEra].when})` : ''}`;
   const r = game.submitted;
   $('ov-save').classList.toggle('hidden', !r?.anonPending);
   if (r?.anonPending) { $('ov-nick').value = store.get(NICK_KEY) || game.profile.name; $('ov-save-btn').disabled = false; }
