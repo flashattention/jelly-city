@@ -317,18 +317,19 @@ segSet('diff-pick', game.pickDiff);
 for (const b of $('diff-pick').children) b.onclick = () => { game.pickDiff = b.dataset.m; store.set(DIFF_KEY, game.pickDiff); segSet('diff-pick', game.pickDiff); };
 for (const b of $('room-diff').children) b.onclick = () => net.send({ t: 'diff', diff: b.dataset.m });
 game.pickMap = mapOf(store.get(MAP_KEY)); segSet('map-pick', game.pickMap);
-for (const b of $('map-pick').children) b.onclick = () => { game.pickMap = b.dataset.m; store.set(MAP_KEY, game.pickMap); segSet('map-pick', game.pickMap); game.titleT = 6; renderTimeResume(); };
+for (const b of $('map-pick').children) b.onclick = () => { const was = game.pickMap; game.pickMap = b.dataset.m; store.set(MAP_KEY, game.pickMap); segSet('map-pick', game.pickMap); game.titleT = 6; renderTimeResume(); if (game.mode === 'title' && (was === 'time') !== (game.pickMap === 'time')) titleWorld(); };
 // ⏳ 시간 여행: 어느 시대부터 출발하는지 + 빅뱅부터 다시
 function renderTimeResume() {
   const el = $('time-resume'), e = timeEra(), th = ERAS[e];
   el.classList.toggle('hidden', game.pickMap !== 'time');
   el.innerHTML = e > 0 ? `<span>⏳ <b>${th.emoji} ${th.name}</b> <small>(시대 #${e + 1} · ${th.when})</small>부터 출발</span><button id="time-reset" type="button">⏮ 빅뱅부터</button>` : `<span>⏳ <b>💥 빅뱅</b>부터 출발 · 쓰러지면 다음 판은 그 시대부터 이어져요</span>`;
-  const b = $('time-reset'); if (b) b.onclick = () => { store.set(ERA_KEY, 0); renderTimeResume(); toast('💥 빅뱅부터 다시 출발해요'); };
+  const b = $('time-reset'); if (b) b.onclick = () => { store.set(ERA_KEY, 0); renderTimeResume(); toast('💥 빅뱅부터 다시 출발해요'); if (game.mode === 'title') titleWorld(); };
 }
 renderTimeResume();
+if (game.pickMap === 'time') titleWorld(); // 첫 화면부터 그 시대 세상
 // 새 맵 소개 공지 (웹만 · 2026-11-29 까지): 누르면 시간 여행을 고른다
 const timeNoticeOn = () => !TOSS && Date.now() < Date.parse('2026-11-29T00:00:00+09:00');
-$('time-notice').onclick = () => { game.pickMap = 'time'; store.set(MAP_KEY, 'time'); segSet('map-pick', 'time'); renderTimeResume(); game.titleT = 6; };
+$('time-notice').onclick = () => { const was = game.pickMap; game.pickMap = 'time'; store.set(MAP_KEY, 'time'); segSet('map-pick', 'time'); renderTimeResume(); game.titleT = 6; if (game.mode === 'title' && was !== 'time') titleWorld(); };
 if (timeNoticeOn()) $('time-notice').classList.remove('hidden');
 for (const b of $('room-map').children) b.onclick = () => net.send({ t: 'map', map: b.dataset.m, era: timeEra() });
 for (const b of $('board-map').children) b.onclick = async () => { game.boardMap = b.dataset.m; segSet('board-map', game.boardMap); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
@@ -474,13 +475,15 @@ function countdown(ms) {
   clearTimeout(game.howtoT); game.howtoT = setTimeout(() => h.classList.add('dock'), 5500);
 }
 function goRun() { game.mode = 'run'; $('countdown').classList.add('hidden'); }
+// 첫 화면 뒤 세상: 시간 여행을 골랐으면 출발할 시대의 세상을 미리 펼친다 (다른 맵은 꿈 하늘만)
+function titleWorld() { newRun((Math.random() * 2 ** 31) | 0, false, game.pickDiff, game.pickMap === 'time' ? 'time' : 'dream'); }
 function toTitle() {
   game.team = false; $('teambar').classList.add('hidden');
   $('howto').classList.add('hidden'); $('itembar').classList.add('hidden');
   game.mode = 'title'; game.multi = false;
   for (const g of game.ghosts.values()) g.remove(); game.ghosts.clear();
   $('hud').classList.add('hidden'); $('touch').classList.add('hidden'); $('spectate').classList.add('hidden'); $('countdown').classList.add('hidden');
-  newRun((Math.random() * 2 ** 31) | 0);
+  titleWorld();
   game.mode = 'title';
   show('title'); renderAccount();
 }
@@ -871,12 +874,13 @@ function frame() {
   if (game.mode === 'title') {
     // 처음 화면: 출발 발판에서 제자리 달리기 + 꿈이 6초마다 바뀌며 빙글 도는 카메라
     game.titleT += dt;
+    if (game.titleT > 6 && track.tmap) game.titleT = 0;
     if (game.titleT > 6) { game.titleT = 0; const pool = game.pickMap === 'hell' ? HELLS : game.pickMap === 'void' ? VOIDS : game.pickMap === 'seoul' ? SEOULS : game.pickMap === 'time' ? ERAS : THEMES, th = pool[Math.floor(Math.random() * pool.length)]; env.setTheme(th); }
     runner.bear.root.position.set(0, 0, z); runner.bear.root.rotation.y = Math.PI;
     runner.bear.update(dt, 8, { noCrawl: true });
-    const a = t * 0.18;
-    camera.position.set(Math.sin(a) * 7, 2.6, z + Math.cos(a) * 7);
-    camera.lookAt(0, 1.1, z);
+    const a = t * 0.18, ck = track.tmap ? 0.72 : 1;
+    camera.position.set(Math.sin(a) * 7 * ck, 2.6 * ck, z + Math.cos(a) * 7 * ck);
+    camera.lookAt(0, 1.1 * ck, z);
   } else if (game.paused) {
     hud(); // 서버 점검: 그 자리에서 멈춰 있는다
   } else {
@@ -933,7 +937,7 @@ function frame() {
   if (sOn) { seoulFrame(dt); return; }
   if (tworld.track) tworld.update(dt, game.mode === 'title' ? t : game.runT, runner.s);
   // 시간 여행 달리는 동안만 곰을 사람 크기로 (첫 화면 · 다른 맵으로 가면 원래 크기)
-  const tb = !!tworld.track && game.mode !== 'title';
+  const tb = !!tworld.track;
   if (tb || game.timeBear) { const k = tb ? TIME_BEAR : 1; runner.bear.root.scale.setScalar(k); for (const g of game.ghosts.values()) g.bear.root.scale.setScalar(k); }
   game.timeBear = tb;
   env.update(dt, t, camera, runner.s, runner.x, runner.y);
