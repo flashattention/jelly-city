@@ -46,7 +46,7 @@ export function makeKit(h, G) {
   // 토닥: 휠로 지팡이(치유 · 강화) ↔ 딱총
   K.wheel = () => { if (h.id !== 'mercy' || busy()) return; st.gun = !st.gun; st.tgt = st.tgtS = null; st.beams = []; st.beamsS = []; G.sfx('pick'); G.toast(st.gun ? '🔫 딱총 (휠로 지팡이)' : '🪄 지팡이 (휠로 딱총)'); };
   // 지금 쏠 수 없는 상태 (기절 · 망령화 · 방벽 들고 · 돌진 …)
-  const busy = () => !!st.aim || !!st.tire || G.has('stun') || G.has('sleep') || G.has('ghost') || G.has('blossom') || G.has('hogult') || G.has('coal') || st.mode === 'charge' || st.mode === 'tp' || st.mode === 'recall' || st.mode === 'grap' || st.mode === 'ga' || (h.id === 'rein' && G.mouseR) || (h.id === 'dva' && G.mouseR && !G.has('pilot')) || G.has('deflect');
+  const busy = () => !!st.aim || !!st.tire || G.has('stun') || G.has('sleep') || G.has('ghost') || G.has('blossom') || G.has('hogult') || G.has('coal') || st.mode === 'charge' || st.mode === 'tp' || st.mode === 'recall' || st.mode === 'grap' || (h.id === 'rein' && G.mouseR) || (h.id === 'dva' && G.mouseR && !G.has('pilot')) || G.has('deflect');
 
   // ---------- 기본 공격 ----------
   function fireHit(sp, a, now, opt = {}) {
@@ -255,7 +255,7 @@ export function makeKit(h, G) {
         G.flash('#9fe8ff'); G.sfx('blink'); return;
       }
       case 'tracer.e': if (!useCd('e', sp.cd)) return; abil('e'); st.mode = 'recall'; st.until = now + 700; st.rpath = [...st.hist].reverse(); G.sfx('blink'); return;
-      case 'mercy.shift': { const t = G.findTarget({ range: 30, arc: 0.9, lock: 'ally' }) || G.findTarget({ range: 30, arc: 0.9, lock: 'ally', dead: true }); if (!t) { G.toast('🪽 날아갈 아군을 조준해요'); return; } if (!useCd('shift', G.has('valk') ? 1 : sp.cd)) return; abil('shift', { to: t.id }); st.mode = 'ga'; st.until = now + 1600; st.gaTo = t; G.sfx('dash'); return; }
+      case 'mercy.shift': { const t = (st.tgt?.alive && !st.gun ? st.tgt : null) || (st.tgtS?.alive ? st.tgtS : null) || G.findTarget({ range: 30, arc: 0.9, lock: 'ally' }) || G.findTarget({ range: 30, arc: 0.9, lock: 'ally', dead: true }); if (!t) { G.toast('🪽 날아갈 아군을 조준해요'); return; } if (!useCd('shift', G.has('valk') ? 1 : sp.cd)) return; abil('shift', { to: t.id }); st.mode = 'ga'; st.until = now + 1600; st.gaTo = t; G.sfx('dash'); return; }
       case 'mercy.e': if (cdLeft('e') > 0) { G.sfx('cd'); return; } G.cd.e = now + 1000; abil('e'); return;
       case 'ana.shift': if (!useCd('shift', sp.cd)) return; abil('shift'); G.fireProj('sleep', { a: 'shift' }); G.sfx('laser'); return;
       case 'ana.e': if (!useCd('e', sp.cd)) return; abil('e'); G.fireProj('biotic', { a: 'e' }); G.sfx('throw'); return;
@@ -441,6 +441,9 @@ export function makeKit(h, G) {
     if (h.id === 'archer' && st.drawAt) return { bar: Math.min(1, (performance.now() - st.drawAt) / 750), label: '당기는 중' };
     if (h.id === 'widow' && G.mouseR) return { bar: Math.min(1, (performance.now() - st.scopeAt) / (h.p.scoped.charge * 1000)), label: '충전' };
     if (h.id === 'lucio') return { label: G.has('songheal') ? '🎵 치유 곡' : '🎵 속도 곡' };
+    // 부글 · 탱글: 자원 게이지를 조준점 아래 가운데에도 (오른쪽 아래 숫자만으론 싸우는 중에 보기 어려웠다)
+    if (h.id === 'moira') { const v = Math.round(G.ps?.[8] ?? 100); return { bar: v / 100, label: `🧬 ${v}` }; }
+    if (h.id === 'zarya') { const v = Math.round(G.ps?.[6] ?? 0); return { bar: v / 100, label: `⚡ ${v}%` }; }
     return null;
   };
   return K;

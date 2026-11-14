@@ -438,9 +438,11 @@ export class GuardRooms extends BaseRooms {
     if (c.hero === 'mercy' && c.fx.valk > now) cd = Math.min(cd, slot === 'e' ? 30 : 1);
     if (c.hero === 'lucio' && slot === 'shift') { if (!this.useCd(r, c, slot, 0.5, now)) return; c.song = c.song === 'heal' ? 'speed' : 'heal'; return; }
     if (c.hero === 'soldier' && slot === 'shift') return; // 질주는 화면에서만
+    // 부활: 쿨타임부터 확인 (예전엔 부활을 먼저 해서 쿨타임 없이 계속 쓸 수 있었다)
+    if (c.hero === 'mercy' && slot === 'e' && (c.cd.e || 0) > now) { this.send(c, { t: 'cd', s: 'e', ms: c.cd.e - now }); return; }
     if (c.hero === 'mercy' && slot === 'e') { if (!this.rez(r, c, now)) { this.send(c, { t: 'cd', s: 'e', ms: 0 }); this.send(c, { t: 'toast', text: '✝️ 가까이 쓰러진 아군이 없어요' }); return; } }
     if (!(c.hero === 'mercy' && slot === 'e') && !this.useCd(r, c, slot, cd, now)) return;
-    if (c.hero === 'mercy' && slot === 'e') c.cd.e = now + cd * 1000;
+    if (c.hero === 'mercy' && slot === 'e') { c.cd.e = now + cd * 1000; this.send(c, { t: 'cd', s: 'e', ms: cd * 1000 }); }
     this.abilEffect(r, c, h, slot, m, now);
     this.toRoom(r, { t: 'fx', k: 'abil', by: c.id, h: c.hero, s: slot, p: [c.pos.x, c.pos.y, c.pos.z], yaw: c.yaw, to: m.to ?? null, dst: Array.isArray(m.p) ? m.p.slice(0, 3).map(Number) : null }, c);
   }
@@ -1018,6 +1020,11 @@ export class GuardRooms extends BaseRooms {
     return best;
   }
   botFight(r, b, h, spec, tgt, td, range, speed, nav, dt, now) {
+    // 용검 · 원시의 분노: 근접 전용. 원래 무기 거리(칼바람 표창 18m)를 지키면 벨 수가 없다 → 곧장 붙고 앞에서 옆걸음
+    if (b.fx.blade > now || (b.hero === 'winston' && b.fx.primal > now)) {
+      if (td > 5) this.botWalkTo(r, b, nav, tgt.pos, speed, dt); else if (!this.botStep(r, b, 1, b.strafe * 0.3, speed, dt)) b.strafe = -b.strafe;
+      return true;
+    }
     if (now >= (b.tacticT || 0)) this.botPickTactic(r, b, h, spec, tgt, td, range, now);
     // 방금 맞았으면 방향을 틀고 가끔 뛴다
     const hit = now - (b.hitAt || 0) < 120;
@@ -1180,6 +1187,11 @@ export class GuardRooms extends BaseRooms {
     if (b.hero === 'soldier' && cdOk('e') && lowHp < 0.55) { use('e'); this.addEnt(r, { k: 'field', team: b.team, owner: b, x: b.pos.x, y: b.pos.y, z: b.pos.z, until: now + 5000, r: 5 }); return; }
     if (b.hero === 'zarya' && cdOk('shift') && lowHp < 0.8 && near) { use('shift'); this.bubble(b, b, now); return; }
     if (b.hero === 'zarya' && cdOk('e') && ally && ally.hp / this.maxHp(ally) < 0.6) { use('e'); this.bubble(ally, b, now); return; }
+    // 용검 중: 멀면 질풍참으로 파고든다 (벽에 막히지 않을 때만, 처치하면 쿨타임 초기화는 그대로)
+    if (b.hero === 'genji' && b.fx.blade > now && cdOk('shift') && tgt && td > 4 && td < 14) {
+      const k = Math.max(0, td - 1.6) / td, to = { x: b.pos.x + (tgt.pos.x - b.pos.x) * k, z: b.pos.z + (tgt.pos.z - b.pos.z) * k };
+      if (clearLine(r.g.map, { x: b.pos.x, y: b.pos.y + 0.6, z: b.pos.z }, { x: to.x, y: b.pos.y + 0.6, z: to.z })) { use('shift'); b.pos.x = to.x; b.pos.z = to.z; this.damage(r, tgt, 50, b, now, { a: 'dash', melee: true }); return; }
+    }
     if (b.hero === 'genji' && cdOk('e') && lowHp < 0.6 && tgt) { use('e'); b.fx.deflect = now + 2000; return; }
     if (b.hero === 'reaper' && cdOk('shift') && lowHp < 0.3) { use('shift'); b.fx.invuln = now + 3000; b.fx.ghost = now + 3000; return; }
     if (b.hero === 'moira' && cdOk('e') && (tgt || ally)) { use('e'); const f = fwd(b.yaw); this.addEnt(r, { k: 'orb', team: b.team, owner: b, x: b.pos.x + f.x, y: b.pos.y + 1.3, z: b.pos.z + f.z, vx: f.x * 8.5, vz: f.z * 8.5, until: now + 7000, r: 4.2 }); return; }
