@@ -223,6 +223,9 @@ export class TimeWorld {
     const pat = th.road?.[2] || 'dirt', rc = th.road?.[1] || '#5d4037', gc = th.ground?.[1] || '#6a8a4a', E = TIME_W / 2 + 0.55;
     const M = (c) => toon(c), G1 = EDGE_G;
     const box = (x, y, z, w, h, d, c) => { const m = new THREE.Mesh(G1.box, M(c)); m.position.set(x, y, z); m.scale.set(w, h, d); stat.add(m); };
+    // 땅 얼룩: 땅 색보다 조금 밝거나 어두운 넓은 둥근 판 (멀리서 봐도 같은 무늬가 되풀이돼 보이지 않게)
+    const g0c = th.ground?.[0] || '#555555', g1c = th.ground?.[1] || '#666666';
+    for (let i = 0; i < (isPhone ? 3 : 6); i++) { const side = R() < 0.5 ? -1 : 1, sx = 4 + R() * 10, sz = 3 + R() * 8, m = new THREE.Mesh(G1.disc, M(R() < 0.5 ? shade(g0c, 0.92 + R() * 0.06) : mixC(g0c, g1c, 0.2 + R() * 0.25))); m.position.set(side * (E + 1.5 + Math.max(sx, sz) + R() * 50), 0.05 + i * 0.006, -(a + R() * (b - a))); m.scale.set(sx, 1, sz); m.rotation.y = R() * 3; stat.add(m); }
     const step = pat === 'asphalt' ? 2.2 : pat === 'light' || pat === 'metal' ? 6 : pat === 'plank' ? 3 : 1.6;
     for (let s = a + R() * step; s < b; s += step * (0.7 + R() * 0.6)) for (const side of [-1, 1]) {
       const x = side * (E + R() * 0.35), z = -s;
@@ -235,5 +238,5 @@ export class TimeWorld {
     }
   }
 }
-const EDGE_G = { box: new THREE.BoxGeometry(1, 1, 1), sph: new THREE.SphereGeometry(1, 8, 6), cone: new THREE.ConeGeometry(1, 1, 5), dod: new THREE.DodecahedronGeometry(1, 0) };
+const EDGE_G = { disc: new THREE.CylinderGeometry(1, 1, 0.02, 14), box: new THREE.BoxGeometry(1, 1, 1), sph: new THREE.SphereGeometry(1, 8, 6), cone: new THREE.ConeGeometry(1, 1, 5), dod: new THREE.DodecahedronGeometry(1, 0) };
 export { shade, mixC, toon };
