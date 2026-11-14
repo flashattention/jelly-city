@@ -457,3 +457,10 @@ body.swplay:not(.swready) #sw-load { color: #f3eee6; background: radial-gradient
 #time-warp .tw-year.land { color: #fff3c4; transform: scale(1.12); }
 @keyframes twSpin { 0% { transform: rotate(0deg) scale(.4); opacity: 0; } 15% { opacity: 1; } 70% { opacity: .9; } 100% { transform: rotate(540deg) scale(1.6); opacity: 0; } }
 @keyframes twYear { 0% { opacity: 0; transform: scale(.6); } 12% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-30px) scale(1); } }
+/* 새 맵 소개 공지 (시간 여행): 금빛 → 보라 */
+.time-notice { display: flex; flex-direction: column; gap: 3px; margin: -6px auto 14px; max-width: 560px; width: 100%; padding: 9px 14px; border-radius: 14px; border: 2px solid #ffd54f; background: linear-gradient(100deg, rgba(255, 193, 7, .18), rgba(124, 77, 255, .22)); color: #fff3c4; font: inherit; font-size: 13px; line-height: 1.45; text-align: center; cursor: pointer; box-shadow: 0 0 18px rgba(255, 213, 79, .3); animation: timeGlow 1.8s ease-in-out infinite alternate; }
+.time-notice b { color: #ffd54f; font-size: 15px; }
+.time-notice em { font-style: normal; font-weight: 700; color: #fff; }
+.time-notice small { color: #d7c9ff; font-size: 12px; }
+.time-notice:hover { filter: brightness(1.12); }
+.time-notice.hidden { display: none; }

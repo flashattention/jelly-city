@@ -327,7 +327,11 @@ function renderTimeResume() {
 }
 renderTimeResume();
 // 다 만들기 전엔 개발용으로만 보인다 (?timedev 또는 localStorage dr-time-dev=1)
-if (!/[?&]timedev/.test(location.search) && store.get('dr-time-dev') !== '1') { for (const b of document.querySelectorAll('[data-m="time"]')) b.classList.add('hidden'); if (game.pickMap === 'time') { game.pickMap = 'dream'; segSet('map-pick', 'dream'); renderTimeResume(); } }
+// 새 맵 소개 공지 (웹만 · 2026-11-29 까지): 누르면 시간 여행을 고른다
+const timeNoticeOn = () => !TOSS && Date.now() < Date.parse('2026-11-29T00:00:00+09:00');
+$('time-notice').onclick = () => { game.pickMap = 'time'; store.set(MAP_KEY, 'time'); segSet('map-pick', 'time'); renderTimeResume(); game.titleT = 6; };
+if (timeNoticeOn()) $('time-notice').classList.remove('hidden');
+if (!/[?&]timedev/.test(location.search) && store.get('dr-time-dev') !== '1') { $('time-notice').classList.add('hidden'); for (const b of document.querySelectorAll('[data-m="time"]')) b.classList.add('hidden'); if (game.pickMap === 'time') { game.pickMap = 'dream'; segSet('map-pick', 'dream'); renderTimeResume(); } }
 for (const b of $('room-map').children) b.onclick = () => net.send({ t: 'map', map: b.dataset.m, era: timeEra() });
 for (const b of $('board-map').children) b.onclick = async () => { game.boardMap = b.dataset.m; segSet('board-map', game.boardMap); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
 for (const b of $('board-diff').children) b.onclick = async () => { game.boardDiff = b.dataset.m; segSet('board-diff', game.boardDiff); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
