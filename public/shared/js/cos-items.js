@@ -120,14 +120,23 @@ export const SHOP = [
   it('trail', 'voidb', '시공의 균열 길', '⚡', 360000, 'apex', { grand: 3, shape: 'bolt', colors: ['#ffffff', '#7fe9ff', '#b28bff'], size: 0.5, life: 0.8, rate: 75, ribbon: { w: 1.7, life: 2.3, colors: ['#06040e', '#3a1a8a', '#b28bff', '#7fe9ff', '#ffffff', '#7fe9ff', '#b28bff', '#3a1a8a', '#06040e'] } }, R('beyond', 10000, 'void')),
   it('boost', 'voidb', '광속 돌파', '💫', 330000, 'apex', { grand: 3, shape: 'rune', colors: ['#ffffff', '#7fe9ff', '#b28bff'], size: 0.66, life: 0.7, rate: 130 }, R('beyond', 10000, 'void')),
   it('back', 'voidb', '특이점의 날개', '✴️', 350000, 'apex', { grand: 3, kind: 'wing', color: '#06040e', glow: RAIN, big: 1, sharp: 1 }, R('beyond', 10000, 'void')),
+  // 특이점 도전 (2026-11-15): 초월의 1.5배 빠르기. 맵마다 특이점 1,000m(전설) · 2,500m(신화) · 5,000m(최고 등급). 흰 · 하늘 · 보라 · 금빛
+  it('aura', 'singb', '특이점의 광륜', '💠', 70000, 'legend', { grand: 1, shape: 'rune', colors: ['#ffffff', '#7fe9ff', '#b28bff', '#ffd700'], n: 40, size: 0.34, ring: '#ffffff', ring2: '#7fe9ff', rise: 2 }, R('singular', 1000)),
+  it('trail', 'singb', '빛이 휘는 길', '✨', 180000, 'myth', { grand: 2, shape: 'star', colors: ['#ffffff', '#7fe9ff', '#b28bff', '#ffd700'], size: 0.46, life: 1.4, rate: 65, ribbon: { w: 1.5, life: 2, colors: ['#06040e', '#7fe9ff', '#ffffff', '#ffd700', '#ffffff', '#b28bff', '#06040e'] } }, R('singular', 2500)),
+  it('jump', 'singb', '특이점 폭발', '💥', 380000, 'apex', { grand: 3, shape: 'rune', colors: ['#ffffff', '#7fe9ff', '#b28bff', '#ffd700'], n: 60, size: 0.6, ring: '#ffffff' }, R('singular', 5000)),
+  it('land', 'singb', '붕괴하는 불꽃 착지', '☄️', 75000, 'legend', { grand: 1, shape: 'flame', colors: ['#ffffff', '#ffd700', '#ff2b2b'], n: 36, size: 0.56, ring: '#ffd700' }, R('singular', 1000, 'hell')),
+  it('boost', 'singb', '지옥문 돌파', '🔥', 190000, 'myth', { grand: 2, shape: 'flame', colors: ['#06040e', '#ff2b2b', '#ffd700', '#ffffff'], size: 0.68, life: 0.7, rate: 120 }, R('singular', 2500, 'hell')),
+  it('shoes', 'singb', '법칙 너머', '💠', 180000, 'myth', { grand: 2, color: '#06040e', sole: '#ffffff', wing: '#7fe9ff', flame: '#ffd700', shine: '#ffffff' }, R('singular', 2500, 'void')),
+  it('back', 'singb', '무한의 날개', '♾️', 400000, 'apex', { grand: 3, kind: 'wing', color: '#ffffff', glow: ['#ffffff', '#7fe9ff', '#b28bff', '#ffd700'], big: 1, sharp: 1 }, R('singular', 5000, 'void')),
 ];
 // 난이도 · 맵별 별 보상 배수 (어려울수록 많이)
-export const STAR_MULT = { easy: 1, hard: 1.6, extreme: 2.2, lightspeed: 3.2, beyond: 4.5 };
+export const STAR_MULT = { easy: 1, hard: 1.6, extreme: 2.2, lightspeed: 3.2, beyond: 4.5, singular: 6.4 };
 export const HELL_MULT = 1.5, VOID_MULT = 1.8; // 이공간이 가장 어려워서 별도 가장 많이
 export const starsEarned = (stars, diff, map) => Math.floor((Number(stars) || 0) * (STAR_MULT[diff] || 1) * (map === 'hell' ? HELL_MULT : map === 'void' ? VOID_MULT : 1));
 
 // ---------- 업적 ----------
-const DIFF_NAMES = { easy: '노멀', hard: '하드', extreme: '익스트림', lightspeed: '광속', beyond: '초월' }, MAPS = { dream: '꿈나라', hell: '지옥', void: '이공간', seoul: '서울' };
+// 노멀은 2026-11-15 없앰 (업적 · 정상의 길에서 빠진다. 예전에 딴 노멀 업적은 서버가 같은 단계의 하드 업적으로 옮긴다: server/cosmetics.js)
+const DIFF_NAMES = { hard: '하드', extreme: '익스트림', lightspeed: '광속', beyond: '초월', singular: '특이점' }, MAPS = { dream: '꿈나라', hell: '지옥', void: '이공간', seoul: '서울' };
 export const GAMES = {
   'dream-runner': { name: '드림 러너', emoji: '🌙', color: '#8f7bff' }, 'jelly-guard': { name: '젤리수호대', emoji: '🛡️', color: '#4cc3ff' }, 'jelly-arena': { name: '젤리 아레나', emoji: '⚔️', color: '#ff5c5c' },
   'jelly-tactical': { name: '젤리택티컬', emoji: '🎯', color: '#7ee081' }, 'jelly-drop': { name: '젤리드롭', emoji: '🪂', color: '#ffb347' }, 'jelly-drift': { name: '젤리드리프트', emoji: '🏎️', color: '#ff7ac6' },
@@ -154,21 +163,22 @@ export const PCT_MIN = { 1: 100, 5: 40, 10: 20 };
 //   1 ~ 3위 메달은 인원 · 업적과 상관없이 지금 그 순위면 붙는다 (any)
 export const MEDALS = [[0, 'r1', { rank: 1, exact: true, any: true }, '🥇', '1위'], [1, 'r3', { rank: 2, exact: true, any: true }, '🥈', '2위'], [2, 'r3', { rank: 3, exact: true, any: true }, '🥉', '3위'], [3, 'p1', { pct: 1 }, '💎', '상위 1%'], [4, 'p5', { pct: 5 }, '🏅', '상위 5%'], [5, 'p10', { pct: 10 }, '🎖️', '상위 10%']];
 // 순위 업적의 격: 어려운 난이도 · 지옥일수록 높다 (1 ~ 5.5). 높을수록 왕관 · 칭호 · 휘장이 화려하다
-const DIFF_ORDER = ['easy', 'hard', 'extreme', 'lightspeed', 'beyond'];
+const DIFF_ORDER = ['easy', 'hard', 'extreme', 'lightspeed', 'beyond', 'singular']; // 순서 = 격 (노멀은 자리만 남긴다)
 // 드림 러너 난이도마다 아이콘 · 무지개 색이 다르다 (지옥은 끝에 용암색이 섞인다)
 export const DIFF_STYLE = {
   easy: { e: '🙂', grad: ['#5fe0b0', '#b8f5c8', '#4cc3ff'] }, hard: { e: '🔥', grad: ['#ff5c3a', '#ffa23a', '#ffd27a'] }, extreme: { e: '💀', grad: ['#ff2e63', '#b026ff', '#ff7ab0'] },
   lightspeed: { e: '⚡', grad: ['#ffee70', '#7ff0ff', '#4d7cff'] }, beyond: { e: '🌌', grad: ['#ff5c8a', '#ffc93c', '#5fe0b0', '#7fe9ff', '#c77dff'] },
+  singular: { e: '💠', grad: ['#ffffff', '#7fe9ff', '#b28bff', '#ffd700', '#ffffff'] },
 };
 // 정상의 길: 드림 러너 난이도마다 하나. 그 난이도 순위표(꿈나라 · 지옥 어느 쪽이든) 지금 3위 안에 있는 동안만 쓴다 (사지 않는다)
 //   띠 · 반짝이 색은 그 난이도 아이콘 색(DIFF_STYLE.grad)이고, 어려운 난이도일수록 띠가 넓고 반짝이가 많다
-export const TOP3_TRAILS = DIFF_ORDER.map((d, i) => {
+export const TOP3_TRAILS = DIFF_ORDER.map((d, i) => [d, i]).filter(([d]) => DIFF_NAMES[d]).map(([d, i]) => {
   const st = DIFF_STYLE[d], cols = st.grad;
   return { id: `trail.top3.${d}`, slot: 'trail', name: `${DIFF_NAMES[d]} 정상의 길`, emoji: st.e, rarity: 'myth', top3: d,
     fx: { grand: i >= 4 ? 2 : i >= 3 ? 1 : 0, shape: i >= 3 ? 'star' : 'glow', colors: cols, size: 0.36 + i * 0.03, life: 1.1 + i * 0.1, rate: 45 + i * 6, ribbon: { w: 1.25 + i * 0.07, life: 1.6 + i * 0.12, colors: [...cols, cols[0]] } } };
 });
 export const top3Text = (it) => `${DIFF_STYLE[it.top3]?.e || ''} ${DIFF_NAMES[it.top3]} 순위표(꿈나라 · 지옥 · 이공간) 지금 3위 안에 있는 동안만 쓸 수 있어요`;
-// 최정상의 길: 맵마다 하나. 그 맵 초월 순위표에서 지금 1위인 동안만 쓴다 (사지 않는다 · 1위를 내주면 저절로 벗겨진다)
+// 최정상의 길: 맵마다 하나. 그 맵 가장 빠른 난이도(특이점, 2026-11-15 전엔 초월) 순위표에서 지금 1위인 동안만 쓴다 (사지 않는다 · 1위를 내주면 저절로 벗겨진다)
 //   모든 발자취 중 가장 넓고 오래 남는 띠 + 금빛 반짝이
 const TOP1 = {
   dream: { name: '꿈나라', e: '🌙', shape: 'star', colors: ['#ffd700', '#fff3b0', '#c8b6ff'], rib: ['#3a2a8a', '#ffd700', '#ffe8a8', '#ffffff', '#c8b6ff', '#ffd700', '#3a2a8a'] },
@@ -177,7 +187,7 @@ const TOP1 = {
 };
 export const TOP1_TRAILS = Object.entries(TOP1).map(([map, t]) => ({ id: `trail.top1.${map}`, slot: 'trail', name: `${t.name} 최정상의 길`, emoji: '👑', rarity: 'apex', top1: map,
   fx: { grand: 3, shape: t.shape, colors: t.colors, size: 0.52, life: 1.7, rate: 80, ribbon: { w: 1.75, life: 2.5, colors: t.rib } } }));
-export const liveTrailText = (it) => (it.top1 ? `👑 ${TOP1[it.top1].e} ${TOP1[it.top1].name} 초월 순위표에서 지금 1위인 동안만 쓸 수 있어요` : top3Text(it));
+export const liveTrailText = (it) => (it.top1 ? `👑 ${TOP1[it.top1].e} ${TOP1[it.top1].name} 특이점 순위표에서 지금 1위인 동안만 쓸 수 있어요` : top3Text(it));
 const styleOf = (r) => { const d = r?.diff && DIFF_STYLE[r.diff]; return d ? { e: d.e, grad: r.map === 'hell' ? [...d.grad, '#ff3a1a'] : r.map === 'void' ? [...d.grad, '#7c4dff'] : r.map === 'seoul' ? [...d.grad, '#29b6f6'] : d.grad } : null; };
 export const prestigeOf = (r) => (r?.kind === 'dream' ? 1 + Math.max(0, DIFF_ORDER.indexOf(r.diff)) + (r.map === 'hell' ? 0.5 : r.map === 'void' ? 0.7 : 0) : r?.kind === 'record' ? 1 : 0);
 const TIER_STEP = ['bronze', 'silver', 'gold', 'platinum', 'legend'];
@@ -192,7 +202,7 @@ function buildAch() {
     A.push(ach(`${base}.r10`, game, `${label} 10위권`, `${label} 순위표 10위 안에 들기 (20명 이상 겨룬 순위표)`, 'silver', { ...rule, rank: 10 }));
   };
   // 드림 러너: 맵 × 난이도마다 순위 · 거리
-  const STEP = { easy: [1000, 3000, 6000, 12000], hard: [800, 2000, 4000, 8000], extreme: [500, 1500, 3000, 6000], lightspeed: [500, 1200, 2500, 5000], beyond: [300, 800, 2000, 4000] };
+  const STEP = { hard: [800, 2000, 4000, 8000], extreme: [500, 1500, 3000, 6000], lightspeed: [500, 1200, 2500, 5000], beyond: [300, 800, 2000, 4000], singular: [200, 500, 1200, 2500] };
   for (const [m, mn] of Object.entries(MAPS)) for (const [d, dn] of Object.entries(DIFF_NAMES)) {
     const base = `dr.${m}.${d}`, label = `${mn} ${dn}`;
     rankSet(base, 'dream-runner', label, { kind: 'dream', map: m, diff: d });

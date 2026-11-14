@@ -16,7 +16,7 @@ import { Runner, Ghost, BOOST } from './runner.js';
 import { THEMES } from './themes.js';
 import { sfx, setMusic, unlock, toggleMute, sound } from './music.js';
 import { ITEMS } from './items.js';
-import { DIFFS, diffOf } from './diff.js';
+import { DIFFS, DIFF_KEYS, diffOf, vsHard } from './diff.js';
 import { HELLS } from './hells.js';
 import { VOIDS } from './voids.js';
 import { SEOULS } from './seouls.js';
@@ -296,9 +296,10 @@ game.pickMode = store.get(MODE_KEY) === 'item' ? 'item' : 'speed';
 segSet('mode-pick', game.pickMode);
 for (const b of $('mode-pick').children) b.onclick = () => { game.pickMode = b.dataset.m; store.set(MODE_KEY, game.pickMode); segSet('mode-pick', game.pickMode); };
 for (const b of $('room-mode').children) b.onclick = () => net.send({ t: 'mode', mode: b.dataset.m });
-// 난이도: 길은 같고 빠르기만 다르다 (노멀 · 하드 · 익스트림 · 광속 · 초월)
+// 난이도: 길은 같고 빠르기만 다르다 (하드 · 익스트림 · 광속 · 초월 · 특이점, 노멀은 2026-11-15 숨김)
 const diffName = (d) => DIFFS[diffOf(d)].name;
-for (const id of ['diff-pick', 'room-diff', 'board-diff']) $(id).innerHTML = Object.entries(DIFFS).map(([k, d]) => `<button data-m="${k}">${d.name}</button>`).join('');
+// 모드 고르기: 이름 아래에 하드 기준 몇 배속인지 (순위표 탭은 이름만)
+for (const id of ['diff-pick', 'room-diff', 'board-diff']) $(id).innerHTML = DIFF_KEYS.map((k) => `<button data-m="${k}">${DIFFS[k].name}${id === 'board-diff' ? '' : `<small class="vs-hard">${k === 'hard' ? '기준 속도' : `하드 ×${vsHard(k)}`}</small>`}</button>`).join('');
 game.pickDiff = store.get(DIFF_KEY) ? diffOf(store.get(DIFF_KEY)) : 'hard'; // 처음 온 사람은 하드부터 · 그다음부터는 마지막에 고른 난이도
 segSet('diff-pick', game.pickDiff);
 for (const b of $('diff-pick').children) b.onclick = () => { game.pickDiff = b.dataset.m; store.set(DIFF_KEY, game.pickDiff); segSet('diff-pick', game.pickDiff); };
@@ -345,7 +346,7 @@ async function renderMyStats() {
   try { d = await account.api(`/api/dream/me?map=${game.statsMap || 'dream'}` + (logged() ? '' : `&anon=${anonId()}`)); } catch { el.innerHTML = ''; return; }
   const cell = (r) => (r ? `<b>${r.rank.toLocaleString()}위</b><small>${r.score.toLocaleString()}점 · ${r.of.toLocaleString()}명 중</small>` : '<small>기록 없음</small>');
   el.innerHTML = `<div class="ms-top"><div><small>내가 달린 판수</small><b>${d.runs.toLocaleString()}판</b></div><div><small>달린 시간</small><b>${playTime(d.time)}</b></div></div><small class="ms-note">판수와 시간은 2026년 11월 2일 패치부터 세요 (그 전 기록은 남아 있지 않아요)</small>
-    <div class="ms-table"><div class="ms-row ms-head"><span>난이도</span><span>판수 · 시간</span><span>⚡ 스피드전</span><span>🎁 아이템전</span></div>${Object.entries(DIFFS).map(([k, x]) => { const r = d.diffs[k]; return `<div class="ms-row"><span>${esc(x.name)}</span><span><b>${r.runs.toLocaleString()}판</b><small>${playTime(r.time)}</small></span><span>${cell(r.speed)}</span><span>${cell(r.item)}</span></div>`; }).join('')}</div>${dieBox(d)}`;
+    <div class="ms-table"><div class="ms-row ms-head"><span>난이도</span><span>판수 · 시간</span><span>⚡ 스피드전</span><span>🎁 아이템전</span></div>${DIFF_KEYS.map((k) => [k, DIFFS[k]]).filter(([k]) => d.diffs[k]).map(([k, x]) => { const r = d.diffs[k]; return `<div class="ms-row"><span>${esc(x.name)}</span><span><b>${r.runs.toLocaleString()}판</b><small>${playTime(r.time)}</small></span><span>${cell(r.speed)}</span><span>${cell(r.item)}</span></div>`; }).join('')}</div>${dieBox(d)}`;
 }
 // 달린 판수 · 시간 올리기 (한 판에 한 번, 서버 점검 중이면 다시 시도). 나갈 때는 페이지가 닫혀도 전해지게 한다
 function reportPlay(leaving) {
@@ -369,7 +370,7 @@ function offerAd(r, tk) {
   };
 }
 addEventListener('pagehide', () => { if (game.mode === 'run' || game.mode === 'dead') reportPlay(true); });
-async function loadBoard(mode = 'speed', diff = 'easy', map = 'dream') { try { return await account.api(`/api/dream/board?mode=${mode}&diff=${diff}&map=${map}` + (logged() ? '' : `&anon=${anonId()}`)); } catch { return { top: [] }; } }
+async function loadBoard(mode = 'speed', diff = 'hard', map = 'dream') { try { return await account.api(`/api/dream/board?mode=${mode}&diff=${diff}&map=${map}` + (logged() ? '' : `&anon=${anonId()}`)); } catch { return { top: [] }; } }
 function renderBoard(el, d, hl) {
   const top = d.top || [], me = d.me;
   const myId = me?.id;
@@ -380,7 +381,7 @@ function renderBoard(el, d, hl) {
 }
 
 // ---------- 시작 · 끝 ----------
-function newRun(seed, itemMode = false, diff = 'easy', map = 'dream') {
+function newRun(seed, itemMode = false, diff = 'hard', map = 'dream') {
   game.itemMode = itemMode; game.map = mapOf(map);
   game.diff = diffOf(diff); runner.speedK = DIFFS[game.diff].k;
   game.seed = seed;

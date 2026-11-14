@@ -60,6 +60,20 @@ export class Cosmetics {
     this.file = path.join(dataDir, 'cosmetics.json'); this.users = {}; this.dream = null; this.dreamToss = null; this.records = {};
     try { this.users = JSON.parse(fs.readFileSync(this.file, 'utf8')).users || {}; } catch { /* 처음 */ }
     this.dirty = false; setInterval(() => this.save(), 15000).unref(); inst = this;
+    this.migrateEasy();
+  }
+  // 노멀 없앰 (2026-11-15): 예전에 딴 노멀 업적 · 끼고 있던 노멀 칭호 / 휘장을 같은 단계의 하드 업적으로 옮긴다
+  //   순위 업적(r1 · p1 · p5 · p10 · r3 · r10)은 같은 이름, 거리 업적은 같은 번째 단계 (노멀 1,000 · 3,000 · 6,000 · 12,000m → 하드 800 · 2,000 · 4,000 · 8,000m)
+  migrateEasy() {
+    const ED = [1000, 3000, 6000, 12000], HD = [800, 2000, 4000, 8000];
+    const to = (id) => { const m = /^dr\.(\w+)\.easy\.(.+)$/.exec(id); if (!m) return null; let t = m[2]; const d = /^d(\d+)$/.exec(t); if (d) { const i = ED.indexOf(+d[1]); if (i < 0) return null; t = `d${HD[i]}`; } return `dr.${m[1]}.hard.${t}`; };
+    let n = 0;
+    for (const u of Object.values(this.users)) {
+      for (const id of Object.keys(u.ach || {})) { const h = to(id); if (!h) continue; if (!u.ach[h]) u.ach[h] = u.ach[id]; delete u.ach[id]; n++; }
+      for (const [sl, id] of Object.entries(u.equip || {})) { const m = /^(title|sash)\.(.+)$/.exec(id || ''), h = m && to(m[2]); if (h) { u.equip[sl] = `${m[1]}.${h}`; n++; } }
+      if (Array.isArray(u.fresh)) u.fresh = u.fresh.map((id) => to(id) || id);
+    }
+    if (n) { this.dirty = true; console.log(`🙂 → 🔥 노멀 업적 · 칭호 ${n}개를 하드로 옮겼어요`); }
   }
   save() { if (!this.dirty) return; this.dirty = false; try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ users: this.users })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('치장 저장 실패', e.message); } }
   // 토스 미니앱 계정은 토스 드림 러너 순위표로 업적을 잰다 (웹 기록과 섞이지 않게)
@@ -120,7 +134,7 @@ export class Cosmetics {
     for (const it of [...TOP3, ...Object.keys(u.ach).flatMap((id) => (medalByAch.get(id) || []).filter((m) => !m.rule?.any))]) { if (best && (it.fx.honor > best.fx.honor || (it.fx.honor === best.fx.honor && it.fx.pr <= best.fx.pr))) continue; if (this.holdsNow(sub, it, cache)) best = it; }
     return best?.id || null;
   }
-  holdsNow(sub, it, cache) { if (it.top1) return this.meets(sub, { kind: 'dream', map: it.top1, diff: 'beyond', rank: 1, any: true }, cache); if (it.top3) return ['dream', 'hell', 'void', 'seoul'].some((map) => this.meets(sub, { kind: 'dream', map, diff: it.top3, rank: 3, any: true }, cache)); const a = achById.get(it.ach); return !!a && (it.rule?.any || !!this.users[sub]?.ach[a.id]) && this.meets(sub, it.rule || a.rule, cache); }
+  holdsNow(sub, it, cache) { if (it.top1) return this.meets(sub, { kind: 'dream', map: it.top1, diff: 'singular', rank: 1, any: true }, cache); if (it.top3) return ['dream', 'hell', 'void', 'seoul'].some((map) => this.meets(sub, { kind: 'dream', map, diff: it.top3, rank: 3, any: true }, cache)); const a = achById.get(it.ach); return !!a && (it.rule?.any || !!this.users[sub]?.ach[a.id]) && this.meets(sub, it.rule || a.rule, cache); }
   // 기록 · 순위를 보고 새로 달성한 업적을 적는다 (예전 기록도 여기서 인정된다)
   refresh(sub) {
     const u = this.u(sub), cache = new Map();

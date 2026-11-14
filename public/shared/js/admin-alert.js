@@ -2,7 +2,7 @@
 //   ✅ 정상 인정 · 🗑️ 삭제(별 · 업적 몰수) · ⏭️ 넘기기. '나중에' 로 닫으면 다음 접속 때 다시 뜬다
 import { account } from './account.js';
 
-const DIFF = { easy: '🙂 노멀', hard: '🔥 하드', extreme: '💀 익스트림', lightspeed: '⚡ 광속', beyond: '🌌 초월' };
+const DIFF = { easy: '🙂 노멀', hard: '🔥 하드', extreme: '💀 익스트림', lightspeed: '⚡ 광속', beyond: '🌌 초월', singular: '💠 특이점' };
 const WHY = {
   mismatch: '서버가 입력을 다시 돌려 본 결과와 다름', slowmo: '게임을 느리게 돌린 것 같음 (게임 속 시간이 실제로 지난 시간보다 한참 짧음)', time: '실제로 지난 시간보다 긴 기록', noreplay: '입력 기록 없이 올라옴',
   jump: '재생은 맞지만 기존 1위를 갑자기 크게 앞섬 (진짜 키를 누르는 프로그램일 수 있어요)',

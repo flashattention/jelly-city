@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { readJson } from '../auth.js';
-import { DIFFS, diffOf } from '../../public/dream-runner/js/diff.js';
+import { DIFFS, DIFF_KEYS, diffOf } from '../../public/dream-runner/js/diff.js';
 import { getCos, boardMedal, nameOf, tagChar } from '../cosmetics.js';
 import crypto from 'node:crypto';
 import { Tickets, ReplayPool, decodeReplay } from './verify.js';
@@ -82,7 +82,7 @@ export class DreamBoard {
   // 메달: 드림러너 모든 순위표(난이도 × 꿈나라 · 지옥)의 지금 1 ~ 3위 메달. 익스트림 이상 먼저(1위 → 2위 → 3위, 같은 순위면 높은 난이도 · 지옥 먼저), 그다음 익스트림 아래
   podium() {
     const P = new Map();
-    Object.keys(DIFFS).forEach((diff, di) => { MAPS.forEach((map, mi) => { const all = this.sorted('speed', diff, map); all.slice(0, 3).forEach(([sub], i) => { const id = boardMedal(`dr.${map}.${diff}`, i + 1, all.length); if (id) { if (!P.has(sub)) P.set(sub, []); P.get(sub).push({ id, di, mi, rank: i + 1 }); } }); }); });
+    DIFF_KEYS.forEach((diff) => { const di = Object.keys(DIFFS).indexOf(diff); MAPS.forEach((map, mi) => { const all = this.sorted('speed', diff, map); all.slice(0, 3).forEach(([sub], i) => { const id = boardMedal(`dr.${map}.${diff}`, i + 1, all.length); if (id) { if (!P.has(sub)) P.set(sub, []); P.get(sub).push({ id, di, mi, rank: i + 1 }); } }); }); });
     return P;
   }
   // 한 줄의 메달 · 칭호: 이 순위표 메달(상위 %)도 넣고, 같은 1위를 말하는 칭호는 메달과 겹치니 뺀다. 다른 게임 칭호는 띄우지 않는다
@@ -99,7 +99,7 @@ export class DreamBoard {
   }
   // 명예의 전당: 꿈나라 초월 1위 → 지옥 초월 1위 → 꿈나라 광속 1위 → … → 지옥 익스트림 1위, 다음은 2위 · 3위 차례로. 한 사람은 한 번만 (가장 높은 자리)
   fame(n = 12) {
-    const order = ['beyond', 'lightspeed', 'extreme'].flatMap((diff) => MAPS.map((map) => [diff, map])), seen = new Set(), out = [], P = this.podium();
+    const order = ['singular', 'beyond', 'lightspeed', 'extreme'].flatMap((diff) => MAPS.map((map) => [diff, map])), seen = new Set(), out = [], P = this.podium();
     for (let r = 0; r < 3; r++) for (const [diff, map] of order) {
       if (out.length >= n) return out;
       const all = this.sorted('speed', diff, map), x = all[r]; if (!x || seen.has(x[0])) continue;
@@ -220,7 +220,7 @@ export class DreamBoard {
   // 내 기록 한눈에: 판수 · 시간 · 난이도 · 모드별 지금 순위
   myStats(sub, map = 'dream') {
     const s = (sub && this.stats[sub]) || { runs: 0, time: 0, by: {} }, diffs = {};
-    for (const k of Object.keys(DIFFS)) {
+    for (const k of DIFF_KEYS) {
       const row = { runs: s.by[k]?.runs || 0, time: s.by[k]?.time || 0 };
       for (const mode of ['speed', 'item']) { const m = this.mine(sub, mode, k, map, false); row[mode] = m ? { rank: m.rank, score: m.score, of: Object.keys(this.table(mode, k, map)).length } : null; }
       diffs[k] = row;
