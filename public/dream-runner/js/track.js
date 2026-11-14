@@ -156,7 +156,10 @@ export class Track {
     const th = this.themeOf(this.dream);
     const len = s1 - s0, thick = opts.th ?? (th.style === 'cloud' ? 1.6 : 2.4);
     // 서울 맵: 발판은 판정만 (보이는 길은 실제 서울 찻길 · 보도, seoul-run.js)
-    if (this.seoul || this.tmap) { const m = new THREE.Object3D(); m.position.set(x, y, this.z((s0 + s1) / 2)); m.userData.s = (s0 + s1) / 2; this.root.add(m); const p = { s0, s1, x, cx: x, w, y, th: thick, mesh: m, mv: null, dx: 0, dream: this.dream }; this.plats.push(p); return p; }
+    if (this.seoul || this.tmap) { const m = new THREE.Object3D(); m.position.set(x, y, this.z((s0 + s1) / 2)); m.userData.s = (s0 + s1) / 2; this.root.add(m); const p = { s0, s1, x, cx: x, w, y, th: thick, mesh: m, mv: null, dx: 0, dream: this.dream }; this.plats.push(p);
+      // 시간 여행 아이템전: 긴 길 구간마다 ? 상자 한 줄 (서울처럼 판정만 있는 길이라 여기서)
+      if (this.tmap && this.itemMode && len >= 12 && s0 >= this.nextBox) { const sb = s0 + len * 0.45; for (let i = 0; i < 3; i++) this.box(sb, x + (i - 1) * 2.5, y + 1.1); this.nextBox = sb + this.irng.range(70, 120); }
+      return p; }
     const m = new THREE.Mesh(platGeo(w, thick, len), platMats(th));
     m.position.set(x, y - thick / 2, this.z((s0 + s1) / 2));
     m.userData.s = (s0 + s1) / 2;

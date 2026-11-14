@@ -6,6 +6,7 @@
 //   cast: 길 위 배역 — 역할마다 그 시대 모양 이름 (time-cast.js). 판정 크기는 역할마다 같다 (난이도 같음)
 //     cross 건너는 것 · on 마주 오는 것 · big 큰 것 · weave 흔들며 오는 빠른 것 · wall 옆으로 피할 것 · hurdle 뛰어넘을 것 · bar 숙여 지날 것
 //   near · mid · far · skyK: 풍경 띠 (time-kits.js) · scenes: 살아 움직이는 장면 (중간 띠)
+import { MORE_NAMES } from './times-names.js';
 export const TIME_W = 9;
 export const CHAPTERS = ['', '우주', '지구와 생명', '공룡', '인류', '고대 문명', '중세', '근대', '현대', '미래'];
 
@@ -791,5 +792,6 @@ export const CAST_NAMES = {
   moleculeS: '분자', moleculeBig: '수소화헬륨 분자', starCluster: '별 무리', globular: '구상성단', dustBall: '먼지 덩어리', protostarBall: '원시별', flareBall: '태양 불꽃',
   pebbleRoll: '자갈', asteroidRoll: '소행성', planetesimal: '미행성', rockWall: '바위 벽', rockRow: '돌무더기', rockArchBar: '바위 다리',
 };
+Object.assign(CAST_NAMES, MORE_NAMES);
 const jong = (w) => { const ch = w.charCodeAt(w.length - 1); return ch >= 0xac00 && ch <= 0xd7a3 && (ch - 0xac00) % 28 > 0; };
 export const castHit = (kind) => { const n = CAST_NAMES[kind] || '시대의 무언가'; return `${n}${jong(n) ? '과' : '와'} 부딪혔어요`; };
