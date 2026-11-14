@@ -428,3 +428,24 @@ body.swplay:not(.swready) #sw-load { color: #f3eee6; background: radial-gradient
 #sw-load svg.sw-sky { width: 220px; height: 84px; fill: none; animation: none; }
 /* 휴대폰: 난이도 다섯 개가 한 줄에 들어가게 여백을 줄인다 (위의 #diff-pick 줄바꿈 규칙보다 뒤에 둔다) */
 @media (max-width: 480px) { #diff-pick, #room-diff { flex-wrap: nowrap; gap: 2px; padding: 3px; } #diff-pick button, #room-diff button { flex: 1 1 0; min-width: 0; padding: 6px 3px; font-size: 13px; } #diff-pick .vs-hard, #room-diff .vs-hard { font-size: 9px; } }
+/* ⏳ 시간 여행: 장 띠 · 연도 · 한 줄 이야기 (카드가 조금 더 오래 머문다) */
+#dream-card .dc-ch { display: inline-block; font-family: 'Jua', sans-serif; font-size: 16px; letter-spacing: 3px; padding: 3px 14px; margin-bottom: 6px; border-radius: 999px; color: #2b1d00; background: linear-gradient(90deg, #ffd54f, #fff3c4, #ffd54f); box-shadow: 0 0 16px rgba(255, 213, 79, .7); }
+#dream-card .dc-ch:empty { display: none; }
+#dream-card.time { animation-duration: 4.2s; }
+#dream-card.time .dc-n { letter-spacing: 1px; font-size: 20px; color: #ffe082; }
+#dream-card.time .dc-tip { max-width: min(640px, 88vw); margin: 6px auto 0; color: #fff8e1; font-size: clamp(14px, 2.8vw, 19px); line-height: 1.4; }
+/* 첫 화면: 어느 시대부터 출발하는지 */
+.time-resume { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 2px auto 8px; padding: 7px 12px; border-radius: 14px; background: linear-gradient(90deg, rgba(255, 213, 79, .16), rgba(124, 77, 255, .18)); border: 1.5px solid rgba(255, 213, 79, .55); font-size: 13px; color: #fff3c4; }
+.time-resume b { color: #fff; }
+.time-resume small { color: #d7c9ff; }
+.time-resume button { border: 0; border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; background: rgba(255, 255, 255, .16); color: #fff; }
+.time-resume.hidden { display: none; }
+/* 결과 화면: 다시하면 다음 역사를 이어서 (금빛 → 보라, 반짝) */
+.time-next { margin: 4px auto 10px; padding: 8px 14px; border-radius: 14px; text-align: center; font-family: 'Jua', sans-serif; font-size: 16px; color: #fff8e1; background: linear-gradient(90deg, rgba(255, 193, 7, .22), rgba(124, 77, 255, .28)); border: 1.5px solid #ffd54f; box-shadow: 0 0 18px rgba(255, 213, 79, .35); animation: timeGlow 1.6s ease-in-out infinite alternate; }
+.time-next b { color: #ffd54f; }
+.time-next span { display: block; font-size: 13px; color: #e1d5ff; margin-top: 2px; }
+.time-next.hidden { display: none; }
+#again-btn.time-again { color: #2b1400; background: linear-gradient(100deg, #ffd54f, #ffb300 35%, #ff7ac6 70%, #b388ff); background-size: 200% 100%; animation: timeShine 2.2s linear infinite; box-shadow: 0 0 22px rgba(255, 193, 7, .6), 0 4px 0 #8a5a00; font-weight: bold; }
+#again-btn.time-again small { display: block; font-size: 12px; opacity: .85; }
+@keyframes timeShine { from { background-position: 0 0; } to { background-position: 200% 0; } }
+@keyframes timeGlow { from { box-shadow: 0 0 10px rgba(255, 213, 79, .3); } to { box-shadow: 0 0 24px rgba(255, 213, 79, .7); } }

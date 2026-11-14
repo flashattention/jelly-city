@@ -64,7 +64,8 @@ export class DreamRooms {
       case 'list': return this.send(c, { t: 'rooms', rooms: this.list() });
       case 'create': {
         this.leave(c);
-        const r = { id: this.newCode(), name: clean(m.name, 20) || `${c.name}의 꿈`, players: [], host: c, state: 'wait', seed: 0, startAt: 0, mode: m.mode === 'item' ? 'item' : 'speed', diff: diffOf(m.diff), map: m.map === 'hell' || m.map === 'void' || m.map === 'seoul' ? m.map : 'dream', team: false };
+        const r = { id: this.newCode(), name: clean(m.name, 20) || `${c.name}의 꿈`, players: [], host: c, state: 'wait', seed: 0, startAt: 0, mode: m.mode === 'item' ? 'item' : 'speed', diff: diffOf(m.diff), map: m.map === 'time' ? 'time' : m.map === 'hell' || m.map === 'void' || m.map === 'seoul' ? m.map : 'dream', team: false };
+        if (r.map === 'time') r.era = Math.max(0, Math.min(399, Number(m.era) | 0)); // 시간 여행: 방을 만든 사람의 시대부터
         this.rooms.set(r.id, r);
         return this.join(c, r);
       }
@@ -78,7 +79,7 @@ export class DreamRooms {
         // 기다리는 방 중 사람이 가장 많은 곳, 없으면 새 방
         const r = [...this.rooms.values()].filter((x) => x.state === 'wait' && x.players.length < MAX).sort((a, b) => b.players.length - a.players.length)[0];
         if (r) return this.join(c, r);
-        return this.handle(c, { t: 'create', name: '', mode: m.mode, diff: m.diff, map: m.map });
+        return this.handle(c, { t: 'create', name: '', mode: m.mode, diff: m.diff, map: m.map, era: m.era });
       }
       case 'leave': return this.leave(c, true);
       case 'chat': return this.chat(c, m);
@@ -89,7 +90,7 @@ export class DreamRooms {
         for (const p of r.players) { p.dead = false; p.st = null; p.result = null; }
         // 팀전: 한 팀이 비어 있으면 번갈아 나눈다
         if (r.team && r.players.length > 1 && new Set(r.players.map((p) => p.team)).size < 2) r.players.forEach((p, i) => { p.team = i % 2 ? 'blue' : 'red'; });
-        this.toRoom(r, { t: 'start', seed: r.seed, in: COUNTDOWN, members: this.members(r), mode: r.mode, diff: r.diff, map: r.map || 'dream', team: !!r.team, dur: TEAM_DUR });
+        this.toRoom(r, { t: 'start', seed: r.seed, in: COUNTDOWN, members: this.members(r), mode: r.mode, diff: r.diff, map: r.map || 'dream', era: r.era | 0, team: !!r.team, dur: TEAM_DUR });
         return this.broadcastList();
       }
       case 'st': {
@@ -137,7 +138,8 @@ export class DreamRooms {
       case 'map': {
         const r = c.room;
         if (!r || r.host !== c || r.state !== 'wait') return;
-        r.map = m.map === 'hell' || m.map === 'void' || m.map === 'seoul' ? m.map : 'dream';
+        r.map = m.map === 'hell' || m.map === 'void' || m.map === 'seoul' || m.map === 'time' ? m.map : 'dream';
+        if (r.map === 'time') r.era = Math.max(0, Math.min(399, Number(m.era) | 0));
         this.roomUpdate(r); this.broadcastList();
         return;
       }
@@ -243,7 +245,7 @@ export class DreamRooms {
       if (r.state !== 'run' && r.state !== 'pause') continue;
       this.toRoom(r, { t: 'maint' });
       const players = r.state === 'pause' ? [...r.players.map((p) => this.slotOf(p)), ...r.slots.values()] : r.players.map((p) => this.slotOf(p));
-      rooms.push({ id: r.id, name: r.name, mode: r.mode, diff: r.diff, map: r.map, team: r.team, seed: r.seed, elapsed: r.state === 'pause' ? r.elapsed : now - r.startAt, host: r.host?.tok, chat: r.chat || [], players });
+      rooms.push({ id: r.id, name: r.name, mode: r.mode, diff: r.diff, map: r.map, era: r.era | 0, team: r.team, seed: r.seed, elapsed: r.state === 'pause' ? r.elapsed : now - r.startAt, host: r.host?.tok, chat: r.chat || [], players });
     }
     if (!rooms.length || !this.dataDir) return 0;
     try { fs.writeFileSync(path.join(this.dataDir, PAUSE_FILE), JSON.stringify({ at: now, rooms })); } catch (e) { console.error('드림 러너 방 저장 실패', e.message); }
@@ -257,7 +259,7 @@ export class DreamRooms {
     if (!d?.rooms || Date.now() - d.at > PAUSE_MAX) return;
     for (const x of d.rooms) {
       if (this.rooms.has(x.id) || !Array.isArray(x.players)) continue;
-      const r = { id: x.id, name: x.name, players: [], host: null, hostTok: x.host, state: 'pause', seed: x.seed, startAt: 0, elapsed: x.elapsed, mode: x.mode, diff: diffOf(x.diff), map: x.map === 'hell' || x.map === 'void' ? x.map : 'dream', team: !!x.team, chat: x.chat || [], slots: new Map(), deadline: Date.now() + PAUSE_MAX, firstBack: 0 };
+      const r = { id: x.id, name: x.name, players: [], host: null, hostTok: x.host, state: 'pause', seed: x.seed, startAt: 0, elapsed: x.elapsed, mode: x.mode, diff: diffOf(x.diff), map: x.map === 'hell' || x.map === 'void' || x.map === 'time' ? x.map : 'dream', era: x.era | 0, team: !!x.team, chat: x.chat || [], slots: new Map(), deadline: Date.now() + PAUSE_MAX, firstBack: 0 };
       for (const p of x.players) { r.slots.set(p.tok, p); this.nextPid = Math.max(this.nextPid, p.id + 1); }
       this.rooms.set(r.id, r);
     }

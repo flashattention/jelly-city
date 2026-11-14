@@ -20,6 +20,9 @@ import { DIFFS, DIFF_KEYS, diffOf, vsHard } from './diff.js';
 import { HELLS } from './hells.js';
 import { VOIDS } from './voids.js';
 import { SEOULS } from './seouls.js';
+import { TIMES as ERAS, CHAPTERS } from './times.js';
+import { TimeWorld } from './time-world.js';
+import { makeTimeMover } from './time-cast.js';
 import { makeSeoulMover, seoulNight, seoulTick } from './seoul-movers.js';
 import { SeoulRun } from './seoul-run.js';
 import { openPatchNotes, showWhatsNew } from '../../shared/js/patchnotes.js';
@@ -31,8 +34,8 @@ import { setupMapWin } from './hangang-mapwin.js';
 
 const $ = (id) => document.getElementById(id);
 const MODE_KEY = 'dreamrunner.mode', DIFF_KEY = 'dreamrunner.diff', CAM_KEY = 'dreamrunner.cam', MAP_KEY = 'dreamrunner.map';
-const mapOf = (m) => (m === 'hell' || m === 'void' || m === 'seoul' ? m : 'dream'), mapName = (m) => (m === 'hell' ? '🔥 랜덤 지옥' : m === 'void' ? '🌌 랜덤 이공간' : m === 'seoul' ? '🗺️ 서울' : '🌙 랜덤 꿈나라');
-const mapTag = (m) => (m === 'hell' ? '🔥 지옥 · ' : m === 'void' ? '🌌 이공간 · ' : m === 'seoul' ? '🗺️ 서울 · ' : ''); // 순위표 · 방 이름 앞에
+const mapOf = (m) => (m === 'hell' || m === 'void' || m === 'seoul' || m === 'time' ? m : 'dream'), mapName = (m) => (m === 'hell' ? '🔥 랜덤 지옥' : m === 'void' ? '🌌 랜덤 이공간' : m === 'seoul' ? '🗺️ 서울' : m === 'time' ? '⏳ 시간 여행' : '🌙 랜덤 꿈나라');
+const mapTag = (m) => (m === 'hell' ? '🔥 지옥 · ' : m === 'void' ? '🌌 이공간 · ' : m === 'seoul' ? '🗺️ 서울 · ' : m === 'time' ? '⏳ 시간 여행 · ' : ''); // 순위표 · 방 이름 앞에
 const CHAR_KEY = 'dreamrunner.char', NICK_KEY = 'dreamrunner.nick', ANON_KEY = 'dreamrunner.anon';
 // 비로그인: 이 브라우저의 임시 아이디 (순위표에서 내 기록을 찾는 데만 쓴다)
 function anonId() {
@@ -54,7 +57,12 @@ window.addEventListener('resize', resize); resize();
 const env = new Env(scene, renderer);
 const track = new Track(scene, env, (Math.random() * 2 ** 31) | 0);
 // 🗺️ 서울 맵: 길 위 차 · 버스 · 오토바이 · 자전거 · 행인 젤리 모양 (서버의 기록 다시 돌리기에선 모양 없이 판정만)
-track.makeMover = makeSeoulMover;
+track.makeMover = (kind, n) => makeTimeMover(kind, n) || makeSeoulMover(kind, n);
+// ⏳ 시간 여행: 평지 · 길 · 양옆 시대 풍경 (track 이 만든 길을 따라)
+const tworld = new TimeWorld(scene);
+// 시간 여행 이어 달리기: 마지막으로 쓰러진 시대 (다음 판은 거기서)
+const ERA_KEY = 'dr-time-era';
+const timeEra = () => { const e = Number(store.get(ERA_KEY)); return Number.isInteger(e) && e >= 0 && e < ERAS.length ? e : 0; };
 env.originRef = track;
 const runner = new Runner(scene, {});
 // 🗺️ 서울 맵 그리기 (6-7): 서울 산책 엔진으로 실제 서울을, 판정 자리 물체는 실제 길 위로 휘어서
@@ -89,7 +97,7 @@ const game = window.dream = {
   profile: { name: '꿈꾸는 곰돌이', color: '#8a5634' },
   titleT: 0, deadT: 0, submitted: null, sendT: 0, bumpT: 0,
 };
-game.runner = runner; game.seoulRun = seoulRun; game.track = track; game.env = env; game.scene = scene; game.renderer = renderer; window.__THEMES = THEMES; // 점검용 (콘솔에서 dream.runner 등)
+game.tworld = tworld; game.runner = runner; game.seoulRun = seoulRun; game.track = track; game.env = env; game.scene = scene; game.renderer = renderer; window.__THEMES = THEMES; // 점검용 (콘솔에서 dream.runner 등)
 
 // ---------- 입력 ----------
 const keys = new Set();
@@ -307,8 +315,18 @@ segSet('diff-pick', game.pickDiff);
 for (const b of $('diff-pick').children) b.onclick = () => { game.pickDiff = b.dataset.m; store.set(DIFF_KEY, game.pickDiff); segSet('diff-pick', game.pickDiff); };
 for (const b of $('room-diff').children) b.onclick = () => net.send({ t: 'diff', diff: b.dataset.m });
 game.pickMap = mapOf(store.get(MAP_KEY)); segSet('map-pick', game.pickMap);
-for (const b of $('map-pick').children) b.onclick = () => { game.pickMap = b.dataset.m; store.set(MAP_KEY, game.pickMap); segSet('map-pick', game.pickMap); game.titleT = 6; };
-for (const b of $('room-map').children) b.onclick = () => net.send({ t: 'map', map: b.dataset.m });
+for (const b of $('map-pick').children) b.onclick = () => { game.pickMap = b.dataset.m; store.set(MAP_KEY, game.pickMap); segSet('map-pick', game.pickMap); game.titleT = 6; renderTimeResume(); };
+// ⏳ 시간 여행: 어느 시대부터 출발하는지 + 빅뱅부터 다시
+function renderTimeResume() {
+  const el = $('time-resume'), e = timeEra(), th = ERAS[e];
+  el.classList.toggle('hidden', game.pickMap !== 'time');
+  el.innerHTML = e > 0 ? `<span>⏳ <b>${th.emoji} ${th.name}</b> <small>(시대 #${e + 1} · ${th.when})</small>부터 출발</span><button id="time-reset" type="button">⏮ 빅뱅부터</button>` : `<span>⏳ <b>💥 빅뱅</b>부터 출발 · 쓰러지면 다음 판은 그 시대부터 이어져요</span>`;
+  const b = $('time-reset'); if (b) b.onclick = () => { store.set(ERA_KEY, 0); renderTimeResume(); toast('💥 빅뱅부터 다시 출발해요'); };
+}
+renderTimeResume();
+// 다 만들기 전엔 개발용으로만 보인다 (?timedev 또는 localStorage dr-time-dev=1)
+if (!/[?&]timedev/.test(location.search) && store.get('dr-time-dev') !== '1') { for (const b of document.querySelectorAll('[data-m="time"]')) b.classList.add('hidden'); if (game.pickMap === 'time') { game.pickMap = 'dream'; segSet('map-pick', 'dream'); renderTimeResume(); } }
+for (const b of $('room-map').children) b.onclick = () => net.send({ t: 'map', map: b.dataset.m, era: timeEra() });
 for (const b of $('board-map').children) b.onclick = async () => { game.boardMap = b.dataset.m; segSet('board-map', game.boardMap); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
 for (const b of $('board-diff').children) b.onclick = async () => { game.boardDiff = b.dataset.m; segSet('board-diff', game.boardDiff); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
 for (const b of $('room-team').children) b.onclick = () => net.send({ t: 'team', on: b.dataset.t === '1' });
@@ -383,7 +401,7 @@ function renderBoard(el, d, hl) {
 }
 
 // ---------- 시작 · 끝 ----------
-function newRun(seed, itemMode = false, diff = 'hard', map = 'dream') {
+function newRun(seed, itemMode = false, diff = 'hard', map = 'dream', era = null) {
   game.itemMode = itemMode; game.map = mapOf(map);
   game.diff = diffOf(diff); runner.speedK = DIFFS[game.diff].k;
   game.seed = seed;
@@ -393,13 +411,15 @@ function newRun(seed, itemMode = false, diff = 'hard', map = 'dream') {
   // 지옥 길은 난이도의 실제 빠르기(가속 포함)에 맞춰 만든다 · 빠를수록 멀리 보이게
   const K = DIFFS[game.diff].k * (1 + BOOST);
   env.fogK = game.map === 'hell' || game.map === 'void' ? Math.max(1, (K / 1.9) ** 0.7) : 1;
-  track.reset(seed, itemMode, { map: game.map, K });
+  game.era0 = game.map === 'time' ? (era ?? timeEra()) : 0;
+  track.reset(seed, itemMode, { map: game.map, K, era: game.era0 });
+  if (game.map === 'time') tworld.start(track); else if (tworld.track) tworld.stop();
   // 서울 맵: 서울 산책 엔진을 준비하고 첫 코스 칸부터 만든다 (다른 맵이면 만들어 둔 칸을 내린다)
   if (game.map === 'seoul') { seoulWaitT = 0; seoulRun.init().then(() => { if (track.seoul && track.seed === seed) seoulRun.start(track); }).catch((e) => console.warn('서울 지도 없이', e)); }
   else if (seoulRun.hw?.chunks?.size) seoulRun.dispose();
   game.camFall = 0; game.camG = null; game.rec = null; game.shake = 0; env.underY = undefined; game.underY = -13;
   game.rp = !itemMode && !game.multi ? { dts: [], evs: [], last: -1 } : null; game.dtCarry = 0;
-  game.tkP = game.mode === 'title' && !game.starting ? null : getTicket(seed, itemMode, game.diff, game.map);
+  game.tkP = game.mode === 'title' && !game.starting ? null : getTicket(seed, itemMode, game.diff, game.map, game.era0);
   runner.reset(0, 0);
   runner.multi = game.multi;
   renderItems(true);
@@ -414,7 +434,7 @@ function newRun(seed, itemMode = false, diff = 'hard', map = 'dream') {
   $('itembar').classList.toggle('hidden', !itemMode);
 }
 // 출발표: 기다리지 않고 뒤에서 받아 둔다. 못 받아도 게임은 그대로 할 수 있다
-function getTicket(seed, itemMode, diff, map) { return account.api('/api/dream/run', { method: 'POST', body: { seed, diff, map, mode: itemMode ? 'item' : 'speed' } }).then((r) => { game.tk = r.tk; return r.tk; }).catch(() => null); }
+function getTicket(seed, itemMode, diff, map, era = 0) { return account.api('/api/dream/run', { method: 'POST', body: { seed, diff, map, era, mode: itemMode ? 'item' : 'speed' } }).then((r) => { game.tk = r.tk; return r.tk; }).catch(() => null); }
 async function encodeReplay(R) {
   if (!R || !R.dts.length) return null;
   const text = `${R.dts.join(',')}|${R.evs.join(',')}`;
@@ -470,6 +490,8 @@ function score() { return Math.floor(runner.s) + runner.stars * 10; }
 async function died(why) {
   sfx(why.includes('떨어') ? 'die' : 'bonk');
   game.mode = 'dead'; game.deadT = 0; game.why = why;
+  // 시간 여행: 쓰러진 시대를 기억 (다음 판은 거기서 · 같이 달리기도 내 기록으로)
+  if (game.map === 'time') { game.diedEra = track.order[track.dreamAt(runner.s) % track.order.length]; store.set(ERA_KEY, game.diedEra); renderTimeResume(); }
   const rpNow = game.rp; game.rp = null;
   reportPlay();
   const rec = { dist: Math.floor(runner.s), stars: runner.stars, themes: game.dreamsSeen, time: game.runT, name: game.profile.name, color: game.profile.color, mode: game.itemMode ? 'item' : 'speed', diff: game.diff, map: game.map, seed: game.seed, multi: game.multi || undefined, ver: game.ver || undefined };
@@ -495,7 +517,7 @@ async function showOver() {
   $('ov-why').textContent = `💤 ${game.why || '꿈에서 깼어요'}`;
   const fin = game.rec || { dist: Math.floor(runner.s), stars: runner.stars }; // 쓰러진 순간의 기록 (쓰러지는 동안 조금 더 미끄러진 거리는 넣지 않는다 · 순위표와 같은 값)
   $('ov-score').textContent = (fin.dist + fin.stars * 10).toLocaleString();
-  $('ov-detail').textContent = `${fin.dist.toLocaleString()}m 달림 · 별사탕 ${fin.stars}개 (⭐ +${starsEarned(fin.stars, game.diff, game.map).toLocaleString()}) · ${game.map === 'hell' ? '지옥' : game.map === 'void' ? '이공간' : game.map === 'seoul' ? '서울 코스' : '꿈'} ${game.dreamsSeen}개를 지났어요 · ${Math.floor(game.runT)}초`;
+  $('ov-detail').textContent = `${fin.dist.toLocaleString()}m 달림 · 별사탕 ${fin.stars}개 (⭐ +${starsEarned(fin.stars, game.diff, game.map).toLocaleString()}) · ${game.map === 'hell' ? '지옥' : game.map === 'void' ? '이공간' : game.map === 'seoul' ? '서울 코스' : game.map === 'time' ? '시대' : '꿈'} ${game.dreamsSeen}개를 지났어요 · ${Math.floor(game.runT)}초`;
   const r = game.submitted;
   $('ov-save').classList.toggle('hidden', !r?.anonPending);
   if (r?.anonPending) { $('ov-nick').value = store.get(NICK_KEY) || game.profile.name; $('ov-save-btn').disabled = false; }
@@ -503,6 +525,8 @@ async function showOver() {
   if (r?.anonPending) $('ov-best').textContent = '';
   if (r?.newBest) sfx('best');
   $('again-btn').textContent = game.multi ? '👥 방으로 돌아가기' : '🔁 다시 달리기';
+  // 시간 여행: 다시하면 다음 역사를 이어서 (1-5)
+  { const tm = game.map === 'time' && !game.multi, nx = ERAS[timeEra()]; $('again-btn').classList.toggle('time-again', tm); $('time-next').classList.toggle('hidden', !tm); if (tm) { $('again-btn').innerHTML = `⏳ 이어서 시간 여행 <small>${nx.emoji} ${nx.name}부터</small>`; $('time-next').innerHTML = `✨ 다시하면 <b>다음 역사</b>를 이어서 체험할 수 있어요! <span>${nx.emoji} ${nx.name} · ${nx.when}</span>`; } }
   $('ov-board-title').classList.remove('hidden'); $('ov-board').classList.remove('hidden');
   $('ov-board-title').textContent = `🏆 ${mapTag(game.map)}${diffName(game.diff)} · ${modeName(game.itemMode ? 'item' : 'speed')} 최고 기록`;
   renderBoard($('ov-board'), r?.top ? r : await loadBoard(game.itemMode ? 'item' : 'speed', game.diff, game.map), true);
@@ -541,13 +565,16 @@ function showDreamCard(d) {
   const th = track.themeOf(d);
   const el = $('dream-card');
   el.classList.add('hidden'); void el.offsetWidth;
-  el.querySelector('.dc-n').textContent = `${th.hell ? 'HELL' : th.void ? 'VOID' : th.seoul ? 'SEOUL' : 'DREAM'} ${d + 1}`;
+  const eraN = th.time ? ERAS.indexOf(th) + 1 : 0;
+  el.querySelector('.dc-n').textContent = th.time ? `⏳ ${th.when}` : `${th.hell ? 'HELL' : th.void ? 'VOID' : th.seoul ? 'SEOUL' : 'DREAM'} ${d + 1}`;
   // 서울 코스: 실제 길 (어디 → 어디 · km · 낮/노을/밤)
   el.querySelector('.dc-tip').textContent = th.course ? `${th.course.from} → ${th.course.to} · ${th.course.km}km · ${th.course.time}` : th.tip || '';
   el.querySelector('.dc-e').textContent = th.emoji;
   el.querySelector('.dc-name').textContent = th.name;
   el.classList.remove('hidden');
-  $('h-dream-n').textContent = `${th.hell ? '지옥' : th.void ? '이공간' : th.seoul ? '코스' : '꿈'} #${d + 1}`;
+  $('h-dream-n').textContent = th.time ? `시대 #${eraN}` : `${th.hell ? '지옥' : th.void ? '이공간' : th.seoul ? '코스' : '꿈'} #${d + 1}`;
+  // 장이 바뀌면 (또는 첫 시대) 장 띠
+  el.classList.toggle('time', !!th.time); el.querySelector('.dc-ch').textContent = th.time && (d === 0 || track.themeOf(d - 1).ch !== th.ch) ? `제${th.ch}장 · ${CHAPTERS[th.ch]}` : '';
   $('h-dream-name').textContent = `${th.emoji} ${th.name}`;
 }
 function enterDream(d) {
@@ -699,7 +726,7 @@ net.on('start', (m) => {
   game.team = !!m.team; game.tk = null; game.starting = true;
   game.myTeam = m.members.find((x) => x.id === game.myId)?.team;
   game.endAt = performance.now() + m.in + (m.dur || 180) * 1000; game.respawnT = 0;
-  newRun(m.seed, m.mode === 'item', m.diff, m.map); game.starting = false;
+  newRun(m.seed, m.mode === 'item', m.diff, m.map, m.era | 0); game.starting = false;
   for (const mem of m.members) if (mem.id !== game.myId) { const g = new Ghost(scene, game.team ? { ...mem, teamColor: TEAMS[mem.team]?.color } : mem); g.speedK = runner.speedK; game.ghosts.set(mem.id, g); }
   $('teambar').classList.toggle('hidden', !game.team);
   game.alive = m.members.length;
@@ -761,8 +788,8 @@ net.on('finish', (m) => {
   const show2 = () => { showOver().then(() => { $('ov-room').classList.remove('hidden'); $('ov-room').innerHTML = '<h3>🏁 이번 판 순위</h3>' + m.rank.map((e) => `<div class="brow${e.id === game.myId ? ' me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="dot" style="background:${esc(e.color)}"></span>${esc(e.name)}</span><span class="sc">${e.dist.toLocaleString()}m<small>⭐${e.stars}</small></span></div>`).join(''); renderRoom(m.rank); }); };
   if (game.mode === 'dead' && game.deadT < 1.4) setTimeout(show2, (1.4 - game.deadT) * 1000); else show2();
 });
-$('quick-btn').onclick = () => net.send({ t: 'quick', mode: game.pickMode, diff: game.pickDiff, map: game.pickMap });
-$('create-btn').onclick = () => net.send({ t: 'create', name: $('room-name').value, mode: game.pickMode, diff: game.pickDiff, map: game.pickMap });
+$('quick-btn').onclick = () => net.send({ t: 'quick', mode: game.pickMode, diff: game.pickDiff, map: game.pickMap, era: timeEra() });
+$('create-btn').onclick = () => net.send({ t: 'create', name: $('room-name').value, mode: game.pickMode, diff: game.pickDiff, map: game.pickMap, era: timeEra() });
 $('lobby-back').onclick = () => { game.multi = false; show('title'); };
 $('leave-btn').onclick = () => { net.send({ t: 'leave' }); game.room = null; $('ov-room').classList.add('hidden'); afterLeave(); };
 // 방에서 나온 뒤: 로그인했으면 방 목록, 아니면 처음 화면
@@ -828,7 +855,7 @@ function frame() {
   if (game.mode === 'title') {
     // 처음 화면: 출발 발판에서 제자리 달리기 + 꿈이 6초마다 바뀌며 빙글 도는 카메라
     game.titleT += dt;
-    if (game.titleT > 6) { game.titleT = 0; const pool = game.pickMap === 'hell' ? HELLS : game.pickMap === 'void' ? VOIDS : game.pickMap === 'seoul' ? SEOULS : THEMES, th = pool[Math.floor(Math.random() * pool.length)]; env.setTheme(th); }
+    if (game.titleT > 6) { game.titleT = 0; const pool = game.pickMap === 'hell' ? HELLS : game.pickMap === 'void' ? VOIDS : game.pickMap === 'seoul' ? SEOULS : game.pickMap === 'time' ? ERAS : THEMES, th = pool[Math.floor(Math.random() * pool.length)]; env.setTheme(th); }
     runner.bear.root.position.set(0, 0, z); runner.bear.root.rotation.y = Math.PI;
     runner.bear.update(dt, 8, { noCrawl: true });
     const a = t * 0.18;
@@ -888,6 +915,7 @@ function frame() {
   input.jump = input.slide = input.shove = input.item = false;
   const sOn = seoulOn(); if (sOn !== seoulWas) { seoulWas = sOn; seoulSwap(sOn); }
   if (sOn) { seoulFrame(dt); return; }
+  if (tworld.track) tworld.update(dt, game.mode === 'title' ? t : game.runT, runner.s);
   env.update(dt, t, camera, runner.s, runner.x, runner.y);
   renderer.render(scene, camera);
 }

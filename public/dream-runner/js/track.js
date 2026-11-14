@@ -7,6 +7,7 @@ import { RNG } from '../../shared/js/utils.js';
 import { THEMES } from './themes.js';
 import { HELLS } from './hells.js';
 import { VOIDS } from './voids.js';
+import { TIMES, TIME_W, timeCast, castHit } from './times.js';
 import { SEOULS, seoulAt, SEOUL_U0, seoulCourseOf, seoulLaneW, seoulSpan, ROUTES } from './seouls.js';
 import { glow, starG } from './kits.js';
 import { buildMonster, buildFist } from './hellkits.js';
@@ -109,7 +110,7 @@ export class Track {
   }
   // opt.map: 'hell' 이면 랜덤 지옥 · 'void' 면 랜덤 이공간 · opt.K: 난이도 빠르기 (지옥 · 이공간 길은 시간 기준이라 빠를수록 길어진다)
   reset(seed, itemMode = false, opt = {}) {
-    this.itemMode = itemMode; this.hell = opt.map === 'hell'; this.void = opt.map === 'void'; this.seoul = opt.map === 'seoul'; this.xLim = null; this.movers = []; this.decos = []; this.gateN = 0; this.K = opt.K || 1; this.time = 0; this.meteors = []; this.strikes = []; this.nextStrike = 0; this.lastFloor = 0; this.trend = 0; this.lastPat = '';
+    this.itemMode = itemMode; this.hell = opt.map === 'hell'; this.void = opt.map === 'void'; this.seoul = opt.map === 'seoul'; this.tmap = opt.map === 'time'; this.xLim = null; this.movers = []; this.decos = []; this.gateN = 0; this.K = opt.K || 1; this.time = 0; this.meteors = []; this.strikes = []; this.nextStrike = 0; this.lastFloor = 0; this.trend = 0; this.lastPat = '';
     this.irng = new RNG(seed ^ 0x2545f491); // 아이템 상자 자리 (길 모양과 따로라서 스피드전 길이 바뀌지 않는다)
     this.nextBox = 120;
     for (const c of [...this.root.children]) this.drop(c);
@@ -121,6 +122,8 @@ export class Track {
     if (this.void) this.order = new RNG(seed ^ 0x6a09e667).shuffle([...VOIDS.keys()]);
     // 서울 코스 순서: 20곳을 섞어서 차례로
     if (this.seoul) { this.order = new RNG(seed ^ 0x1f83d9ab).shuffle([...SEOULS.keys()]); this.xLim = seoulLaneW(this.order[0]) / 2 - 0.2; }
+    // ⏳ 시간 여행: 섞지 않는다. 시작 시대(opt.era)부터 차례로 (마지막 다음은 다시 빅뱅)
+    if (this.tmap) { const e0 = Math.max(0, Math.min(TIMES.length - 1, opt.era | 0)); this.era0 = e0; this.order = TIMES.map((_, i) => (e0 + i) % TIMES.length); this.xLim = TIME_W / 2 - 0.2; }
     if (this.hell) { const q = new RNG(seed ^ 0x3c6ef372), keys = (l) => q.shuffle([...HELLS.keys()].filter((i) => HELLS[i].layout === l)), a = keys('climb'), b = keys('plunge'); this.order = []; for (let i = 0; i < Math.max(a.length, b.length); i++) this.order.push(a[i % a.length], b[i % b.length]); }
     this.plats = []; this.obs = []; this.stars = []; this.portals = []; this.boxes = []; this.traps = [];
     this.origin = 0;
@@ -134,7 +137,7 @@ export class Track {
     this.gs = 70;
     this.generate(0);
   }
-  themeOf(dream) { if (this.seoul) return seoulAt(this.order[dream % this.order.length], this.seoulFlip ?? Math.floor(dream / 2) % 2 === 1); return this.hell || this.void ? (this.void ? VOIDS : HELLS)[this.order[dream % this.order.length]] : THEMES[this.order[dream % THEMES.length]]; }
+  themeOf(dream) { if (this.tmap) return TIMES[this.order[dream % this.order.length]]; if (this.seoul) return seoulAt(this.order[dream % this.order.length], this.seoulFlip ?? Math.floor(dream / 2) % 2 === 1); return this.hell || this.void ? (this.void ? VOIDS : HELLS)[this.order[dream % this.order.length]] : THEMES[this.order[dream % THEMES.length]]; }
   // 이 아래로 떨어지면 탈락 (지옥은 높이가 계속 바뀌니 눈앞 발판을 기준으로)
   deathY(s) {
     if (this.void) return -9; // 이공간: 한 번 떨어지면 금방 끝
@@ -153,7 +156,7 @@ export class Track {
     const th = this.themeOf(this.dream);
     const len = s1 - s0, thick = opts.th ?? (th.style === 'cloud' ? 1.6 : 2.4);
     // 서울 맵: 발판은 판정만 (보이는 길은 실제 서울 찻길 · 보도, seoul-run.js)
-    if (this.seoul) { const m = new THREE.Object3D(); m.position.set(x, y, this.z((s0 + s1) / 2)); m.userData.s = (s0 + s1) / 2; this.root.add(m); const p = { s0, s1, x, cx: x, w, y, th: thick, mesh: m, mv: null, dx: 0, dream: this.dream }; this.plats.push(p); return p; }
+    if (this.seoul || this.tmap) { const m = new THREE.Object3D(); m.position.set(x, y, this.z((s0 + s1) / 2)); m.userData.s = (s0 + s1) / 2; this.root.add(m); const p = { s0, s1, x, cx: x, w, y, th: thick, mesh: m, mv: null, dx: 0, dream: this.dream }; this.plats.push(p); return p; }
     const m = new THREE.Mesh(platGeo(w, thick, len), platMats(th));
     m.position.set(x, y - thick / 2, this.z((s0 + s1) / 2));
     m.userData.s = (s0 + s1) / 2;
@@ -239,7 +242,7 @@ export class Track {
     const ahead = this.hell || this.void ? Math.max(AHEAD, speedAt(playerS) * this.K * 2.4) : AHEAD; // 내리치기 예고가 보일 만큼 앞을 만든다
     while (this.gs < playerS + ahead) {
       if (this.gs >= this.nextB) { this.newDream(); continue; }
-      if (this.hell) this.hellPattern(); else if (this.void) this.voidPattern(); else if (this.seoul) this.seoulPattern(); else this.pattern();
+      if (this.hell) this.hellPattern(); else if (this.void) this.voidPattern(); else if (this.seoul) this.seoulPattern(); else if (this.tmap) this.timePattern(); else this.pattern();
     }
     // 지나간 것 치우기
     const cut = playerS - BEHIND;
@@ -259,15 +262,15 @@ export class Track {
   // 꿈이 바뀌는 곳: 넓은 발판 + 빛나는 문
   newDream() {
     const v = speedAt(this.gs) * (this.hell || this.void ? this.K : 1);
-    const gap = this.gs > 0 && !this.seoul ? v * 0.22 : 0;
+    const gap = this.gs > 0 && !this.seoul && !this.tmap ? v * 0.22 : 0;
     const s0 = this.gs + gap;
     this.dream++;
     this.bounds.push(s0 + 14); this.trend = 0;
     this.nextB = s0 + 14 + (this.seoul ? seoulSpan(seoulCourseOf(this, this.dream), v) : DREAM_SEC * v);
     this.cx *= 0.5; if (this.void) this.cy = 0;
     const len = this.hell || this.void ? Math.max(34, v * 0.8) : 34; // 빠른 난이도의 지옥은 숨 돌릴 자리도 같은 시간만큼
-    this.plat(s0, s0 + len, this.cx, 10, this.cy);
-    if (this.seoul) this.seoulGate(s0 + 12, this.cx, this.cy, 10); else this.portal(s0 + 14, this.cx, this.cy, 10);
+    this.plat(s0, s0 + len, this.cx, this.tmap ? TIME_W : 10, this.cy);
+    if (this.seoul) this.seoulGate(s0 + 12, this.cx, this.cy, 10); else if (this.tmap) this.timeGate(s0 + 12, 0, 0, TIME_W); else this.portal(s0 + 14, this.cx, this.cy, 10);
     this.starLine(s0 + 20, s0 + 32, this.cx, this.cy, 5);
     this.gs = s0 + len;
   }
@@ -771,7 +774,7 @@ export class Track {
     const g = this.makeMover?.(kind, o.n ?? 0) || new THREE.Group();
     this.root.add(g); g.userData.s = o.sEnd ?? o.s ?? 0;
     // sEnd: 치우는 기준 (판정이 잠깐 꺼진 동안 s1 = -1e9 라서 그걸로 치우면 앞에 있는 차 · 행인이 화면 · 판정에서 사라졌다 · 6-10)
-    const ob = { kind: o.hitKind || 'mover', s0: -1e9, s1: -1e9, x0: 1e9, x1: 1e9, y0: o.y, y1: o.y + o.h, mesh: g, seoul: kind, sEnd: o.type === 'on' ? Infinity : (o.sEnd ?? o.s ?? 0) + 2 };
+    const ob = { kind: o.hitKind || 'mover', s0: -1e9, s1: -1e9, x0: 1e9, x1: 1e9, y0: o.y, y1: o.y + o.h, mesh: g, seoul: kind, hit: o.hit, sEnd: o.type === 'on' ? Infinity : (o.sEnd ?? o.s ?? 0) + 2 };
     this.obs.push(ob);
     const mv = { kind, ob, g, ...o }; this.movers.push(mv); this.placeMover(mv, this.time || 0); return mv;
   }
@@ -912,6 +915,85 @@ export class Track {
     const o = { kind: kind === 'banner' ? 'bar' : kind === 'barrier' ? 'wall' : 'hurdle', s0: sAt - depth / 2, s1: sAt + depth / 2, x0, x1, y0, y1, mesh: g, seoul: kind }; this.obs.push(o); return o;
   }
 
+  // ---------- ⏳ 시간 여행 (시간여행 작업지시서 1-2) ----------
+  //   평지 한 줄(폭 9m · 레인 3개). 지나가는 것 · 장애물은 서울 맵과 같은 판정 크기, 모양만 그 시대 배역 (times.js cast)
+  //   빽빽함은 늘 같다 (어느 시대에서 시작하든 공평): 서울처럼 거리로 점점 어려워지지 않고, 빠르기만 판 거리로 오른다
+  timePattern() {
+    const r = this.rng, s = this.gs, v = speedAt(s), W = TIME_W, th = this.themeOf(this.dream);
+    this.cx = 0; this.cy = 0;
+    let at = s;
+    const flat = (len) => { const p = this.plat(at, at + len, 0, W, 0); at += len; return p; };
+    const L = [-W / 3, 0, W / 3];
+    // 시대가 바뀐 뒤 3초는 별만 (문을 지나자마자 부딪히지 않게)
+    const safeEnd = this.bounds[this.dream] + v * 3 + 12;
+    if (s < safeEnd) { const p = flat(Math.max(12, safeEnd - s)); this.starLine(p.s0 + 4, p.s1 - 4, r.pick(L), 0, 5); this.gs = at; return; }
+    const SZ = { cross: [0.6, 0.6, 1.25], on: [1.86, 4.8, 1.45], big: [2.5, 9, 3.0], weave: [0.75, 2.0, 1.4] };
+    const oncoming = (p, role, lane, speed, ph, extra = {}) => { const kind = timeCast(th, role, r), [wx, ls, h] = SZ[role]; return this.mover(kind, { type: 'on', x: lane, y: 0, h, lx: wx, ls, sNear: p.s0 - 12, sFar: p.s1 + 70, sEnd: p.s1, v: speed, rest: r.range(0.6, 2.0), ph, n: r.int(0, 1e6), hit: castHit(kind), ...extra }); };
+    const cross = (sAt, dir, speed, ph, rest) => { const kind = timeCast(th, 'cross', r), [wx, ls, h] = SZ.cross; return this.mover(kind, { type: 'cross', s: sAt, sEnd: sAt + 4, y: 0, h, lx: ls, ls: wx, xL: -W / 2 - 11, xR: W / 2 + 11, dir, v: speed, rest, ph, n: r.int(0, 1e6), hit: castHit(kind) }); };
+    const len = Math.max(26, r.range(32, 46) * (1 + v / 40));
+    const pick = r.weighted([['march', 3], ['crowd', 2.6], ['charge', 1.5], ['weave', 1.3], ['block', 2.4], ['mixed', 1.8]], (x) => x[1])[0];
+    const p = flat(len);
+    switch (pick) {
+      case 'march': { const n = r.int(2, 3); for (let i = 0; i < n; i++) oncoming(p, 'on', L[(i + r.int(0, 2)) % 3], r.range(7, 10), r.next(), { rest: r.range(0.3, 1.2) }); this.starLine(p.s0 + 6, p.s1 - 6, r.pick(L), 0, r.int(3, 6)); break; }
+      case 'crowd': { const n = r.int(3, 4); for (let i = 0; i < n; i++) cross(p.s0 + len * r.range(0.3, 0.9), r.chance(0.5) ? 1 : -1, r.range(1.4, 2.3), r.next(), r.range(0.2, 1.2)); this.starLine(p.s0 + 3, p.s0 + len * 0.28, r.pick(L), 0, 3); break; }
+      case 'charge': { const li = r.int(0, 2); oncoming(p, 'big', L[li], r.range(6, 8), r.next()); oncoming(p, 'on', L[(li + r.int(1, 2)) % 3], r.range(7, 10), r.next()); this.starLine(p.s0 + 4, p.s1 - 4, L[(li + 1) % 3], 0, 4); break; }
+      case 'weave': { const n = r.int(3, 4); for (let i = 0; i < n; i++) oncoming(p, 'weave', L[i % 3], r.range(9, 13), r.next(), { weave: r.range(0.6, 1.4), rest: r.range(0.3, 1) }); break; }
+      case 'block': {
+        // 서 있는 것: 옆으로 피할 벽 · 뛰어넘을 줄 · 숙여 지날 가로대 중 1 ~ 3개, 순서 · 간격을 섞어서
+        const at2 = p.s0 + len * r.range(0.25, 0.45), side = r.chance(0.5) ? 1 : -1, half = W * r.range(0.45, 0.6);
+        const x0 = side > 0 ? W / 2 - half : -W / 2, x1 = x0 + half;
+        const kinds = r.shuffle(['wall', 'hurdle', 'bar']).slice(0, r.weighted([[1, 2], [2, 2], [3, 1]], (x) => x[1])[0]);
+        let sAt = at2;
+        for (const k of kinds) {
+          if (sAt > p.s1 - 2) break;
+          if (k === 'wall') this.timeStatic('wall', th, sAt, x0, x1, 0, 1.4, 1.4);
+          else if (k === 'hurdle') this.timeStatic('hurdle', th, sAt, -W / 2, W / 2, 0, 0.6, 0.6);
+          else this.timeStatic('bar', th, sAt, -W / 2, W / 2, 1.0, 2.2, 0.5);
+          sAt += v * r.range(0.75, 1.3);
+        }
+        this.starLine(p.s0 + 2, at2 - 2, side > 0 ? x0 - 1 : x1 + 1, 0, 4); break;
+      }
+      case 'mixed': {
+        const sAt = p.s0 + len * r.range(0.55, 0.7), k = r.pick(['hurdle', 'bar']);
+        if (k === 'hurdle') this.timeStatic('hurdle', th, sAt, -W / 2, W / 2, 0, 0.6, 0.6); else this.timeStatic('bar', th, sAt, -W / 2, W / 2, 1.0, 2.2, 0.5);
+        for (let i = 0; i < 2; i++) cross(p.s0 + len * r.range(0.15, 0.4), i ? 1 : -1, r.range(1.4, 2.2), r.next(), r.range(0.3, 1.2));
+        this.starLine(sAt + 3, p.s1 - 3, r.pick(L), 0, 3); break;
+      }
+    }
+    this.gs = at;
+  }
+  // 서 있는 장애물 (시대 모양): 판정은 기존 wall · hurdle · bar 그대로
+  timeStatic(role, th, sAt, x0, x1, y0, y1, depth) {
+    const kind = timeCast(th, role, this.rng), okind = role;
+    if (!this.makeMover) { const o = this.obstacle(okind, sAt, x0, x1, y0, y1, depth); o.seoul = kind; o.hit = castHit(kind); return o; }
+    const g = this.makeMover(kind, Math.round((x1 - x0) * 100)) || new THREE.Group(); g.userData.w = x1 - x0;
+    g.position.set((x0 + x1) / 2, y0, this.z(sAt)); g.userData.s = sAt; g.userData.fit?.(g, x1 - x0, y1 - y0); this.root.add(g);
+    const o = { kind: okind, s0: sAt - depth / 2, s1: sAt + depth / 2, x0, x1, y0, y1, mesh: g, seoul: kind, hit: castHit(kind) }; this.obs.push(o); return o;
+  }
+  // 시대가 바뀌는 곳: 시간의 문 (빛 고리 + 시계 눈금 + 도는 바늘 + 안쪽 소용돌이). 세 가지 모양을 번갈아
+  timeGate(s, x, y, w) {
+    const th = this.themeOf(this.dream), kind = this.gateN++ % 3, g = new THREE.Group(), R = w / 2 + 1.8, cy = R * 0.82;
+    const gold = glow('#ffd54f'), col = glow(th.P?.a || '#b388ff'), white = glow('#ffffff');
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(R, 0.34, 10, 64), gold); ring.position.y = cy; g.add(ring);
+    const ring2 = new THREE.Mesh(new THREE.TorusGeometry(R - 0.7, 0.12, 6, 64), col); ring2.position.y = cy; g.add(ring2);
+    // 눈금 12개 (3 · 6 · 9 · 12 는 크게)
+    for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2, big = i % 3 === 0, m = new THREE.Mesh(G_BOX, big ? white : gold); m.scale.set(big ? 0.34 : 0.18, big ? 0.9 : 0.5, 0.2); m.position.set(Math.sin(a) * (R - 0.25), cy + Math.cos(a) * (R - 0.25), 0); m.rotation.z = -a; g.add(m); }
+    // 안쪽 소용돌이: 얇은 고리 여러 겹이 서로 반대로 돈다 (투명)
+    const swirl = []; for (let i = 0; i < 5; i++) { const m = new THREE.Mesh(new THREE.TorusGeometry(R * (0.25 + i * 0.13), 0.05 + i * 0.01, 4, 40, Math.PI * 1.3), glow(i % 2 ? '#ffffff' : th.P?.a || '#b388ff', 0.75)); m.position.y = cy; g.add(m); swirl.push(m); }
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(R - 0.4, 48), new THREE.MeshBasicMaterial({ color: th.sky[1], transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false })); disc.position.y = cy; g.add(disc);
+    // 바늘 둘
+    const hands = [[0.22, R * 0.62], [0.14, R * 0.85]].map(([wd, ln]) => { const h = new THREE.Group(); h.position.set(0, cy, 0.25); const m = new THREE.Mesh(G_BOX, white); m.scale.set(wd, ln, 0.08); m.position.y = ln / 2; h.add(m); g.add(h); return h; });
+    // 기둥 · 받침 (땅에 선 문)
+    for (const sx of [-1, 1]) { const p = new THREE.Mesh(G_BOX, gold); p.scale.set(0.5, cy, 0.5); p.position.set(sx * (R + 0.1), cy / 2, 0); g.add(p); const b = new THREE.Mesh(G_BOX, col); b.scale.set(1.2, 0.4, 1.2); b.position.set(sx * (R + 0.1), 0.2, 0); g.add(b); }
+    // 모래시계 문: 꼭대기에 모래시계 · 톱니 문: 둘레에 톱니 · 별 문: 둘레에 별빛
+    if (kind === 0) { const hg = new THREE.Group(); hg.position.set(0, cy + R + 1.1, 0); for (const sy of [-1, 1]) { const k = new THREE.Mesh(new THREE.ConeGeometry(0.55, 0.9, 12), glow('#fff3c4', 0.9)); k.position.y = sy * 0.45; k.rotation.x = sy > 0 ? 0 : Math.PI; hg.add(k); const cap = new THREE.Mesh(G_BOX, gold); cap.scale.set(1.3, 0.14, 1.3); cap.position.y = sy * 0.95; hg.add(cap); } g.add(hg); swirl.push(hg); }
+    else if (kind === 1) { for (let i = 0; i < 24; i++) { const a = (i / 24) * Math.PI * 2, m = new THREE.Mesh(G_BOX, gold); m.scale.set(0.42, 0.42, 0.3); m.position.set(Math.sin(a) * (R + 0.45), cy + Math.cos(a) * (R + 0.45), 0); m.rotation.z = -a; g.add(m); } }
+    else { for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2, m = new THREE.Mesh(G_PUFF, white); m.scale.setScalar(0.16); m.position.set(Math.sin(a) * (R + 0.6), cy + Math.cos(a) * (R + 0.6), 0); g.add(m); } }
+    g.position.set(x, y, this.z(s)); g.userData.s = s;
+    g.userData.anim = (o, t) => { ring2.rotation.z = -t * 0.6; swirl.forEach((m, i) => { m.rotation.z = t * (i % 2 ? -1.4 : 1.1) * (1 + i * 0.2); }); hands[0].rotation.z = -t * 1.2; hands[1].rotation.z = -t * 7; disc.material.opacity = 0.24 + Math.sin(t * 3) * 0.08; };
+    this.root.add(g); this.portals.push({ s, mesh: g, dream: this.dream });
+  }
+
   // ---------- 판정 ----------
   // 움직이는 발판 위치 갱신 (모두 같은 시계 t 로 움직여서 모두에게 같은 자리)
   update(t, playerS, v = 0, dt = 0) {
@@ -926,6 +1008,7 @@ export class Track {
     STAR_HALO.opacity = 0.7 + 0.25 * Math.sin(t * 4); // 별 빛무리가 천천히 숨 쉰다
     for (const st of this.stars) if (!st.got) { st.mesh.rotation.y = t * 2.5 + st.s; }
     for (const po of this.portals) po.mesh.userData.anim(po.mesh, t);
+    if (this.tmap) this.updateMovers(t, playerS);
     if (this.seoul) { this.updateMovers(t, playerS); this.xLim = seoulLaneW(seoulCourseOf(this, this.dreamAt(playerS))) / 2 - 0.2; }
     for (const b of this.boxes) if (!b.got) { b.mesh.children[0].rotation.set(t * 1.3, t * 1.8, 0); b.mesh.position.y = b.y + Math.sin(t * 2.5 + b.s) * 0.15; }
     // 아주 멀리 달리면 숫자가 커져서 떨리지 않게 원점을 옮긴다

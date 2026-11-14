@@ -28,8 +28,9 @@ const DAILY_KEEP = 120;
 // 서울 명소 도장: 명소 id → 체험에 걸리는 최소 시간(초, 실제 시간). 시작(begin)을 알리고 이 시간이 지나야 도장(done)이 찍힌다
 const HG_STAMPS = { gbg: 30, cable: 40, lock: 3, cruise: 60, bike: 45, obs63: 20, lwt: 20, lotteworld: 30, market: 15, haneul: 25, naksan: 30, nodeul: 18, huwon: 20, museum: 20, ddp: 20, library: 15, botanic: 20, baseball: 30 };
 const HG_TTL = 10 * 3600e3, HG_MO = ['sunset', 'sunrise', 'night', 'rain', 'snow', 'spring', 'summer', 'autumn', 'winter']; // 한강 러닝: 한 번에 10시간까지 · 순간들 // 이 날수보다 오래된 하루 기록은 지운다
-const MAPS = ['dream', 'hell', 'void', 'seoul'], mapOf = (m) => (m === 'hell' || m === 'void' || m === 'seoul' ? m : 'dream'); // 꿈나라 · 지옥 · 이공간 · 서울
-const SEP = new Set(['hell', 'void', 'seoul']); // 난이도마다 따로 쓰는 맵 (꿈나라 노멀만 예전 표)
+const MAPS = ['dream', 'hell', 'void', 'seoul', 'time'], mapOf = (m) => (m === 'hell' || m === 'void' || m === 'seoul' || m === 'time' ? m : 'dream'); // 꿈나라 · 지옥 · 이공간 · 서울 · 시간 여행
+const SEP = new Set(['hell', 'void', 'seoul', 'time']);
+const eraOf = (e) => { const n = Number(e) | 0; return n >= 0 && n < 400 ? n : 0; }; // 시간 여행 시작 시대 (0 = 빅뱅) // 난이도마다 따로 쓰는 맵 (꿈나라 노멀만 예전 표)
 const clean = (s, n) => { const t = cleanName(s, n); return impersonates(t) ? '' : t; };
 
 // 5-2 입력 기록으로 본 사람 같지 않음: 누름 사이 간격의 변동계수가 2% 미만(30번 이상) · 50ms 안 연속 누름이 대부분
@@ -251,12 +252,15 @@ export class DreamBoard {
     const claim = Math.floor(Number(b.dist)) + Math.floor(Number(b.stars)) * STAR_PTS;
     if (claim <= oldScore) { this.vstat.skip++; return { ok: false, skip: true, why: 'notbest' }; } // 내 최고보다 낮으면 돌려 볼 필요가 없다
     const sum = rp.dts.reduce((a, v) => a + v, 0) / 10000;
-    if (tk && (tk.diff !== diff || tk.map !== map || sum > (now - tk.at) / 1000 + 5)) return { ok: false, why: 'time' }; // 기록된 시간이 실제로 지난 시간보다 길면 안 된다
+    if (tk && (tk.diff !== diff || tk.map !== map || sum > (now - tk.at) / 1000 + 5)) return { ok: false, why: 'time' };
+    // 시간 여행: 표에 적힌 시작 시대와 보낸 시대가 다르면 안 된다
+    const era = map === 'time' ? (tk ? eraOf(tk.era) : eraOf(b.era)) : 0;
+    if (map === 'time' && tk && eraOf(b.era) !== era) return { ok: false, why: 'era' }; // 기록된 시간이 실제로 지난 시간보다 길면 안 된다
     // 그 판을 달린 게임 코드로 다시 돌린다 (토스 미니앱은 검수 때문에 예전 판으로 돌 수 있다). 서버가 보관한 적 없는 판이면 확인할 수 없다
     const ver = VER_RE.test(String(b.ver || '')) ? String(b.ver) : DREAM_VER;
     if (ver !== DREAM_VER && !hasVer(ver)) { this.vstat.old = (this.vstat.old || 0) + 1; return { ok: false, why: 'oldver' }; }
     const seed = tk ? tk.seed : Number(b.seed) | 0;
-    const r = await this.pool.run({ seed, diff, map, dts: rp.dts, evs: rp.evs, ver });
+    const r = await this.pool.run({ seed, diff, map, era, dts: rp.dts, evs: rp.evs, ver });
     if (!r) return { ok: false, why: 'busy', soft: true };
     // 브라우저마다 소수점 끝자리가 조금 달라도 괜찮게 약간의 오차는 넘어간다
     const dOk = r.dead && Math.abs(r.dist - Number(b.dist)) <= Math.max(3, r.dist * 0.01), sOk = Math.abs(r.stars - Number(b.stars)) <= Math.max(1, r.stars * 0.02);
@@ -269,7 +273,8 @@ export class DreamBoard {
     if (bot) { this.vstat.robot = (this.vstat.robot || 0) + 1; return { ok: false, why: 'robotic', r, detail: bot }; }
     this.vstat.ok++; return { ok: true, r, ticket: !!tk };
   }
-  ticket(b) { return this.tickets.issue({ seed: Number(b.seed) | 0, diff: diffOf(b.diff), map: mapOf(b.map), mode: b.mode === 'item' ? 'item' : 'speed' }); }
+  // 시간 여행: 시작 시대(era)도 표에 적는다 (기록 다시 돌리기가 그 시대부터 길을 만든다)
+  ticket(b) { const map = mapOf(b.map); return this.tickets.issue({ seed: Number(b.seed) | 0, diff: diffOf(b.diff), map, mode: b.mode === 'item' ? 'item' : 'speed', ...(map === 'time' ? { era: eraOf(b.era) } : {}) }); }
   // 사람이 볼 목록 · 승인 · 삭제 (삭제하면 그 계정의 드림 러너 업적을 다시 계산하고 별을 거둔다)
   // 비상 리포트: 조작(AI) 의심 기록. 순위표에는 바로 올라가고, 운영자가 접속하면 크게 뜬다
   //   red = 서버가 다시 돌려 본 결과와 다름 · 시간이 맞지 않음 · 입력 기록 없음 (상위권)
