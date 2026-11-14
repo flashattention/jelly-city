@@ -130,13 +130,14 @@ export const SHOP = [
   it('back', 'singb', '무한의 날개', '♾️', 400000, 'apex', { grand: 3, kind: 'wing', color: '#ffffff', glow: ['#ffffff', '#7fe9ff', '#b28bff', '#ffd700'], big: 1, sharp: 1 }, R('singular', 5000, 'void')),
 ];
 // 난이도 · 맵별 별 보상 배수 (어려울수록 많이)
-export const STAR_MULT = { easy: 1, hard: 1.6, extreme: 2.2, lightspeed: 3.2, beyond: 4.5, singular: 6.4 };
+export const STAR_MULT = { easy: 1, hard: 1.6, extreme: 2.4, lightspeed: 3.2, beyond: 4.5, singular: 6.4 };
 export const HELL_MULT = 1.5, VOID_MULT = 1.8; // 이공간이 가장 어려워서 별도 가장 많이
 export const starsEarned = (stars, diff, map) => Math.floor((Number(stars) || 0) * (STAR_MULT[diff] || 1) * (map === 'hell' ? HELL_MULT : map === 'void' ? VOID_MULT : 1));
 
 // ---------- 업적 ----------
 // 노멀은 2026-11-15 없앰 (업적 · 정상의 길에서 빠진다. 예전에 딴 노멀 업적은 서버가 같은 단계의 하드 업적으로 옮긴다: server/cosmetics.js)
-const DIFF_NAMES = { hard: '하드', extreme: '익스트림', lightspeed: '광속', beyond: '초월', singular: '특이점' }, MAPS = { dream: '꿈나라', hell: '지옥', void: '이공간', seoul: '서울' };
+// 2026-11-15: 속 이름 hard = 노멀, extreme = 하드 (보이는 이름만 바꿨다 · 딴 업적 · 칭호 아이디는 그대로)
+const DIFF_NAMES = { hard: '노멀', extreme: '하드', lightspeed: '광속', beyond: '초월', singular: '특이점' }, MAPS = { dream: '꿈나라', hell: '지옥', void: '이공간', seoul: '서울' };
 export const GAMES = {
   'dream-runner': { name: '드림 러너', emoji: '🌙', color: '#8f7bff' }, 'jelly-guard': { name: '젤리수호대', emoji: '🛡️', color: '#4cc3ff' }, 'jelly-arena': { name: '젤리 아레나', emoji: '⚔️', color: '#ff5c5c' },
   'jelly-tactical': { name: '젤리택티컬', emoji: '🎯', color: '#7ee081' }, 'jelly-drop': { name: '젤리드롭', emoji: '🪂', color: '#ffb347' }, 'jelly-drift': { name: '젤리드리프트', emoji: '🏎️', color: '#ff7ac6' },
@@ -166,7 +167,7 @@ export const MEDALS = [[0, 'r1', { rank: 1, exact: true, any: true }, '🥇', '1
 const DIFF_ORDER = ['easy', 'hard', 'extreme', 'lightspeed', 'beyond', 'singular']; // 순서 = 격 (노멀은 자리만 남긴다)
 // 드림 러너 난이도마다 아이콘 · 무지개 색이 다르다 (지옥은 끝에 용암색이 섞인다)
 export const DIFF_STYLE = {
-  easy: { e: '🙂', grad: ['#5fe0b0', '#b8f5c8', '#4cc3ff'] }, hard: { e: '🔥', grad: ['#ff5c3a', '#ffa23a', '#ffd27a'] }, extreme: { e: '💀', grad: ['#ff2e63', '#b026ff', '#ff7ab0'] },
+  easy: { e: '🙂', grad: ['#5fe0b0', '#b8f5c8', '#4cc3ff'] }, hard: { e: '🙂', grad: ['#5fe0b0', '#b8f5c8', '#4cc3ff'] }, extreme: { e: '🔥', grad: ['#ff5c3a', '#ffa23a', '#ffd27a'] },
   lightspeed: { e: '⚡', grad: ['#ffee70', '#7ff0ff', '#4d7cff'] }, beyond: { e: '🌌', grad: ['#ff5c8a', '#ffc93c', '#5fe0b0', '#7fe9ff', '#c77dff'] },
   singular: { e: '💠', grad: ['#ffffff', '#7fe9ff', '#b28bff', '#ffd700', '#ffffff'] },
 };

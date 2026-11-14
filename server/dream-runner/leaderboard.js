@@ -62,10 +62,17 @@ export class DreamBoard {
     this.ipHits = new Map();
     try {
       const d = JSON.parse(fs.readFileSync(this.file, 'utf8'));
-      this.best = d.best || {}; this.bestItem = d.bestItem || {}; this.boards = d.boards || {}; this.stats = d.stats || {}; this.dieAll = d.dieAll || {}; this.daily = d.daily || {}; this.first = d.first || {}; this.hg = d.hg || {}; this.hgSess = d.hgSess || {}; this.runs = d.runs || 0; this.reports = d.reports || []; this.secret = d.secret || this.secret;
+      this.resets = d.resets || {}; this.best = d.best || {}; this.bestItem = d.bestItem || {}; this.boards = d.boards || {}; this.stats = d.stats || {}; this.dieAll = d.dieAll || {}; this.daily = d.daily || {}; this.first = d.first || {}; this.hg = d.hg || {}; this.hgSess = d.hgSess || {}; this.runs = d.runs || 0; this.reports = d.reports || []; this.secret = d.secret || this.secret;
       // 예전 '확인 대기' 기록: 순위표에 올리고 비상 리포트로 옮긴다 (더는 기다리게 하지 않는다)
       for (const p of d.pending || []) { this.mig = true; const T = this.table(p.mode, p.diff, p.map); if (!T[p.sub] || p.e.score > T[p.sub].score) T[p.sub] = p.e; this.report('red', p.sub, p.mode, p.diff, p.map, p.why, p.e, p.r); }
     } catch { /* 처음 */ }
+    this.resets ||= {};
+    // 2026-11-15 익스트림이 '하드'(빠르기 1.9 → 2.17배)가 되며 예전 익스트림 순위표를 비운다: 한 번만, 지우기 전에 파일로 남긴다 (판수 · 시간 · 업적은 그대로)
+    if (!this.resets['extreme-2026-11-15']) {
+      const gone = {}; for (const k of Object.keys(this.boards)) if (/(^|:)(speed|item):extreme$/.test(k)) { gone[k] = this.boards[k]; delete this.boards[k]; }
+      if (Object.keys(gone).length) { try { fs.mkdirSync(dataDir, { recursive: true }); fs.writeFileSync(path.join(dataDir, `${name}-extreme-backup-2026-11-15.json`), JSON.stringify(gone)); } catch (e) { console.error('익스트림 기록 백업 실패', e.message); } console.log(`🔥 ${name}: 예전 익스트림 순위표 ${Object.keys(gone).length}개를 비웠어요 (백업 남김)`); }
+      this.resets['extreme-2026-11-15'] = Date.now(); this.mig = true;
+    }
     this.dirty = !!this.mig; this.tickets = new Tickets(this.secret); this.pool = opt.pool || new ReplayPool(DREAM_VER, archiveCode(dataDir, DREAM_VER)); this.done = new Map(); this.busy = new Set();
     try { this.tickets.load(JSON.parse(fs.readFileSync(this.file, 'utf8')).used); } catch { /* 처음 */ }
     setInterval(() => this.save(), 20000).unref();
@@ -73,7 +80,7 @@ export class DreamBoard {
   save() {
     if (!this.dirty) return;
     this.dirty = false;
-    try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ best: this.best, bestItem: this.bestItem, boards: this.boards, stats: this.stats, dieAll: this.dieAll, daily: this.daily, first: this.first, hg: this.hg, hgSess: this.hgSess, runs: this.runs, reports: this.reports, secret: this.secret, used: this.tickets.dump(TICKET_TTL) })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('드림 러너 저장 실패', e); }
+    try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ resets: this.resets, best: this.best, bestItem: this.bestItem, boards: this.boards, stats: this.stats, dieAll: this.dieAll, daily: this.daily, first: this.first, hg: this.hg, hgSess: this.hgSess, runs: this.runs, reports: this.reports, secret: this.secret, used: this.tickets.dump(TICKET_TTL) })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('드림 러너 저장 실패', e); }
   }
   // map: 'hell' 은 난이도마다 따로 (꿈나라 노멀은 예전 표 그대로)
   table(mode, diff, map = 'dream') { if (SEP.has(map)) return (this.boards[`${map}:${mode}:${diff}`] ||= {}); if (diff !== 'easy') return (this.boards[`${mode}:${diff}`] ||= {}); return mode === 'item' ? this.bestItem : this.best; }

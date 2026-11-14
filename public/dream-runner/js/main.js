@@ -298,8 +298,8 @@ for (const b of $('mode-pick').children) b.onclick = () => { game.pickMode = b.d
 for (const b of $('room-mode').children) b.onclick = () => net.send({ t: 'mode', mode: b.dataset.m });
 // 난이도: 길은 같고 빠르기만 다르다 (하드 · 익스트림 · 광속 · 초월 · 특이점, 노멀은 2026-11-15 숨김)
 const diffName = (d) => DIFFS[diffOf(d)].name;
-// 모드 고르기: 이름 아래에 하드 기준 몇 배속인지 (순위표 탭은 이름만)
-for (const id of ['diff-pick', 'room-diff', 'board-diff']) $(id).innerHTML = DIFF_KEYS.map((k) => `<button data-m="${k}">${DIFFS[k].name}${id === 'board-diff' ? '' : `<small class="vs-hard">${k === 'hard' ? '기준 속도' : `하드 ×${vsHard(k)}`}</small>`}</button>`).join('');
+// 모드 고르기: 이름 아래에 노멀 기준 몇 배속인지 (순위표 탭은 이름만)
+for (const id of ['diff-pick', 'room-diff', 'board-diff']) $(id).innerHTML = DIFF_KEYS.map((k) => `<button data-m="${k}">${DIFFS[k].name}${id === 'board-diff' ? '' : `<small class="vs-hard">${k === 'hard' ? '기준 속도' : `노멀 ×${vsHard(k)}`}</small>`}</button>`).join('');
 game.pickDiff = store.get(DIFF_KEY) ? diffOf(store.get(DIFF_KEY)) : 'hard'; // 처음 온 사람은 하드부터 · 그다음부터는 마지막에 고른 난이도
 segSet('diff-pick', game.pickDiff);
 for (const b of $('diff-pick').children) b.onclick = () => { game.pickDiff = b.dataset.m; store.set(DIFF_KEY, game.pickDiff); segSet('diff-pick', game.pickDiff); };
