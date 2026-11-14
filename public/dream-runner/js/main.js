@@ -496,7 +496,7 @@ async function died(why) {
   if (game.map === 'time') { game.diedEra = track.order[track.dreamAt(runner.s) % track.order.length]; store.set(ERA_KEY, game.diedEra); renderTimeResume(); }
   const rpNow = game.rp; game.rp = null;
   reportPlay();
-  const rec = { dist: Math.floor(runner.s), stars: runner.stars, themes: game.dreamsSeen, time: game.runT, name: game.profile.name, color: game.profile.color, mode: game.itemMode ? 'item' : 'speed', diff: game.diff, map: game.map, seed: game.seed, multi: game.multi || undefined, ver: game.ver || undefined };
+  const rec = { dist: Math.floor(runner.s), stars: runner.stars, themes: game.dreamsSeen, time: game.runT, name: game.profile.name, color: game.profile.color, mode: game.itemMode ? 'item' : 'speed', diff: game.diff, map: game.map, era: game.map === 'time' ? game.era0 : undefined, seed: game.seed, multi: game.multi || undefined, ver: game.ver || undefined };
   if (game.multi) net.send({ t: 'dead', dist: rec.dist, stars: rec.stars, why });
   game.rec = rec;
   // 출발표 · 플레이 기록이 있어야 기록이 올라간다 (출발표는 늦게 와도 조금 더 기다린다)

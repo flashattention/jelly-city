@@ -53,7 +53,7 @@ const GROUND = {
 };
 // 길 무늬: [바탕, 테두리 색]. 테두리는 그림 양옆에 같이 그려서 길 한 장이 그리기 한 번
 const ROAD = {
-  light: (x, n, a, b) => { const g = x.createLinearGradient(0, 0, n, 0); g.addColorStop(0, b); g.addColorStop(0.06, a); g.addColorStop(0.5, shade(a, 1.25)); g.addColorStop(0.94, a); g.addColorStop(1, b); x.fillStyle = g; x.fillRect(0, 0, n, n); x.fillStyle = 'rgba(255,255,255,.55)'; for (const k of [1 / 3, 2 / 3]) for (let y = 0; y < n; y += n / 4) x.fillRect(k * n - 1.5, y, 3, n / 8); },
+  light: (x, n, a, b) => { const g = x.createLinearGradient(0, 0, n, 0); g.addColorStop(0, b); g.addColorStop(0.06, a); g.addColorStop(0.5, shade(a, 1.05)); g.addColorStop(0.94, a); g.addColorStop(1, b); x.fillStyle = g; x.fillRect(0, 0, n, n); x.fillStyle = 'rgba(255,255,255,.55)'; for (const k of [1 / 3, 2 / 3]) for (let y = 0; y < n; y += n / 4) x.fillRect(k * n - 1.5, y, 3, n / 8); },
   dirt: (x, n, a, b) => { x.fillStyle = a; x.fillRect(0, 0, n, n); dots(x, n, shade(a, 0.8), 260, 1, 3, 0.6); dots(x, n, shade(a, 1.15), 120, 1, 2.5, 0.6); x.fillStyle = shade(a, 0.86); for (const k of [0.3, 0.7]) x.fillRect(k * n - 5, 0, 10, n); x.fillStyle = b; x.fillRect(0, 0, 7, n); x.fillRect(n - 7, 0, 7, n); },
   stone: (x, n, a, b) => { x.fillStyle = shade(a, 0.7); x.fillRect(0, 0, n, n); for (let r = 0; r < 8; r++) { let c = 0; while (c < n) { const w = 18 + R() * 24; x.fillStyle = mixC(a, shade(a, 0.85), R()); x.beginPath(); x.roundRect(c + 1.5, r * n / 8 + 1.5, w - 3, n / 8 - 3, 4); x.fill(); c += w; } } x.fillStyle = b; x.fillRect(0, 0, 9, n); x.fillRect(n - 9, 0, 9, n); },
   cobble: (x, n, a, b) => { x.fillStyle = shade(a, 0.65); x.fillRect(0, 0, n, n); for (let i = 0; i < 160; i++) { x.fillStyle = mixC(a, shade(a, 0.8), R()); x.beginPath(); x.ellipse(R() * n, R() * n, 6 + R() * 4, 5 + R() * 3, R() * 3, 0, 7); x.fill(); } x.fillStyle = b; x.fillRect(0, 0, 8, n); x.fillRect(n - 8, 0, 8, n); },
@@ -79,8 +79,9 @@ function groundMat(g) {
 function roadMat(r) {
   const [a, b, pat = 'dirt', glowK = 0] = r, key = r.join('|');
   let m = roadMats.get(key); if (m) return m;
-  const t = canvasTex('r' + key, 256, (x, n) => (ROAD[pat] || ROAD.dirt)(x, n, a, b));
-  m = new THREE.MeshLambertMaterial({ map: t, emissive: glowK ? new THREE.Color('#ffffff') : new THREE.Color('#000000'), emissiveIntensity: glowK || 0, emissiveMap: glowK ? t : null, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  // 빛길은 밝은 색이 하얗게 날아가지 않게 조금 어둡게 칠한다
+  const t = canvasTex('r' + key, 256, (x, n) => (ROAD[pat] || ROAD.dirt)(x, n, pat === 'light' ? shade(a, 0.78) : a, b));
+  m = new THREE.MeshLambertMaterial({ map: t, emissive: glowK ? new THREE.Color('#ffffff') : new THREE.Color('#000000'), emissiveIntensity: Math.min(0.28, (glowK || 0) * 0.45), emissiveMap: glowK ? t : null, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   roadMats.set(key, m); return m;
 }
 const G_PLANE = new THREE.PlaneGeometry(1, 1), BOX = new THREE.Box3();
@@ -151,7 +152,8 @@ export class TimeWorld {
     this.root.position.z = T.origin;
     // 길이 만들어진 곳까지만 (시대 경계를 알아야 한다)
     const lim = Math.min(T.gs, ps + AHEAD);
-    let n = 0; while (this.at + STEP <= lim && n++ < 3) { this.fill(this.at, this.at + STEP); this.at += STEP; }
+    // 처음엔 한꺼번에, 달리는 동안엔 한 프레임에 한 칸씩 (휴대폰 끊김 줄이기)
+    let n = 0; const burst = this.at < ps + 90 ? 3 : 1; while (this.at + STEP <= lim && n++ < burst) { this.fill(this.at, this.at + STEP); this.at += STEP; }
     this.cells = this.cells.filter((c) => { if (c.s1 < ps - BEHIND) { this.drop(c.g); return false; } return true; });
     this.anim = this.anim.filter((o) => o.parent);
     const cur = T.dreamAt(ps);
