@@ -139,7 +139,9 @@ h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 #touch .t-r { flex-direction: column; align-items: flex-end; gap: 12px; }
 #touch .t-x { display: flex; gap: 12px; }
 #touch .t-js { display: flex; flex-direction: column; gap: 14px; }
-#touch .t-js button.big { width: min(200px, calc(100vw - 32px - 168px - 16px)); height: 100px; border-radius: 50px; }
+#touch .t-js button.big { width: min(200px, calc(100vw - 32px - 168px - 16px)); height: 150px; border-radius: 75px; }
+/* 조이스틱: 점프 · 숙이기 두 버튼을 합친 높이(150 × 2 + 14)의 가운데에 */
+#touch .t-l { padding-bottom: calc((150px * 2 + 14px - 168px) / 2); }
 /* 조이스틱: 큰 원 안에서 작은 원이 사방으로 움직이지만, 게임에는 좌우만 들어간다 */
 #joy { position: relative; width: 168px; height: 168px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); background: radial-gradient(circle, rgba(255,255,255,.08) 0 30%, rgba(20,8,50,.45) 31%); touch-action: none; display: flex; align-items: center; justify-content: center; }
 #joy::before, #joy::after { content: '◀'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,.5); font-size: 15px; pointer-events: none; }
