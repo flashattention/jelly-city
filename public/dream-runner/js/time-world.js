@@ -89,6 +89,10 @@ function roadMat(r) {
   roadMats.set(key, m); return m;
 }
 const G_PLANE = new THREE.PlaneGeometry(1, 1), BOX = new THREE.Box3();
+// 지나간 시대의 땅 · 길 그림을 버린다 (125개 시대를 다 달리면 그림이 250장 쌓여 휴대폰 메모리가 모자란다)
+function evict(cur) {
+  for (const [mats, pre] of [[groundMats, 'g'], [roadMats, 'r']]) for (const [key, m] of mats) if ((m.userData.used ?? cur) < cur - 1) { m.map?.dispose(); m.dispose(); mats.delete(key); texCache.delete(pre + key); }
+}
 // 평면 (눕히면 +v 가 앞쪽 = s 가 커지는 쪽): u 는 가로 반복, v 는 s0 부터
 function uvPlane(w, len, ru, rv, v0) {
   const g = new THREE.PlaneGeometry(w, len), uv = g.attributes.uv;
@@ -147,7 +151,7 @@ const ANIM_CAP = isPhone ? 10 : 24; // 움직이는 그물 수 (칸 하나)
 
 export class TimeWorld {
   constructor(scene) { this.scene = scene; this.root = new THREE.Group(); this.root.visible = false; scene.add(this.root); this.cells = []; this.anim = []; this.track = null; }
-  start(track) { this.clear(); this.track = track; this.at = -80; this.last = {}; this.root.visible = true; }
+  start(track) { this.clear(); evict(1e9); this.track = track; this.at = -80; this.last = {}; this.curD = 0; this.root.visible = true; }
   stop() { this.clear(); this.track = null; this.root.visible = false; }
   clear() { for (const c of this.cells) this.drop(c.g); this.cells = []; this.anim = []; }
   drop(g) { this.root.remove(g); g.traverse((o) => { if (o.isMesh && o.geometry && o.geometry !== G_PLANE && o.userData.own) o.geometry.dispose(); }); }
@@ -163,6 +167,7 @@ export class TimeWorld {
     this.cells = this.cells.filter((c) => { if (c.s1 < ps - BEHIND) { this.drop(c.g); return false; } return true; });
     this.anim = this.anim.filter((o) => o.parent);
     const cur = T.dreamAt(ps);
+    if (cur !== this.curD) { this.curD = cur; evict(cur); }
     for (const c of this.cells) for (const sg of c.g.userData.segs || []) sg.visible = sg.userData.d <= cur || sg.userData.s0 - ps < 18;
     for (const o of this.anim) { const s = o.userData.s; if (s > ps - 30 && s < ps + 220 && o.parent.visible) o.userData.anim(o, t, dt); }
   }
@@ -172,7 +177,8 @@ export class TimeWorld {
     const cuts = [s0, ...T.bounds.filter((b) => b > s0 && b < s1), s1];
     for (let i = 0; i + 1 < cuts.length; i++) {
       const a = cuts[i], b = cuts[i + 1], th = this.eraAt((a + b) / 2), len = b - a;
-      const gm = groundMat(th.ground || ['#555555', '#666666', 'dirt']), rm = roadMat(th.road || ['#8d6e63', '#5d4037', 'dirt']);
+      const gm = groundMat(th.ground || ['#555555', '#666666', 'dirt']), rm = roadMat(th.road || ['#8d6e63', '#5d4037', 'dirt']), dd = T.dreamAt((a + b) / 2);
+      gm.userData.used = Math.max(gm.userData.used ?? -1, dd); rm.userData.used = Math.max(rm.userData.used ?? -1, dd);
       // 무늬가 세상에 붙어 있게: 칸마다 UV 를 그 자리(s) 기준으로 (같은 재질을 나눠 써도 이음매가 맞는다)
       const rep = th.ground?.[4] || 7, RW = TIME_W + 0.6;
       const gr = new THREE.Mesh(uvPlane(WIDE, len, WIDE / rep, len / rep, a / rep), gm); gr.userData.own = true; gr.rotation.x = -Math.PI / 2; gr.position.set(0, -0.02, -(a + b) / 2); g.add(gr);
