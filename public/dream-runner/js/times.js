@@ -795,6 +795,8 @@ const EXTRA = {
   '화성 이주': { near: ['rock', 'crystal'], far: ['mountain'] }, '마지막 숲': { near: ['mushroom', 'pine'] }, '새로운 새벽': { near: ['flower', 'roundTree', 'blossom'], skyK: ['cloud', 'balloonAir'] }, '별을 향해': { skyK: ['planet', 'satellite'] },
 };
 for (const t of TIMES) { const e = EXTRA[t.name]; if (e) for (const k of Object.keys(e)) t[k] = [...(t[k] || []), ...e[k]]; }
+// 문명 시대(5 ~ 8장)엔 길가를 오가는 그 시대 사람들
+for (const t of TIMES) if (t.ch >= 4 && t.ch <= 9) t.scenes = [...(t.scenes || []), 'locals'];
 
 // 역할마다 그 시대 배역 하나 (길 씨앗 r 를 한 번 쓴다 — 서버 · 브라우저가 같다)
 export const ROLES = ['cross', 'on', 'big', 'weave', 'wall', 'hurdle', 'bar'];
