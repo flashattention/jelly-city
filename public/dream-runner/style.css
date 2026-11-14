@@ -134,8 +134,12 @@ h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 #touch > div { display: flex; gap: 12px; align-items: flex-end; pointer-events: auto; touch-action: none; }
 #touch button { width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); background: rgba(20,8,50,.4); color: #fff; font-size: 26px; touch-action: none; }
 #touch button.big { width: 80px; height: 80px; }
-#touch .t-r button[data-k="jump"] { margin-bottom: 96px; margin-left: -6px; }
-#touch button svg { display: block; margin: auto; pointer-events: none; } /* 점프는 숙이기의 오른쪽 위 대각선 (엄지를 위로 밀어 누르게) */
+#touch button svg { display: block; margin: auto; pointer-events: none; }
+/* 점프(위) · 숙이기(아래): 가로로 넓은 알약 두 개를 같은 폭 · 같은 좌우 끝으로 쌓는다 (엄지로 위아래만 오가면 되게). 화면이 좁으면 조이스틱을 피해 줄인다 */
+#touch .t-r { flex-direction: column; align-items: flex-end; gap: 12px; }
+#touch .t-x { display: flex; gap: 12px; }
+#touch .t-js { display: flex; flex-direction: column; gap: 14px; }
+#touch .t-js button.big { width: min(200px, calc(100vw - 132px - 64px)); height: 72px; border-radius: 36px; }
 /* 조이스틱: 큰 원 안에서 작은 원이 사방으로 움직이지만, 게임에는 좌우만 들어간다 */
 #joy { position: relative; width: 132px; height: 132px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); background: radial-gradient(circle, rgba(255,255,255,.08) 0 30%, rgba(20,8,50,.45) 31%); touch-action: none; display: flex; align-items: center; justify-content: center; }
 #joy::before, #joy::after { content: '◀'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,.5); font-size: 15px; pointer-events: none; }
@@ -291,7 +295,6 @@ body.touch .hg-stat b { font-size: 26px; }
 body.hg #touch #t-item { display: none !important; }
 body.hg #touch #t-shove { display: block !important; }
 body.hg #touch #t-shove::after { content: ''; }
-body.hg #touch .t-r button[data-k="jump"] { margin-bottom: 0; }
 #hg-set { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; background: rgba(5, 10, 25, .45); padding: 16px; }
 #hg-set.hidden, #hg-hud.hidden { display: none; }
 .hg-card { width: min(560px, 100%); max-height: 92vh; overflow: auto; padding: 18px 20px; border-radius: 22px; background: rgba(18, 28, 52, .92); }
