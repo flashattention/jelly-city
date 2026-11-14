@@ -79,7 +79,8 @@ const playtime = new PlayTime(DATA_DIR); // 게임마다 플레이 시간 (메�
 const cosmetics = new Cosmetics(DATA_DIR); cosmetics.dream = dreamBoard; // 치장 · 업적 (모든 게임 공용)
 // 토스 미니앱: 계정 · 드림 러너 기록을 웹과 따로 (같은 서버 · 같은 게임 코드, 파일만 다르다)
 const toss = new TossAccounts(DATA_DIR);
-const dreamToss = new DreamBoard(DATA_DIR, 'dream-runner-toss', { pool: dreamBoard.pool, ads: true }); cosmetics.dreamToss = dreamToss;
+// 광고 보너스는 TOSS_ADS=1 일 때만 (사업자 등록 전엔 끈다: 누적 광고 수익 5천 원 + 5영업일 안에 사업자 등록을 못 하면 미니앱 노출이 멈춘다)
+const dreamToss = new DreamBoard(DATA_DIR, 'dream-runner-toss', { pool: dreamBoard.pool, ads: process.env.TOSS_ADS === '1' }); cosmetics.dreamToss = dreamToss;
 setNames({ nick: (sub) => (sub.startsWith('toss:') ? toss.nickOf(sub) : world.users[sub]?.nick) || null, chars: (sub) => (world.users[sub]?.chars || []).map((token) => ({ token, name: world.accounts[token]?.name })) }); // 순위표에는 지금 닉네임 · 캐릭터 이름
 const board = new Board(DATA_DIR); // 메인 화면 게시판
 const dreamRooms = new DreamRooms((sid) => world.userOf(sid), DATA_DIR); // 드림 러너 같이 달리기 방
