@@ -780,6 +780,22 @@ export const TIMES = [
     P: { a: '#ff9100', b: '#fff8e1', c: '#7c4dff', g: '#ffffff' } }),
 ];
 
+// 풍경 더하기: 꿈나라 조각(kits.js)까지 섞어 빽빽하게 (시대에 맞는 것만)
+const EXTRA = {
+  '지구의 탄생': { near: ['rock', 'fire'], far: ['mountain'] }, '달의 탄생': { near: ['rock'], far: ['mountain'] }, '바다의 탄생': { near: ['rock'], skyK: ['cloud'] }, '운석 대충돌기': { near: ['rock', 'fire'] },
+  '최초의 생명': { near: ['bubbleBig', 'crystal'], mid: ['bubbleBig'] }, '스트로마톨라이트': { near: ['rock'], far: ['mountain'] }, '대산화 사건': { near: ['rock'], far: ['mountain'], skyK: ['cloud'] }, '눈덩이 지구': { near: ['iceSpike'], mid: ['iceberg'], far: ['mountain'] },
+  '에디아카라 정원': { near: ['jellyfish', 'rock'], mid: ['jellyfish'] }, '캄브리아기 대폭발': { near: ['kelp', 'rock'], mid: ['kelp', 'jellyfish'] }, '최초의 어류': { near: ['kelp', 'coral'], mid: ['kelp', 'fishSchool', 'jellyfish'] },
+  '최초의 육상 식물': { near: ['rock'], far: ['mountain'], skyK: ['cloud'] }, '바다전갈의 바다': { near: ['kelp', 'coral'], mid: ['kelp', 'fishSchool'] }, '어류의 시대': { near: ['kelp', 'coral'], mid: ['kelp', 'fishSchool', 'jellyfish'] },
+  '물 밖으로': { near: ['rock'], skyK: ['cloud'] }, '석탄기 거대 숲': { near: ['mushroom'], mid: ['treeFern'] }, '최초의 파충류': { near: ['mushroom', 'rock'] }, '페름기 대멸종': { near: ['deadTree', 'rock'], far: ['volcano'] },
+  '최초의 공룡': { near: ['rock', 'cactus'], far: ['mountain'] }, '최초의 포유류': { near: ['mushroom'] }, '판게아 분열': { far: ['mountain'] }, '쥐라기 거인들': { near: ['rock'], far: ['mountain', 'waterfall'], skyK: ['cloud'] }, '익룡의 하늘': { skyK: ['cloud', 'birds'] }, '시조새': { skyK: ['cloud'] }, '꽃의 탄생': { near: ['flower', 'mushroom'], skyK: ['cloud'] }, '티라노사우루스': { near: ['rock'], far: ['mountain'] }, '트리케라톱스 무리': { near: ['flower', 'rock'], far: ['mountain'], skyK: ['cloud'] }, '공룡의 멸종': { near: ['fire', 'rock'] },
+  '포유류의 시대': { near: ['flower', 'rock'], skyK: ['cloud'] }, '최초의 영장류': { near: ['mushroom', 'flower'] }, '고래의 조상': { near: ['palm', 'rock'], skyK: ['cloud'] }, '최초의 인류 조상': { near: ['rock'], skyK: ['cloud'] }, '최초의 석기': { near: ['rock'] }, '불의 발견': { near: ['rock'] }, '호모 사피엔스의 탄생': { near: ['rock', 'flower'] }, '사피엔스 vs 네안데르탈인': { near: ['rock', 'mushroom'], far: ['mountain'] }, '빙하기 매머드 사냥': { near: ['iceSpike', 'rock'], far: ['mountain'] }, '인류의 대이동': { near: ['rock'], far: ['mountain', 'iceberg'] },
+  '농업 혁명': { near: ['rock', 'flower'], far: ['mountain'], skyK: ['cloud'] }, '스톤헨지': { near: ['flower', 'rock'], skyK: ['cloud'] }, '고대 이집트': { far: ['dune'] }, '실크로드': { near: ['cactus', 'rock'], far: ['dune'] }, '그리스 신화': { near: ['column'], skyK: ['cloud'] }, '아테네 민주정': { near: ['column'] }, '고대 올림픽': { near: ['column'], skyK: ['cloud'] }, '로마 콜로세움': { near: ['column'] },
+  '바이킹': { near: ['pine', 'rock'], far: ['mountain'] }, '몽골 제국': { near: ['rock', 'flower'], far: ['mountain'], skyK: ['cloud'] }, '잉카 마추픽추': { far: ['mountain'], skyK: ['cloud'] }, '르네상스': { near: ['flower'], skyK: ['cloud'] }, '대항해시대': { mid: ['shipwreck'], skyK: ['cloud'] },
+  '산업혁명': { near: ['gear', 'pipes'], mid: ['factory', 'smokeStack'] }, '전기의 시대': { near: ['lampPost'] }, '첫 비행': { skyK: ['cloud', 'birds'] }, '대공황': { near: ['lampPost', 'bench'] }, '스마트폰': { near: ['bench', 'lampPost'] }, '팬데믹': { near: ['bench', 'lampPost'] },
+  '화성 이주': { near: ['rock', 'crystal'], far: ['mountain'] }, '마지막 숲': { near: ['mushroom', 'pine'] }, '새로운 새벽': { near: ['flower', 'roundTree', 'blossom'], skyK: ['cloud', 'balloonAir'] }, '별을 향해': { skyK: ['planet', 'satellite'] },
+};
+for (const t of TIMES) { const e = EXTRA[t.name]; if (e) for (const k of Object.keys(e)) t[k] = [...(t[k] || []), ...e[k]]; }
+
 // 역할마다 그 시대 배역 하나 (길 씨앗 r 를 한 번 쓴다 — 서버 · 브라우저가 같다)
 export const ROLES = ['cross', 'on', 'big', 'weave', 'wall', 'hurdle', 'bar'];
 const DEF = { cross: COSMIC.cross, on: COSMIC.on, big: COSMIC.big, weave: COSMIC.weave, wall: COSMIC.wall, hurdle: COSMIC.hurdle, bar: COSMIC.bar };

@@ -7,7 +7,10 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { isPhone } from '../../shared/js/perf.js';
 import { toon } from '../../shared/js/utils.js';
 import { TIME_W } from './times.js';
-import { TK } from './time-kits.js';
+import { TK as TK0 } from './time-kits.js';
+import { KITS } from './kits.js';
+// 시간 여행 조각 + 꿈나라 조각(해초 · 해파리 · 산 · 성 …)도 같이 쓴다
+const TK = new Proxy(TK0, { get: (t, k) => t[k] || (KITS[k] ? { build: (r, P) => KITS[k].build(r, P), y: KITS[k].place === 'drift' ? 2.5 : undefined } : undefined) });
 
 const STEP = 40, AHEAD = isPhone ? 230 : 330, BEHIND = 70, WIDE = 1400;
 const R = Math.random;
@@ -135,7 +138,7 @@ function bakeColored(root) {
 // 풍경 띠: 가까이 · 중간 · 멀리 · 하늘 (길 가운데에서 떨어진 거리 m)
 const BAND = { near: [TIME_W / 2 + 1.6, TIME_W / 2 + 9], mid: [TIME_W / 2 + 10, 46], scene: [TIME_W / 2 + 7, 34], far: [55, 190], sky: [20, 140] };
 // 칸 40m 마다 띠별로 몇 개 (휴대폰은 덜)
-const PER = isPhone ? { near: 3, mid: 2, far: 1, sky: 0.4, scene: 0.6 } : { near: 6, mid: 4, far: 2, sky: 0.8, scene: 1 };
+const PER = isPhone ? { near: 5, mid: 3, far: 1.2, sky: 0.4, scene: 0.6 } : { near: 11, mid: 7, far: 2.5, sky: 1, scene: 1.2 };
 // 칸 하나에서 움직이는 것은 이만큼만 (나머지는 멈춘 채 묶어서 그리기 호출을 줄인다). 장면(scene)은 먼저 자리를 받는다
 const ANIM_CAP = isPhone ? 10 : 24; // 움직이는 그물 수 (칸 하나)
 
