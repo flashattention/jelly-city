@@ -97,16 +97,23 @@ export class DreamBoard {
   top(mode, diff, map) {
     const all = this.sorted(mode, diff, map), n = all.length, P = this.podium(); return all.slice(0, TOP).map(([sub, e], i) => ({ rank: i + 1, id: publicId(sub), ...this.badges(sub, P, mode, diff, map, i + 1, n), name: nameOf(sub, e), color: e.color, score: e.score, dist: e.dist, stars: e.stars, themes: e.themes, guest: !!e.guest, anon: !!e.anon }));
   }
-  // 명예의 전당: 꿈나라 초월 1위 → 지옥 초월 1위 → 꿈나라 광속 1위 → … → 지옥 익스트림 1위, 다음은 2위 · 3위 차례로. 한 사람은 한 번만 (가장 높은 자리)
+  // 명예의 전당: 사람마다 (순위 × 난이도) 칸별로 가진 순위표 수를 센다 (맵은 합친다). 가장 높은 칸(특이점 1위)부터 개수가 많은 사람이 위,
+  //   같으면 다음 칸(초월 1위 → … → 익스트림 1위 → 특이점 2위 …), 모두 같으면 가장 높은 자리(그 칸 안에서는 꿈나라 → 지옥 → 이공간 → 서울). 한 사람은 한 번만
+  //   (예: 특이점 1위 2개인 사람이 특이점 1위 1개인 사람보다 위)
   fame(n = 12) {
-    const order = ['singular', 'beyond', 'lightspeed', 'extreme'].flatMap((diff) => MAPS.map((map) => [diff, map])), seen = new Set(), out = [], P = this.podium();
-    for (let r = 0; r < 3; r++) for (const [diff, map] of order) {
-      if (out.length >= n) return out;
-      const all = this.sorted('speed', diff, map), x = all[r]; if (!x || seen.has(x[0])) continue;
-      const [sub, e] = x; seen.add(sub);
-      out.push({ rank: r + 1, diff, map, id: publicId(sub), name: nameOf(sub, e), color: e.color, score: e.score, medals: this.badges(sub, P, 'speed', diff, map, r + 1, all.length).medals }); // 그 사람의 메달 모두 (순위표와 같은 순서)
-    }
-    return out;
+    const D = ['singular', 'beyond', 'lightspeed', 'extreme'], P = this.podium(), who = new Map();
+    const lex = (a, b) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i]; return 0; };
+    D.forEach((diff, di) => MAPS.forEach((map, mi) => {
+      const all = this.sorted('speed', diff, map);
+      for (let r = 0; r < 3; r++) {
+        const x = all[r]; if (!x) continue; const [sub, e] = x;
+        let w = who.get(sub); if (!w) who.set(sub, (w = { sub, cnt: new Array(3 * D.length).fill(0), best: null }));
+        w.cnt[r * D.length + di]++; const key = [r, di, mi];
+        if (!w.best || lex(key, w.best.key) < 0) w.best = { key, r, diff, map, e, total: all.length };
+      }
+    }));
+    return [...who.values()].sort((a, b) => { for (let i = 0; i < a.cnt.length; i++) if (a.cnt[i] !== b.cnt[i]) return b.cnt[i] - a.cnt[i]; return lex(a.best.key, b.best.key); })
+      .slice(0, n).map(({ sub, best: { r, diff, map, e, total } }) => ({ rank: r + 1, diff, map, id: publicId(sub), name: nameOf(sub, e), color: e.color, score: e.score, medals: this.badges(sub, P, 'speed', diff, map, r + 1, total).medals })); // 그 사람의 메달 모두 (순위표와 같은 순서)
   }
   mine(sub, mode, diff, map, badges = true) {
     const T = this.table(mode, diff, map);
