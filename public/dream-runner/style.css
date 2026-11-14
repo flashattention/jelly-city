@@ -34,6 +34,11 @@ input::placeholder { color: rgba(255,255,255,.5); }
 h2 { font-family: 'Jua', sans-serif; font-size: 30px; margin: 0 0 6px; }
 h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 .sub { color: var(--soft); margin: 6px 0 16px; line-height: 1.5; }
+/* 난이도 변경 공지 (1주일만): 빨간 칸 */
+.diff-notice { display: flex; flex-direction: column; gap: 3px; margin: -6px auto 14px; max-width: 560px; padding: 9px 14px; border-radius: 14px; border: 2px solid #ff3b4d; background: rgba(255, 40, 60, .16); color: #ffd6da; font-size: 13px; line-height: 1.45; text-align: center; box-shadow: 0 0 18px rgba(255, 59, 77, .35); }
+.diff-notice b { color: #ff4d5e; font-size: 15px; letter-spacing: .02em; }
+.diff-notice em { font-style: normal; font-weight: 700; color: #fff; }
+.diff-notice.hidden { display: none; }
 .note { color: var(--soft); font-size: 13px; margin-top: 10px; }
 .btn { font-family: 'Jua', sans-serif; font-size: 17px; padding: 11px 20px; border-radius: 999px; border: 0; background: #fff; color: #2b1d5c; box-shadow: 0 4px 0 rgba(0,0,0,.2); transition: transform .12s; }
 .btn:hover { transform: translateY(-2px); }
@@ -421,3 +426,5 @@ body.swplay:not(.swready) #sw-load { color: #f3eee6; background: radial-gradient
 .sw-sky .st circle { fill: #fff3c8; filter: drop-shadow(0 0 4px #ffd98a); transform-box: fill-box; transform-origin: center; animation: sw-tw 1.8s ease-in-out infinite; } .sw-sky .st circle:nth-child(2n) { animation-delay: .7s; } .sw-sky .st circle:nth-child(3n) { animation-delay: 1.2s; }
 @keyframes sw-tw { 0%, 100% { opacity: .35; transform: scale(.7); } 50% { opacity: 1; transform: scale(1.15); } }
 #sw-load svg.sw-sky { width: 220px; height: 84px; fill: none; animation: none; }
+/* 휴대폰: 난이도 다섯 개가 한 줄에 들어가게 여백을 줄인다 (위의 #diff-pick 줄바꿈 규칙보다 뒤에 둔다) */
+@media (max-width: 480px) { #diff-pick, #room-diff { flex-wrap: nowrap; gap: 2px; padding: 3px; } #diff-pick button, #room-diff button { flex: 1 1 0; min-width: 0; padding: 6px 3px; font-size: 13px; } #diff-pick .vs-hard, #room-diff .vs-hard { font-size: 9px; } }
