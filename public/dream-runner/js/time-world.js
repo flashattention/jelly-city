@@ -229,7 +229,7 @@ export class TimeWorld {
     const step = pat === 'asphalt' ? 2.2 : pat === 'light' || pat === 'metal' ? 6 : pat === 'plank' ? 3 : 1.6;
     for (let s = a + R() * step; s < b; s += step * (0.7 + R() * 0.6)) for (const side of [-1, 1]) {
       const x = side * (E + R() * 0.35), z = -s;
-      if (pat === 'stone' || pat === 'cobble' || pat === 'brick' || pat === 'tile') box(x, 0.12, z, 0.45, 0.24, step * 0.55, shade(rc, 0.9 + R() * 0.2));
+      if (pat === 'stone' || pat === 'cobble' || pat === 'brick' || pat === 'tile') box(x, 0.12, z, 0.45, 0.24, step * 0.55, shade(th.road?.[0] || '#8a8478', 0.62 + R() * 0.16));
       else if (pat === 'asphalt') { box(side * (E - 0.1), 0.1, z, 0.3, 0.2, step, '#9e9e9e'); if (R() < 0.12) { box(side * (E + 0.4), 1.6, z, 0.1, 3.2, 0.1, '#455a64'); const l = new THREE.Mesh(G1.sph, glow('#fff3c4')); l.position.set(side * (E + 0.1), 3.2, z); l.scale.setScalar(0.22); stat.add(l); } }
       else if (pat === 'light' || pat === 'metal') { box(x, 0.45, z, 0.12, 0.9, 0.12, '#263238'); const l = new THREE.Mesh(G1.sph, glow(rc)); l.position.set(x, 0.95, z); l.scale.setScalar(0.16); stat.add(l); }
       else if (pat === 'plank') { box(x, 0.5, z, 0.12, 1.0, 0.12, '#5d4037'); if (R() < 0.5) box(x, 0.85, z - step / 2, 0.04, 0.04, step, '#c8a878'); }
