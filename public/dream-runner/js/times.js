@@ -27,8 +27,8 @@ const c = (base, o = {}) => ({ ...base, ...o });
 export const TIMES = [
   // ===================== 제1장 우주 =====================
   t('빅뱅', '💥', '138억 년 전', '아무것도 없던 한 점에서 시간과 공간, 모든 것이 시작됐어요', 1, {
-    sky: ['#ffb74d', '#fff3e0', '#ff8a65'], fog: [30, 260], light: 1.0, fx: 'rise', fxC: '#fff8e1', mus: m('lydian', 64, 132, 'sine'),
-    ground: ['#e65100', '#ffcc80', 'plasma', 0.5, 18], road: ['#ffe0b2', '#ff6d00', 'light', 0.35],
+    sky: ['#1a0630', '#ffb74d', '#5a1020'], fog: [30, 320], light: 0.95, stars: 0.3, fx: 'rise', fxC: '#fff3c4', mus: m('lydian', 64, 132, 'sine'),
+    ground: ['#3a0a24', '#ff9100', 'lava', 0.45, 16], road: ['#ffcc80', '#ff6d00', 'light', 0.3],
     cast: c(COSMIC, { cross: ['photon', 'energyBall'], on: ['plasmaBlob'] }), near: ['plasmaPillar', 'energyShard', 'lightSeed'], mid: ['shockRing', 'plasmaPillar', 'energyShard'], far: ['bangCore', 'shockRing'], skyK: ['lightSeed'], scenes: ['bangBurst'],
     P: { a: '#ff9100', b: '#fff8e1', c: '#ff4081', g: '#ffffff' } }),
   t('급팽창', '🌀', '빅뱅 후 10⁻³²초', '눈 깜빡할 새보다 짧은 순간, 우주가 엄청나게 부풀어 올랐어요', 1, {
