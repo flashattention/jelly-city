@@ -29,6 +29,12 @@ const CSS = `
 .cos-title.p5{position:relative;outline:2px solid #fff;outline-offset:1px;padding:0 9px;font-weight:bold;background:linear-gradient(100deg,#ff5c8a,#ffc93c,#5fe0b0,#7fe9ff,#c77dff,#ff5c8a);background-size:300% 100%;animation:cosShineRb .9s linear infinite,cosAura 2.4s linear infinite;text-shadow:0 0 6px #fff}
 .cos-title.p5::after{content:'✦';position:absolute;right:-7px;top:-8px;font-size:11px;color:#fff;text-shadow:0 0 6px #fff,0 0 12px #ffe27a;animation:cosTwinkle 1.2s ease-in-out infinite}
 .cos-title.p5::before{content:'✦';position:absolute;left:-6px;bottom:-7px;font-size:9px;color:#fff;text-shadow:0 0 6px #fff,0 0 12px #7fe9ff;animation:cosTwinkle 1.2s ease-in-out .6s infinite}
+.cos-title.fire.fire{position:relative;color:#fff8e0;font-weight:bold;outline:1.5px solid #ffd27a;outline-offset:1px;background-image:linear-gradient(0deg,#4a0000,#b01400 22%,#ff4a00 45%,#ff9a00 65%,#ffd24a 80%,#ff4a00 90%,#4a0000)!important;background-size:100% 300%!important;animation:cosFireBg 1.1s linear infinite,cosFire .45s ease-in-out infinite alternate;text-shadow:0 0 3px #fff,0 -1px 4px #ffd000,0 -3px 8px #ff7a00,0 -6px 14px #ff2a00}
+.cos-title.fire.fire::before{content:'🔥';position:absolute;left:-8px;top:-9px;font-size:11px;text-shadow:none;animation:cosFlick .5s ease-in-out infinite alternate}
+.cos-title.fire.fire::after{content:'🔥';position:absolute;right:-8px;top:-10px;font-size:12px;color:inherit;text-shadow:none;animation:cosFlick .6s ease-in-out .25s infinite alternate}
+@keyframes cosFireBg{from{background-position:0 0}to{background-position:0 150%}}
+@keyframes cosFire{from{box-shadow:0 0 8px #ff5a00,0 -4px 14px #ff2a00,0 0 2px #fff inset}to{box-shadow:0 0 14px #ffb000,0 -8px 22px #ff3a00,0 0 4px #fff inset}}
+@keyframes cosFlick{from{transform:translateY(0) scale(.85) rotate(-8deg);opacity:.75}to{transform:translateY(-3px) scale(1.15) rotate(8deg);opacity:1}}
 .cos-medal{--c1:#ffc93c}.cos-medal.h0{--c1:#ffd54a}.cos-medal.h1{--c1:#e3ebf5}.cos-medal.h2{--c1:#e0955f}.cos-medal.h3{--c1:#ff7ab0}.cos-medal.h4{--c1:#7fe9ff}.cos-medal.h5{--c1:#e9c46a}
 @keyframes cosGlow{from{box-shadow:0 0 6px var(--c1)}to{box-shadow:0 0 18px var(--c1),0 0 4px #fff}}
 @keyframes cosAura{0%,100%{box-shadow:0 0 12px #ff5c8a,0 0 26px #ff5c8a}25%{box-shadow:0 0 12px #ffc93c,0 0 26px #ffc93c}50%{box-shadow:0 0 12px #7fe9ff,0 0 26px #7fe9ff}75%{box-shadow:0 0 12px #c77dff,0 0 26px #c77dff}}
@@ -44,10 +50,12 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 // 무지개 칭호: 난이도마다 다른 색으로 돈다 (첫 색을 끝에 한 번 더 넣어 이음매 없이)
 const gradCss = (f, force) => (f?.grad && (f.rainbow || force) ? `;background-image:linear-gradient(100deg,${[...f.grad, f.grad[0]].join(',')});background-size:300% 100%` : '');
 const prCls = (f) => (f?.pr >= 1 ? ` p${Math.min(5, Math.floor(f.pr))}` : '');
+// 특이점 순위 칭호 · 메달: 글자가 불타오른다
+const fireCls = (it) => ((it.rule?.diff ?? ACHIEVEMENTS.find((a) => a.id === it.ach)?.rule?.diff) === 'singular' ? ' fire' : '');
 export function titleHtml(id) {
   const it = id && itemById.get(id); if (!it || it.slot !== 'title') return '';
   css(); const t = TIERS[it.rarity] || TIERS.bronze;
-  return `<span class="cos-title${it.fx.rainbow ? ' rb' : ''}${prCls(it.fx)}" style="--c1:${it.fx.grad && it.fx.rainbow ? it.fx.grad[0] : t.color};--g:${t.n * 3}${gradCss(it.fx)}" title="${esc(ACHIEVEMENTS.find((a) => a.id === it.ach)?.desc || '')}">${it.emoji} ${esc(it.name)}</span>`;
+  return `<span class="cos-title${it.fx.rainbow ? ' rb' : ''}${prCls(it.fx)}${fireCls(it)}" style="--c1:${it.fx.grad && it.fx.rainbow ? it.fx.grad[0] : t.color};--g:${t.n * 3}${gradCss(it.fx)}" title="${esc(ACHIEVEMENTS.find((a) => a.id === it.ach)?.desc || '')}">${it.emoji} ${esc(it.name)}</span>`;
 }
 // 이름 옆 메달 (서버가 지금 가장 높은 순위를 골라 준다: 🥇 1위 → 🥈 2위 → 🥉 3위 → 상위 1% → 5% → 10%)
 // title 을 주면: 같은 순위표의 1위 칭호를 이미 달고 있을 때 1위 메달은 빼서 같은 글자가 두 번 뜨지 않게
@@ -55,7 +63,7 @@ export function medalHtml(id, title) {
   const it = id && itemById.get(id); if (!it || it.slot !== 'medal') return '';
   if (title && it.fx.honor === 0 && itemById.get(title)?.ach === it.ach) return '';
   css(); const h = it.fx.honor, t = TIERS[it.rarity] || TIERS.gold;
-  return `<span class="cos-title cos-medal h${h}${h === 0 || h === 3 ? ' rb' : ''}${h === 0 ? prCls(it.fx) : h <= 3 ? prCls({ pr: Math.min(3, it.fx.pr) }) : ''}" style="--g:${t.n * 3}${h === 0 || h === 3 ? gradCss(it.fx, true) : ''}" title="지금 ${esc(it.name)}">${it.emoji}${it.fx.de || ''} ${esc(it.name)}</span>`;
+  return `<span class="cos-title cos-medal h${h}${h === 0 || h === 3 ? ' rb' : ''}${h === 0 ? prCls(it.fx) : h <= 3 ? prCls({ pr: Math.min(3, it.fx.pr) }) : ''}${fireCls(it)}" style="--g:${t.n * 3}${h === 0 || h === 3 ? gradCss(it.fx, true) : ''}" title="지금 ${esc(it.name)}">${it.emoji}${it.fx.de || ''} ${esc(it.name)}</span>`;
 }
 const anon = () => (account.session ? '' : store.get('dreamrunner.anon') || '');
 const q = () => (anon() ? `?anon=${anon()}` : '');
