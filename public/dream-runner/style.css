@@ -449,3 +449,11 @@ body.swplay:not(.swready) #sw-load { color: #f3eee6; background: radial-gradient
 #again-btn.time-again small { display: block; font-size: 12px; opacity: .85; }
 @keyframes timeShine { from { background-position: 0 0; } to { background-position: 200% 0; } }
 @keyframes timeGlow { from { box-shadow: 0 0 10px rgba(255, 213, 79, .3); } to { box-shadow: 0 0 24px rgba(255, 213, 79, .7); } }
+/* ⏳ 시대 넘어갈 때: 빛 소용돌이 + 연도 */
+#time-warp { position: fixed; inset: 0; z-index: 3; pointer-events: none; display: flex; align-items: center; justify-content: center; }
+#time-warp.hidden { display: none; }
+#time-warp .tw-swirl { position: absolute; inset: -30%; background: repeating-conic-gradient(from 0deg, rgba(255, 255, 255, .0) 0deg 9deg, rgba(255, 236, 179, .55) 10deg 13deg, rgba(179, 136, 255, .35) 14deg 18deg); -webkit-mask: radial-gradient(circle, transparent 8%, #000 30%, #000 55%, transparent 75%); mask: radial-gradient(circle, transparent 8%, #000 30%, #000 55%, transparent 75%); animation: twSpin 1.5s cubic-bezier(.2, .7, .3, 1) forwards; }
+#time-warp .tw-year { position: relative; font-family: 'Jua', sans-serif; font-size: clamp(30px, 7vw, 64px); color: #fff; letter-spacing: 2px; text-shadow: 0 0 12px #ffd54f, 0 0 32px #b388ff, 0 3px 0 #5a3a00; animation: twYear 1.5s ease forwards; font-variant-numeric: tabular-nums; }
+#time-warp .tw-year.land { color: #fff3c4; transform: scale(1.12); }
+@keyframes twSpin { 0% { transform: rotate(0deg) scale(.4); opacity: 0; } 15% { opacity: 1; } 70% { opacity: .9; } 100% { transform: rotate(540deg) scale(1.6); opacity: 0; } }
+@keyframes twYear { 0% { opacity: 0; transform: scale(.6); } 12% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-30px) scale(1); } }

@@ -579,10 +579,22 @@ function showDreamCard(d) {
   el.classList.toggle('time', !!th.time); el.querySelector('.dc-ch').textContent = th.time && (d === 0 || track.themeOf(d - 1).ch !== th.ch) ? `제${th.ch}장 · ${CHAPTERS[th.ch]}` : '';
   $('h-dream-name').textContent = `${th.emoji} ${th.name}`;
 }
+// ⏳ 시간 여행: 문을 지나면 빛 소용돌이 + 연도가 슬롯처럼 돌다가 새 시대에서 멈춘다 (작업지시서 1-6)
+let warpT = null;
+function timeWarp(from, to) {
+  const el = $('time-warp'), y = el.querySelector('.tw-year');
+  el.classList.add('hidden'); void el.offsetWidth; el.classList.remove('hidden');
+  clearInterval(warpT); let n = 0;
+  const roll = (s) => s.replace(/[0-9]/g, () => String(Math.floor(Math.random() * 10)));
+  warpT = setInterval(() => { n++; if (n < 9) y.textContent = roll(n < 3 ? from : to); else { y.textContent = to; y.classList.add('land'); clearInterval(warpT); } }, 70);
+  y.classList.remove('land'); y.textContent = from;
+  setTimeout(() => el.classList.add('hidden'), 1500);
+}
 function enterDream(d) {
   game.dream = d; game.dreamsSeen = Math.max(game.dreamsSeen, d + 1);
   const th = track.themeOf(d);
   env.setTheme(th);
+  if (th.time && d > 0) timeWarp(track.themeOf(d - 1).when, th.when);
   if (th.seoul) { seoulNight(th.light < 0.7); seoulRun.jumpHour(); }
   setMusic(th.mus);
   sfx('portal');
