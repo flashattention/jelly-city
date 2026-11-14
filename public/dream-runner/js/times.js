@@ -357,7 +357,7 @@ export const TIMES = [
     near: ['clayTablets', 'datePalm', 'potStack'], mid: ['mudHouse', 'datePalm', 'reedBoat'], far: ['ziggurat'], skyK: ['birdFlock'], scenes: ['scribeWriting'],
     P: { a: '#c8a068', b: '#2a6ad8', c: '#8a4a2a', wall: '#c89a68', roof: '#a07a50', leaf: '#5a8a3a', wood: '#6d4c41', rock: '#b89068' } }),
   t('고대 이집트', '🐫', '4천5백 년 전', '나일강 옆에서 수많은 사람이 돌을 끌어 피라미드를 쌓았어요', 5, {
-    sky: ['#5aa8e8', '#fff3d0', '#e8c890'], fog: [40, 360], light: 1.15, sun: '#ffffff', fx: 'dust', fxC: '#fff3e0', mus: m('phryg', 57, 108, 'triangle'),
+    sky: ['#5aa8e8', '#fff3d0', '#e8c890'], fog: [40, 360], light: 1.05, sun: '#ffffff', fx: 'dust', fxC: '#fff3e0', mus: m('phryg', 57, 108, 'triangle'),
     ground: ['#e8c880', '#d8b068', 'sand', 0, 10], road: ['#d8c090', '#a08050', 'stone', 0],
     cast: { cross: ['egyptWorker', 'egyptPriest'], on: ['stoneSled'], big: ['pharaohBarge'], weave: ['egyptCat'], wall: ['sandstoneWall'], hurdle: ['papyrusRow'], bar: ['hieroglyphBar'] },
     near: ['papyrusClump', 'ankhStatue', 'scarabStone'], mid: ['obelisk', 'datePalm', 'sphinxSmall', 'egyptCrowd'], far: ['pyramidBig', 'pyramidBig', 'sphinxBig'], skyK: ['falconT'], scenes: ['stoneHaul'],
@@ -377,7 +377,7 @@ export const TIMES = [
   t('황하 문명', '🐉', '3천6백 년 전', '상나라 사람들은 거북 등딱지에 점을 쳐 한자의 조상인 갑골문을 새겼어요', 5, {
     sky: ['#d8a070', '#fbe8c8', '#a08060'], fog: [30, 300], light: 1.0, fx: 'leaves', fxC: '#d4e157', mus: m('pent', 55, 92, 'triangle'),
     ground: ['#c8a870', '#b89860', 'dirt', 0, 9], road: ['#a8886a', '#6a5a40', 'dirt', 0],
-    cast: { cross: ['shangPeople'], on: ['shangChariot'], big: ['bronzeDingRoll'], weave: ['silkMoth'], wall: ['rammedEarthWall'], hurdle: ['oracleBones'], bar: ['silkLine'] },
+    cast: { cross: ['shangPeople'], on: ['shangChariot'], big: ['elephantWar'], weave: ['silkMoth'], wall: ['rammedEarthWall'], hurdle: ['oracleBones'], bar: ['silkLine'] },
     near: ['oracleBoneSet', 'bronzeDing', 'mulberry'], mid: ['shangHall', 'mulberry', 'silkLoom'], far: ['loessHills'], skyK: ['craneBird'], scenes: ['oracleReading'],
     P: { a: '#c8a870', b: '#2e7d32', c: '#8a3a2a', wall: '#c8a870', roof: '#5d4037', leaf: '#5a8a3a', wood: '#6d4c41', rock: '#a08060', bronze: '#4a8a6a' } }),
   t('함무라비 법전', '📜', '기원전 1754년', '바빌론의 왕은 282개의 법을 돌기둥에 새겨 모두가 볼 수 있게 했어요', 5, {
@@ -399,13 +399,13 @@ export const TIMES = [
     near: ['amphora', 'letterStone', 'cedarLogs'], mid: ['phoenicianShipT', 'dockPost', 'purpleVat'], far: ['cedarMountain', 'phoenicianShipT'], skyK: ['seagullT'], scenes: ['dyeWork'],
     P: { a: '#7a2a6a', b: '#fff3e0', c: '#c8a070', wall: '#d8c8a0', roof: '#7a2a6a', leaf: '#2f5a3a', wood: '#8d6e63', rock: '#b8a888' } }),
   t('그리스 신화', '⚡', '기원전 8세기', '올림포스산의 제우스, 날개 달린 페가수스… 그리스 사람들은 신들의 이야기를 노래했어요', 5, {
-    sky: ['#4a88d8', '#e8f0ff', '#b0c0d8'], fog: [40, 340], light: 1.15, sun: '#ffffff', fx: 'sparkles', fxC: '#fff9c4', mus: m('lydian', 64, 100, 'triangle'), lightning: true,
-    ground: ['#e8e4d8', '#c8c0a8', 'marble', 0, 6], road: ['#f5f2ea', '#c9a227', 'tile', 0],
+    sky: ['#4a88d8', '#e8f0ff', '#b0c0d8'], fog: [40, 340], light: 0.95, sun: '#ffffff', fx: 'sparkles', fxC: '#fff9c4', mus: m('lydian', 64, 100, 'triangle'), lightning: true,
+    ground: ['#cfc8b8', '#b0a890', 'marble', 0, 6], road: ['#e0dacb', '#c9a227', 'tile', 0],
     cast: { cross: ['greekMuse'], on: ['pegasusLow'], big: ['minotaur'], weave: ['harpy'], wall: ['columnWall'], hurdle: ['brokenColumn'], bar: ['olympusCloud'] },
     near: ['marbleStatue', 'olivePot', 'lyreStand'], mid: ['greekTemple', 'olympusCloudT', 'pegasusT'], far: ['mtOlympus'], skyK: ['zeusBolt', 'pegasusSky'], scenes: ['zeusThunder'],
     P: { a: '#f5f2ea', b: '#c9a227', c: '#1565c0', wall: '#f5f2ea', roof: '#e8e0d0', leaf: '#6a8a4a', wood: '#8d6e63', rock: '#d8d0c0' } }),
   t('고대 올림픽', '🏅', '기원전 776년', '올림피아에서 첫 올림픽이 열렸어요. 우승자는 올리브 관을 썼죠', 5, {
-    sky: ['#5aa8e8', '#f0f8ff', '#c8c8a8'], fog: [40, 340], light: 1.15, sun: '#ffffff', fx: 'leaves', fxC: '#9ccc65', mus: m('major', 64, 120, 'triangle'),
+    sky: ['#5aa8e8', '#f0f8ff', '#c8c8a8'], fog: [40, 340], light: 1.05, sun: '#ffffff', fx: 'leaves', fxC: '#9ccc65', mus: m('major', 64, 120, 'triangle'),
     ground: ['#c8b080', '#b8a070', 'sand', 0, 9], road: ['#d8c090', '#a08050', 'sand', 0],
     cast: { cross: ['athlete'], on: ['chariotRace'], big: ['chariotRace'], weave: ['athleteRun'], wall: ['columnWall'], hurdle: ['startLine'], bar: ['oliveGarland'] },
     near: ['olivePot', 'discusStatue', 'torchStake'], mid: ['stadiumSeat', 'oliveTree', 'templeZeus'], far: ['stadiumSeat'], skyK: ['birdFlock'], scenes: ['footRace'],
@@ -423,7 +423,7 @@ export const TIMES = [
     near: ['lotusPond', 'scrollStack', 'stonelantern'], mid: ['bodhiTree', 'academyColumns', 'bambooGrove'], far: ['bodhiTree', 'mountainMist'], skyK: ['craneBird'], scenes: ['teaching'],
     P: { a: '#c8b898', b: '#ffcc80', c: '#e65100', wall: '#e8dcc8', roof: '#8a5a3a', leaf: '#5a8a3a', wood: '#6d4c41', rock: '#b8a890' } }),
   t('아테네 민주정', '🗳️', '기원전 5세기', '아테네 시민들은 광장에 모여 투표로 나라의 일을 정했어요. 민주주의의 시작이에요', 5, {
-    sky: ['#4a98e0', '#eef6ff', '#b8c0c8'], fog: [40, 340], light: 1.15, sun: '#ffffff', fx: 'none', mus: m('major', 62, 100, 'triangle'),
+    sky: ['#4a98e0', '#eef6ff', '#b8c0c8'], fog: [40, 340], light: 1.05, sun: '#ffffff', fx: 'none', mus: m('major', 62, 100, 'triangle'),
     ground: ['#d8d0b8', '#c8c0a8', 'stone', 0, 7], road: ['#ece6d8', '#a89870', 'tile', 0],
     cast: { cross: ['athenian', 'philosopher'], on: ['oxCart'], big: ['triremeRoll'], weave: ['owlT'], wall: ['columnWall'], hurdle: ['potRow'], bar: ['theaterMaskBar'] },
     near: ['ostraconPile', 'amphora', 'owlStatue'], mid: ['agoraStoa', 'theaterMask', 'athenianCrowd'], far: ['parthenon', 'acropolisHill'], skyK: ['owlSky'], scenes: ['voting'],
@@ -447,7 +447,7 @@ export const TIMES = [
     near: ['spiceSacksT', 'oasisPalm', 'silkBolt'], mid: ['caravanserai', 'camelT', 'oasisPool'], far: ['duneBig', 'duneBig'], skyK: ['falconT'], scenes: ['caravanRest'],
     P: { a: '#e0b070', b: '#c62828', c: '#1e88e5', wall: '#d8b888', roof: '#c08050', leaf: '#4a8a3a', wood: '#6d4c41', rock: '#c8a070' } }),
   t('로마 콜로세움', '🏟️', '서기 80년', '5만 명이 들어가는 콜로세움에서 검투사 경기와 공연이 열렸어요', 5, {
-    sky: ['#5aa0e0', '#f8f0e0', '#c8b898'], fog: [40, 340], light: 1.15, sun: '#ffffff', fx: 'none', mus: m('major', 57, 112, 'triangle'),
+    sky: ['#5aa0e0', '#f8f0e0', '#c8b898'], fog: [40, 340], light: 1.05, sun: '#ffffff', fx: 'none', mus: m('major', 57, 112, 'triangle'),
     ground: ['#b8a888', '#a89878', 'stone', 0, 7], road: ['#a89a88', '#6a5a48', 'stone', 0],
     cast: { cross: ['romanCitizen', 'gladiator'], on: ['romanCart'], big: ['romanChariot'], weave: ['romanMessenger'], wall: ['shieldWallRoman'], hurdle: ['amphoraRow'], bar: ['velariumBar'] },
     near: ['romanStatue', 'amphora', 'cypress'], mid: ['romanInsula', 'aqueductT', 'romanCrowd'], far: ['colosseum', 'aqueductT'], skyK: ['eagleT'], scenes: ['gladiatorDuel'],
@@ -539,7 +539,7 @@ export const TIMES = [
     near: ['porcelainVase', 'compassStand', 'ropeCoilT'], mid: ['treasureShipT', 'giraffeT', 'dockPost'], far: ['treasureShipT', 'treasureShipT'], skyK: ['seagullT'], scenes: ['shipSail'],
     P: { a: '#c62828', b: '#1e88e5', c: '#f5f5f5', wall: '#e8d8c0', roof: '#c62828', leaf: '#3f6a3a', wood: '#8a5a3a', rock: '#9a8a78' } }),
   t('르네상스', '🎨', '15세기', '피렌체의 화가 · 조각가 · 발명가들이 사람과 자연을 새로운 눈으로 바라봤어요', 6, {
-    sky: ['#5a98d8', '#fff0d8', '#d8b890'], fog: [40, 340], light: 1.15, sun: '#fff8e1', fx: 'petals', fxC: '#ffccbc', mus: m('major', 60, 100, 'triangle'),
+    sky: ['#5a98d8', '#fff0d8', '#d8b890'], fog: [40, 340], light: 1.05, sun: '#fff8e1', fx: 'petals', fxC: '#ffccbc', mus: m('major', 60, 100, 'triangle'),
     ground: ['#c8a878', '#b89868', 'stone', 0, 6], road: ['#d0b890', '#8a5a3a', 'brick', 0],
     cast: { cross: ['renaissanceArtist', 'florentine'], on: ['horseCart'], big: ['flyingMachineCart'], weave: ['horseRider'], wall: ['easelWall'], hurdle: ['paintPots'], bar: ['canvasBar'] },
     near: ['easel', 'marbleStatue', 'cypress'], mid: ['florenceHouse', 'davidStatue', 'artistAtWork'], far: ['duomo', 'tuscanHills'], skyK: ['ornithopter'], scenes: ['artistAtWork'],
@@ -631,7 +631,7 @@ export const TIMES = [
     near: ['lightBulbPost', 'teslaCoilSmall', 'phoneBooth'], mid: ['teslaCoil', 'brickRowHouse', 'telegraphPole'], far: ['electricCity'], skyK: [], scenes: ['teslaSpark'],
     P: { a: '#ffd54f', b: '#4fc3f7', c: '#3a3a3a', wall: '#8a4a3a', roof: '#3a3a3a', leaf: '#3a4a3a', wood: '#4e342e', rock: '#6a6460' } }),
   t('첫 비행', '✈️', '1903년', '라이트 형제의 비행기가 12초 동안 하늘을 날았어요. 인류가 처음 하늘을 난 순간이에요', 7, {
-    sky: ['#4aa0e8', '#e8f4ff', '#d8d0b8'], fog: [40, 360], light: 1.15, sun: '#ffffff', fx: 'none', mus: m('lydian', 64, 116, 'triangle'),
+    sky: ['#4aa0e8', '#e8f4ff', '#d8d0b8'], fog: [40, 360], light: 1.05, sun: '#ffffff', fx: 'none', mus: m('lydian', 64, 116, 'triangle'),
     ground: ['#e0d0a8', '#d0c098', 'sand', 0, 10], road: ['#c8b890', '#8a7a5a', 'plank', 0],
     cast: { cross: ['aviator'], on: ['biplaneTaxi'], big: ['biplaneTaxi'], weave: ['bicycleOld'], wall: ['crateWallT'], hurdle: ['launchRail'], bar: ['wingBar'] },
     near: ['dunGrass', 'windsock', 'toolCrate'], mid: ['woodenHangar', 'wrightFlyerT', 'duneSmall'], far: ['duneBig'], skyK: ['wrightFlyerSky', 'seagullT'], scenes: ['firstFlight'],
