@@ -771,7 +771,7 @@ export class Track {
   //   움직임은 모두 같은 시계 t 로만 정해서(곰 위치와 상관없이) 같은 방 사람 · 기록 다시 돌리기에서 똑같다
   //   모양은 브라우저가 this.makeMover(kind, n) 로 넣는다 (서버의 기록 다시 돌리기에선 빈 묶음)
   mover(kind, o) {
-    const g = this.makeMover?.(kind, o.n ?? 0) || new THREE.Group();
+    const g = this.makeMover?.(kind, o.n ?? 0, o) || new THREE.Group();
     this.root.add(g); g.userData.s = o.sEnd ?? o.s ?? 0;
     // sEnd: 치우는 기준 (판정이 잠깐 꺼진 동안 s1 = -1e9 라서 그걸로 치우면 앞에 있는 차 · 행인이 화면 · 판정에서 사라졌다 · 6-10)
     const ob = { kind: o.hitKind || 'mover', s0: -1e9, s1: -1e9, x0: 1e9, x1: 1e9, y0: o.y, y1: o.y + o.h, mesh: g, seoul: kind, hit: o.hit, sEnd: o.type === 'on' ? Infinity : (o.sEnd ?? o.s ?? 0) + 2 };

@@ -6,7 +6,7 @@ import { glow } from './kits.js';
 
 export { THREE, toon, G, geo, glow };
 export const M = (c) => (typeof c === 'object' ? c : toon(c));
-export function add(p, g, mat, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0) { const m = new THREE.Mesh(g, M(mat)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.set(rx, ry, rz); p.add(m); return m; }
+export function add(p, g, mat, x, y, z, sx = 1, sy = sx, sz = sx, rx = 0, ry = 0, rz = 0) { const m = new THREE.Mesh(g, M(mat)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.set(rx, ry, rz); p.add(m); return m; }
 export const grp = (...ch) => { const g = new THREE.Group(); for (const c of ch) g.add(c); return g; };
 // 상자(가운데) · 상자(바닥) · 원기둥(바닥) · 공 · 원뿔(바닥) · 고리
 export const B = (p, c, x, y, z, w, h, d, ry = 0, rx = 0, rz = 0) => add(p, G.box(), c, x, y, z, w, h, d, rx, ry, rz);
@@ -172,18 +172,19 @@ export function quad(r, o = {}) {
   if (o.stripes) for (let i = 0; i < 6; i++) add(body, G.box(), o.stripes, 0, by + W * 0.1, (i / 5 - 0.5) * L * 0.8, W * 1.12, W * 0.9, L * 0.04);
   // 목 · 머리
   const neck = new THREE.Group(); neck.position.set(0, by + W * 0.1, L * 0.45); body.add(neck);
-  const nl = o.neck ?? W * 0.6, hs = o.head ?? W * 0.42;
-  add(neck, G.sphereLow(), c, 0, nl * 0.4, nl * 0.25, W * 0.24, nl * 0.55 + 0.05, W * 0.24, -0.5);
-  const head = new THREE.Group(); head.position.set(0, nl * 0.85, nl * 0.5 + hs * 0.4); neck.add(head);
+  // 목: 세로에서 앞으로 tilt 만큼 기운다 (목이 긴 공룡 · 기린은 곧게, 보통 짐승은 앞으로)
+  const nl = o.neck ?? W * 0.6, hs = o.head ?? W * 0.42, tilt = o.tilt ?? (nl > 2 ? 0.45 : 0.95);
+  add(neck, G.sphereLow(), c, 0, nl * 0.5 * Math.cos(tilt), nl * 0.5 * Math.sin(tilt), W * 0.24, nl * 0.55 + 0.05, W * 0.24, tilt);
+  const head = new THREE.Group(); head.position.set(0, nl * Math.cos(tilt), nl * Math.sin(tilt) + hs * 0.4); neck.add(head);
   add(head, G.sphereLow(), c, 0, 0, 0, hs * 0.8, hs * 0.75, hs);
   add(head, G.sphereLow(), c2, 0, -hs * 0.2, hs * 0.75, hs * 0.5, hs * 0.42, hs * 0.45);
   for (const sx of [-1, 1]) add(head, G.sphereLow(), '#1a1a1a', sx * hs * 0.5, hs * 0.2, hs * 0.6, hs * 0.11, hs * 0.13, hs * 0.08);
   if (o.ears !== false) for (const sx of [-1, 1]) add(head, G.sphereLow(), o.earC || c, sx * hs * 0.55, hs * 0.65, -hs * 0.1, hs * (o.bigEars ? 0.5 : 0.18), hs * (o.bigEars ? 0.6 : 0.28), hs * 0.08);
   if (o.horns) for (const sx of [-1, 1]) add(head, G.cone(), o.hornC || '#efe6d0', sx * hs * 0.45, hs * 0.85, hs * 0.1, hs * 0.12, hs * (o.horns), hs * 0.12, -0.3, 0, -sx * 0.5);
   if (o.antlers) for (const sx of [-1, 1]) { add(head, G.cylLow(), '#a1887f', sx * hs * 0.4, hs * 1.1, 0, hs * 0.05, hs * 1.0, hs * 0.05, 0, 0, -sx * 0.5); add(head, G.cylLow(), '#a1887f', sx * hs * 0.75, hs * 1.4, 0, hs * 0.04, hs * 0.6, hs * 0.04, 0, 0, sx * 0.3); }
-  if (o.tusks) for (const sx of [-1, 1]) add(head, torG(o.tusks, o.tusks * 0.1, 2.4), '#f5ecd7', sx * hs * 0.35, -hs * 0.6 - o.tusks * 0.6, hs * 0.8, 1, 1, 1, 0, Math.PI / 2 * sx * 0 + Math.PI / 2, Math.PI);
+  if (o.tusks) for (const sx of [-1, 1]) { const L1 = o.tusks; add(head, G.cylLow(), '#f5ecd7', sx * hs * 0.38, -hs * 0.45 - L1 * 0.35, hs * 0.75 + L1 * 0.2, L1 * 0.09, L1 * 0.8, L1 * 0.09, 0.5, 0, sx * 0.15); add(head, G.cone(), '#f5ecd7', sx * hs * 0.48, -hs * 0.55 - L1 * 0.5, hs * 0.85 + L1 * 0.75, L1 * 0.085, L1 * 0.9, L1 * 0.085, 2.2, 0, sx * 0.35); }
   if (o.trunk) { const tr = add(head, G.cone(), c, 0, -hs * 0.9, hs * 1.0, hs * 0.22, hs * 1.6, hs * 0.22, Math.PI); tr.userData.trunk = true; }
-  if (o.mane) add(neck, G.sphereLow(), o.mane, 0, nl * 0.75, nl * 0.15, W * 0.32, nl * 0.45 + 0.1, W * 0.4);
+  if (o.mane) add(neck, G.sphereLow(), o.mane, 0, nl * 0.5 * Math.cos(tilt) + W * 0.12, nl * 0.5 * Math.sin(tilt) - W * 0.1, W * 0.3, nl * 0.5 + 0.1, W * 0.36, tilt);
   if (o.horn1) add(head, G.cone(), o.hornC || '#efe6d0', 0, hs * 0.2, hs * 1.1, hs * 0.15, hs * o.horn1, hs * 0.15, 1.1);
   // 다리 · 꼬리
   const legs = [];

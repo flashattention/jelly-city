@@ -83,7 +83,7 @@ function roadMat(r) {
   m = new THREE.MeshLambertMaterial({ map: t, emissive: glowK ? new THREE.Color('#ffffff') : new THREE.Color('#000000'), emissiveIntensity: glowK || 0, emissiveMap: glowK ? t : null, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   roadMats.set(key, m); return m;
 }
-const G_PLANE = new THREE.PlaneGeometry(1, 1);
+const G_PLANE = new THREE.PlaneGeometry(1, 1), BOX = new THREE.Box3();
 // 평면 (눕히면 +v 가 앞쪽 = s 가 커지는 쪽): u 는 가로 반복, v 는 s0 부터
 function uvPlane(w, len, ru, rv, v0) {
   const g = new THREE.PlaneGeometry(w, len), uv = g.attributes.uv;
@@ -154,7 +154,9 @@ export class TimeWorld {
     let n = 0; while (this.at + STEP <= lim && n++ < 3) { this.fill(this.at, this.at + STEP); this.at += STEP; }
     this.cells = this.cells.filter((c) => { if (c.s1 < ps - BEHIND) { this.drop(c.g); return false; } return true; });
     this.anim = this.anim.filter((o) => o.parent);
-    for (const o of this.anim) { const s = o.userData.s; if (s > ps - 30 && s < ps + 220) o.userData.anim(o, t, dt); }
+    const cur = T.dreamAt(ps);
+    for (const c of this.cells) for (const sg of c.g.userData.segs || []) sg.visible = sg.userData.d <= cur || sg.userData.s0 - ps < 18;
+    for (const o of this.anim) { const s = o.userData.s; if (s > ps - 30 && s < ps + 220 && o.parent.visible) o.userData.anim(o, t, dt); }
   }
   // 칸 하나 [s0, s1): 시대 경계에서 나눠서 땅 · 길, 그다음 풍경
   fill(s0, s1) {
@@ -167,13 +169,30 @@ export class TimeWorld {
       const rep = th.ground?.[4] || 7, RW = TIME_W + 0.6;
       const gr = new THREE.Mesh(uvPlane(WIDE, len, WIDE / rep, len / rep, a / rep), gm); gr.userData.own = true; gr.rotation.x = -Math.PI / 2; gr.position.set(0, -0.02, -(a + b) / 2); g.add(gr);
       const ro = new THREE.Mesh(uvPlane(RW, len, 1, len / RW, a / RW), rm); ro.userData.own = true; ro.rotation.x = -Math.PI / 2; ro.position.set(0, 0, -(a + b) / 2); g.add(ro);
-      this.scenery(g, a, b, th);
+      // 시대마다 풍경 묶음: 다음 시대 풍경은 그 시대의 문을 지날 때 펼쳐진다 (update)
+      const seg = new THREE.Group(); seg.userData.d = T.dreamAt((a + b) / 2); seg.userData.s0 = a; g.add(seg); (g.userData.segs ||= []).push(seg);
+      this.scenery(seg, a, b, th);
     }
     this.root.add(g); this.cells.push({ s0, s1, g });
   }
   scenery(cell, a, b, th) {
     const len = b - a, k = len / STEP, P = th.P || {}, stat = new THREE.Group(); let animN = 0;
     const meshes = (o) => { let n = 0; o.traverse((c) => { if (c.isMesh) n++; }); return n; };
+    // 조각 하나를 s 자리 · 띠(band)에 놓는다
+    const place = (band, name, sAt) => {
+      const K = TK[name]; if (!K) return;
+      const o = K.build(rr, P, th); if (!o) return;
+      const side = R() < 0.5 ? -1 : 1, [x0, x1] = K.band || BAND[band];
+      let x = side * rr.range(x0, x1); const y = band === 'sky' ? rr.range(BAND.sky[0], K.high || 70) : 0;
+      // 길을 덮지 않게: 조각의 반지름만큼 길에서 더 떨어뜨린다 (하늘에 뜬 것은 빼고)
+      if (band !== 'sky' && !K.y) { BOX.setFromObject(o); const rad = Math.max(-BOX.min.x, BOX.max.x, -BOX.min.z, BOX.max.z); const need = TIME_W / 2 + 1.2 + rad; if (Math.abs(x) < need) x = side * need; }
+      o.position.set(x, y + (K.y || 0), -sAt);
+      o.rotation.y = K.face ? (side > 0 ? -Math.PI / 2 : Math.PI / 2) + rr.range(-0.3, 0.3) : rr.range(0, Math.PI * 2);
+      o.userData.s = sAt; o.userData.kit = name;
+      // 통째로만 움직이는 것(rootAnim: 돌기 · 떠오르기 · 숨쉬기)은 속을 묶어서 그대로 움직인다
+      if (o.userData.anim) { if (o.userData.rootAnim) bakeColored(o); const mn = meshes(o); if (animN + mn <= ANIM_CAP || (band === 'scene' && animN + mn <= ANIM_CAP * 1.6)) { animN += mn; cell.add(o); this.anim.push(o); o.userData.y0 = o.position.y; return; } delete o.userData.anim; }
+      stat.add(o);
+    };
     const put = (band, names, count) => {
       if (!names?.length) return;
       let n = count * k; n = Math.floor(n) + (R() < n % 1 ? 1 : 0);
@@ -181,17 +200,11 @@ export class TimeWorld {
         const name = rr.pick(names), K = TK[name]; if (!K) continue;
         // gap: 이 조각끼리 최소 간격(m) — 큰 것(빅뱅 한가운데 · 태양 등)은 드물게
         const sAt = a + R() * len; if (K.gap && sAt - (this.last[name] ?? -1e9) < K.gap) continue; this.last[name] = sAt;
-        const o = K.build(rr, P, th); if (!o) continue;
-        const side = R() < 0.5 ? -1 : 1, [x0, x1] = K.band || BAND[band], s = sAt;
-        const x = side * rr.range(x0, x1), y = band === 'sky' ? rr.range(BAND.sky[0], K.high || 70) : 0;
-        o.position.set(x, y + (K.y || 0), -s);
-        o.rotation.y = K.face ? (side > 0 ? -Math.PI / 2 : Math.PI / 2) + rr.range(-0.3, 0.3) : rr.range(0, Math.PI * 2);
-        o.userData.s = s;
-        // 통째로만 움직이는 것(rootAnim: 돌기 · 떠오르기 · 숨쉬기)은 속을 묶어서 그대로 움직인다
-        if (o.userData.anim) { if (o.userData.rootAnim) bakeColored(o); const mn = meshes(o); if (animN + mn <= ANIM_CAP || (band === 'scene' && animN + mn <= ANIM_CAP * 1.6)) { animN += mn; cell.add(o); this.anim.push(o); o.userData.y0 = o.position.y; continue; } delete o.userData.anim; }
-        stat.add(o);
+        place(band, name, sAt);
       }
     };
+    // 시대가 시작하는 칸: 그 시대의 큰 상징물(피라미드 · 콜로세움 · 만리장성 …)을 문 바로 너머에 꼭 세운다
+    if (this.track.bounds.includes(a)) for (const name of th.far || []) { const K = TK[name]; if (K?.gap >= 100 && (this.last[name] ?? -1e9) < a - 50) { const sAt = a + rr.range(35, 80); this.last[name] = sAt; place('far', name, sAt); } }
     if (th.scenes?.length) put('scene', th.scenes, PER.scene);
     put('far', th.far, PER.far); put('mid', th.mid, PER.mid); put('near', th.near, PER.near); put('sky', th.skyK, PER.sky);
     bakeColored(stat); cell.add(stat);

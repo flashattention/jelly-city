@@ -4,6 +4,8 @@
 //   모양은 판정 상자를 넉넉히 채우되 넘치지 않게. 앞 = +z (마주 오는 것은 곰을 본다)
 import { THREE, add, B, C, S, Sh, K, T, Oct, Rock, glow, G, flame, liven } from './time-lib.js';
 import { CAST_PEOPLE } from './time-cast-people.js';
+import { LIFE_CAST } from './time-life.js';
+import { CIV_CAST } from './time-civ.js';
 import { COSMOS } from './time-kits-cosmos.js';
 
 const rnd = (n) => { let s = (n * 2654435761) >>> 0; const f = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; return { next: f, range: (a, b) => a + (b - a) * f(), int: (a, b) => Math.floor(a + (b - a + 1) * f()), pick: (a) => a[Math.floor(f() * a.length)], chance: (p) => f() < p }; };
@@ -59,12 +61,24 @@ const COSMIC_CAST = {
   rockArchBar: () => fitBar((o, w, h) => { for (let i = 0; i < Math.round(w / 1.2); i++) Rock(o, ['#5d4037', '#6d4c41'][i % 2], -w / 2 + 0.6 + i * 1.2, h / 2, 0, 0.7, h / 2, 0.35, i); for (const sx of [-1, 1]) Rock(o, '#4e342e', sx * w / 2, -0.5 + (h + 1) / 2 - 0.5, 0, 0.5, (h + 1) / 2, 0.5); }),
 };
 
-const ALL = { ...COSMIC_CAST, ...CAST_PEOPLE };
+const ALL = { ...COSMIC_CAST, ...LIFE_CAST, ...CIV_CAST, ...CAST_PEOPLE };
 // 빛 웅덩이 크기 (역할 크기 대충): 서 있는 것은 fit 에서 폭에 맞춘다
-export function makeTimeMover(kind, n) {
+// 판정 상자에 맞게 고르게 줄이고 늘린다 (바닥 y=0 · 가운데 정렬). 상자 크기는 역할마다 같다
+const BOX = new THREE.Box3(), V = new THREE.Vector3();
+function fitBox(g, w, l, h, over = 1.08) {
+  const inner = new THREE.Group(); while (g.children.length) inner.add(g.children[0]); g.add(inner);
+  inner.updateMatrixWorld(true); BOX.setFromObject(inner); BOX.getSize(V); if (V.x < 1e-3 || V.y < 1e-3 || V.z < 1e-3) return;
+  const k = Math.min(w / V.x, l / V.z, h / V.y) * over; inner.scale.setScalar(k);
+  // 움직임은 안쪽 묶음에 (원래 anim 이 q.children[i] 를 쓰므로)
+  const an = g.userData.anim; if (an) g.userData.anim = (q, t, dt) => { inner.userData.walk = q.userData.walk; an(inner, t, dt); };
+  inner.position.set(-(BOX.min.x + BOX.max.x) / 2 * k, -BOX.min.y * k, -(BOX.min.z + BOX.max.z) / 2 * k);
+}
+export function makeTimeMover(kind, n, o) {
   const f = ALL[kind]; if (!f) return null;
   const g = f(rnd(n + 11)); if (!g) return null;
   g.userData.keepGeo = true;
+  // 움직이는 배역: 역할 판정 상자에 맞춘다 (건너는 것은 옆으로 걸으니 길이 · 폭이 바뀐다)
+  if (o && !g.userData.fit && !g.userData.noFit) { const cr = o.type === 'cross'; fitBox(g, cr ? o.ls : o.lx, cr ? o.lx : o.ls, o.h); }
   if (g.userData.fit) { const fit = g.userData.fit; g.userData.fit = (o, w, h) => { fit(o, w, h); halo(o, w + 2, 2.6, 0.03 - o.position.y); }; }
   else halo(g, 2.4, 3.2);
   return g;

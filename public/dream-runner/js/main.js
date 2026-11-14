@@ -62,6 +62,8 @@ track.makeMover = (kind, n) => makeTimeMover(kind, n) || makeSeoulMover(kind, n)
 const tworld = new TimeWorld(scene);
 // 시간 여행 이어 달리기: 마지막으로 쓰러진 시대 (다음 판은 거기서)
 const ERA_KEY = 'dr-time-era';
+// 시간 여행에서는 곰을 사람 · 동물과 같은 비율로 (보이는 키 약 1.7m · 판정 키 1.45m)
+const TIME_BEAR = 0.72;
 const timeEra = () => { const e = Number(store.get(ERA_KEY)); return Number.isInteger(e) && e >= 0 && e < ERAS.length ? e : 0; };
 env.originRef = track;
 const runner = new Runner(scene, {});
@@ -915,7 +917,9 @@ function frame() {
   input.jump = input.slide = input.shove = input.item = false;
   const sOn = seoulOn(); if (sOn !== seoulWas) { seoulWas = sOn; seoulSwap(sOn); }
   if (sOn) { seoulFrame(dt); return; }
-  if (tworld.track) tworld.update(dt, game.mode === 'title' ? t : game.runT, runner.s);
+  if (tworld.track) { tworld.update(dt, game.mode === 'title' ? t : game.runT, runner.s); if (game.mode !== 'title') { runner.bear.root.scale.setScalar(TIME_BEAR); for (const g of game.ghosts.values()) g.bear.root.scale.setScalar(TIME_BEAR); } }
+  else if (game.timeBear) { runner.bear.root.scale.setScalar(1); for (const g of game.ghosts.values()) g.bear.root.scale.setScalar(1); }
+  game.timeBear = !!tworld.track && game.mode !== 'title';
   env.update(dt, t, camera, runner.s, runner.x, runner.y);
   renderer.render(scene, camera);
 }
@@ -989,7 +993,8 @@ function followCamera(dt) {
     yc = game.camR;
   } else game.camG = null;
   // 서울 맵은 곰이 작아진 만큼(6-13) 카메라를 가까이 · 낮게
-  const sk = seoulOn() ? 0.72 : 1; up *= sk; back *= sk; look *= sk; ahead *= sk;
+  // 시간 여행도 곰을 사람 크기로 줄였으니(TIME_BEAR) 카메라를 조금 가까이
+  const sk = seoulOn() ? 0.72 : track.tmap && game.mode !== 'title' ? 0.8 : 1; up *= sk; back *= sk; look *= sk; ahead *= sk;
   const cx = x * 0.85, cy = Math.max(yc, fl) + up + game.camFall * 5;
   // 서울 맵: 곧은 길 자리에서 정하고, 그리기 전에 실제 길 위로 옮긴다 (seoulFrame)
   const cam = seoulOn() ? seoulCam : camera;
