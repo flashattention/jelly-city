@@ -851,6 +851,7 @@ const EXTRA = {
   '첫 비행': { skyK: ['cloud', 'birds'] },
   '스마트폰': { near: ['bench', 'lampPost'] },
   '팬데믹': { near: ['bench', 'lampPost'] },
+  '특이점': { near: ['glitchCube', 'screenPost', 'surveillanceCam'], mid: ['screenTower', 'aiMonolith', 'dataCenter'] }, '기계 도시': { near: ['warningSign', 'brokenBot', 'surveillanceCam'], mid: ['machineTower', 'screenTower', 'factoryArm'] }, 'AI 코어 돌파': { near: ['dataShard', 'circuitPillar'], mid: ['laserGate', 'circuitPillar'] }, '인터넷': { near: ['routerT'], mid: ['serverRackT', 'globeNet'] }, '개인용 컴퓨터': { near: ['crtPC'], mid: ['arcadeRow', 'pixelInvader'] },
   '화성 이주': { near: ['rock', 'crystal'], far: ['mountain'] },
   '마지막 숲': { near: ['mushroom', 'pine'] },
   '새로운 새벽': { near: ['flower', 'roundTree', 'blossom'], skyK: ['cloud', 'balloonAir'] },
