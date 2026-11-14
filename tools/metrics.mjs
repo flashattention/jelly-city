@@ -12,7 +12,7 @@ const fmt = (n) => Math.round(n).toLocaleString('ko-KR');
 const pct = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : '-');
 const median = (xs) => { const s = [...xs].sort((a, b) => a - b); return s.length ? (s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2) : 0; };
 const hours = (sec) => (sec >= 3600 ? `${(sec / 3600).toFixed(1)}시간` : `${Math.round(sec / 60)}분`);
-const date = (t) => new Date(t).toISOString().slice(0, 10);
+const date = (t) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10); // 한국 날짜
 const out = [];
 const p = (s = '') => out.push(s);
 
@@ -24,7 +24,7 @@ const MAP = { dream: '꿈나라', hell: '지옥', void: '이공간' };
 
 p('# 운영 지표');
 p();
-p(`> ${date(now)} 기준 · 실제 서버 저장 파일에서 \`tools/metrics.mjs\`로 뽑은 합계예요. 개인 정보와 닉네임은 넣지 않아요.`);
+p(`> ${date(now)} 기준 · 실제 서버 저장 파일에서 \`tools/metrics.mjs\`로 뽑은 합계예요. 매일 00:17(KST)에 GitHub Actions(\`.github/workflows/metrics.yml\`)가 자동으로 다시 뽑아요. 개인 정보와 닉네임은 넣지 않아요.`);
 p();
 
 // ---------- 계정 ----------
@@ -183,5 +183,94 @@ if (board) {
   p();
 }
 if (world?.feedback) { p(`- 게임 안 문의 · 제보: ${fmt(world.feedback.length)}건`); p(); }
+
+// ---------- 게임별 플레이 시간 (playtime.json: 날짜 → 게임 → 1분마다 한 번 알림 · '#n' 은 판수) ----------
+const pt = read('playtime');
+if (pt?.d) {
+  const names = {}; try { const html = fs.readFileSync(new URL('../public/index.html', import.meta.url), 'utf8'); for (const m of html.matchAll(/href="\/((?:dream-runner|jelly-[a-z]+))\/"[\s\S]{0,1500}?<h3>([^<]+)</g)) names[m[1]] ??= m[2].trim(); } catch { /* 이름 없이 */ }
+  const days = Object.keys(pt.d).sort(), kst = (t) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10), since = (n) => kst(now - (n - 1) * DAY);
+  const sum = (from, g, suffix = '') => days.filter((d) => d >= from).reduce((a, d) => a + (pt.d[d][`${g}${suffix}`] || 0), 0);
+  const games = [...new Set(days.flatMap((d) => Object.keys(pt.d[d]).filter((k) => !k.includes('#'))))];
+  const rowsP = games.map((g) => ({ g, m7: sum(since(7), g), m30: sum(since(30), g), all: sum('', g), n30: sum(since(30), g, '#n') })).filter((x) => x.all > 0).sort((a, b) => b.m30 - a.m30 || b.all - a.all);
+  if (rowsP.length) {
+    p('## 게임별 플레이 시간'); p();
+    p(`- 집계 기간: ${days[0]} ~ ${days.at(-1)} (서버가 최근 120일만 보관) · 화면이 보이고 사람이 움직이는 동안 1분마다 한 번 센다`); p();
+    p('| 게임 | 최근 7일 | 최근 30일 | 30일 판수 | 보관 기간 합계 |'); p('|---|---|---|---|---|');
+    for (const x of rowsP) p(`| ${names[x.g] || x.g} | ${hours(x.m7 * 60)} | ${hours(x.m30 * 60)} | ${fmt(x.n30)}판 | ${hours(x.all * 60)} |`);
+    p();
+    const last = days.slice(-14); p('### 최근 14일 일별 (모든 게임)'); p(); p('| 날짜 | 플레이 시간 | 판수 |'); p('|---|---|---|');
+    for (const d of last) { const D = pt.d[d]; let m = 0, n = 0; for (const [k, v] of Object.entries(D)) if (k.endsWith('#n')) n += v; else m += v; p(`| ${d} | ${hours(m * 60)} | ${fmt(n)}판 |`); }
+    p();
+  }
+}
+
+// ---------- 젤리 서울 러너 (익명 이용 이벤트: seoul-walk-metrics/날짜.jsonl, 정의는 docs/dream-runner/서울러너-지표.md) ----------
+{
+  const sw = path.join(DIR, 'seoul-walk-metrics'); let files = []; try { files = fs.readdirSync(sw).filter((f) => f.endsWith('.jsonl')).sort(); } catch { /* 아직 없음 */ }
+  if (files.length) {
+    const { buildReport } = await import('../server/seoul-walk/report.js'), readline = await import('node:readline');
+    async function* rows() { for (const f of files) for await (const l of readline.createInterface({ input: fs.createReadStream(path.join(sw, f)), crlfDelay: Infinity })) { try { yield JSON.parse(l); } catch { /* 깨진 줄 */ } } }
+    const R = await buildReport(rows(), { days: files.length }), O = R['개요'], Fn = R['퍼널'], Rt = R['리텐션'], A = R['지역'], B = R['행동'], T = R['기술'], U = R['유저별플레이시간'];
+    const list = (xs, unit = '', n = 8) => (xs || []).slice(0, n).map(([k, v]) => `${k} ${typeof v === 'number' ? fmt(v) : v}${unit}`).join(' · ') || '-';
+    const v = (x) => (x == null ? '-' : x), pc = (x) => (x == null ? '-' : `${x}%`);
+    const KO = { pick: '직접 고름', random: '무작위', map: '지도', last: '이어 걷기', resume: '이어 걷기', direct: '주소로 바로', walk: '걷기', fly: '날기', idle: '멈춤', shop: '가게 안', station: '역 안', train: '열차', mall: '몰', deck: '전망대', cafe: '카페', bakery: '빵집', korean: '식당', chicken: '치킨', pizza: '피자', burger: '버거', chinese: '중식', japanese: '일식', pub: '술집', mart: '편의점' };
+    const ko = (xs) => (xs || []).map(([k, n]) => [KO[k] || k, n]);
+    p('## 젤리 서울 러너 (익명 이용 지표)'); p();
+    p(`- 수집 기간: ${files[0].slice(0, 10)} ~ ${files.at(-1).slice(0, 10)} · 기기 = 익명 사용자 (같은 사람의 PC · 휴대폰은 둘로 센다)`); p();
+    p('| 항목 | 값 |'); p('|---|---|');
+    p(`| 기기 · 세션 · 게임 세션 | ${fmt(O.기기수)} · ${fmt(O.세션수)} · ${fmt(O.게임세션수)} |`);
+    p(`| 총 플레이 시간 · 이동 거리 | ${v(O.총플레이시간_분)}분 · ${v(O.총이동거리_km)}km |`);
+    p(`| 기기당 플레이 시간 (중앙값) | ${v(O.기기당플레이시간_중앙값_분)}분 |`);
+    p(`| 세션 길이 중앙값 · p90 | ${v(O.세션시간_중앙값_분)}분 · ${v(O.세션시간_p90_분)}분 |`);
+    p(`| 가 본 칸 (201칸 중) | ${fmt(O.플레이한_칸수)}칸 (${pc(O.칸_도달률_pct)}) |`);
+    p(`| 재방문 D1 · D7 · D30 | ${pc(Rt.D1.pct)} · ${pc(Rt.D7.pct)} · ${pc(Rt.D30.pct)} (재방문 기기 ${fmt(Rt.재방문기기)}) |`);
+    p(`| 플레이 시간 분포 (기기) | ${Object.entries(U.분포_기기수).map(([k, n]) => `${k} ${n}`).join(' · ')} |`);
+    p();
+    p('### 퍼널 (세션)'); p(); p('| 단계 | 세션 |'); p('|---|---|');
+    for (const k of ['랜딩', '3D표시', '3장이상스크롤', '시작클릭', '게임시작', '첫화면준비', '첫이동', '플레이1분이상', '플레이5분이상']) p(`| ${k} | ${fmt(Fn[k] || 0)} |`);
+    p(`| 랜딩 → 시작 클릭 | ${pc(Fn.랜딩대비시작클릭_pct)} |`); p(`| 게임 시작 → 첫 이동 | ${pc(Fn.시작대비첫이동_pct)} |`); p();
+    p('### 어디서 · 무엇을'); p();
+    p(`- 오래 머문 구: ${list(A.구별머문시간_분, '분')}`);
+    p(`- 직접 고른 시작 (무작위 시작 제외): ${list(A.직접고른시작_상위, '회')}`);
+    p(`- 시작 방식: ${list(ko(A.시작방식), '회')}`);
+    p(`- 기능 사용 (게임 세션 중 비율): ${Object.entries(B.기능사용_세션).map(([k, x]) => `${k} ${pc(x.pct)}`).join(' · ')}`);
+    p(`- 가게 종류 (방문): ${list(ko(B.가게종류_방문수), '회')}`);
+    p(`- 가게 종류 (머문 시간): ${list(ko(B.가게종류_머문시간_분), '분')}`);
+    p(`- 인기 메뉴: ${list(B.인기메뉴, '회', 5)} · 인기 역: ${list(B.인기역, '회', 5)}`);
+    p(`- 걷기 · 날기 · 실내 시간: ${list(ko(B.모드별시간_분), '분')}`);
+    p();
+    p('### 기술 (실제 사용자 기기)'); p();
+    p(`- 프레임 중앙값: PC ${v(T.프레임_PC.p50)}fps (30fps 미만 ${pc(T.프레임_PC.under30_pct)}) · 휴대폰 ${v(T.프레임_휴대폰.p50)}fps (30fps 미만 ${pc(T.프레임_휴대폰.under30_pct)})`);
+    p(`- 첫 화면까지 중앙값 ${v(T.첫화면준비_ms.p50)}ms · JS 메모리 중앙값 ${v(T.JS메모리_MB.p50)}MB · 오류가 난 세션 ${pc(T.오류세션_pct)}`);
+    p(`- 기기: ${list(T.기기, '')} · 브라우저: ${list(T.브라우저, '')} · 유입: ${list(R['유입'].출처, '')}`);
+    p();
+  }
+}
+
+// ---------- 개발 · 운영 (저장소 기록: 사람이 만든 커밋만, 매일 갱신 커밋은 뺀다) ----------
+try {
+  const { execFileSync } = await import('node:child_process'), root = new URL('..', import.meta.url).pathname;
+  const git = (...a) => execFileSync('git', ['-C', root, ...a], { encoding: 'utf8', maxBuffer: 64e6 });
+  const logs = git('log', '--no-merges', '--format=%H%x09%at%x09%an%x09%s%x09%(trailers:key=Co-Authored-By,valueonly,separator=;)').trim().split('\n').map((l) => l.split('\t')).filter((c) => c[1] && !/github-actions/.test(c[2]) && !/운영 지표 매일 갱신/.test(c[3]));
+  if (logs.length > 10) {
+    const at = (c) => +c[1] * 1000, first = Math.min(...logs.map(at)), n = (d) => logs.filter((c) => now - at(c) < d * DAY), claude = logs.filter((c) => /claude/i.test(c[4] || ''));
+    const kind = (re, L) => L.filter((c) => re.test(c[3])).length, L30 = n(30), activeDays = new Set(L30.map((c) => date(at(c)))).size;
+    const games = fs.readdirSync(path.join(root, 'public')).filter((d) => /^(jelly-[a-z]+|dream-runner|seoul-walk)$/.test(d) && d !== 'jelly-city').length;
+    let loc = 0, files = 0; for (const f of git('ls-files', 'public', 'server', 'tools').split('\n')) if (/\.(m?js|html|css)$/.test(f) && !/_hg\.html$/.test(f)) { try { const t = fs.readFileSync(path.join(root, f), 'utf8'); if (t.length < 2e6) { loc += t.split('\n').length; files++; } } catch { /* 지워진 파일 */ } }
+    let notes = 0; try { notes = (JSON.parse(fs.readFileSync(path.join(root, 'public/shared/patchnotes.json'), 'utf8')).notes || []).length; } catch { /* 없음 */ }
+    p('## 개발 · 운영'); p();
+    p('main 에 올라간 커밋은 모두 GitHub Actions 로 자동 검사 · 배포된다 (커밋 수 ≈ 배포 수).'); p();
+    p('| 항목 | 값 |'); p('|---|---|');
+    p(`| 첫 커밋 | ${date(first)} (${Math.round((now - first) / DAY)}일 전) |`);
+    p(`| 커밋 (전체 · 최근 30일 · 최근 7일) | ${fmt(logs.length)} · ${fmt(L30.length)} · ${fmt(n(7).length)} |`);
+    p(`| 최근 30일 하루 평균 커밋 (커밋한 날 기준) | ${activeDays ? (L30.length / activeDays).toFixed(1) : '-'}개 · 커밋한 날 ${activeDays}일 |`);
+    p(`| 최근 30일 기능 · 고침 · 성능 커밋 | ${kind(/^feat/, L30)} · ${kind(/^fix/, L30)} · ${kind(/^perf/, L30)} |`);
+    p(`| Claude 와 함께 쓴 커밋 (Co-Authored-By) | ${pct(claude.length, logs.length)} (${fmt(claude.length)}개) · 최근 30일 ${pct(claude.filter((c) => now - at(c) < 30 * DAY).length, L30.length)} |`);
+    p(`| 서비스 중인 게임 | ${games}개 |`);
+    p(`| 코드 (public · server · tools 의 js · html · css) | ${fmt(loc)}줄 · ${fmt(files)}개 파일 |`);
+    p(`| 패치노트 항목 | ${fmt(notes)}개 |`);
+    p();
+  }
+} catch { /* git 이 없는 곳에서 돌릴 때 */ }
 
 console.log(out.join('\n'));
