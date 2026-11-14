@@ -1011,7 +1011,7 @@ export class Track {
     STAR_HALO.opacity = 0.7 + 0.25 * Math.sin(t * 4); // 별 빛무리가 천천히 숨 쉰다
     for (const st of this.stars) if (!st.got) { st.mesh.rotation.y = t * 2.5 + st.s; }
     for (const po of this.portals) po.mesh.userData.anim(po.mesh, t);
-    if (this.tmap) this.updateMovers(t, playerS);
+    if (this.tmap) { this.updateMovers(t, playerS); for (const o of this.obs) if (o.kind !== 'mover' && o.mesh.userData.anim && Math.abs(o.s0 - playerS) < 160) o.mesh.userData.anim(o.mesh, t); }
     if (this.seoul) { this.updateMovers(t, playerS); this.xLim = seoulLaneW(seoulCourseOf(this, this.dreamAt(playerS))) / 2 - 0.2; }
     for (const b of this.boxes) if (!b.got) { b.mesh.children[0].rotation.set(t * 1.3, t * 1.8, 0); b.mesh.position.y = b.y + Math.sin(t * 2.5 + b.s) * 0.15; }
     // 아주 멀리 달리면 숫자가 커져서 떨리지 않게 원점을 옮긴다

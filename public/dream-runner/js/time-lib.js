@@ -48,10 +48,13 @@ export const spin = (speed, axis = 'y') => (o, t, dt) => { o.rotation[axis] += s
 export const bob = (amp, sp, ph = Math.random() * 6) => (o, t) => { o.position.y = (o.userData.y0 ?? 0) + Math.sin(t * sp + ph) * amp; };
 export const both = (...fs) => (o, t, dt) => { for (const f of fs) f(o, t, dt); };
 // 불꽃: 원뿔 세 겹이 일렁인다 (dynamic → 묶지 않음)
-export function flame(p, x, y, z, s = 1, cols = ['#ff3d00', '#ffa000', '#fff59d']) {
+export function flame(p, x, y, z, s = 1, cols = ['#ff3d00', '#ff9100', '#ffe57f']) {
+  // 불꽃: 아래가 둥글고 위가 뾰족한 물방울 셋(빨강 · 주황 · 노랑)이 겹쳐 일렁이고, 둘레에 은은한 빛
   const f = new THREE.Group(); f.position.set(x, y, z); f.userData.dynamic = true; p.add(f);
-  const parts = cols.map((c, i) => { const m = add(f, G.cone(), glow(c, i ? 0.92 : 0.85), 0, (0.5 - i * 0.08) * s, 0, (0.42 - i * 0.12) * s, (1 - i * 0.22) * s, (0.42 - i * 0.12) * s); return m; });
-  f.userData.flick = (t) => parts.forEach((m, i) => { const k = 1 + Math.sin(t * (11 + i * 4) + x * 3 + z) * 0.14; m.scale.y = (1 - i * 0.22) * s * k; m.rotation.z = Math.sin(t * 7 + i) * 0.08; });
+  const drop = latheG('flame', [[0, 0], [0.32, 0.08], [0.46, 0.3], [0.4, 0.6], [0.22, 0.95], [0, 1.3]], 10);
+  const parts = cols.map((c, i) => add(f, drop, glow(c, i ? 0.95 : 0.9), (i - 1) * 0.04 * s, 0, 0, (1 - i * 0.26) * s, (1 - i * 0.18) * s, (1 - i * 0.26) * s));
+  add(f, G.sphereLow(), glow('#ff9100', 0.22), 0, 0.45 * s, 0, 0.9 * s, 0.8 * s, 0.9 * s);
+  f.userData.flick = (t) => parts.forEach((m, i) => { const k = 1 + Math.sin(t * (11 + i * 4) + x * 3 + z) * 0.16; m.scale.y = (1 - i * 0.18) * s * k; m.rotation.z = Math.sin(t * 7 + i) * 0.1; });
   return f;
 }
 // 연기: 회색 공 몇 개가 위로 올라가며 커졌다 사라진다

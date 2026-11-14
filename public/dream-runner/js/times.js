@@ -424,7 +424,7 @@ export const TIMES = [
     P: { a: '#c8b898', b: '#ffcc80', c: '#e65100', wall: '#e8dcc8', roof: '#8a5a3a', leaf: '#5a8a3a', wood: '#6d4c41', rock: '#b8a890' } }),
   t('아테네 민주정', '🗳️', '기원전 5세기', '아테네 시민들은 광장에 모여 투표로 나라의 일을 정했어요. 민주주의의 시작이에요', 5, {
     sky: ['#4a98e0', '#eef6ff', '#b8c0c8'], fog: [40, 340], light: 1.05, sun: '#ffffff', fx: 'none', mus: m('major', 62, 100, 'triangle'),
-    ground: ['#d8d0b8', '#c8c0a8', 'stone', 0, 7], road: ['#ece6d8', '#a89870', 'tile', 0],
+    ground: ['#c8c0a8', '#b0a890', 'stone', 0, 7], road: ['#d8d0c0', '#a89870', 'tile', 0],
     cast: { cross: ['athenian', 'philosopher'], on: ['oxCart'], big: ['triremeRoll'], weave: ['owlT'], wall: ['columnWall'], hurdle: ['potRow'], bar: ['theaterMaskBar'] },
     near: ['ostraconPile', 'amphora', 'owlStatue'], mid: ['agoraStoa', 'theaterMask', 'athenianCrowd'], far: ['parthenon', 'acropolisHill'], skyK: ['owlSky'], scenes: ['voting'],
     P: { a: '#ece6d8', b: '#1565c0', c: '#c9a227', wall: '#f2eee4', roof: '#d8cfc0', leaf: '#6a8a4a', wood: '#8d6e63', rock: '#d0c8b0' } }),
