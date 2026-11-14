@@ -213,7 +213,7 @@ if (pt?.d) {
     const R = await buildReport(rows(), { days: files.length }), O = R['개요'], Fn = R['퍼널'], Rt = R['리텐션'], A = R['지역'], B = R['행동'], T = R['기술'], U = R['유저별플레이시간'];
     const list = (xs, unit = '', n = 8) => (xs || []).slice(0, n).map(([k, v]) => `${k} ${typeof v === 'number' ? fmt(v) : v}${unit}`).join(' · ') || '-';
     const v = (x) => (x == null ? '-' : x), pc = (x) => (x == null ? '-' : `${x}%`);
-    const KO = { pick: '직접 고름', random: '무작위', map: '지도', last: '이어 걷기', resume: '이어 걷기', direct: '주소로 바로', walk: '걷기', fly: '날기', idle: '멈춤', shop: '가게 안', station: '역 안', train: '열차', mall: '몰', deck: '전망대', cafe: '카페', bakery: '빵집', korean: '식당', chicken: '치킨', pizza: '피자', burger: '버거', chinese: '중식', japanese: '일식', pub: '술집', mart: '편의점' };
+    const KO = { pick: '직접 고름', random: '무작위', map: '지도', last: '이어 걷기', resume: '이어 걷기', direct: '주소로 바로', walk: '걷기', fly: '날기', idle: '멈춤', shop: '가게 안', station: '역 안', train: '열차', mall: '몰', deck: '전망대', cafe: '카페', bakery: '빵집', korean: '식당', chicken: '치킨', pizza: '피자', burger: '버거', chinese: '중식', japanese: '일식', pub: '술집', mart: '편의점', yeouido: '여의도 한강', banpo: '반포 한강', ttukseom: '뚝섬 한강', namsan: '남산타워', hongdae: '홍대', sinchon: '신촌', itaewon: '이태원', myeongdong: '명동', insadong: '인사동 · 종로', bukchon: '북촌 한옥마을', seongsu: '성수', gangnam: '강남역', jamsil: '석촌호수' };
     const ko = (xs) => (xs || []).map(([k, n]) => [KO[k] || k, n]);
     p('## 젤리 서울 러너 (익명 이용 지표)'); p();
     p(`- 수집 기간: ${files[0].slice(0, 10)} ~ ${files.at(-1).slice(0, 10)} · 기기 = 익명 사용자 (같은 사람의 PC · 휴대폰은 둘로 센다)`); p();
@@ -231,7 +231,7 @@ if (pt?.d) {
     p(`| 랜딩 → 시작 클릭 | ${pc(Fn.랜딩대비시작클릭_pct)} |`); p(`| 게임 시작 → 첫 이동 | ${pc(Fn.시작대비첫이동_pct)} |`); p();
     p('### 어디서 · 무엇을'); p();
     p(`- 오래 머문 구: ${list(A.구별머문시간_분, '분')}`);
-    p(`- 직접 고른 시작 (무작위 시작 제외): ${list(A.직접고른시작_상위, '회')}`);
+    p(`- 직접 고른 시작 (무작위 시작 제외): ${list(ko(A.직접고른시작_상위), '회')}`);
     p(`- 시작 방식: ${list(ko(A.시작방식), '회')}`);
     p(`- 기능 사용 (게임 세션 중 비율): ${Object.entries(B.기능사용_세션).map(([k, x]) => `${k} ${pc(x.pct)}`).join(' · ')}`);
     p(`- 가게 종류 (방문): ${list(ko(B.가게종류_방문수), '회')}`);
@@ -242,7 +242,7 @@ if (pt?.d) {
     p('### 기술 (실제 사용자 기기)'); p();
     p(`- 프레임 중앙값: PC ${v(T.프레임_PC.p50)}fps (30fps 미만 ${pc(T.프레임_PC.under30_pct)}) · 휴대폰 ${v(T.프레임_휴대폰.p50)}fps (30fps 미만 ${pc(T.프레임_휴대폰.under30_pct)})`);
     p(`- 첫 화면까지 중앙값 ${v(T.첫화면준비_ms.p50)}ms · JS 메모리 중앙값 ${v(T.JS메모리_MB.p50)}MB · 오류가 난 세션 ${pc(T.오류세션_pct)}`);
-    p(`- 기기: ${list(T.기기, '')} · 브라우저: ${list(T.브라우저, '')} · 유입: ${list(R['유입'].출처, '')}`);
+    p(`- 랜딩 세션 기준 — 기기: ${list(T.기기, '')} · 브라우저: ${list(T.브라우저, '')} · 유입: ${list(R['유입'].출처, '')}`);
     p();
   }
 }
