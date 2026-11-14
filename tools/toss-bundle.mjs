@@ -19,6 +19,7 @@ cp('node_modules/three/build/three.module.js', 'vendor/three/three.module.js');
 cp('node_modules/three/examples/jsm/utils/BufferGeometryUtils.js', 'vendor/three/addons/utils/BufferGeometryUtils.js');
 cp('node_modules/three/examples/jsm/postprocessing', 'vendor/three/addons/postprocessing'); // 한강 러닝 화면 보정
 cp('node_modules/three/examples/jsm/shaders', 'vendor/three/addons/shaders');
+cp('node_modules/three/examples/jsm/geometries', 'vendor/three/addons/geometries'); // 서울 맵 차 모양 (RoundedBoxGeometry, 2026-11-12 부터)
 
 // 진입 화면: 드림 러너 index.html 을 맨 위로 옮기고 주소만 고친다
 let html = fs.readFileSync(path.join(ROOT, 'public/dream-runner/index.html'), 'utf8');
@@ -31,6 +32,26 @@ html = html
 if (!html.includes('./dream-ver.js') || !html.includes('./toss-bridge.js') || !html.includes('./vendor/three/three.module.js')) throw new Error('index.html 모양이 바뀌었어요: tools/toss-bundle.mjs 를 고쳐 주세요');
 fs.writeFileSync(path.join(OUT, 'index.html'), html);
 fs.rmSync(path.join(OUT, 'dream-runner/index.html'));
+
+// 빠진 파일 검사: main.js 에서 정적으로 불러오는 파일이 하나라도 번들에 없으면 미니앱에서 게임 코드가 통째로 안 돌고(첫 화면 버튼이 모두 먹통) 아무 오류도 안 보인다
+//   (2026-11-15: three 의 RoundedBoxGeometry 가 빠져서 실제로 그랬다). 그래서 번들을 만들 때 여기서 먼저 멈춘다
+{
+  const IMAP = { three: 'vendor/three/three.module.js', 'three/addons/': 'vendor/three/addons/' }, seen = new Set(), missing = [];
+  const walk = (rel) => {
+    if (seen.has(rel)) return; seen.add(rel); const file = path.join(OUT, rel);
+    if (!fs.existsSync(file)) { missing.push(rel); return; }
+    for (const m of fs.readFileSync(file, 'utf8').matchAll(/^\s*(?:import|export)\s+(?:[^'"]*?from\s+)?['"]([^'"]+)['"]/gm)) {
+      const sp = m[1]; let to;
+      if (sp === 'three') to = IMAP.three; else if (sp.startsWith('three/addons/')) to = IMAP['three/addons/'] + sp.slice(13);
+      else if (sp.startsWith('.')) to = path.normalize(path.join(path.dirname(rel), sp)); else { missing.push(`${rel} → ${sp} (번들 밖 주소)`); continue; }
+      if (to.startsWith('..')) { missing.push(`${rel} → ${sp} (번들 밖)`); continue; }
+      walk(to);
+    }
+  };
+  walk('dream-runner/js/main.js');
+  if (missing.length) throw new Error(`번들에 없는 파일을 불러와요 (미니앱에서 게임이 안 돌아요):\n  ${missing.join('\n  ')}\n tools/toss-bundle.mjs 의 cp(...) 에 더해 주세요`);
+  console.log(`불러오는 파일 검사: main.js 에서 닿는 ${seen.size}개 모두 번들에 있음`);
+}
 
 // 게임 코드 판: 미니앱 기록은 서버가 이 판의 코드로 다시 돌려 본다. 서버가 이 판을 한 번도 돌린 적이 없으면(아직 배포 전) 미니앱 기록이 모두 거절되니 번들을 만들지 않는다
 const VER = codeVer(ROOT);
