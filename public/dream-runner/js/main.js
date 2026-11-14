@@ -326,12 +326,10 @@ function renderTimeResume() {
   const b = $('time-reset'); if (b) b.onclick = () => { store.set(ERA_KEY, 0); renderTimeResume(); toast('💥 빅뱅부터 다시 출발해요'); };
 }
 renderTimeResume();
-// 다 만들기 전엔 개발용으로만 보인다 (?timedev 또는 localStorage dr-time-dev=1)
 // 새 맵 소개 공지 (웹만 · 2026-11-29 까지): 누르면 시간 여행을 고른다
 const timeNoticeOn = () => !TOSS && Date.now() < Date.parse('2026-11-29T00:00:00+09:00');
 $('time-notice').onclick = () => { game.pickMap = 'time'; store.set(MAP_KEY, 'time'); segSet('map-pick', 'time'); renderTimeResume(); game.titleT = 6; };
 if (timeNoticeOn()) $('time-notice').classList.remove('hidden');
-if (!/[?&]timedev/.test(location.search) && store.get('dr-time-dev') !== '1') { $('time-notice').classList.add('hidden'); for (const b of document.querySelectorAll('[data-m="time"]')) b.classList.add('hidden'); if (game.pickMap === 'time') { game.pickMap = 'dream'; segSet('map-pick', 'dream'); renderTimeResume(); } }
 for (const b of $('room-map').children) b.onclick = () => net.send({ t: 'map', map: b.dataset.m, era: timeEra() });
 for (const b of $('board-map').children) b.onclick = async () => { game.boardMap = b.dataset.m; segSet('board-map', game.boardMap); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
 for (const b of $('board-diff').children) b.onclick = async () => { game.boardDiff = b.dataset.m; segSet('board-diff', game.boardDiff); renderBoard($('board-list'), await loadBoard(game.boardMode, game.boardDiff, game.boardMap)); };
@@ -578,7 +576,7 @@ function showDreamCard(d) {
   el.querySelector('.dc-e').textContent = th.emoji;
   el.querySelector('.dc-name').textContent = th.name;
   el.classList.remove('hidden');
-  $('h-dream-n').textContent = th.time ? `시대 #${eraN}` : `${th.hell ? '지옥' : th.void ? '이공간' : th.seoul ? '코스' : '꿈'} #${d + 1}`;
+  $('h-dream-n').textContent = th.time ? `시대 ${eraN}/${ERAS.length}` : `${th.hell ? '지옥' : th.void ? '이공간' : th.seoul ? '코스' : '꿈'} #${d + 1}`;
   // 장이 바뀌면 (또는 첫 시대) 장 띠
   el.classList.toggle('time', !!th.time); el.querySelector('.dc-ch').textContent = th.time && (d === 0 || track.themeOf(d - 1).ch !== th.ch) ? `제${th.ch}장 · ${CHAPTERS[th.ch]}` : '';
   $('h-dream-name').textContent = `${th.emoji} ${th.name}`;
@@ -933,9 +931,11 @@ function frame() {
   input.jump = input.slide = input.shove = input.item = false;
   const sOn = seoulOn(); if (sOn !== seoulWas) { seoulWas = sOn; seoulSwap(sOn); }
   if (sOn) { seoulFrame(dt); return; }
-  if (tworld.track) { tworld.update(dt, game.mode === 'title' ? t : game.runT, runner.s); if (game.mode !== 'title') { runner.bear.root.scale.setScalar(TIME_BEAR); for (const g of game.ghosts.values()) g.bear.root.scale.setScalar(TIME_BEAR); } }
-  else if (game.timeBear) { runner.bear.root.scale.setScalar(1); for (const g of game.ghosts.values()) g.bear.root.scale.setScalar(1); }
-  game.timeBear = !!tworld.track && game.mode !== 'title';
+  if (tworld.track) tworld.update(dt, game.mode === 'title' ? t : game.runT, runner.s);
+  // 시간 여행 달리는 동안만 곰을 사람 크기로 (첫 화면 · 다른 맵으로 가면 원래 크기)
+  const tb = !!tworld.track && game.mode !== 'title';
+  if (tb || game.timeBear) { const k = tb ? TIME_BEAR : 1; runner.bear.root.scale.setScalar(k); for (const g of game.ghosts.values()) g.bear.root.scale.setScalar(k); }
+  game.timeBear = tb;
   env.update(dt, t, camera, runner.s, runner.x, runner.y);
   renderer.render(scene, camera);
 }
