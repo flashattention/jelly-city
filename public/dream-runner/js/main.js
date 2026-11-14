@@ -135,9 +135,10 @@ document.addEventListener('selectstart', (e) => { if (!typing(e.target)) e.preve
 document.addEventListener('contextmenu', (e) => { if (!typing(e.target)) e.preventDefault(); });
 document.addEventListener('touchstart', (e) => { if (!typing(e.target)) { const sel = window.getSelection?.(); if (sel && sel.rangeCount && !typing(document.activeElement)) sel.removeAllRanges(); } }, { passive: true });
 {
+  // R · DEAD 는 원 지름 132px 기준: 원이 커지면 같은 비율로 늘린다
   const joy = $('joy'), knob = $('joy-knob'), R = 40, DEAD = 12;
   // 작은 원은 큰 원 안에서 사방으로 움직이고, 좌우로 기운 만큼만 방향이 된다
-  const move = (e) => { const r = joy.getBoundingClientRect(); let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2); const d = Math.hypot(dx, dy); if (d > R) { dx *= R / d; dy *= R / d; } knob.style.transform = `translate(${dx}px, ${dy}px)`; joyDir = dx > DEAD ? 1 : dx < -DEAD ? -1 : 0; joyY = Math.abs(dy) > DEAD ? -dy / R : 0; joyX = Math.abs(dx) > DEAD ? dx / R : 0; joy.classList.toggle('on', joyDir !== 0); };
+  const move = (e) => { const r = joy.getBoundingClientRect(), k = r.width / 132, RR = R * k, DD = DEAD * k; let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2); const d = Math.hypot(dx, dy); if (d > RR) { dx *= RR / d; dy *= RR / d; } knob.style.transform = `translate(${dx}px, ${dy}px)`; joyDir = dx > DD ? 1 : dx < -DD ? -1 : 0; joyY = Math.abs(dy) > DD ? -dy / RR : 0; joyX = Math.abs(dx) > DD ? dx / RR : 0; joy.classList.toggle('on', joyDir !== 0); };
   const end = (e) => { if (e.pointerId !== joyId) return; joyId = null; joyDir = 0; joyY = 0; joyX = 0; knob.style.transform = ''; joy.classList.remove('on'); };
   joy.addEventListener('pointerdown', (e) => { e.preventDefault(); unlock(); joyId = e.pointerId; joy.setPointerCapture(e.pointerId); move(e); });
   joy.addEventListener('pointermove', (e) => { if (e.pointerId === joyId) move(e); });

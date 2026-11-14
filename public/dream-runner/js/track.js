@@ -209,7 +209,7 @@ export class Track {
     const body = new THREE.Mesh(starG(), STAR_M); body.scale.setScalar(0.42);
     const rim = new THREE.Mesh(starG(), STAR_RIM); rim.scale.setScalar(0.42 * 1.16);
     m.add(rim, body);
-    if (!isPhone) { const halo = new THREE.Sprite(STAR_HALO); halo.scale.setScalar(1.5); m.add(halo); }
+    { const halo = new THREE.Sprite(STAR_HALO); halo.scale.setScalar(isPhone ? 1.6 : 2); m.add(halo); } // 빛무리: 휴대폰에서도
     const g = this.ground(s, x, y);
     if (!isPhone && g && y - g.y < 3) { const sh = new THREE.Mesh(G_SHADOW, SHADOW_M); sh.rotation.x = -Math.PI / 2; sh.position.y = g.y + 0.04 - y; sh.scale.setScalar(0.42); m.add(sh); m.userData.shadow = sh; }
     m.position.set(x, y, this.z(s)); m.userData.s = s;
@@ -923,6 +923,7 @@ export class Track {
       const nx = p.x + Math.sin(t * p.mv.f + p.mv.ph) * p.mv.amp;
       p.dx = nx - p.cx; p.cx = nx; p.mesh.position.x = nx;
     }
+    STAR_HALO.opacity = 0.7 + 0.25 * Math.sin(t * 4); // 별 빛무리가 천천히 숨 쉰다
     for (const st of this.stars) if (!st.got) { st.mesh.rotation.y = t * 2.5 + st.s; }
     for (const po of this.portals) po.mesh.userData.anim(po.mesh, t);
     if (this.seoul) { this.updateMovers(t, playerS); this.xLim = seoulLaneW(seoulCourseOf(this, this.dreamAt(playerS))) / 2 - 0.2; }
@@ -1026,9 +1027,10 @@ const G_BOX = new THREE.BoxGeometry(1, 1, 1);
 const G_EDGE = G_BOX;
 const G_PUFF = new THREE.SphereGeometry(1, 10, 8);
 const G_HANG = new THREE.ConeGeometry(1, 1, 7).rotateX(Math.PI);
-const STAR_M = new THREE.MeshToonMaterial({ color: '#ffd23f', emissive: '#7a5200' });
-const STAR_RIM = new THREE.MeshBasicMaterial({ color: '#a8560a', side: THREE.BackSide });
-const STAR_HALO = new THREE.SpriteMaterial({ map: (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,240,170,.9)'); g.addColorStop(1, 'rgba(255,220,120,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })(), transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending });
+// 별: 스스로 빛나는 밝은 노랑 (예전엔 진한 갈색 빛 · 갈색 테두리라 어두운 맵에서 칙칙했다)
+const STAR_M = new THREE.MeshToonMaterial({ color: '#ffe14d', emissive: '#ffc21a', emissiveIntensity: 0.85 });
+const STAR_RIM = new THREE.MeshBasicMaterial({ color: '#ff9f1a', side: THREE.BackSide });
+const STAR_HALO = new THREE.SpriteMaterial({ map: (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,244,150,1)'); g.addColorStop(0.35, 'rgba(255,214,60,.55)'); g.addColorStop(1, 'rgba(255,190,30,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })(), transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending });
 const G_SHADOW = new THREE.CircleGeometry(1, 20);
 const G_ROCK = new THREE.DodecahedronGeometry(1, 0);
 const NOR = {};
