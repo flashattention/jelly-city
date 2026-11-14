@@ -108,8 +108,8 @@ const INV = new THREE.Matrix4(), MT = new THREE.Matrix4();
 function bakeColored(root) {
   root.updateMatrixWorld(true); INV.copy(root.matrixWorld).invert();
   const buckets = new Map(), remove = [];
+  // 멈춘 풍경은 팔 · 불꽃처럼 따로 움직이던 부분(dynamic)까지 모두 합친다 (어차피 안 움직인다)
   const visit = (o) => {
-    if (o.userData.dynamic) return;
     if (o.isMesh && !o.isInstancedMesh && !o.isSkinnedMesh && !Array.isArray(o.material) && !o.userData.keep) {
       const m = o.material, plain = !m.map && m.blending === THREE.NormalBlending && m.side !== THREE.DoubleSide;
       let kind = m.uuid, mat = m, vc = false;
@@ -118,10 +118,12 @@ function bakeColored(root) {
       if (!buckets.has(kind)) buckets.set(kind, { mat, geos: [], vc });
       const B = buckets.get(kind);
       let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
-      for (const name of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
+      // 이미 꼭짓점 색으로 합친 그물(사람 몸 등)은 그 색을 그대로 쓴다
+      const keepC = m.vertexColors && g.attributes.color;
+      for (const name of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(name) && !(keepC && name === 'color')) g.deleteAttribute(name);
       if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
       if (!g.attributes.normal) g.computeVertexNormals();
-      if (B.vc) { const c = m.color, n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); }
+      if (B.vc && !keepC) { const c = m.color, n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); }
       g.clearGroups(); g.applyMatrix4(MT.multiplyMatrices(INV, o.matrixWorld)); B.geos.push(g); remove.push(o);
     }
     for (const c of o.children) visit(c);

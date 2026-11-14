@@ -390,7 +390,7 @@ export const TIMES = [
     sky: ['#5aa0d8', '#e8f0f0', '#a0a8a0'], fog: [30, 320], light: 1.05, fx: 'dust', fxC: '#efebe9', mus: m('minor', 48, 120, 'sawtooth'),
     ground: ['#c0a878', '#a89868', 'sand', 0, 9], road: ['#a8987a', '#6a5a48', 'stone', 0],
     cast: { cross: ['hoplite', 'trojan'], on: ['greekChariot'], big: ['trojanHorse'], weave: ['horseRider'], wall: ['shieldWallGreek'], hurdle: ['spearRow'], bar: ['bannerBarGreek'] },
-    near: ['spearStack', 'shieldPile', 'amphora'], mid: ['troyWall', 'greekTent', 'duelGreek'], far: ['troyCity', 'greekShips'], skyK: ['birdFlock'], scenes: ['duelGreek'],
+    near: ['spearStack', 'shieldPile', 'amphora'], mid: ['troyWall', 'greekTent', 'duelGreek'], far: ['troyCity', 'greekShips'], skyK: ['birdFlock'], scenes: ['duelGreek', 'meleeGreek'],
     P: { a: '#c8a040', b: '#1565c0', c: '#c62828', wall: '#d8c8a0', roof: '#a0522d', leaf: '#5a8a3a', wood: '#6d4c41', rock: '#c8b890' } }),
   t('페니키아 알파벳', '🔤', '기원전 1050년', '바다 상인 페니키아인이 만든 22개 글자가 오늘날 알파벳의 조상이 됐어요', 5, {
     sky: ['#3a9ad8', '#e0f4ff', '#80b0c8'], fog: [40, 340], light: 1.1, sun: '#ffffff', fx: 'none', mus: m('dorian', 57, 104, 'triangle'),
@@ -456,7 +456,7 @@ export const TIMES = [
     sky: ['#d8784a', '#ffd8b0', '#5a4a40'], fog: [30, 300], light: 1.0, fx: 'embers', fxC: '#ffab40', mus: m('minor', 45, 132, 'sawtooth'),
     ground: ['#7a8a5a', '#8a8a60', 'grass', 0, 9], road: ['#9a9080', '#5a5048', 'stone', 0],
     cast: { cross: ['legionary'], on: ['legionLine'], big: ['romanChariot'], weave: ['romanCavalry'], wall: ['shieldWallRoman'], hurdle: ['fallenColumn'], bar: ['burningBeam'] },
-    near: ['aquilaStandard', 'shieldPile', 'spearStack'], mid: ['burningTemple', 'catapult', 'legionDuel'], far: ['burningTemple', 'romanFort'], skyK: ['eagleT'], scenes: ['legionDuel', 'catapultFire'],
+    near: ['aquilaStandard', 'shieldPile', 'spearStack'], mid: ['burningTemple', 'catapult', 'legionDuel'], far: ['burningTemple', 'romanFort'], skyK: ['eagleT'], scenes: ['legionDuel', 'catapultFire', 'meleeRoman'],
     P: { a: '#c62828', b: '#c9a227', c: '#3e2723', wall: '#e0d4bc', roof: '#b0522d', leaf: '#3f6a3a', wood: '#5d4037', rock: '#a8a090' } }),
   t('폼페이', '🌋', '서기 79년', '베수비오 화산이 터져 폼페이는 하루 만에 화산재에 묻혔어요', 5, {
     sky: ['#3a2a24', '#a05a3a', '#1a1210'], fog: [16, 220], light: 0.75, fx: 'ash', fxC: '#bcaaa4', mus: m('dim', 43, 112, 'sawtooth'),
@@ -500,13 +500,13 @@ export const TIMES = [
     sky: ['#5a7898', '#d0dce8', '#4a5a6a'], fog: [20, 260], light: 0.9, fx: 'snow', fxC: '#eceff1', mus: m('dorian', 45, 112, 'sawtooth'),
     ground: ['#4a6a5a', '#5a7a68', 'grass', 0, 9], road: ['#6a5a48', '#3a3028', 'plank', 0],
     cast: { cross: ['viking'], on: ['vikingCart'], big: ['longship'], weave: ['vikingRider'], wall: ['shieldWallRound'], hurdle: ['barrelRow'], bar: ['dragonProwBar'] },
-    near: ['runestone', 'shieldRack', 'barrelT'], mid: ['longhouse', 'longshipT', 'vikingFire'], far: ['fjordCliff', 'longshipT'], skyK: ['ravenT'], scenes: ['vikingRow'],
+    near: ['runestone', 'shieldRack', 'barrelT'], mid: ['longhouse', 'longshipT', 'vikingFire'], far: ['fjordCliff', 'longshipT'], skyK: ['ravenT'], scenes: ['vikingRow', 'meleeViking'],
     P: { a: '#c62828', b: '#f5f5f5', c: '#5d4037', wall: '#6d4c41', roof: '#4a6a3a', leaf: '#2f5a3a', wood: '#5d4037', rock: '#7a8a8a' } }),
   t('십자군 전쟁', '🛡️', '1096년 ~', '유럽의 기사들과 이슬람 군대가 성지 예루살렘을 두고 200년 동안 싸웠어요', 6, {
     sky: ['#e8a060', '#ffe8c8', '#b08060'], fog: [30, 320], light: 1.05, sun: '#fff3d0', fx: 'dust', fxC: '#ffe0b2', mus: m('phryg', 50, 120, 'sawtooth'),
     ground: ['#d0b080', '#c0a070', 'sand', 0, 10], road: ['#c0a078', '#7a6048', 'stone', 0],
     cast: { cross: ['crusader', 'saracen'], on: ['knightHorse'], big: ['siegeTower'], weave: ['saracenRider'], wall: ['shieldWallKite'], hurdle: ['spearRow'], bar: ['bannerBarCross'] },
-    near: ['crusaderTent', 'shieldPile', 'oasisPalm'], mid: ['crusaderCastle', 'trebuchet', 'knightDuel'], far: ['jerusalemWall', 'crusaderCastle'], skyK: ['falconT'], scenes: ['knightDuel'],
+    near: ['crusaderTent', 'shieldPile', 'oasisPalm'], mid: ['crusaderCastle', 'trebuchet', 'knightDuel'], far: ['jerusalemWall', 'crusaderCastle'], skyK: ['falconT'], scenes: ['knightDuel', 'meleeCrusade'],
     P: { a: '#fafafa', b: '#c62828', c: '#2e7d32', wall: '#d8c098', roof: '#a07a50', leaf: '#4a8a3a', wood: '#6d4c41', rock: '#c8b088' } }),
   t('몽골 제국', '🐎', '1206년', '칭기즈 칸의 기마 군단은 역사상 가장 넓은 땅을 하나로 이었어요', 6, {
     sky: ['#4a98e0', '#e8f4ff', '#a0b890'], fog: [40, 380], light: 1.1, sun: '#ffffff', fx: 'dust', fxC: '#f1f8e9', mus: m('pent', 52, 128, 'sawtooth'),
@@ -574,7 +574,7 @@ export const TIMES = [
     sky: ['#5a5a6a', '#b8a898', '#3a3434'], fog: [20, 250], light: 0.8, fx: 'ash', fxC: '#bcaaa4', mus: m('minor', 45, 116, 'sawtooth'),
     ground: ['#5a6a4a', '#6a7050', 'mud', 0, 8], road: ['#6a6050', '#3a3428', 'dirt', 0],
     cast: { cross: ['musketeer', 'pikeman'], on: ['cannonCart'], big: ['cavalryCharge'], weave: ['cuirassier'], wall: ['gabionWall'], hurdle: ['fallenFence'], bar: ['pikeBar'] },
-    near: ['drumT', 'cannonballs', 'flagStake'], mid: ['burningFarm', 'cannonT', 'pikeSquare'], far: ['burningFarm', 'starFort'], skyK: ['crowT'], scenes: ['cannonSmoke'],
+    near: ['drumT', 'cannonballs', 'flagStake'], mid: ['burningFarm', 'cannonT', 'pikeSquare'], far: ['burningFarm', 'starFort'], skyK: ['crowT'], scenes: ['cannonSmoke', 'melee30'],
     P: { a: '#c62828', b: '#1565c0', c: '#f5f5f5', wall: '#d8ccb0', roof: '#5a3a2a', leaf: '#3a5a3a', wood: '#4e342e', rock: '#7a7468' } }),
   t('과학 혁명', '🍎', '1687년', '뉴턴은 떨어지는 사과를 보고, 달과 사과를 같은 힘 — 만유인력으로 설명했어요', 7, {
     sky: ['#7ab0e0', '#f0f4e8', '#a8b888'], fog: [40, 330], light: 1.1, sun: '#ffffff', fx: 'leaves', fxC: '#e57373', mus: m('major', 62, 104, 'triangle'),

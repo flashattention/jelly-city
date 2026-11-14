@@ -29,6 +29,8 @@ const screenPanel = (g, x, y, z, w, h, c1, c2) => { add(g, G.box(), '#212121', x
 
 export const CIV_KITS = {
   spark: k(glowOrb('#fff59d', 0.4), { high: 50 }),
+  // 난전: 맞붙어 싸우는 둘씩 세 쌍 + 깃발 + 연기 (전쟁 시대 장면)
+  ...Object.fromEntries([['meleeGreek', 'hoplite', 'trojan', '#1565c0'], ['meleeRoman', 'legionary', 'germanicWarrior', '#c62828'], ['meleeViking', 'viking', 'germanicWarrior', '#c62828'], ['meleeCrusade', 'crusader', 'saracen', '#fafafa'], ['melee30', 'musketeer', 'pikeman', '#1565c0']].map(([id, a, b, fc]) => [id, k((r) => { const g = g0(), ds = []; for (let i = 0; i < 3; i++) { const d = duel(r, a, b); d.position.set(r.range(-4, 4), 0, (i - 1) * 3 + r.range(-0.6, 0.6)); d.rotation.y = r.range(-0.5, 0.5); g.add(d); ds.push(d); } const f = flag(r, { c: fc, c2: '#ffca28', h: 4 }); f.position.set(r.range(-5, 5), 0, r.range(-4, 4)); g.add(f); for (let i = 0; i < 4; i++) add(g, G.cylLow(), r.pick(['#c62828', '#ffca28', '#1565c0', '#8d6e63']), r.range(-5, 5), 0.05, r.range(-5, 5), 0.35, 0.06, 0.35, 0.2, 0, 0.1); smoke(g, r.range(-4, 4), 0, -4, 2, '#5e5650', 4); return liven(g, (q, t, dt) => { ds.forEach((d) => d.userData.anim(d, t, dt)); f.userData.anim(f, t); }); })])),
   // ===== 제5장 고대 =====
   wheatPatch: k((r) => { const g = g0(); for (let i = 0; i < 14; i++) { const x = r.range(-1, 1), z = r.range(-1, 1); add(g, G.cylLow(), '#c8a060', x, 0.4, z, 0.012, 0.8, 0.012); add(g, G.sphereLow(), '#e6c97a', x, 0.85, z, 0.03, 0.1, 0.03); } return g; }),
   grindStone: k((r) => { const g = g0(); add(g, G.cylLow(), '#9a9080', 0, 0.2, 0, 0.6, 0.4, 0.6); add(g, G.cylLow(), '#8a8070', 0, 0.5, 0, 0.45, 0.2, 0.45); add(g, G.cylLow(), '#6d4c41', 0.3, 0.8, 0, 0.04, 0.5, 0.04); return g; }),

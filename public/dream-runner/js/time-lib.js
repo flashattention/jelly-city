@@ -3,8 +3,21 @@
 import * as THREE from 'three';
 import { toon, G, geo } from '../../shared/js/utils.js';
 import { glow } from './kits.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export { THREE, toon, G, geo, glow };
+// 한 묶음 안의 멈춘 그물을 꼭짓점 색으로 합친다 (dynamic 표시된 자식은 그대로 둔다) — 사람 몸 · 머리
+const VC_T = new THREE.MeshToonMaterial({ vertexColors: true }), VC_B = new THREE.MeshBasicMaterial({ vertexColors: true });
+const INVM = new THREE.Matrix4(), MM = new THREE.Matrix4();
+export function bakeLocal(root) {
+  root.updateMatrixWorld(true); INVM.copy(root.matrixWorld).invert();
+  const B2 = { t: [], b: [] }, rm = [];
+  const visit = (o) => { if (o.userData.dynamic) return; if (o.isMesh && !Array.isArray(o.material) && !o.material.transparent && !o.material.map && (o.material.isMeshToonMaterial || o.material.isMeshBasicMaterial)) { let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); for (const n of Object.keys(g.attributes)) if (!['position', 'normal'].includes(n)) g.deleteAttribute(n); const c = o.material.color, cnt = g.attributes.position.count, a = new Float32Array(cnt * 3); for (let i = 0; i < cnt; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); g.applyMatrix4(MM.multiplyMatrices(INVM, o.matrixWorld)); (o.material.isMeshToonMaterial ? B2.t : B2.b).push(g); rm.push(o); } for (const c of o.children) visit(c); };
+  for (const c of root.children) visit(c);
+  for (const o of rm) o.parent.remove(o);
+  for (const [k, list] of Object.entries(B2)) if (list.length) { const g = mergeGeometries(list, false); if (g) { g.computeBoundingSphere(); const m = new THREE.Mesh(g, k === 't' ? VC_T : VC_B); m.userData.own = true; root.add(m); } }
+  return root;
+}
 export const M = (c) => (typeof c === 'object' ? c : toon(c));
 export function add(p, g, mat, x, y, z, sx = 1, sy = sx, sz = sx, rx = 0, ry = 0, rz = 0) { const m = new THREE.Mesh(g, M(mat)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.set(rx, ry, rz); p.add(m); return m; }
 export const grp = (...ch) => { const g = new THREE.Group(); for (const c of ch) g.add(c); return g; };
@@ -76,6 +89,8 @@ export function person(r, o = {}) {
   const [armR, itemR] = arm(1, o.r, o.rc), [armL, itemL] = arm(-1, o.l, o.lc);
   if (o.cape) { const c = add(body, G.box(), o.cape, 0, 0.6 * s, -0.3 * s, 0.56 * s, 0.85 * s, 0.05 * s); c.rotation.x = 0.12; }
   const legs = [-1, 1].map((sx) => add(g, G.sphereLow(), bot, sx * 0.13 * s, 0.22 * s, 0, 0.1 * s, 0.24 * s, 0.1 * s));
+  // 몸 · 머리 · 모자는 그물 하나로 합친다 (팔은 휘두르니 그대로) — 그리기 호출 20 → 약 8
+  armR.userData.dynamic = armL.userData.dynamic = true; bakeLocal(body);
   g.userData.parts = { body, head, armR, armL, legs, itemR, itemL };
   // 기본 걷기: walk(시간) 이 있으면 그걸로, 없으면 제자리
   g.userData.anim = (q, t) => { const w = (q.userData.walk ?? 0) * 9; body.position.y = Math.abs(Math.sin(w)) * 0.06; legs[0].position.z = Math.sin(w) * 0.12; legs[1].position.z = -Math.sin(w) * 0.12; armR.rotation.x = -Math.sin(w) * 0.3; armL.rotation.x = Math.sin(w) * 0.3; };
@@ -190,6 +205,8 @@ export function quad(r, o = {}) {
   const legs = [];
   for (const [lx, lz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) { const lg = new THREE.Group(); lg.position.set(lx * W * 0.32, by - W * 0.2, lz * L * 0.32); body.add(lg); add(lg, G.cylLow(), o.legC || c, 0, -(by - W * 0.2) / 2, 0, W * (o.thickLegs ? 0.2 : 0.12), by - W * 0.2, W * (o.thickLegs ? 0.2 : 0.12)); add(lg, G.sphereLow(), shadeHex(o.legC || c, 0.7), 0, -(by - W * 0.2), 0.02, W * (o.thickLegs ? 0.22 : 0.13), W * 0.08, W * (o.thickLegs ? 0.24 : 0.15)); legs.push(lg); }
   if (o.tail !== false) add(body, G.cone(), o.tailC || c, 0, by, -L * 0.6, W * 0.08, (o.tail ?? 0.5) * L, W * 0.08, -2.2);
+  // 몸통 · 목은 하나로 합친다 (다리 · 머리는 움직이니 그대로)
+  for (const lg of legs) lg.userData.dynamic = true; head.userData.dynamic = true; bakeLocal(body);
   g.userData.parts = { body, head, neck, legs };
   g.userData.anim = (q, t) => { const w = (q.userData.walk ?? t * 0.5) * (o.gait ?? 6); legs.forEach((lg, i) => { lg.rotation.x = Math.sin(w + (i === 0 || i === 3 ? 0 : Math.PI)) * 0.35; }); body.position.y = Math.abs(Math.sin(w)) * 0.04 * L; head.rotation.x = Math.sin(w * 0.5) * 0.06; };
   return g;
@@ -213,6 +230,7 @@ export function biped(r, o = {}) {
   if (o.feathers) for (let i = 0; i < 5; i++) add(body, G.sphereLow(), o.feathers, 0, by + W * 0.5, -L * 0.3 + i * L * 0.12, W * 0.1, W * 0.3, W * 0.12);
   const arms = [-1, 1].map((sx) => add(body, G.sphereLow(), c, sx * W * 0.5, by - W * 0.1, L * 0.38, W * (o.bigArms ? 0.14 : 0.08), W * (o.bigArms ? 0.4 : 0.24), W * 0.08, 0.6));
   const legs = [-1, 1].map((sx) => { const lg = new THREE.Group(); lg.position.set(sx * W * 0.4, by - W * 0.1, -L * 0.05); body.add(lg); add(lg, G.sphereLow(), c, 0, -W * 0.15, 0, W * 0.28, W * 0.5, W * 0.38); add(lg, G.cylLow(), c, 0, -(by - W * 0.1) * 0.75, 0.05, W * 0.12, (by - W * 0.1) * 0.6, W * 0.12); add(lg, G.sphereLow(), shadeHex(c, 0.7), 0, -(by - W * 0.1) + 0.04, W * 0.12, W * 0.16, W * 0.07, W * 0.3); return lg; });
+  for (const lg of legs) lg.userData.dynamic = true; head.userData.dynamic = true; bakeLocal(body);
   g.userData.parts = { body, head, jaw, legs, arms };
   g.userData.anim = (q, t) => { const w = (q.userData.walk ?? t * 0.5) * (o.gait ?? 7); legs[0].rotation.x = Math.sin(w) * 0.45; legs[1].rotation.x = -Math.sin(w) * 0.45; body.position.y = Math.abs(Math.cos(w)) * 0.05 * L; body.rotation.y = Math.sin(w) * 0.04; jaw.rotation.x = Math.max(0, Math.sin(t * 1.3)) * 0.25; };
   return g;
