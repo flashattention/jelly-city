@@ -736,18 +736,20 @@ export class Track {
   }
   updateVoid(t, playerS, v, dt) {
     const fl = Math.sin(t * 40) > 0;
+    // 암흑물질: 거리가 아니라 시간으로 보인다 (발판은 닿기 1.6초 전, 장애물은 2.2초 전). 26m 고정이면 빠를수록 반응할 시간이 없었다
+    const seeP = Math.max(26, (v || 0) * 1.6), seeO = Math.max(34, (v || 0) * 2.2);
     for (const p of this.plats) {
       if (p.blink) { const [per, on, ph] = p.blink, c = (((t + ph) % per) + per) % per; p.off = c >= on; p.mesh.visible = !p.off && (c < on - 0.35 || fl); }
       if (p.br) { const [lo, hi, f, ph] = p.br; p.w = lo + (hi - lo) * (0.5 + 0.5 * Math.sin(t * f + ph)); p.mesh.scale.x = p.w / p.w0; }
       if (p.qx) { const [a, b, per, ph] = p.qx, c = (((t + ph) % per) + per) % per, half = per / 2, nx = p.x + (c < half ? a : b); p.dx = 0; p.cx = nx; p.mesh.position.x = nx; p.mesh.visible = (c < half ? half - c : per - c) > 0.35 || fl; }
       if (p.crumble && p.touchT != null && !p.doomed) { if (t - p.touchT > p.crumble) p.doomed = true; else p.mesh.position.x = p.cx + Math.sin(t * 70) * 0.06; }
       if (p.crumble && p.doomed) { p.fallV = (p.fallV || 0) + 40 * dt; p.mesh.position.y -= p.fallV * dt; }
-      if (p.dark) p.mesh.visible = p.s0 - playerS < 26;
+      if (p.dark) p.mesh.visible = p.s0 - playerS < seeP;
     }
     for (const o of this.obs) {
       if (o.mvx) { const [amp, f, ph] = o.mvx, dx = Math.sin(t * f + ph) * amp; o.x0 = o.bx0 + dx; o.x1 = o.bx1 + dx; o.mesh.position.x = (o.x0 + o.x1) / 2; }
       if (o.osc) { const [lo, hi, f, ph] = o.osc, h = o.y1 - o.y0, y = lo + (hi - lo) * (0.5 + 0.5 * Math.sin(t * f + ph)); o.y0 = y; o.y1 = y + h; o.mesh.position.y = y; }
-      if (o.dark) o.mesh.visible = o.s0 - playerS < 26;
+      if (o.dark) o.mesh.visible = o.s0 - playerS < seeO;
     }
     // 운석: 닿기 1.4초 전부터 비스듬히 떨어져서 0.55초 전에 땅에 박힌다
     const vs = Math.max(v || 0, 1);
