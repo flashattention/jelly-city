@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { isPhone } from '../../shared/js/perf.js';
 import { toon } from '../../shared/js/utils.js';
+import { glow } from './kits.js';
 import { TIME_W } from './times.js';
 import { TK as TK0 } from './time-kits.js';
 import { KITS } from './kits.js';
@@ -214,7 +215,25 @@ export class TimeWorld {
     if (this.track.bounds.includes(a)) for (const name of th.far || []) { const K = TK[name]; if (K?.gap >= 100 && (this.last[name] ?? -1e9) < a - 50) { const sAt = a + rr.range(35, 80); this.last[name] = sAt; place('far', name, sAt); } }
     if (th.scenes?.length) put('scene', th.scenes, PER.scene);
     put('far', th.far, PER.far); put('mid', th.mid, PER.mid); put('near', th.near, PER.near); put('sky', th.skyK, PER.sky);
+    this.edges(stat, a, b, th);
     bakeColored(stat); cell.add(stat);
   }
+  // 길가 장식: 길 무늬에 맞춰 양쪽 가장자리에 (흙길 = 풀 · 돌길 = 경계석 · 찻길 = 연석 + 가로등 · 빛길 = 빛 기둥 · 나무길 = 밧줄 기둥)
+  edges(stat, a, b, th) {
+    const pat = th.road?.[2] || 'dirt', rc = th.road?.[1] || '#5d4037', gc = th.ground?.[1] || '#6a8a4a', E = TIME_W / 2 + 0.55;
+    const M = (c) => toon(c), G1 = EDGE_G;
+    const box = (x, y, z, w, h, d, c) => { const m = new THREE.Mesh(G1.box, M(c)); m.position.set(x, y, z); m.scale.set(w, h, d); stat.add(m); };
+    const step = pat === 'asphalt' ? 2.2 : pat === 'light' || pat === 'metal' ? 6 : pat === 'plank' ? 3 : 1.6;
+    for (let s = a + R() * step; s < b; s += step * (0.7 + R() * 0.6)) for (const side of [-1, 1]) {
+      const x = side * (E + R() * 0.35), z = -s;
+      if (pat === 'stone' || pat === 'cobble' || pat === 'brick' || pat === 'tile') box(x, 0.12, z, 0.45, 0.24, step * 0.55, shade(rc, 0.9 + R() * 0.2));
+      else if (pat === 'asphalt') { box(side * (E - 0.1), 0.1, z, 0.3, 0.2, step, '#9e9e9e'); if (R() < 0.12) { box(side * (E + 0.4), 1.6, z, 0.1, 3.2, 0.1, '#455a64'); const l = new THREE.Mesh(G1.sph, glow('#fff3c4')); l.position.set(side * (E + 0.1), 3.2, z); l.scale.setScalar(0.22); stat.add(l); } }
+      else if (pat === 'light' || pat === 'metal') { box(x, 0.45, z, 0.12, 0.9, 0.12, '#263238'); const l = new THREE.Mesh(G1.sph, glow(rc)); l.position.set(x, 0.95, z); l.scale.setScalar(0.16); stat.add(l); }
+      else if (pat === 'plank') { box(x, 0.5, z, 0.12, 1.0, 0.12, '#5d4037'); if (R() < 0.5) box(x, 0.85, z - step / 2, 0.04, 0.04, step, '#c8a878'); }
+      else if (pat === 'rail') box(x, 0.08, z, 0.3, 0.16, step * 0.5, '#6a6a6a');
+      else { const t = new THREE.Mesh(G1.cone, M(R() < 0.25 ? shade(gc, 0.8) : gc)); t.position.set(x + (R() - 0.5) * 0.3, 0.18, z); t.scale.set(0.12, 0.36 + R() * 0.3, 0.12); stat.add(t); if (R() < 0.2) { const p2 = new THREE.Mesh(G1.dod, M(shade(rc, 1.1))); p2.position.set(x + side * 0.4, 0.08, z + 0.4); p2.scale.setScalar(0.12 + R() * 0.1); stat.add(p2); } }
+    }
+  }
 }
+const EDGE_G = { box: new THREE.BoxGeometry(1, 1, 1), sph: new THREE.SphereGeometry(1, 8, 6), cone: new THREE.ConeGeometry(1, 1, 5), dod: new THREE.DodecahedronGeometry(1, 0) };
 export { shade, mixC, toon };
