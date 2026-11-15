@@ -532,6 +532,8 @@ async function showOver() {
   $('again-btn').textContent = game.multi ? '👥 방으로 돌아가기' : '🔁 다시 달리기';
   // 모든 것의 역사: 다시하면 다음 역사를 이어서 (1-5)
   { const tm = game.map === 'time' && !game.multi, nx = ERAS[timeEra()]; $('again-btn').classList.toggle('time-again', tm); $('time-next').classList.toggle('hidden', !tm); if (tm) { $('again-btn').innerHTML = `⏳ 이어서 달리기 <small>${nx.emoji} ${nx.name}부터</small>`; $('time-next').innerHTML = `✨ 다시하면 <b>다음 역사</b>를 이어서 체험할 수 있어요! <span>${nx.emoji} ${nx.name} · ${nx.when}</span>`; } }
+  // 혼자 달리기: Enter(또는 Space)로 이 버튼을 누를 수 있다는 표시 (휴대폰 터치 화면에서는 CSS 로 숨긴다)
+  if (!game.multi) $('again-btn').insertAdjacentHTML('beforeend', '<kbd class="enter-k" title="Enter 키로 바로 시작">Enter ⏎</kbd>');
   $('ov-board-title').classList.remove('hidden'); $('ov-board').classList.remove('hidden');
   $('ov-board-title').textContent = `🏆 ${mapTag(game.map)}${diffName(game.diff)} · ${modeName(game.itemMode ? 'item' : 'speed')} 최고 기록`;
   renderBoard($('ov-board'), r?.top ? r : await loadBoard(game.itemMode ? 'item' : 'speed', game.diff, game.map), true);
