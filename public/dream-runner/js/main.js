@@ -24,6 +24,7 @@ import { HELLS } from './hells.js';
 import { VOIDS } from './voids.js';
 import { SEOULS } from './seouls.js';
 import { TIMES as ERAS, CHAPTERS } from './times.js';
+import { makeSeoulTitle } from './seoul-title.js';
 import { TimeWorld } from './time-world.js';
 import { makeTimeMover } from './time-cast.js';
 import { makeSeoulMover, seoulNight, seoulTick } from './seoul-movers.js';
@@ -73,8 +74,9 @@ const runner = new Runner(scene, {});
 // 🗺️ 서울 맵 그리기 (6-7): 서울 산책 엔진으로 실제 서울을, 판정 자리 물체는 실제 길 위로 휘어서
 const seoulRun = new SeoulRun(renderer, camera), seoulCam = new THREE.PerspectiveCamera();
 seoulRun.api = (path) => account.api(path);
+let seoulT = null; // 첫 화면 서울: 성수 카페거리 임시 거리 (setSeoulTitle)
 let seoulPost = null, seoulWas = false, seoulWaitT = 0;
-const seoulOn = () => track.seoul && seoulRun.ready; // 첫 화면에서 서울을 골라도 실제 서울 거리가 뒤에 보인다 (랜딩)
+const seoulOn = () => track.seoul && seoulRun.ready && game.mode !== 'title'; // 첫 화면은 성수 카페거리 임시 거리(seoul-title.js)
 // 서울 맵 판에 들어가고 나올 때: 곰 · 길 · 그림자를 서울 장면으로 옮기고, 화면 설정(색 · 그림자 · 먼 거리)을 서울 산책처럼
 // 부스터 가루(뒤로 흩날리는 빛)는 부스터가 정한 장면에 따로 붙는다: 서울 맵에선 서울 장면으로 (불꽃 자체는 곰에 붙어 있다)
 function boosterTo(b, sc) { if (!b || b.scene === sc) return; for (const p of b.sparks || []) { sc.add(p.m); p.life = 0; p.m.visible = false; } b.scene = sc; }
@@ -466,7 +468,9 @@ function newRun(seed, itemMode = false, diff = 'hard', map = 'dream', era = null
   track.reset(seed, itemMode, { map: game.map, K, era: game.era0 });
   if (game.map === 'time') tworld.start(track); else if (tworld.track) tworld.stop();
   // 서울 맵: 서울 산책 엔진을 준비하고 첫 코스 칸부터 만든다 (다른 맵이면 만들어 둔 칸을 내린다)
-  if (game.map === 'seoul') { seoulWaitT = 0; seoulRun.init().then(() => { if (track.seoul && track.seed === seed) seoulRun.start(track); }).catch((e) => console.warn('서울 지도 없이', e)); }
+  const titleOnly = game.mode === 'title' && !game.starting;
+  if (!titleOnly) setSeoulTitle(false);
+  if (game.map === 'seoul' && !titleOnly) { seoulWaitT = 0; seoulRun.init().then(() => { if (track.seoul && track.seed === seed) seoulRun.start(track); }).catch((e) => console.warn('서울 지도 없이', e)); }
   else if (seoulRun.hw?.chunks?.size) seoulRun.dispose();
   game.camFall = 0; game.camG = null; game.rec = null; game.shake = 0; env.underY = undefined; game.underY = -13;
   game.rp = !itemMode && !game.multi ? { dts: [], evs: [], last: -1 } : null; game.dtCarry = 0;
@@ -521,8 +525,15 @@ function countdown(ms) {
   clearTimeout(game.howtoT); game.howtoT = setTimeout(() => h.classList.add('dock'), 5500);
 }
 function goRun() { game.mode = 'run'; $('countdown').classList.add('hidden'); }
-// 첫 화면 뒤 세상: 고른 세계(꿈나라 · 지옥 · 이공간 · 서울 · 모든 것의 역사)의 실제 맵을 펼친다
-function titleWorld() { newRun((Math.random() * 2 ** 31) | 0, false, game.pickDiff, game.pickMap); }
+// 첫 화면 뒤 세상: 고른 세계(꿈나라 · 지옥 · 이공간 · 서울 · 모든 것의 역사)의 맵을 펼친다
+//   서울은 실제 지도(무겁고 시점이 다르다) 대신 성수 카페거리를 본뜬 가벼운 임시 거리 (seoul-title.js)
+function setSeoulTitle(on) {
+  if (on && !seoulT) { seoulT = makeSeoulTitle(); scene.add(seoulT.root); }
+  if (!on && seoulT) { scene.remove(seoulT.root); seoulT.dispose(); seoulT = null; runner.bear.root.scale.setScalar(1); }
+  if (seoulT) seoulT.root.position.z = track.origin - runner.s;
+  track.root.visible = !seoulT; // 임시 거리 위에는 판정용 길 · 장애물을 보이지 않는다
+}
+function titleWorld() { newRun((Math.random() * 2 ** 31) | 0, false, game.pickDiff, game.pickMap); setSeoulTitle(game.pickMap === 'seoul'); }
 function toTitle() {
   game.team = false; $('teambar').classList.add('hidden');
   $('howto').classList.add('hidden'); $('itembar').classList.add('hidden');
@@ -924,16 +935,13 @@ function frame() {
     game.titleT += dt;
     if (game.titleT > 6 && track.tmap) game.titleT = 0;
     if (game.titleT > 6) { game.titleT = 0; const pool = game.pickMap === 'hell' ? HELLS : game.pickMap === 'void' ? VOIDS : game.pickMap === 'seoul' ? SEOULS : game.pickMap === 'time' ? ERAS : THEMES, th = pool[Math.floor(Math.random() * pool.length)]; env.setTheme(th); }
-    if (track.seoul && seoulRun.ready) {
-      // 서울: 달릴 때처럼 곰 뒤에서 서울 거리를 본다 (seoulFrame 이 곧은 길 자리를 실제 서울 길 위로 옮긴다)
-      runner.pose(dt, z); runner.bear.update(dt, 8, { noCrawl: true }); followCamera(dt);
-    } else {
-      runner.bear.root.position.set(0, 0, z); runner.bear.root.rotation.y = Math.PI;
-      runner.bear.update(dt, 8, { noCrawl: true });
-      const a = t * 0.18, ck = track.tmap ? 0.72 : 1;
-      camera.position.set(Math.sin(a) * 7 * ck, 2.6 * ck, z + Math.cos(a) * 7 * ck);
-      camera.lookAt(0, 1.1 * ck, z);
-    }
+    runner.bear.root.position.set(0, 0, z); runner.bear.root.rotation.y = Math.PI;
+    runner.bear.update(dt, 8, { noCrawl: true });
+    // 서울(임시 성수 거리)은 곰을 행인 크기로 · 카메라도 그만큼 가까이 (모든 것의 역사와 같은 회전 카메라)
+    if (seoulT) { runner.bear.root.scale.setScalar(SEOUL_BEAR); seoulT.update(dt, t); }
+    const a = t * 0.18, ck = track.tmap || seoulT ? 0.72 : 1;
+    camera.position.set(Math.sin(a) * 7 * ck, 2.6 * ck, z + Math.cos(a) * 7 * ck);
+    camera.lookAt(0, 1.1 * ck, z);
   } else if (game.paused) {
     hud(); // 서버 점검: 그 자리에서 멈춰 있는다
   } else {
