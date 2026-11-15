@@ -24,7 +24,7 @@ import { HELLS } from './hells.js';
 import { VOIDS } from './voids.js';
 import { SEOULS } from './seouls.js';
 import { TIMES as ERAS, CHAPTERS } from './times.js';
-import { makeSeoulTitle } from './seoul-title.js';
+import { makeSeoulTitle, SEOUL_TITLE_NAMES } from './seoul-title.js';
 import { TimeWorld } from './time-world.js';
 import { makeTimeMover } from './time-cast.js';
 import { makeSeoulMover, seoulNight, seoulTick } from './seoul-movers.js';
@@ -528,12 +528,14 @@ function goRun() { game.mode = 'run'; $('countdown').classList.add('hidden'); }
 // 첫 화면 뒤 세상: 고른 세계(꿈나라 · 지옥 · 이공간 · 서울 · 모든 것의 역사)의 맵을 펼친다
 //   서울은 실제 지도(무겁고 시점이 다르다) 대신 성수 카페거리를 본뜬 가벼운 임시 거리 (seoul-title.js)
 function setSeoulTitle(on) {
-  if (on && !seoulT) { seoulT = makeSeoulTitle(); scene.add(seoulT.root); }
-  if (!on && seoulT) { scene.remove(seoulT.root); seoulT.dispose(); seoulT = null; runner.bear.root.scale.setScalar(1); }
+  // 누를 때마다 5곳(성수 · 명동 · 광화문 · 반포 한강 · 석촌호수) 중 바로 전과 다른 곳
+  if (seoulT) { scene.remove(seoulT.root); seoulT.dispose(); seoulT = null; runner.bear.root.scale.setScalar(1); }
+  if (on) { const ks = Object.keys(SEOUL_TITLE_NAMES).filter((k) => k !== game.seoulLast); seoulT = makeSeoulTitle(ks[Math.floor(Math.random() * ks.length)]); game.seoulLast = seoulT.kind; scene.add(seoulT.root); }
   if (seoulT) seoulT.root.position.z = track.origin - runner.s;
   track.root.visible = !seoulT; // 임시 거리 위에는 판정용 길 · 장애물을 보이지 않는다
 }
-function titleWorld() { newRun((Math.random() * 2 ** 31) | 0, false, game.pickDiff, game.pickMap); setSeoulTitle(game.pickMap === 'seoul'); }
+// 모든 것의 역사도 누를 때마다 125개 시대 중 하나를 배경으로 (출발은 그대로 마지막으로 쓰러진 시대부터 · renderTimeResume)
+function titleWorld() { const m = game.pickMap; newRun((Math.random() * 2 ** 31) | 0, false, game.pickDiff, m, m === 'time' ? Math.floor(Math.random() * ERAS.length) : null); setSeoulTitle(m === 'seoul'); }
 function toTitle() {
   game.team = false; $('teambar').classList.add('hidden');
   $('howto').classList.add('hidden'); $('itembar').classList.add('hidden');
