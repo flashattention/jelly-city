@@ -171,8 +171,8 @@
       <button class="home-btn snd-btn" data-snd title="소리 켜기 · 끄기 (M)">🔊</button>
       <div class="logo">🌙 드림 러너</div>
       <div class="sub">잠든 곰돌이가 꿈속을 끝없이 달려요<br>20초마다 바뀌는 100가지가 넘는 꿈</div>
-      <!-- 드림 러너 소식 (새 맵 시간 여행 + 난이도 변경을 하나로): 2026-11-29 00:00 (한국 시간) 부터 저절로 숨는다 (main.js) · 누르면 시간 여행을 고른다 -->
-      <button type="button" class="dr-news hidden" id="time-notice"><b>📢 드림 러너 소식</b><span class="n-time">⏳ 새 맵 <em>「시간 여행」</em> — 빅뱅부터 AI의 미래까지 <em>125개 시대</em>, 쓰러진 시대부터 이어서 달려요</span><span class="n-diff">⚠️ 난이도 변경 — 예전 하드 → <em>🙂 노멀</em> · 예전 익스트림 → <em>🔥 하드</em> · 새 난이도 <em>💠 특이점</em></span><small>눌러서 시간 여행 골라 보기 ▶</small></button>
+      <!-- 드림 러너 소식 (새 맵 모든 것의 역사 + 난이도 변경을 하나로): 2026-11-29 00:00 (한국 시간) 부터 저절로 숨는다 (main.js) · 누르면 모든 것의 역사를 고른다 -->
+      <button type="button" class="dr-news hidden" id="time-notice"><b>📢 드림 러너 소식</b><span class="n-time">⏳ 새 맵 <em>「모든 것의 역사」</em> — 빅뱅부터 AI의 미래까지 <em>125개 시대</em>, 쓰러진 시대부터 이어서 달려요</span><span class="n-diff">⚠️ 난이도 변경 — 예전 하드 → <em>🙂 노멀</em> · 예전 익스트림 → <em>🔥 하드</em> · 새 난이도 <em>💠 특이점</em></span><small>눌러서 모든 것의 역사 골라 보기 ▶</small></button>
       <div class="t-cols"><div class="t-left">
       <div id="fame"></div>
       <button id="toss-login" class="btn big hidden">토스로 시작하기 <small>기록 · 별 · 치장이 토스 계정에 남아요</small></button>
@@ -190,7 +190,7 @@
         <div id="nick-row" class="hidden"><input id="nick" maxlength="14" placeholder="달리기 이름 (순위표 · 방에 보여요)" /></div>
       </div><div class="t-right">
         <div class="picks">
-        <div class="seg" id="map-pick"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button><button data-m="void">🌌 랜덤 이공간</button><button data-m="seoul">🗺️ 서울</button><button data-m="time">⏳ 시간 여행</button></div>
+        <div class="seg" id="map-pick"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button><button data-m="void">🌌 랜덤 이공간</button><button data-m="seoul">🗺️ 서울</button><button data-m="time">⏳ 모든 것의 역사</button></div>
         <div id="time-resume" class="time-resume hidden"></div>
         <div class="seg" id="mode-pick"><button data-m="speed">⚡ 스피드전</button><button data-m="item">🎁 아이템전</button></div>
         <div class="seg" id="diff-pick"></div>
@@ -232,7 +232,7 @@
       <h2 id="room-title"></h2>
       <div class="seg" id="room-team"><button data-t="0">🏃 개인전</button><button data-t="1">👥 팀전 <small>3분</small></button></div>
       <div class="seg" id="room-mode"><button data-m="speed">⚡ 스피드전</button><button data-m="item">🎁 아이템전</button></div>
-      <div class="seg" id="room-map"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button><button data-m="void">🌌 랜덤 이공간</button><button data-m="seoul">🗺️ 서울</button><button data-m="time">⏳ 시간 여행</button></div>
+      <div class="seg" id="room-map"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button><button data-m="void">🌌 랜덤 이공간</button><button data-m="seoul">🗺️ 서울</button><button data-m="time">⏳ 모든 것의 역사</button></div>
       <div class="seg" id="room-diff"></div>
       <div id="room-code"><span>초대 코드</span><b id="code-txt"></b><button id="copy-link" class="btn alt">🔗 링크 복사</button><button id="copy-code" class="btn ghost">코드 복사</button></div>
       <div class="note">링크를 보내거나 코드를 알려 주면 로그인 안 한 친구도 들어올 수 있어요</div>
@@ -268,7 +268,7 @@
   <div id="board" class="screen hidden">
     <div class="card wide">
       <h2>🏆 최고 기록</h2>
-      <div class="seg" id="board-map"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button><button data-m="void">🌌 랜덤 이공간</button><button data-m="seoul">🗺️ 서울</button><button data-m="time">⏳ 시간 여행</button></div>
+      <div class="seg" id="board-map"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button><button data-m="void">🌌 랜덤 이공간</button><button data-m="seoul">🗺️ 서울</button><button data-m="time">⏳ 모든 것의 역사</button></div>
       <div class="seg" id="board-mode"><button data-m="speed">⚡ 스피드전</button><button data-m="item">🎁 아이템전</button></div>
       <div class="seg" id="board-diff"></div>
       <div class="sub">점수 = 달린 거리(m) + 별사탕 × 10</div>
@@ -282,7 +282,7 @@
   <div id="stats" class="screen hidden">
     <div class="card wide">
       <h2>📊 내 기록</h2>
-      <div class="seg" id="stats-map"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button><button data-m="void">🌌 랜덤 이공간</button><button data-m="seoul">🗺️ 서울</button><button data-m="time">⏳ 시간 여행</button></div>
+      <div class="seg" id="stats-map"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button><button data-m="void">🌌 랜덤 이공간</button><button data-m="seoul">🗺️ 서울</button><button data-m="time">⏳ 모든 것의 역사</button></div>
       <div id="my-stats"></div>
       <div class="row2"><button id="stats-close" class="btn ghost">닫기</button></div>
     </div>

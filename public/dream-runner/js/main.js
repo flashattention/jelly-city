@@ -34,8 +34,8 @@ import { setupMapWin } from './hangang-mapwin.js';
 
 const $ = (id) => document.getElementById(id);
 const MODE_KEY = 'dreamrunner.mode', DIFF_KEY = 'dreamrunner.diff', CAM_KEY = 'dreamrunner.cam', MAP_KEY = 'dreamrunner.map';
-const mapOf = (m) => (m === 'hell' || m === 'void' || m === 'seoul' || m === 'time' ? m : 'dream'), mapName = (m) => (m === 'hell' ? '🔥 랜덤 지옥' : m === 'void' ? '🌌 랜덤 이공간' : m === 'seoul' ? '🗺️ 서울' : m === 'time' ? '⏳ 시간 여행' : '🌙 랜덤 꿈나라');
-const mapTag = (m) => (m === 'hell' ? '🔥 지옥 · ' : m === 'void' ? '🌌 이공간 · ' : m === 'seoul' ? '🗺️ 서울 · ' : m === 'time' ? '⏳ 시간 여행 · ' : ''); // 순위표 · 방 이름 앞에
+const mapOf = (m) => (m === 'hell' || m === 'void' || m === 'seoul' || m === 'time' ? m : 'dream'), mapName = (m) => (m === 'hell' ? '🔥 랜덤 지옥' : m === 'void' ? '🌌 랜덤 이공간' : m === 'seoul' ? '🗺️ 서울' : m === 'time' ? '⏳ 모든 것의 역사' : '🌙 랜덤 꿈나라');
+const mapTag = (m) => (m === 'hell' ? '🔥 지옥 · ' : m === 'void' ? '🌌 이공간 · ' : m === 'seoul' ? '🗺️ 서울 · ' : m === 'time' ? '⏳ 모든 것의 역사 · ' : ''); // 순위표 · 방 이름 앞에
 const CHAR_KEY = 'dreamrunner.char', NICK_KEY = 'dreamrunner.nick', ANON_KEY = 'dreamrunner.anon';
 // 비로그인: 이 브라우저의 임시 아이디 (순위표에서 내 기록을 찾는 데만 쓴다)
 function anonId() {
@@ -58,11 +58,11 @@ const env = new Env(scene, renderer);
 const track = new Track(scene, env, (Math.random() * 2 ** 31) | 0);
 // 🗺️ 서울 맵: 길 위 차 · 버스 · 오토바이 · 자전거 · 행인 젤리 모양 (서버의 기록 다시 돌리기에선 모양 없이 판정만)
 track.makeMover = (kind, n) => makeTimeMover(kind, n) || makeSeoulMover(kind, n);
-// ⏳ 시간 여행: 평지 · 길 · 양옆 시대 풍경 (track 이 만든 길을 따라)
+// ⏳ 모든 것의 역사: 평지 · 길 · 양옆 시대 풍경 (track 이 만든 길을 따라)
 const tworld = new TimeWorld(scene);
-// 시간 여행 이어 달리기: 마지막으로 쓰러진 시대 (다음 판은 거기서)
+// 모든 것의 역사 이어 달리기: 마지막으로 쓰러진 시대 (다음 판은 거기서)
 const ERA_KEY = 'dr-time-era';
-// 시간 여행에서는 곰을 사람 · 동물과 같은 비율로 (보이는 키 약 1.7m · 판정 키 1.45m)
+// 모든 것의 역사에서는 곰을 사람 · 동물과 같은 비율로 (보이는 키 약 1.7m · 판정 키 1.45m)
 const TIME_BEAR = 0.72;
 const timeEra = () => { const e = Number(store.get(ERA_KEY)); return Number.isInteger(e) && e >= 0 && e < ERAS.length ? e : 0; };
 env.originRef = track;
@@ -317,16 +317,15 @@ for (const b of $('diff-pick').children) b.onclick = () => { game.pickDiff = b.d
 for (const b of $('room-diff').children) b.onclick = () => net.send({ t: 'diff', diff: b.dataset.m });
 game.pickMap = mapOf(store.get(MAP_KEY)); segSet('map-pick', game.pickMap);
 for (const b of $('map-pick').children) b.onclick = () => { const was = game.pickMap; game.pickMap = b.dataset.m; store.set(MAP_KEY, game.pickMap); segSet('map-pick', game.pickMap); game.titleT = 6; renderTimeResume(); if (game.mode === 'title' && (was === 'time') !== (game.pickMap === 'time')) titleWorld(); };
-// ⏳ 시간 여행: 어느 시대부터 출발하는지 + 빅뱅부터 다시
+// ⏳ 모든 것의 역사: 어느 시대부터 출발하는지 (늘 마지막으로 쓰러진 시대부터 · 빅뱅부터 다시 하기는 없다)
 function renderTimeResume() {
   const el = $('time-resume'), e = timeEra(), th = ERAS[e];
   el.classList.toggle('hidden', game.pickMap !== 'time');
-  el.innerHTML = e > 0 ? `<span>⏳ <b>${th.emoji} ${th.name}</b> <small>(시대 #${e + 1} · ${th.when})</small>부터 출발</span><button id="time-reset" type="button">⏮ 빅뱅부터</button>` : `<span>⏳ <b>💥 빅뱅</b>부터 출발 · 쓰러지면 다음 판은 그 시대부터 이어져요</span>`;
-  const b = $('time-reset'); if (b) b.onclick = () => { store.set(ERA_KEY, 0); renderTimeResume(); toast('💥 빅뱅부터 다시 출발해요'); if (game.mode === 'title') titleWorld(); };
+  el.innerHTML = e > 0 ? `<span>⏳ <b>${th.emoji} ${th.name}</b> <small>(시대 #${e + 1} · ${th.when})</small>부터 이어서 출발</span>` : `<span>⏳ <b>💥 빅뱅</b>부터 출발 · 쓰러지면 다음 판은 그 시대부터 이어져요</span>`;
 }
 renderTimeResume();
 if (game.pickMap === 'time') titleWorld(); // 첫 화면부터 그 시대 세상
-// 새 맵 소개 공지 (웹만 · 2026-11-29 까지): 누르면 시간 여행을 고른다
+// 새 맵 소개 공지 (웹만 · 2026-11-29 까지): 누르면 모든 것의 역사를 고른다
 const timeNoticeOn = () => !TOSS && Date.now() < Date.parse('2026-11-29T00:00:00+09:00');
 $('time-notice').onclick = () => { const was = game.pickMap; game.pickMap = 'time'; store.set(MAP_KEY, 'time'); segSet('map-pick', 'time'); renderTimeResume(); game.titleT = 6; if (game.mode === 'title' && was !== 'time') titleWorld(); };
 if (timeNoticeOn()) $('time-notice').classList.remove('hidden');
@@ -474,7 +473,7 @@ function countdown(ms) {
   clearTimeout(game.howtoT); game.howtoT = setTimeout(() => h.classList.add('dock'), 5500);
 }
 function goRun() { game.mode = 'run'; $('countdown').classList.add('hidden'); }
-// 첫 화면 뒤 세상: 시간 여행을 골랐으면 출발할 시대의 세상을 미리 펼친다 (다른 맵은 꿈 하늘만)
+// 첫 화면 뒤 세상: 모든 것의 역사를 골랐으면 출발할 시대의 세상을 미리 펼친다 (다른 맵은 꿈 하늘만)
 function titleWorld() { newRun((Math.random() * 2 ** 31) | 0, false, game.pickDiff, game.pickMap === 'time' ? 'time' : 'dream'); }
 function toTitle() {
   game.team = false; $('teambar').classList.add('hidden');
@@ -496,7 +495,7 @@ function score() { return Math.floor(runner.s) + runner.stars * 10; }
 async function died(why) {
   sfx(why.includes('떨어') ? 'die' : 'bonk');
   game.mode = 'dead'; game.deadT = 0; game.why = why;
-  // 시간 여행: 쓰러진 시대를 기억 (다음 판은 거기서 · 같이 달리기도 내 기록으로)
+  // 모든 것의 역사: 쓰러진 시대를 기억 (다음 판은 거기서 · 같이 달리기도 내 기록으로)
   if (game.map === 'time') { game.diedEra = track.order[track.dreamAt(runner.s) % track.order.length]; store.set(ERA_KEY, game.diedEra); renderTimeResume(); }
   const rpNow = game.rp; game.rp = null;
   reportPlay();
@@ -531,8 +530,8 @@ async function showOver() {
   if (r?.anonPending) $('ov-best').textContent = '';
   if (r?.newBest) sfx('best');
   $('again-btn').textContent = game.multi ? '👥 방으로 돌아가기' : '🔁 다시 달리기';
-  // 시간 여행: 다시하면 다음 역사를 이어서 (1-5)
-  { const tm = game.map === 'time' && !game.multi, nx = ERAS[timeEra()]; $('again-btn').classList.toggle('time-again', tm); $('time-next').classList.toggle('hidden', !tm); if (tm) { $('again-btn').innerHTML = `⏳ 이어서 시간 여행 <small>${nx.emoji} ${nx.name}부터</small>`; $('time-next').innerHTML = `✨ 다시하면 <b>다음 역사</b>를 이어서 체험할 수 있어요! <span>${nx.emoji} ${nx.name} · ${nx.when}</span>`; } }
+  // 모든 것의 역사: 다시하면 다음 역사를 이어서 (1-5)
+  { const tm = game.map === 'time' && !game.multi, nx = ERAS[timeEra()]; $('again-btn').classList.toggle('time-again', tm); $('time-next').classList.toggle('hidden', !tm); if (tm) { $('again-btn').innerHTML = `⏳ 이어서 달리기 <small>${nx.emoji} ${nx.name}부터</small>`; $('time-next').innerHTML = `✨ 다시하면 <b>다음 역사</b>를 이어서 체험할 수 있어요! <span>${nx.emoji} ${nx.name} · ${nx.when}</span>`; } }
   $('ov-board-title').classList.remove('hidden'); $('ov-board').classList.remove('hidden');
   $('ov-board-title').textContent = `🏆 ${mapTag(game.map)}${diffName(game.diff)} · ${modeName(game.itemMode ? 'item' : 'speed')} 최고 기록`;
   renderBoard($('ov-board'), r?.top ? r : await loadBoard(game.itemMode ? 'item' : 'speed', game.diff, game.map), true);
@@ -583,7 +582,7 @@ function showDreamCard(d) {
   el.classList.toggle('time', !!th.time); el.querySelector('.dc-ch').textContent = th.time && (d === 0 || track.themeOf(d - 1).ch !== th.ch) ? `제${th.ch}장 · ${CHAPTERS[th.ch]}` : '';
   $('h-dream-name').textContent = `${th.emoji} ${th.name}`;
 }
-// ⏳ 시간 여행: 문을 지나면 빛 소용돌이 + 연도가 슬롯처럼 돌다가 새 시대에서 멈춘다 (작업지시서 1-6)
+// ⏳ 모든 것의 역사: 문을 지나면 빛 소용돌이 + 연도가 슬롯처럼 돌다가 새 시대에서 멈춘다 (작업지시서 1-6)
 let warpT = null;
 function timeWarp(from, to) {
   const el = $('time-warp'), y = el.querySelector('.tw-year');
@@ -935,7 +934,7 @@ function frame() {
   const sOn = seoulOn(); if (sOn !== seoulWas) { seoulWas = sOn; seoulSwap(sOn); }
   if (sOn) { seoulFrame(dt); return; }
   if (tworld.track) tworld.update(dt, game.mode === 'title' ? t : game.runT, runner.s);
-  // 시간 여행 달리는 동안만 곰을 사람 크기로 (첫 화면 · 다른 맵으로 가면 원래 크기)
+  // 모든 것의 역사 달리는 동안만 곰을 사람 크기로 (첫 화면 · 다른 맵으로 가면 원래 크기)
   const tb = !!tworld.track;
   if (tb || game.timeBear) { const k = tb ? TIME_BEAR : 1; runner.bear.root.scale.setScalar(k); for (const g of game.ghosts.values()) g.bear.root.scale.setScalar(k); }
   game.timeBear = tb;
@@ -1012,7 +1011,7 @@ function followCamera(dt) {
     yc = game.camR;
   } else game.camG = null;
   // 서울 맵은 곰이 작아진 만큼(6-13) 카메라를 가까이 · 낮게
-  // 시간 여행도 곰을 사람 크기로 줄였으니(TIME_BEAR) 카메라를 조금 가까이
+  // 모든 것의 역사도 곰을 사람 크기로 줄였으니(TIME_BEAR) 카메라를 조금 가까이
   const sk = seoulOn() ? 0.72 : track.tmap && game.mode !== 'title' ? 0.8 : 1; up *= sk; back *= sk; look *= sk; ahead *= sk;
   const cx = x * 0.85, cy = Math.max(yc, fl) + up + game.camFall * 5;
   // 서울 맵: 곧은 길 자리에서 정하고, 그리기 전에 실제 길 위로 옮긴다 (seoulFrame)

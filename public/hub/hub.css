@@ -263,7 +263,8 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 /* 드림 러너: 맨 윗줄을 통째로 쓰는 큰 카드 · 맵 4가지를 나란히 */
 .card.dream.wide { grid-column: span 2; min-height: 380px; }
 .card.dream.wide .art { bottom: 132px; }
-.card.dream.wide .art { display: grid; grid-template-columns: repeat(5, 1fr); background: #120a35; }
+.card.dream.wide .art { display: grid; grid-template-columns: repeat(4, 1fr) 1.45fr; background: #120a35; } /* 새 맵(모든 것의 역사)은 이름이 길어 조금 넓게 */
+.card.dream .dp > span { white-space: nowrap; }
 .dp { position: relative; overflow: hidden; border-right: 2px solid rgba(255,255,255,.12); background-size: cover; background-position: center; transition: transform .6s; }
 .card.dream.wide:hover .dp { transform: scale(1.04); }
 .card.dream .dp .new { position: absolute; right: 10px; top: 46px; padding: 3px 10px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-family: 'Jua', sans-serif; font-size: 13px; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
