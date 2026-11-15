@@ -311,7 +311,6 @@ const diffName = (d) => DIFFS[diffOf(d)].name;
 // 모드 고르기: 이름 아래에 노멀 기준 몇 배속인지 (순위표 탭은 이름만)
 for (const id of ['diff-pick', 'room-diff', 'board-diff']) $(id).innerHTML = DIFF_KEYS.map((k) => `<button data-m="${k}">${DIFFS[k].name}${id === 'board-diff' ? '' : `<small class="vs-hard">${k === 'hard' ? '기준 속도' : `노멀 ×${vsHard(k)}`}</small>`}</button>`).join('');
 // 난이도 변경 공지: 2026-11-22 00:00 (한국 시간) 전까지만 · 토스 미니앱은 처음 하는 사람들이라 보이지 않는다
-if (!TOSS && Date.now() < Date.parse('2026-11-22T00:00:00+09:00')) $('diff-notice').classList.remove('hidden');
 game.pickDiff = store.get(DIFF_KEY) ? diffOf(store.get(DIFF_KEY)) : 'hard'; // 처음 온 사람은 하드부터 · 그다음부터는 마지막에 고른 난이도
 segSet('diff-pick', game.pickDiff);
 for (const b of $('diff-pick').children) b.onclick = () => { game.pickDiff = b.dataset.m; store.set(DIFF_KEY, game.pickDiff); segSet('diff-pick', game.pickDiff); };
