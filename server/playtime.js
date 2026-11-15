@@ -29,7 +29,8 @@ export class PlayTime {
 export function allTime(pt, src) {
   const games = {};
   const add = (g, k, v) => { (games[g] ||= { min: 0, players: 0, plays: 0 })[k] += v; };
-  for (const g of src.ids) { add(g, 'min', pt.total(g)); add(g, 'plays', pt.plays(g)); }
+  // 드림 러너는 저장된 판(웹 + 토스)의 판수 · 달린 시간만 센다. 페이지에 머문 시간(1분 신호)까지 더하면 달린 시간이 두 번 들어간다 (랜딩 지표와 같은 기준)
+  for (const g of src.ids) { if (g === 'dream-runner' && src.dream?.length) continue; add(g, 'min', pt.total(g)); add(g, 'plays', pt.plays(g)); }
   for (const B of src.dream) { const subs = new Set(); for (const [sub, st] of Object.entries(B.stats || {})) { add('dream-runner', 'min', (st.time || 0) / 60); add('dream-runner', 'plays', st.runs || 0); subs.add(sub); } for (const T of [B.best, B.bestItem, ...Object.values(B.boards || {})]) for (const sub of Object.keys(T || {})) subs.add(sub); for (const sub of Object.keys(B.hg || {})) subs.add(sub); add('dream-runner', 'players', subs.size); }
   for (const [g, R] of Object.entries(src.records)) { const subs = new Set(); for (const T of Object.values(R.data || {})) for (const sub of Object.keys(T || {})) subs.add(sub); add(g, 'players', subs.size); }
   if (src.cityUsers) add('jelly-city', 'players', src.cityUsers);

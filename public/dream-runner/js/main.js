@@ -217,7 +217,9 @@ if (!TOSS) {
     // 서버가 센 시각(오전 8시 · 낮 12시 · 오후 4시, 한국 시간) 기준
     const k = new Date((st.asof || Date.now()) + 9 * 3600e3), h = k.getUTCHours(); $('dl-asof').textContent = `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일 ${h < 12 ? `오전 ${h}시` : h === 12 ? '낮 12시' : `오후 ${h - 12}시`} 기준`;
     const io = 'IntersectionObserver' in window ? new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { io.unobserve(e.target); const v = val(st, e.target.dataset.st); if (typeof v === 'number') fill(e.target, v); } }, { root: T, threshold: 0.4 }) : null;
-    for (const el of document.querySelectorAll('#dl [data-st]')) { const v = val(st, el.dataset.st); if (typeof v !== 'number') continue; if (io) io.observe(el); else fill(el, v); }
+    for (const el of document.querySelectorAll('#dl [data-st]')) { const v = val(st, el.dataset.st); if (typeof v === 'string') { el.textContent = v; continue; } if (typeof v !== 'number') continue; if (io && 'n' in el.dataset) io.observe(el); else fill(el, v); }
+    // 난이도 배속: 게임 코드의 값 그대로 (예: 🙂 노멀 ×1 · 🔥 하드 ×1.4 …)
+    const dEl = document.querySelector('#dl [data-st-diffs]'); if (dEl && st.game?.diffs) dEl.textContent = st.game.diffs.map((d) => `${d.name.replace(/^\S+\s/, '')} ×${d.x}`).join(' · ');
   }).catch(() => { /* 지표를 못 받으면 — 그대로 */ });
 }
 
