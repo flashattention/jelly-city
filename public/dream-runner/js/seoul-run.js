@@ -55,7 +55,7 @@ class RoutePath {
 }
 const PATHS = ROUTES.map((R) => new RoutePath(R));
 // 달리는 길 띠 무늬: 아스팔트 결 · 흰 가장자리 · 노란 가운데 점선 (8m 한 번)
-let PATH_M = null, LANE_M = null;
+let PATH_M = null, LANE_M = null, WARM_M = null;
 function pathTex() {
   const cv = document.createElement('canvas'); cv.width = 64; cv.height = 256; const g = cv.getContext('2d');
   g.fillStyle = '#5a5d61'; g.fillRect(0, 0, 64, 256);
@@ -132,19 +132,25 @@ export class SeoulRun {
     const w = this.want.find((q) => !hw.chunks.has(`${q.t}_${q.c}`) && !hw.chunkFail?.has(`${q.t}_${q.c}`)); if (!w) return;
     const key = `${w.t}_${w.c}`, same = [...hw.chunks.entries()].filter(([k2]) => k2.startsWith(`${w.t}_`)).map(([, c2]) => c2);
     hw.chunkLoading = key;
-    hw.loadChunk(key, () => this.pick(w.t, w.c, w.u1, same)).then((c) => { c.kept = c.map.__kept; c.deps = same; this.thin(c, w.c); hw.chunks.set(key, c); for (const c2 of hw.chunks.values()) if (c2.chunkKey.startsWith(`${w.t}_`)) this.cullRoute(c2, w.c); if (this.shown != null) this.show(this.shown); for (const P of PATHS) if (P.R.tiles.includes(w.t)) P.sampleH(hw); this.onChunk?.(); })
+    hw.loadChunk(key, () => this.pick(w.t, w.c, w.u1, same)).then(async (c) => { c.kept = c.map.__kept; c.deps = same; this.thin(c, w.c); await Promise.all([...same, c].map((c2) => this.cullRoute(c2, w.c))); hw.chunks.set(key, c); this.warmAdd(c); if (this.shown != null) this.show(this.shown); for (const P of PATHS) if (P.R.tiles.includes(w.t)) P.sampleH(hw); this.onChunk?.(); })
       .catch((e) => { console.warn('서울 칸', key, e); (hw.chunkFail ||= new Set()).add(key); }).finally(() => { hw.chunkLoading = null; });
   }
   // 칸 지도에서 코스 길 둘레(건물 RB · 길 · 녹지 RR)만 남긴다 (seoul-run-worker.js, 따로 스레드에서)
   //   같은 칸의 다른 코스 조각(same)이 이미 지은 것은 뺀다 (겹쳐 그리면 깜빡인다)
   pick(tile, c, u1, same) {
-    this.worker ||= new Worker(new URL('./seoul-run-worker.js', import.meta.url));
-    this.wq ||= new Map(); this.worker.onmessage ||= (e) => { const f = this.wq.get(e.data.id); if (f) { this.wq.delete(e.data.id); f(e.data); } };
+    this.wk();
     const P = PATHS[c], pts = [], q = { x: 0, z: 0 }; for (let u = 0; u <= Math.min(P.len, u1); u += 8) { P.pos(u, q); pts.push(q.x, q.z); }
     const taken = {}; for (const c2 of same) for (const [f, idx] of Object.entries(c2.kept || {})) (taken[f] ||= []).push(...idx);
     const id = (this.wid = (this.wid || 0) + 1), [ti, tj] = tile.split('_'), url = new URL(`../seoul/t_${ti}_${tj}.json`, import.meta.url).href;
     return new Promise((ok, no) => { this.wq.set(id, (d) => (d.error ? no(new Error(d.error)) : ok({ ...d.M, __kept: d.kept }))); this.worker.postMessage({ id, url, pts, RB, RR, taken, half: seoulLaneW(c) / 2 }); });
   }
+  // 일꾼 스레드 (칸 지도 고르기 · 차로 위 면 고르기). 답은 id 로 찾는다
+  wk() {
+    this.worker ||= new Worker(new URL('./seoul-run-worker.js', import.meta.url));
+    this.wq ||= new Map(); this.worker.onmessage ||= (e) => { const f = this.wq.get(e.data.id); if (f) { this.wq.delete(e.data.id); f(e.data); } };
+    return this.worker;
+  }
+  ask(msg, transfer = []) { const w = this.wk(), id = (this.wid = (this.wid || 0) + 1); return new Promise((ok, no) => { this.wq.set(id, (d) => (d.error ? no(new Error(d.error)) : ok(d))); w.postMessage({ ...msg, id }, transfer); }); }
   // 판정 좌표 → 세상 좌표 행렬: 곧은 길의 (0, 0, z) 를 그 코스 길 위 점으로, -z 를 길 방향으로
   //   dream 을 주면 그 코스 길로 (카메라: 곰이 있는 코스)
   bendM(z, dream, out) {
@@ -173,6 +179,29 @@ export class SeoulRun {
         U.uC.value.set(ti, tj); for (let b = -2; b <= 2; b++) for (let a = -2; a <= 2; a++) U.uL.value[(b + 2) * 5 + a + 2] = have.has(`${ti + a}_${tj + b}`) ? 1 : 0; }
       for (const c of hw.chunks.values()) c.scene.traverse((o) => { const L = o.userData.lod; if (L) { o.count = Math.hypot(L[0] - px, L[1] - pz) < (L[3] ? Math.min(L[3], LOD_R) : R + 360) ? L[2] : 0; o.visible = o.count > 0 && !o.userData.seasonOff; } const V = o.userData.lodV; if (V) o.visible = Math.hypot(V[0] - px, V[1] - pz) < V[2]; });
       const v = this.v; for (const o of hw.lodObjs || []) { const bs = o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere); v.copy(bs.center).applyMatrix4(o.matrixWorld); o.visible = Math.hypot(v.x - px, v.z - pz) - bs.radius < SMALL_R; } }
+    this.warmStep(3);
+  }
+  // 6-26: 미리 GPU 에 올려 두기. 다음 코스 칸은 숨긴 채 지어 두는데, 코스가 바뀌어 처음 보일 때 글씨 그림 · 꼭짓점을 한꺼번에 올리느라 한 프레임이 크게 멈췄다
+  //   숨어 있는 동안 프레임마다 몇 ms 씩: 그림은 initTexture, 물체는 1×1 그림판에 단색 재질로 한 번 그려 꼭짓점 · 번호 · 인스턴스 자료를 올린다
+  warmAdd(c) { (this.warmQ ||= []).push(c); }
+  warmStep(ms) {
+    const Q = this.warmQ, R = this.renderer; if (!Q?.length || !R) return;
+    const c = Q[0]; if (c.scene.visible || ![...this.hw.chunks.values()].includes(c)) { Q.shift(); return; }
+    if (!c.warm) { const tex = new Set(), objs = [], add = (v) => { if (v?.isTexture) tex.add(v); };
+      c.scene.traverse((o) => { if (!(o.isMesh || o.isPoints || o.isLine) || !o.geometry) return; objs.push(o); for (const m of Array.isArray(o.material) ? o.material : [o.material]) { if (!m) continue; for (const k in m) add(m[k]); for (const u of Object.values(m.uniforms || {})) add(u?.value); } });
+      c.warm = { tex: [...tex], objs }; }
+    const W = c.warm, t0 = performance.now(), prev = R.getRenderTarget();
+    this.warmRT ||= new THREE.WebGLRenderTarget(1, 1);
+    WARM_M ||= { mesh: new THREE.MeshBasicMaterial(), pts: new THREE.PointsMaterial(), line: new THREE.LineBasicMaterial() };
+    while (performance.now() - t0 < ms && (W.tex.length || W.objs.length)) {
+      if (W.tex.length) { const t = W.tex.pop(); try { R.initTexture(t); } catch { /* 그릴 때 올린다 */ } continue; }
+      const o = W.objs.pop(), mat = o.material, vis = o.visible, fc = o.frustumCulled, kids = o.children.map((k) => k.visible);
+      o.material = o.isPoints ? WARM_M.pts : o.isLine ? WARM_M.line : WARM_M.mesh; o.visible = true; o.frustumCulled = false; for (const k of o.children) k.visible = false;
+      try { R.setRenderTarget(this.warmRT); R.render(o, this.camera); } catch { /* 그릴 때 올린다 */ }
+      o.material = mat; o.visible = vis; o.frustumCulled = fc; o.children.forEach((k, i) => { k.visible = kids[i]; });
+    }
+    R.setRenderTarget(prev);
+    if (!W.tex.length && !W.objs.length) Q.shift();
   }
   // 코스가 바뀌는 순간 시간은 바로 (빛 문으로 하얗게 덮인 동안)
   jumpHour() { this.hourJump = true; this.hourTo = null; }
@@ -205,37 +234,36 @@ export class SeoulRun {
     // 44-2: 골목에 세워 둔 스쿠터 · 쓰레기봉투가 차로 위(레인 폭/2 + 0.8m 안)에 있으면 숨긴다 (곰이 그 속을 지나가 숨은 장애물처럼 보였다)
     { const M4 = new THREE.Matrix4(); chunk.scene.traverse((o) => { if (!o.isInstancedMesh || !o.userData.alleyProp) return; let hit = false; for (let i = 0; i < o.instanceMatrix.count; i++) { o.getMatrixAt(i, M4); const e = M4.elements; if (e[0] === 0 && e[5] === 0) continue; if (near(e[12], e[14], half + 0.8)) { o.setMatrixAt(i, zero); hit = true; } } if (hit) { o.instanceMatrix.needsUpdate = true; o.computeBoundingSphere?.(); } }); }
     this.cullPoles(chunk, c);
-    this.carveLane(chunk, c);
+    return this.carveLane(chunk, c);
   }
   // 6-12: 달리는 차로 위(가운데에서 레인 폭/2 + 0.6m 안) · 길 높이 + 0.35 ~ 7m 에 걸친 면을 잘라 낸다
   //   다리 경사로 · 낮은 상판 · 시설물이 곰 · 장애물 · 카메라를 가렸다(여의도 · 서울숲). 다리는 칸마다 한 그물로 묶여 있어 면 단위로 자른다
   //   땅 · 길 바닥 층(renderOrder < -40)과 인스턴스(나무 · 기둥은 cullRoute · cullPoles 가 따로)는 건드리지 않는다
-  carveLane(chunk, c) {
-    const P = PATHS[c], GS = 10, G = new Map(), q = { x: 0, z: 0 };
-    for (let u = 0; u <= P.len; u += 2) { P.pos(u, q); const k = `${Math.floor(q.x / GS)},${Math.floor(q.z / GS)}`; if (!G.has(k)) G.set(k, []); G.get(k).push(q.x, q.z, u); }
-    const R = seoulLaneW(c) / 2 + 0.6, R2 = R * R;
-    // 점(x, y, z)이 차로 위 높이 창 안인가
-    const inLane = (x, y, z) => { const gx = Math.floor(x / GS), gz = Math.floor(z / GS); let bu = -1, bd = R2; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const L = G.get(`${gx + a},${gz + b}`); if (!L) continue; for (let i = 0; i < L.length; i += 3) { const d = (L[i] - x) ** 2 + (L[i + 1] - z) ** 2; if (d < bd) { bd = d; bu = L[i + 2]; } } } if (bu < 0) return false; const dy = y - P.hAt(bu); return dy > 0.35 && dy < 7; };
-    const v = new THREE.Vector3(), A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), done = (this.carved ||= new WeakMap()), uses = new Map();
+  //   6-26: 삼각형마다 검사는 일꾼 스레드에서 (메인 스레드에서 한 칸에 170 ~ 230ms 멈췄다). 여기서는 상자로 거르고, 답을 받아 지운다
+  async carveLane(chunk, c) {
+    const P = PATHS[c], L = [], H = [], q = { x: 0, z: 0 };
+    for (let u = 0; u <= P.len; u += 2) { P.pos(u, q); L.push(q.x, q.z, u); H.push(P.hAt(u)); }
+    const R = seoulLaneW(c) / 2 + 0.6, done = (this.carved ||= new WeakMap()), uses = new Map(), list = [];
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (let i = 0; i < L.length; i += 3) { x0 = Math.min(x0, L[i]); x1 = Math.max(x1, L[i]); z0 = Math.min(z0, L[i + 1]); z1 = Math.max(z1, L[i + 1]); }
     chunk.scene.traverse((o) => { if (o.geometry) uses.set(o.geometry, (uses.get(o.geometry) || 0) + 1); });
-    let cut = 0;
     chunk.scene.traverse((o) => {
       if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || (o.renderOrder || 0) < -40 || !o.geometry?.attributes?.position) return; { let S = done.get(o); if (!S) done.set(o, (S = new Set())); if (S.has(c)) return; S.add(c); }
-      o.updateWorldMatrix(true, false); const g = o.geometry, pos = g.attributes.position, idx = g.index, n = idx ? idx.count : pos.count, M = o.matrixWorld;
-      if (!g.boundingBox) g.computeBoundingBox(); const bb = g.boundingBox.clone().applyMatrix4(M);
-      // 칸 안 차로와 상자가 안 겹치면 건너뛴다
-      let near = false; for (const [k, L] of G) { for (let i = 0; i < L.length && !near; i += 3) if (L[i] > bb.min.x - R && L[i] < bb.max.x + R && L[i + 1] > bb.min.z - R && L[i + 1] < bb.max.z + R) near = true; if (near) break; } if (!near) return;
-      let ia = null;
-      const at = (k, out) => out.fromBufferAttribute(pos, idx ? idx.getX(k) : k).applyMatrix4(M);
-      for (let t = 0; t + 2 < n; t += 3) {
-        at(t, A); at(t + 1, B); at(t + 2, C);
-        let hit = inLane((A.x + B.x + C.x) / 3, (A.y + B.y + C.y) / 3, (A.z + B.z + C.z) / 3);
-        if (!hit) for (const [p1, p2] of [[A, B], [B, C], [C, A], [A, A], [B, B], [C, C]]) { v.addVectors(p1, p2).multiplyScalar(0.5); if (inLane(v.x, v.y, v.z)) { hit = true; break; } }
-        if (!hit) continue;
-        if (!ia) { const own = (uses.get(g) || 0) <= 1, g2 = own ? g : g.clone(); if (!own) o.geometry = g2; if (!g2.index) { const arr = new Uint32Array(pos.count); for (let k = 0; k < arr.length; k++) arr[k] = k; g2.setIndex(new THREE.BufferAttribute(arr, 1)); } ia = g2.index; }
-        const k0 = ia.getX(t); ia.setX(t + 1, k0); ia.setX(t + 2, k0); cut++;
-      }
-      if (ia) ia.needsUpdate = true;
+      o.updateWorldMatrix(true, false); const g = o.geometry;
+      if (!g.boundingBox) g.computeBoundingBox(); const bb = g.boundingBox.clone().applyMatrix4(o.matrixWorld);
+      // 코스 길 상자와 안 겹치면 건너뛰고, 겹치면 길 점 하나라도 상자 둘레에 있는지
+      if (bb.max.x < x0 - R || bb.min.x > x1 + R || bb.max.z < z0 - R || bb.min.z > z1 + R) return;
+      let near = false; for (let i = 0; i < L.length; i += 3) if (L[i] > bb.min.x - R && L[i] < bb.max.x + R && L[i + 1] > bb.min.z - R && L[i + 1] < bb.max.z + R) { near = true; break; } if (!near) return;
+      list.push(o);
+    });
+    if (!list.length) return;
+    const meshes = list.map((o) => { const g = o.geometry, pa = g.attributes.position; let pos; if (pa.isInterleavedBufferAttribute || pa.itemSize !== 3) { pos = new Float32Array(pa.count * 3); for (let k = 0; k < pa.count; k++) { pos[k * 3] = pa.getX(k); pos[k * 3 + 1] = pa.getY(k); pos[k * 3 + 2] = pa.getZ(k); } } else pos = new Float32Array(pa.array); return { pos, idx: g.index ? Uint32Array.from(g.index.array) : null, M: [...o.matrixWorld.elements] }; });
+    let res; try { res = await this.ask({ type: 'carve', L, H, R, meshes }, meshes.flatMap((m) => (m.idx ? [m.pos.buffer, m.idx.buffer] : [m.pos.buffer]))); } catch (e) { console.warn('차로 면 고르기', e); return; }
+    let cut = 0;
+    list.forEach((o, mi) => {
+      const T = res.cuts[mi]; if (!T?.length) return;
+      const g = o.geometry, own = (uses.get(g) || 0) <= 1, g2 = own ? g : g.clone(); if (!own) o.geometry = g2;
+      if (!g2.index) { const arr = new Uint32Array(g2.attributes.position.count); for (let k = 0; k < arr.length; k++) arr[k] = k; g2.setIndex(new THREE.BufferAttribute(arr, 1)); }
+      const ia = g2.index; for (const t of T) { const k0 = ia.getX(t); ia.setX(t + 1, k0); ia.setX(t + 2, k0); } ia.needsUpdate = true; cut += T.length;
     });
     if (cut) (this.carveN = (this.carveN || 0) + cut);
   }

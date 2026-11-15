@@ -26,7 +26,26 @@ function laneTest(pts, h) {
     return false;
   };
 }
+// 6-26: 차로 위 면 고르기 (carveLane 의 무거운 삼각형 검사, 메인 스레드에서 한 칸에 170 ~ 230ms 멈췄다)
+//   받는 것: { type: 'carve', id, L: [x, z, u, ...] (코스 길 2m 간격), H: [그 점 길 높이], R, meshes: [{ pos, idx, M }] }
+//   주는 것: { id, cuts: [Uint32Array (지울 삼각형 첫 번째 번호 t)] }
+function carve({ L, H, R, meshes }) {
+  const GS = 10, G = new Map(), R2 = R * R;
+  for (let i = 0; i < L.length; i += 3) { const k = `${Math.floor(L[i] / GS)},${Math.floor(L[i + 1] / GS)}`; let a = G.get(k); if (!a) G.set(k, (a = [])); a.push(i); }
+  const inLane = (x, y, z) => { const gx = Math.floor(x / GS), gz = Math.floor(z / GS); let bi = -1, bd = R2; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const A = G.get(`${gx + a},${gz + b}`); if (!A) continue; for (const i of A) { const d = (L[i] - x) ** 2 + (L[i + 1] - z) ** 2; if (d < bd) { bd = d; bi = i; } } } if (bi < 0) return false; const dy = y - H[bi / 3]; return dy > 0.35 && dy < 7; };
+  return meshes.map(({ pos, idx, M }) => {
+    const n = idx ? idx.length : pos.length / 3, out = [], P = new Float32Array(9);
+    const at = (k, o) => { const v = (idx ? idx[k] : k) * 3, x = pos[v], y = pos[v + 1], z = pos[v + 2]; P[o] = M[0] * x + M[4] * y + M[8] * z + M[12]; P[o + 1] = M[1] * x + M[5] * y + M[9] * z + M[13]; P[o + 2] = M[2] * x + M[6] * y + M[10] * z + M[14]; };
+    const mid = (a, b) => inLane((P[a] + P[b]) / 2, (P[a + 1] + P[b + 1]) / 2, (P[a + 2] + P[b + 2]) / 2);
+    for (let t = 0; t + 2 < n; t += 3) {
+      at(t, 0); at(t + 1, 3); at(t + 2, 6);
+      if (inLane((P[0] + P[3] + P[6]) / 3, (P[1] + P[4] + P[7]) / 3, (P[2] + P[5] + P[8]) / 3) || mid(0, 3) || mid(3, 6) || mid(6, 0) || mid(0, 0) || mid(3, 3) || mid(6, 6)) out.push(t);
+    }
+    return new Uint32Array(out);
+  });
+}
 self.onmessage = async (e) => {
+  if (e.data.type === 'carve') { try { const cuts = carve(e.data); self.postMessage({ id: e.data.id, cuts }, cuts.map((c) => c.buffer)); } catch (err) { self.postMessage({ id: e.data.id, error: String(err?.message || err) }); } return; }
   const { id, url, pts, RB, RR, taken = {}, half = 0 } = e.data;
   try {
     const res = await fetch(url); if (!res.ok) throw new Error('칸 없음'); const M = await res.json(), S = M.scale || 0.1;
