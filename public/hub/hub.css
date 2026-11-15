@@ -263,9 +263,10 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 /* 드림 러너: 맨 윗줄을 통째로 쓰는 큰 카드 · 맵 4가지를 나란히 */
 .card.dream.wide { grid-column: span 2; min-height: 380px; }
 .card.dream.wide .art { bottom: 132px; }
-.card.dream.wide .art { display: grid; grid-template-columns: repeat(4, 1fr); background: #120a35; }
+.card.dream.wide .art { display: grid; grid-template-columns: repeat(5, 1fr); background: #120a35; }
 .dp { position: relative; overflow: hidden; border-right: 2px solid rgba(255,255,255,.12); background-size: cover; background-position: center; transition: transform .6s; }
 .card.dream.wide:hover .dp { transform: scale(1.04); }
+.card.dream .dp .new { position: absolute; right: 10px; top: 46px; padding: 3px 10px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-family: 'Jua', sans-serif; font-size: 13px; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
 .dp:last-child { border-right: 0; }
 .dp > span { position: absolute; left: 12px; top: 12px; padding: 4px 11px; border-radius: 999px; background: rgba(10,6,30,.5); font-family: 'Jua', sans-serif; font-size: 14px; backdrop-filter: blur(4px); }
 .dp-dream { background: linear-gradient(180deg, #120a35 0%, #3b1f7a 45%, #ff8fb8 100%); }
@@ -302,10 +303,13 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
   .card.dream.wide .info { grid-template-columns: 1fr; }
   .card.dream.wide .info .play { grid-column: 1; grid-row: auto; justify-self: start; margin-top: 10px; }
   .card.dream.wide { grid-column: 1 / -1; }
-  /* 휴대폰: 네 칸을 2 × 2 로 (한 줄 넷은 너무 좁아 찌그러진다) */
-  .card.dream.wide .art { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr); }
-  .card.dream.wide .dp:nth-child(2) { border-right: 0; }
-  .card.dream.wide .dp:nth-child(-n+2) { border-bottom: 2px solid rgba(255,255,255,.12); }
+  /* 휴대폰: 다섯 칸을 위 3 · 아래 2 로 (한 줄 다섯은 너무 좁아 찌그러진다) */
+  .card.dream.wide .art { grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(2, 1fr); }
+  .card.dream.wide .dp { grid-column: span 2; }
+  .card.dream.wide .dp:nth-child(n+4) { grid-column: span 3; }
+  .card.dream.wide .dp:nth-child(3) { border-right: 0; }
+  .card.dream.wide .dp:nth-child(-n+3) { border-bottom: 2px solid rgba(255,255,255,.12); }
+  .card.dream.wide .dp > span { left: 8px; top: 8px; font-size: 12px; padding: 3px 8px; }
   .card.dream.wide .info p { font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) { .dp-hell .fist, .dp-hg .jog, .dp-hg .river, .dp-void .vroad, .dp-hell .lava { animation: none; } }
@@ -326,11 +330,20 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .ody .new { position: absolute; right: 14px; bottom: 12px; padding: 4px 12px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-size: 13px; }
 /* 젤리 서울 러너 카드: 드림 러너와 나란히 둘 다 2칸 (사진 두 장) */
 .card.seoul.wide { grid-column: span 2; min-height: 380px; }
-.card.seoul.wide .art { bottom: 132px; display: grid; grid-template-columns: repeat(2, 1fr); background: #0f1726; }
+.card.seoul.wide .art { bottom: 132px; display: grid; grid-template-columns: repeat(4, 1fr); background: #0f1726; }
 .card.seoul.wide:hover .dp { transform: scale(1.04); }
 .card.seoul .new { position: absolute; left: 14px; top: 12px; z-index: 1; padding: 4px 12px; border-radius: 999px; background: #ffd84d; color: #3b1d00; font-family: 'Jua', sans-serif; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
-@media (max-width: 720px) { .card.seoul.wide { grid-column: 1 / -1; } }
-.card.seoul .dp > span { top: 48px; }
+@media (max-width: 720px) {
+  .card.seoul.wide { grid-column: 1 / -1; min-height: 560px; }
+  /* 휴대폰: 네 곳을 2 × 2 로 */
+  .card.seoul.wide .art { bottom: 220px; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr); }
+  .card.seoul.wide .dp:nth-child(2) { border-right: 0; }
+  .card.seoul.wide .dp:nth-child(-n+2) { border-bottom: 2px solid rgba(255,255,255,.12); }
+  .card.seoul .dp > span { left: 8px; font-size: 12px; padding: 3px 8px; }
+  .card.seoul .dp:not(:first-child) > span { top: 8px; }
+}
+.card.seoul .dp > span { top: 12px; }
+.card.seoul .dp:first-child > span { top: 48px; } /* 첫 칸만 NEW 딱지 아래로 */
 /* 게시판: 내 글 추천 단추 · 안내 · 신고 사유 (2026-11-12) */
 .bd-votes.mine button { opacity: .5; cursor: default; }
 .bd-hint { margin: 4px 2px 0; font-size: 12px; color: var(--soft); }
