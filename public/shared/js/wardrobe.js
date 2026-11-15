@@ -32,6 +32,9 @@ const CSS = `
 .cos-title.fire.fire{position:relative;color:#fff8e0;font-weight:bold;outline:1.5px solid #ffd27a;outline-offset:1px;background-image:linear-gradient(0deg,#4a0000,#b01400 22%,#ff4a00 45%,#ff9a00 65%,#ffd24a 80%,#ff4a00 90%,#4a0000)!important;background-size:100% 300%!important;animation:cosFireBg 1.1s linear infinite,cosFire .45s ease-in-out infinite alternate;text-shadow:0 0 3px #fff,0 -1px 4px #ffd000,0 -3px 8px #ff7a00,0 -6px 14px #ff2a00}
 .cos-title.fire.fire::before{content:'🔥';position:absolute;left:-8px;top:-9px;font-size:11px;text-shadow:none;animation:cosFlick .5s ease-in-out infinite alternate}
 .cos-title.fire.fire::after{content:'🔥';position:absolute;right:-8px;top:-10px;font-size:12px;color:inherit;text-shadow:none;animation:cosFlick .6s ease-in-out .25s infinite alternate}
+.cos-title.fire.f1.fire{color:#fff;outline-color:#ffd0e0;background-image:linear-gradient(0deg,rgba(0,0,0,.45),rgba(255,255,255,0) 30%,rgba(255,255,255,.35) 55%,rgba(255,255,255,0) 75%,rgba(0,0,0,.35)),linear-gradient(90deg,#0a2cff,#1e88ff 22%,#6fd3ff 42%,#ff6a8a 58%,#ff1f3d 78%,#b0001e)!important;background-size:100% 300%,100% 100%!important;animation:cosFireBg .9s linear infinite,cosFire1 .45s ease-in-out infinite alternate;text-shadow:0 0 3px #fff,-2px -2px 6px #2a8cff,2px -2px 6px #ff2a4a,0 -5px 12px #8a5cff}
+.cos-title.fire.f1.fire::before{filter:hue-rotate(195deg) saturate(1.6) brightness(1.15)}
+@keyframes cosFire1{from{box-shadow:-6px -3px 12px #1e6bff,6px -3px 12px #ff1f3d,0 0 2px #fff inset}to{box-shadow:-9px -7px 20px #29b6ff,9px -7px 20px #ff2a2a,0 0 4px #fff inset}}
 @keyframes cosFireBg{from{background-position:0 0}to{background-position:0 150%}}
 @keyframes cosFire{from{box-shadow:0 0 8px #ff5a00,0 -4px 14px #ff2a00,0 0 2px #fff inset}to{box-shadow:0 0 14px #ffb000,0 -8px 22px #ff3a00,0 0 4px #fff inset}}
 @keyframes cosFlick{from{transform:translateY(0) scale(.85) rotate(-8deg);opacity:.75}to{transform:translateY(-3px) scale(1.15) rotate(8deg);opacity:1}}
@@ -51,7 +54,8 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const gradCss = (f, force) => (f?.grad && (f.rainbow || force) ? `;background-image:linear-gradient(100deg,${[...f.grad, f.grad[0]].join(',')});background-size:300% 100%` : '');
 const prCls = (f) => (f?.pr >= 1 ? ` p${Math.min(5, Math.floor(f.pr))}` : '');
 // 특이점 순위 칭호 · 메달: 글자가 불타오른다
-const fireCls = (it) => ((it.rule?.diff ?? ACHIEVEMENTS.find((a) => a.id === it.ach)?.rule?.diff) === 'singular' ? ' fire' : '');
+// 특이점 1위(1위 칭호 · 🥇 메달)는 파랑 + 빨강 불꽃, 2 · 3위는 주황 불꽃
+const fireCls = (it) => { const r = it.rule?.diff ? it.rule : ACHIEVEMENTS.find((a) => a.id === it.ach)?.rule; if (r?.diff !== 'singular') return ''; const first = it.slot === 'medal' ? it.fx?.honor === 0 : r.rank === 1; return first ? ' fire f1' : ' fire'; };
 export function titleHtml(id) {
   const it = id && itemById.get(id); if (!it || it.slot !== 'title') return '';
   css(); const t = TIERS[it.rarity] || TIERS.bronze;

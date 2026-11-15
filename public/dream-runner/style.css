@@ -97,6 +97,7 @@ h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 .brow .md { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; } /* 메달은 이름 오른쪽에서만, 넘치면 다음 줄로 */
 .brow .md:empty { display: none; }
 .brow .md > * { white-space: nowrap; }
+.brow .md > .fire { margin: 0 9px; } /* 불꽃(🔥)이 옆 메달 · 점수 위로 넘치지 않게 */
 @media (max-width: 560px) { .brow .nm { flex-wrap: wrap; gap: 6px; } .brow .md { flex-basis: 100%; } .brow .md > * { font-size: 11px; } } /* 좁은 화면: 이름 줄은 비워 두고 메달은 그 아래 줄부터 */
 .brow .sc { font-family: 'Jua', sans-serif; font-size: 17px; }
 .brow .sc small { font-family: 'Gowun Dodum'; color: var(--soft); font-size: 12px; margin-left: 6px; }
@@ -198,6 +199,8 @@ kbd.wide { min-width: 64px; }
 #mode-pick, #diff-pick, #map-pick { display: flex; width: fit-content; max-width: 100%; }
 #diff-pick, #room-diff, #board-diff { flex-wrap: wrap; justify-content: center; border-radius: 22px; }
 #diff-pick button, #room-diff button, #board-diff button { padding: 7px 11px; font-size: 14px; }
+/* 좁은 화면: 맵 버튼이 5개라 글자가 끊기지 않게 줄을 넘겨 감싼다 */
+@media (max-width: 520px) { #board-map, #room-map, #stats-map { display: flex; flex-wrap: wrap; justify-content: center; border-radius: 18px; max-width: 100%; } #board-map button, #room-map button, #stats-map button { white-space: nowrap; } }
 @media (max-width: 520px) { #diff-pick button, #room-diff button, #board-diff button, #map-pick button, #room-map button, #board-map button, #stats-map button { padding: 6px 8px; font-size: 13px; } }
 /* 아이템 칸 */
 #itembar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; z-index: 4; pointer-events: none; }
