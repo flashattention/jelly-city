@@ -178,13 +178,32 @@ async function renderFame() {
   $('fame').innerHTML = `<div class="fame-h">🏆 명예의 전당</div>` + (d.fame.length ? d.fame.map(row).join('') : '<div class="empty">아직 기록이 없어요</div>');
 }
 renderFame(); // 처음 열 때
-// ---------- 랜딩: 처음 화면 카드 아래로 이어지는 드림 러너 이야기 (웹만 · docs/dream-runner/랜딩-작업지시서.md) ----------
-{
-  const T = $('title'), up = () => T.scrollTo({ top: 0, behavior: 'smooth' });
-  for (const a of document.querySelectorAll('[data-dl-go]')) a.onclick = (e) => { e.preventDefault(); $(a.dataset.dlGo)?.scrollIntoView({ behavior: 'smooth' }); };
-  // "이 세계로 달리기": 그 맵을 고르고 맨 위 카드로
-  for (const b of document.querySelectorAll('.dl-go[data-map]')) b.onclick = () => { document.querySelector(`#map-pick [data-m="${b.dataset.map}"]`)?.click(); up(); };
-  for (const b of document.querySelectorAll('[data-dl-top]')) b.onclick = up;
+// ---------- 랜딩 (웹만 · 토스 미니앱은 예전 카드 그대로) · docs/dream-runner/랜딩-작업지시서.md ----------
+// 예전 처음 화면의 단추를 랜딩의 [data-slot] 자리로 옮겨 붙인다 (아이디 · 눌렀을 때 하는 일은 그대로)
+if (!TOSS) {
+  const T = $('title'), card = document.querySelector('#title > .card'), slot = (n) => document.querySelector(`#dl [data-slot="${n}"]`);
+  const mv = (n, ...els) => { const sl = slot(n); for (const e of els) if (e) sl.append(e); };
+  const tools = [...card.querySelectorAll('.row2 > *')];
+  mv('snd', card.querySelector('.snd-btn'));
+  mv('news', $('time-notice'));
+  mv('resume', $('map-pick'), $('time-resume'));
+  mv('mode', $('mode-pick')); mv('diff', $('diff-pick'));
+  mv('play', $('play-btns')); mv('code', card.querySelector('.code-row')); mv('err', $('err'));
+  mv('tools', ...tools); mv('fame', $('fame'));
+  // 세계 고르기: 01 ~ 05 목록 ↔ 숨은 맵 단추 (공지를 눌러 맵이 바뀌어도 따라간다)
+  const wp = [...document.querySelectorAll('#dl-wpick button')];
+  const sync = () => { for (const b of wp) b.classList.toggle('on', b.dataset.map === game.pickMap); };
+  const pick = (m) => { document.querySelector(`#map-pick [data-m="${m}"]`)?.click(); sync(); };
+  for (const b of wp) b.onclick = () => pick(b.dataset.map);
+  new MutationObserver(sync).observe($('map-pick'), { subtree: true, attributes: true, attributeFilter: ['class'] }); sync();
+  const up = () => T.scrollTo({ top: 0, behavior: 'smooth' });
+  for (const a of document.querySelectorAll('#dl [data-dl-go]')) a.onclick = (e) => { e.preventDefault(); $(a.dataset.dlGo)?.scrollIntoView({ behavior: 'smooth' }); };
+  for (const a of document.querySelectorAll('#dl [data-dl-top]')) a.onclick = (e) => { e.preventDefault(); up(); };
+  for (const b of document.querySelectorAll('#dl .dl-link[data-map]')) b.onclick = () => { pick(b.dataset.map); up(); };
+  for (const b of document.querySelectorAll('#dl [data-tool]')) b.onclick = () => $(b.dataset.tool)?.click();
+  // 위 막대: 첫 화면을 지나면 종이색으로
+  const bar = document.querySelector('.dl-bar');
+  T.addEventListener('scroll', () => bar.classList.toggle('solid', T.scrollTop > innerHeight * 0.7), { passive: true });
   // 실시간 지표: 화면에 들어오면 숫자가 차오른다
   const val = (o, path) => path.split('.').reduce((v, k) => v?.[k], o);
   const fmt = (v, dec) => (dec ? v.toFixed(dec) : Math.round(v).toLocaleString());
@@ -194,10 +213,11 @@ renderFame(); // 처음 열 때
     const t0 = performance.now(), step = (t) => { const k = Math.min(1, (t - t0) / 1400), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(v * e, dec) + suf; if (k < 1) requestAnimationFrame(step); };
     requestAnimationFrame(step);
   };
-  if (!TOSS) account.api('/api/dream/stats').then((st) => {
-    const els = [...document.querySelectorAll('#dl [data-st]')];
+  account.api('/api/dream/stats').then((st) => {
+    // 서버가 센 시각(오전 8시 · 낮 12시 · 오후 4시, 한국 시간) 기준
+    const k = new Date((st.asof || Date.now()) + 9 * 3600e3), h = k.getUTCHours(); $('dl-asof').textContent = `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일 ${h < 12 ? `오전 ${h}시` : h === 12 ? '낮 12시' : `오후 ${h - 12}시`} 기준`;
     const io = 'IntersectionObserver' in window ? new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { io.unobserve(e.target); const v = val(st, e.target.dataset.st); if (typeof v === 'number') fill(e.target, v); } }, { root: T, threshold: 0.4 }) : null;
-    for (const el of els) { const v = val(st, el.dataset.st); if (typeof v !== 'number') continue; if (io) io.observe(el); else fill(el, v); }
+    for (const el of document.querySelectorAll('#dl [data-st]')) { const v = val(st, el.dataset.st); if (typeof v !== 'number') continue; if (io) io.observe(el); else fill(el, v); }
   }).catch(() => { /* 지표를 못 받으면 — 그대로 */ });
 }
 

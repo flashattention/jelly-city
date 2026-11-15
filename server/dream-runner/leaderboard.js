@@ -23,6 +23,18 @@ const STAR_PTS = 10;       // 별사탕 하나 = 10점
 const TOP_GUARD = 10, DAY_STARS = 300000; // 확인 안 된 기록이 이 순위 안에 들면 비상 리포트 · 하루에 벌 수 있는 별 (사람이 닿지 못할 만큼 넉넉하게)
 
 // 운영 지표: 하루(한국 시간)마다 달린 사람 · 판수 · 광고 (기획 지표용, tools/metrics.mjs 가 읽는다)
+// 랜딩 지표 (docs/dream-runner/랜딩-작업지시서.md): 매일 오전 8시 · 낮 12시 · 오후 4시(한국 시간)에 새로 센 값을 보여 준다
+const STAT_SLOTS = [8, 12, 16];
+const statSlot = (now) => { const k = new Date(now + 9 * 3600e3), day = Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate()) - 9 * 3600e3, h = k.getUTCHours(); let at = day - 24 * 3600e3 + STAT_SLOTS[STAT_SLOTS.length - 1] * 3600e3; for (const x of STAT_SLOTS) if (h >= x) at = day + x * 3600e3; return at; };
+// 세계마다 콘텐츠 수: 게임 데이터 파일에서 센다 (못 읽으면 마지막으로 알던 값)
+const CONTENT = { dreams: 116, hells: 30, voids: 30, courses: 20, eras: 125 };
+const JS_DIR = new URL('../../public/dream-runner/js/', import.meta.url);
+(async () => {
+  for (const [k, f, name] of [['dreams', 'themes.js', 'THEMES'], ['hells', 'hells.js', 'HELLS'], ['voids', 'voids.js', 'VOIDS'], ['courses', 'seoul-routes.js', 'ROUTES'], ['eras', 'times.js', 'TIMES']]) {
+    try { const m = await import(new URL(f, JS_DIR)); if (Array.isArray(m[name])) CONTENT[k] = m[name].length; } catch { /* 그대로 */ }
+  }
+})();
+const codeSize = () => { try { let files = 0, lines = 0; for (const f of fs.readdirSync(JS_DIR)) if (f.endsWith('.js')) { files++; lines += fs.readFileSync(new URL(f, JS_DIR), 'utf8').split('\n').length; } return { files, lines }; } catch { return { files: 0, lines: 0 }; } };
 const dayKey = (t = Date.now()) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);
 const DAILY_KEEP = 120;
 // 서울 명소 도장: 명소 id → 체험에 걸리는 최소 시간(초, 실제 시간). 시작(begin)을 알리고 이 시간이 지나야 도장(done)이 찍힌다
@@ -63,7 +75,7 @@ export class DreamBoard {
     this.ipHits = new Map();
     try {
       const d = JSON.parse(fs.readFileSync(this.file, 'utf8'));
-      this.resets = d.resets || {}; this.best = d.best || {}; this.bestItem = d.bestItem || {}; this.boards = d.boards || {}; this.stats = d.stats || {}; this.dieAll = d.dieAll || {}; this.daily = d.daily || {}; this.first = d.first || {}; this.hg = d.hg || {}; this.hgSess = d.hgSess || {}; this.runs = d.runs || 0; this.reports = d.reports || []; this.secret = d.secret || this.secret;
+      this.resets = d.resets || {}; this.best = d.best || {}; this.bestItem = d.bestItem || {}; this.boards = d.boards || {}; this.stats = d.stats || {}; this.dieAll = d.dieAll || {}; this.daily = d.daily || {}; this.first = d.first || {}; this.hg = d.hg || {}; this.hgSess = d.hgSess || {}; this.runs = d.runs || 0; this.psnap = d.psnap || null; this.reports = d.reports || []; this.secret = d.secret || this.secret;
       // 예전 '확인 대기' 기록: 순위표에 올리고 비상 리포트로 옮긴다 (더는 기다리게 하지 않는다)
       for (const p of d.pending || []) { this.mig = true; const T = this.table(p.mode, p.diff, p.map); if (!T[p.sub] || p.e.score > T[p.sub].score) T[p.sub] = p.e; this.report('red', p.sub, p.mode, p.diff, p.map, p.why, p.e, p.r); }
     } catch { /* 처음 */ }
@@ -77,11 +89,12 @@ export class DreamBoard {
     this.dirty = !!this.mig; this.tickets = new Tickets(this.secret); this.pool = opt.pool || new ReplayPool(DREAM_VER, archiveCode(dataDir, DREAM_VER)); this.done = new Map(); this.busy = new Set();
     try { this.tickets.load(JSON.parse(fs.readFileSync(this.file, 'utf8')).used); } catch { /* 처음 */ }
     setInterval(() => this.save(), 20000).unref();
+    setInterval(() => this.publicStats(), 60000).unref(); // 랜딩 지표: 오전 8시 · 낮 12시 · 오후 4시가 지나면 새로 센다
   }
   save() {
     if (!this.dirty) return;
     this.dirty = false;
-    try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ resets: this.resets, best: this.best, bestItem: this.bestItem, boards: this.boards, stats: this.stats, dieAll: this.dieAll, daily: this.daily, first: this.first, hg: this.hg, hgSess: this.hgSess, runs: this.runs, reports: this.reports, secret: this.secret, used: this.tickets.dump(TICKET_TTL) })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('드림 러너 저장 실패', e); }
+    try { fs.mkdirSync(path.dirname(this.file), { recursive: true }); fs.writeFileSync(this.file + '.tmp', JSON.stringify({ resets: this.resets, best: this.best, bestItem: this.bestItem, boards: this.boards, stats: this.stats, dieAll: this.dieAll, daily: this.daily, first: this.first, hg: this.hg, hgSess: this.hgSess, runs: this.runs, psnap: this.psnap, reports: this.reports, secret: this.secret, used: this.tickets.dump(TICKET_TTL) })); fs.renameSync(this.file + '.tmp', this.file); } catch (e) { console.error('드림 러너 저장 실패', e); }
   }
   // map: 'hell' 은 난이도마다 따로 (꿈나라 노멀은 예전 표 그대로)
   table(mode, diff, map = 'dream') { if (SEP.has(map)) return (this.boards[`${map}:${mode}:${diff}`] ||= {}); if (diff !== 'easy') return (this.boards[`${mode}:${diff}`] ||= {}); return mode === 'item' ? this.bestItem : this.best; }
@@ -228,15 +241,16 @@ export class DreamBoard {
   }
   // 랜딩 공개 지표 (개인 정보 · 닉네임 없이 합계만, 1분 캐시): 판수 · 달린 시간 · 플레이어 · 순위표 기록 · 검증 비율 · 맵별 기록한 사람 · 오늘
   publicStats(now = Date.now()) {
-    if (this._ps && now - this._ps.at < 60000) return this._ps.out;
+    const slot = statSlot(now);
+    if (this.psnap?.asof === slot) return this.psnap;
     let time = 0, players = 0, runs = 0; for (const s of Object.values(this.stats)) { time += s.time || 0; runs += s.runs || 0; if (s.runs) players++; }
     const maps = Object.fromEntries(MAPS.map((m) => [m, new Set()])); let records = 0, verified = 0;
     const visit = (map, T) => { for (const [sub, e] of Object.entries(T || {})) { records++; if (e.v) verified++; maps[map]?.add(sub); } };
     visit('dream', this.best); visit('dream', this.bestItem);
     for (const [k, T] of Object.entries(this.boards)) { const p = k.split(':'); visit(p.length === 3 ? p[0] : 'dream', T); }
     const d = this.daily[dayKey(now)] || { runs: 0, subs: [] };
-    const out = { runs: Math.max(runs, this.runs), hours: Math.round(time / 360) / 10, players, records, verified: records ? Math.round((verified / records) * 100) : 0, maps: Object.fromEntries(Object.entries(maps).map(([m, set]) => [m, set.size])), today: { runs: d.runs || 0, players: (d.subs || []).length }, since: '2026-10-22' };
-    this._ps = { at: now, out }; return out;
+    this.psnap = { asof: slot, runs: Math.max(runs, this.runs), hours: Math.round(time / 360) / 10, players, records, verified: records ? Math.round((verified / records) * 100) : 0, maps: Object.fromEntries(Object.entries(maps).map(([m, set]) => [m, set.size])), today: { runs: d.runs || 0, players: (d.subs || []).length }, worlds: MAPS.length, content: { ...CONTENT }, code: codeSize(), since: '2026-10-22' };
+    this.dirty = true; return this.psnap;
   }
   // 오늘(한국 시간) 지표 칸: 달린 사람(subs) · 판수 · 시간 · 난이도 · 맵 · 광고 제안(adOffer) · 시청(adWatch) · 광고로 준 별 · 광고 본 사람
   day(now = Date.now()) {
