@@ -87,9 +87,9 @@ function seoulSwap(on) {
   if (!on) { runner.bear.root.scale.setScalar(1); for (const g of game.ghosts.values()) g.bear.root.scale.setScalar(1); }
   for (const g of game.ghosts.values()) { to.add(g.bear.root); if (g.tag) to.add(g.tag); }
   if (on) {
-    renderer.shadowMap.enabled = !isPhone; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15; renderer.domElement.style.filter = '';
+    // 6-25: 드림 러너 서울 맵은 실시간 그림자 · 후처리(빛 번짐) 없이 (모든 것의 역사 수준으로 가볍게). 색감(ACES)은 그대로
+    renderer.shadowMap.enabled = false; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15; renderer.domElement.style.filter = '';
     camera.far = 24000; camera.updateProjectionMatrix();
-    if (!isPhone && !seoulPost) import('./hangang-post.js').then(({ makePost }) => { if (!seoulPost) seoulPost = makePost(renderer, seoulRun.hw.scene, camera); }).catch(() => {});
   } else {
     seoulRun.unbend([...track.root.children, runner.bear.root, runner.shadow, ...[...game.ghosts.values()].flatMap((g) => [g.bear.root, g.tag])]);
     renderer.shadowMap.enabled = false; renderer.toneMapping = THREE.NoToneMapping; renderer.toneMappingExposure = 1; camera.far = 1600; camera.updateProjectionMatrix();

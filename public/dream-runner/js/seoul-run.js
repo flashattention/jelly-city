@@ -11,7 +11,10 @@ import { speedAt } from './track.js';
 import { isPhone } from '../../shared/js/perf.js';
 
 // 코스 길 둘레: 건물은 RB m, 길 · 녹지 · 물은 RR m 안만 짓는다 (휴대폰은 더 좁게). RT = 칸 고르는 반지름
-const RB = isPhone ? 190 : 260, RR = isPhone ? 260 : 340, RT = RR;
+// 6-25: 드림 러너는 코스 길 바로 옆만 보이니 좁게 (예전 260 / 340 — 서울 산책은 hangang.js 자체 값이라 그대로)
+const RB = isPhone ? 140 : 180, RR = isPhone ? 190 : 240, RT = RR;
+// 6-25: 칸을 지은 뒤 그 코스 길에서 먼 인스턴스(공원 · 숲 나무, 덤불, 작은 빛 등)를 빼고 남은 것만 그린다
+const KEEP_TREE = isPhone ? 70 : 90, KEEP_INST = isPhone ? 110 : 140, LOD_R = isPhone ? 300 : 380, SMALL_R = isPhone ? 160 : 220;
 const HOUR = { 낮: 13.2, 노을: 18.35, 밤: 21.3 };
 const SEASON = () => { const m = new Date().getMonth() + 1; return m >= 3 && m <= 5 ? 'spring' : m >= 6 && m <= 8 ? 'summer' : m >= 9 && m <= 11 ? 'autumn' : 'winter'; };
 
@@ -75,6 +78,7 @@ export class SeoulRun {
     this.initP = hw.load('seoul').then(() => {
       hw.opt = { ...hw.opt, season: 'fixed', weather: 'fixed', time: 'fixed', flow: 0 }; hw.state.season = SEASON(); hw.state.weather = 'clear'; hw.state.hour = 13; hw.applySeason();
       hw.lat = 999; if (hw.shadow) hw.shadow.visible = false;
+      if (hw.sun) hw.sun.castShadow = false; // 6-25: 실시간 그림자 끄기 (곰 발밑 동그란 그림자는 그대로)
       PATHS.forEach((P, c) => P.sampleH(hw, seoulLaneW(c) / 2));
       this.ready = true;
     }).catch((e) => { this.failed = true; throw e; });
@@ -128,7 +132,7 @@ export class SeoulRun {
     const w = this.want.find((q) => !hw.chunks.has(`${q.t}_${q.c}`) && !hw.chunkFail?.has(`${q.t}_${q.c}`)); if (!w) return;
     const key = `${w.t}_${w.c}`, same = [...hw.chunks.entries()].filter(([k2]) => k2.startsWith(`${w.t}_`)).map(([, c2]) => c2);
     hw.chunkLoading = key;
-    hw.loadChunk(key, () => this.pick(w.t, w.c, w.u1, same)).then((c) => { c.kept = c.map.__kept; c.deps = same; hw.chunks.set(key, c); for (const c2 of hw.chunks.values()) if (c2.chunkKey.startsWith(`${w.t}_`)) this.cullRoute(c2, w.c); if (this.shown != null) this.show(this.shown); for (const P of PATHS) if (P.R.tiles.includes(w.t)) P.sampleH(hw); this.onChunk?.(); })
+    hw.loadChunk(key, () => this.pick(w.t, w.c, w.u1, same)).then((c) => { c.kept = c.map.__kept; c.deps = same; this.thin(c, w.c); hw.chunks.set(key, c); for (const c2 of hw.chunks.values()) if (c2.chunkKey.startsWith(`${w.t}_`)) this.cullRoute(c2, w.c); if (this.shown != null) this.show(this.shown); for (const P of PATHS) if (P.R.tiles.includes(w.t)) P.sampleH(hw); this.onChunk?.(); })
       .catch((e) => { console.warn('서울 칸', key, e); (hw.chunkFail ||= new Set()).add(key); }).finally(() => { hw.chunkLoading = null; });
   }
   // 칸 지도에서 코스 길 둘레(건물 RB · 길 · 녹지 RR)만 남긴다 (seoul-run-worker.js, 따로 스레드에서)
@@ -163,17 +167,35 @@ export class SeoulRun {
     hw.state.hour += (this.hourTo - hw.state.hour) * Math.min(1, dt * 3);
     hw.tickEnv(dt, camera, px, pz); hw.tickSignals(hw.time);
     // 먼 나무 칸 · 작은 것 숨기기 (서울 산책 tickWorld 와 같은 거리)
-    this.lodT = (this.lodT || 0) - dt; if (this.lodT <= 0) { this.lodT = 0.4; const R = 1100;
+    this.lodT = (this.lodT || 0) - dt; if (this.lodT <= 0) { this.lodT = 0.4; const R = LOD_R - 360; // 6-25: 나무 · 소품 보이는 거리 (예전 1100 + 360)
       // 6-11: 먼 땅(200m 성긴 격자 · 초록)을 지금 코스 칸이 있는 곳에서는 40m 내린다 (서울 산책은 tickWorld 가 한다). 안 내리면 비탈에서 길보다 3m 넘게 솟아 곰 · 장애물을 덮었다
       if (hw.farU) { const TL = hw.world0.tile, ti = Math.floor(px / TL), tj = Math.floor(pz / TL), U = hw.farU, have = new Set(); for (const c of hw.chunks.values()) if (c.scene.visible) { const [a, b] = c.chunkKey.split('_'); have.add(`${a}_${b}`); }
         U.uC.value.set(ti, tj); for (let b = -2; b <= 2; b++) for (let a = -2; a <= 2; a++) U.uL.value[(b + 2) * 5 + a + 2] = have.has(`${ti + a}_${tj + b}`) ? 1 : 0; }
-      for (const c of hw.chunks.values()) c.scene.traverse((o) => { const L = o.userData.lod; if (L) { o.count = Math.hypot(L[0] - px, L[1] - pz) < (L[3] ? L[3] : R + 360) ? L[2] : 0; o.visible = o.count > 0 && !o.userData.seasonOff; } const V = o.userData.lodV; if (V) o.visible = Math.hypot(V[0] - px, V[1] - pz) < V[2]; });
-      const v = this.v; for (const o of hw.lodObjs || []) { const bs = o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere); v.copy(bs.center).applyMatrix4(o.matrixWorld); o.visible = Math.hypot(v.x - px, v.z - pz) - bs.radius < 400; } }
+      for (const c of hw.chunks.values()) c.scene.traverse((o) => { const L = o.userData.lod; if (L) { o.count = Math.hypot(L[0] - px, L[1] - pz) < (L[3] ? Math.min(L[3], LOD_R) : R + 360) ? L[2] : 0; o.visible = o.count > 0 && !o.userData.seasonOff; } const V = o.userData.lodV; if (V) o.visible = Math.hypot(V[0] - px, V[1] - pz) < V[2]; });
+      const v = this.v; for (const o of hw.lodObjs || []) { const bs = o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere); v.copy(bs.center).applyMatrix4(o.matrixWorld); o.visible = Math.hypot(v.x - px, v.z - pz) - bs.radius < SMALL_R; } }
   }
   // 코스가 바뀌는 순간 시간은 바로 (빛 문으로 하얗게 덮인 동안)
   jumpHour() { this.hourJump = true; this.hourTo = null; }
   dispose() { const hw = this.hw; if (!hw) return; for (const key of [...hw.chunks.keys()]) hw.unloadChunk(key); this.paths(new Set()); }
   // 코스 길 위(레인 + 숲은 나무 갓 만큼 더)에 선 나무는 숨긴다 (숲 속 길에서 화면이 나무 갓으로 덮였다)
+  // 6-25: 그 코스 길에서 먼 인스턴스를 빼고 남은 것을 앞으로 모아 개수(count)를 줄인다 (크기 0 으로만 숨기면 꼭짓점 계산은 그대로 든다)
+  //   나무 묶음(treeGroups)은 여러 그물이 같은 순서를 쓰니 함께 옮기고 idx 도 고친다. lod 그물은 켤 때 쓰는 개수(L[2])도 고친다
+  thin(chunk, c) {
+    const P = PATHS[c], CS = 30, mask = (D) => { const S = new Set(), r = Math.ceil(D / CS) + 1, q = { x: 0, z: 0 }; for (let u = 0; u <= P.len; u += 8) { P.pos(u, q); const gx = Math.floor(q.x / CS), gz = Math.floor(q.z / CS); for (let a = -r; a <= r; a++) for (let b = -r; b <= r; b++) if ((a * a + b * b) * CS * CS <= (D + CS) * (D + CS)) S.add(`${gx + a},${gz + b}`); } return (x, z) => S.has(`${Math.floor(x / CS)},${Math.floor(z / CS)}`); };
+    const inT = mask(KEEP_TREE), inI = mask(KEEP_INST), M4 = new THREE.Matrix4(), C3 = new THREE.Color(), done = new Set();
+    const pack = (m, keep) => { let n = 0; for (const i of keep) { if (i !== n) { m.getMatrixAt(i, M4); m.setMatrixAt(n, M4); if (m.instanceColor) { m.getColorAt(i, C3); m.setColorAt(n, C3); } } n++; } m.count = n; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; if (m.userData.lod) m.userData.lod[2] = n; done.add(m); };
+    for (const T of chunk.treeGroups || []) {
+      const A = T.arr === 'f' ? chunk.forestFill || [] : chunk.trees || [], keepK = [], keepIdx = [];
+      T.idx.forEach((si, k) => { const p = A[si]; if (p && inT(p[0], p[1])) { keepK.push(k); keepIdx.push(si); } });
+      for (const m of T.ms) if (m) pack(m, keepK);
+      T.idx = keepIdx;
+    }
+    chunk.scene.traverse((o) => {
+      if (!o.isInstancedMesh || done.has(o)) return;
+      const keep = []; for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, M4); const e = M4.elements; if (inI(e[12], e[14])) keep.push(i); }
+      if (keep.length < o.count) pack(o, keep);
+    });
+  }
   cullRoute(chunk, c) {
     const P = PATHS[c], G = new Map(), GS = 20, q = { x: 0, z: 0 }; for (let u = 0; u <= P.len; u += 4) { P.pos(u, q); const k = `${Math.floor(q.x / GS)},${Math.floor(q.z / GS)}`; if (!G.has(k)) G.set(k, []); G.get(k).push([q.x, q.z]); }
     const half = seoulLaneW(c) / 2, near = (x, z, R) => { const gx = Math.floor(x / GS), gz = Math.floor(z / GS), R2 = R * R; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const [px, pz] of G.get(`${gx + a},${gz + b}`) || []) if ((px - x) ** 2 + (pz - z) ** 2 < R2) return true; return false; };
