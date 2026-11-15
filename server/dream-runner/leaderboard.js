@@ -44,7 +44,7 @@ const GAME = { sec: 20, items: 8, maxItems: 2, roomMax: 12 };
   try { GAME.roomMax = +/const MAX = (\d+)/.exec(fs.readFileSync(new URL('./rooms.js', import.meta.url), 'utf8'))[1] || GAME.roomMax; } catch { /* 그대로 */ }
   try { const m = await import(new URL('items.js', JS_DIR)); GAME.items = Object.keys(m.ITEMS).length; GAME.maxItems = m.MAX_ITEMS; } catch { /* 그대로 */ }
 })();
-const ageOf = (t) => { const days = Math.max(0, Math.floor((t - LAUNCH) / 864e5)), w = Math.floor(days / 7), d = days % 7; return { days, label: w ? `${w}주${d ? ` ${d}일` : ''}` : `${days}일` }; };
+const ageOf = (t) => { const days = Math.max(0, Math.floor((t - LAUNCH) / 864e5)); return { days, label: `${days}일` }; };
 const codeSize = () => { try { let files = 0, lines = 0; for (const f of fs.readdirSync(JS_DIR)) if (f.endsWith('.js')) { files++; lines += fs.readFileSync(new URL(f, JS_DIR), 'utf8').split('\n').length; } return { files, lines }; } catch { return { files: 0, lines: 0 }; } };
 const dayKey = (t = Date.now()) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);
 const DAILY_KEEP = 120;
@@ -253,7 +253,7 @@ export class DreamBoard {
   // 랜딩 공개 지표 (개인 정보 · 닉네임 없이 합계만, 1분 캐시): 판수 · 달린 시간 · 플레이어 · 순위표 기록 · 검증 비율 · 맵별 기록한 사람 · 오늘
   publicStats(now = Date.now()) {
     const slot = statSlot(now);
-    if (this.psnap?.asof === slot && this.psnap.v === 5) return this.psnap; // v: 담는 항목이 바뀌면 올린다
+    if (this.psnap?.asof === slot && this.psnap.v === 6) return this.psnap; // v: 담는 항목이 바뀌면 올린다
     // 웹 + 토스 미니앱(siblings) 판을 합쳐 센다 (메인 화면 카드와 같은 기준: 실제로 달린 판수 · 달린 시간)
     const all = [this, ...(this.siblings || [])];
     let time = 0, players = 0, runs = 0; for (const B of all) { for (const s of Object.values(B.stats)) { time += s.time || 0; runs += s.runs || 0; if (s.runs) players++; } }
@@ -261,7 +261,7 @@ export class DreamBoard {
     const visit = (map, T, pre) => { for (const [sub, e] of Object.entries(T || {})) { records++; if (e.v) verified++; maps[map]?.add(pre + sub); } };
     all.forEach((B, i) => { const pre = i ? 't:' : ''; visit('dream', B.best, pre); visit('dream', B.bestItem, pre); for (const [k, T] of Object.entries(B.boards)) { const p = k.split(':'); visit(p.length === 3 ? p[0] : 'dream', T, pre); } });
     const d = { runs: 0, subs: [] }; for (const B of all) { const x = B.daily[dayKey(now)]; if (x) { d.runs += x.runs || 0; d.subs.push(...(x.subs || [])); } }
-    this.psnap = { v: 5, asof: slot, runs, hours: Math.round(time / 360) / 10, players, records, verified: records ? Math.round((verified / records) * 100) : 0, maps: Object.fromEntries(Object.entries(maps).map(([m, set]) => [m, set.size])), today: { runs: d.runs || 0, players: (d.subs || []).length }, worlds: MAPS.length, content: { ...CONTENT, total: Object.values(CONTENT).reduce((a, v) => a + v, 0) }, code: codeSize(), avgSec: runs ? Math.round(time / runs) : 0, age: ageOf(slot), game: { ...GAME, tol: Math.round(REPLAY_TOL * 100), diffN: DIFF_KEYS.length, diffs: DIFF_KEYS.map((k) => ({ name: DIFFS[k].name, x: Math.round((DIFFS[k].k / DIFFS.hard.k) * 100) / 100 })) }, since: '2026-10-22' };
+    this.psnap = { v: 6, asof: slot, runs, hours: Math.round(time / 360) / 10, players, records, verified: records ? Math.round((verified / records) * 100) : 0, maps: Object.fromEntries(Object.entries(maps).map(([m, set]) => [m, set.size])), today: { runs: d.runs || 0, players: (d.subs || []).length }, worlds: MAPS.length, content: { ...CONTENT, total: Object.values(CONTENT).reduce((a, v) => a + v, 0) }, code: codeSize(), avgSec: runs ? Math.round(time / runs) : 0, age: ageOf(slot), game: { ...GAME, tol: Math.round(REPLAY_TOL * 100), diffN: DIFF_KEYS.length, diffs: DIFF_KEYS.map((k) => ({ name: DIFFS[k].name, x: Math.round((DIFFS[k].k / DIFFS.hard.k) * 100) / 100 })) }, since: '2026-10-22' };
     this.dirty = true; return this.psnap;
   }
   // 오늘(한국 시간) 지표 칸: 달린 사람(subs) · 판수 · 시간 · 난이도 · 맵 · 광고 제안(adOffer) · 시청(adWatch) · 광고로 준 별 · 광고 본 사람
