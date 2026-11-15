@@ -74,7 +74,7 @@ const runner = new Runner(scene, {});
 const seoulRun = new SeoulRun(renderer, camera), seoulCam = new THREE.PerspectiveCamera();
 seoulRun.api = (path) => account.api(path);
 let seoulPost = null, seoulWas = false, seoulWaitT = 0;
-const seoulOn = () => track.seoul && seoulRun.ready && game.mode !== 'title';
+const seoulOn = () => track.seoul && seoulRun.ready; // 첫 화면에서 서울을 골라도 실제 서울 거리가 뒤에 보인다 (랜딩)
 // 서울 맵 판에 들어가고 나올 때: 곰 · 길 · 그림자를 서울 장면으로 옮기고, 화면 설정(색 · 그림자 · 먼 거리)을 서울 산책처럼
 // 부스터 가루(뒤로 흩날리는 빛)는 부스터가 정한 장면에 따로 붙는다: 서울 맵에선 서울 장면으로 (불꽃 자체는 곰에 붙어 있다)
 function boosterTo(b, sc) { if (!b || b.scene === sc) return; for (const p of b.sparks || []) { sc.add(p.m); p.life = 0; p.m.visible = false; } b.scene = sc; }
@@ -364,7 +364,7 @@ segSet('diff-pick', game.pickDiff);
 for (const b of $('diff-pick').children) b.onclick = () => { game.pickDiff = b.dataset.m; store.set(DIFF_KEY, game.pickDiff); segSet('diff-pick', game.pickDiff); };
 for (const b of $('room-diff').children) b.onclick = () => net.send({ t: 'diff', diff: b.dataset.m });
 game.pickMap = mapOf(store.get(MAP_KEY)); segSet('map-pick', game.pickMap);
-for (const b of $('map-pick').children) b.onclick = () => { const was = game.pickMap; game.pickMap = b.dataset.m; store.set(MAP_KEY, game.pickMap); segSet('map-pick', game.pickMap); game.titleT = 6; renderTimeResume(); if (game.mode === 'title' && (was === 'time') !== (game.pickMap === 'time')) titleWorld(); };
+for (const b of $('map-pick').children) b.onclick = () => { const was = game.pickMap; game.pickMap = b.dataset.m; store.set(MAP_KEY, game.pickMap); segSet('map-pick', game.pickMap); game.titleT = 6; renderTimeResume(); if (game.mode === 'title' && was !== game.pickMap) titleWorld(); };
 // ⏳ 모든 것의 역사: 어느 시대부터 출발하는지 (늘 마지막으로 쓰러진 시대부터 · 빅뱅부터 다시 하기는 없다)
 function renderTimeResume() {
   const el = $('time-resume'), e = timeEra(), th = ERAS[e];
@@ -372,7 +372,7 @@ function renderTimeResume() {
   el.innerHTML = e > 0 ? `<span>⏳ <b>${th.emoji} ${th.name}</b> <small>(시대 #${e + 1} · ${th.when})</small>부터 이어서 출발</span>` : `<span>⏳ <b>💥 빅뱅</b>부터 출발 · 쓰러지면 다음 판은 그 시대부터 이어져요</span>`;
 }
 renderTimeResume();
-if (game.pickMap === 'time') titleWorld(); // 첫 화면부터 그 시대 세상
+if (game.pickMap !== 'dream') titleWorld(); // 첫 화면부터 고른 세계의 맵 (꿈나라는 처음 화면이 이미 꿈나라)
 // 새 맵 소개 공지 (웹만 · 2026-11-29 까지): 누르면 모든 것의 역사를 고른다
 const timeNoticeOn = () => !TOSS && Date.now() < Date.parse('2026-11-29T00:00:00+09:00');
 $('time-notice').onclick = () => { const was = game.pickMap; game.pickMap = 'time'; store.set(MAP_KEY, 'time'); segSet('map-pick', 'time'); renderTimeResume(); game.titleT = 6; if (game.mode === 'title' && was !== 'time') titleWorld(); };
@@ -521,8 +521,8 @@ function countdown(ms) {
   clearTimeout(game.howtoT); game.howtoT = setTimeout(() => h.classList.add('dock'), 5500);
 }
 function goRun() { game.mode = 'run'; $('countdown').classList.add('hidden'); }
-// 첫 화면 뒤 세상: 모든 것의 역사를 골랐으면 출발할 시대의 세상을 미리 펼친다 (다른 맵은 꿈 하늘만)
-function titleWorld() { newRun((Math.random() * 2 ** 31) | 0, false, game.pickDiff, game.pickMap === 'time' ? 'time' : 'dream'); }
+// 첫 화면 뒤 세상: 고른 세계(꿈나라 · 지옥 · 이공간 · 서울 · 모든 것의 역사)의 실제 맵을 펼친다
+function titleWorld() { newRun((Math.random() * 2 ** 31) | 0, false, game.pickDiff, game.pickMap); }
 function toTitle() {
   game.team = false; $('teambar').classList.add('hidden');
   $('howto').classList.add('hidden'); $('itembar').classList.add('hidden');
@@ -924,11 +924,16 @@ function frame() {
     game.titleT += dt;
     if (game.titleT > 6 && track.tmap) game.titleT = 0;
     if (game.titleT > 6) { game.titleT = 0; const pool = game.pickMap === 'hell' ? HELLS : game.pickMap === 'void' ? VOIDS : game.pickMap === 'seoul' ? SEOULS : game.pickMap === 'time' ? ERAS : THEMES, th = pool[Math.floor(Math.random() * pool.length)]; env.setTheme(th); }
-    runner.bear.root.position.set(0, 0, z); runner.bear.root.rotation.y = Math.PI;
-    runner.bear.update(dt, 8, { noCrawl: true });
-    const a = t * 0.18, ck = track.tmap ? 0.72 : 1;
-    camera.position.set(Math.sin(a) * 7 * ck, 2.6 * ck, z + Math.cos(a) * 7 * ck);
-    camera.lookAt(0, 1.1 * ck, z);
+    if (track.seoul && seoulRun.ready) {
+      // 서울: 달릴 때처럼 곰 뒤에서 서울 거리를 본다 (seoulFrame 이 곧은 길 자리를 실제 서울 길 위로 옮긴다)
+      runner.pose(dt, z); runner.bear.update(dt, 8, { noCrawl: true }); followCamera(dt);
+    } else {
+      runner.bear.root.position.set(0, 0, z); runner.bear.root.rotation.y = Math.PI;
+      runner.bear.update(dt, 8, { noCrawl: true });
+      const a = t * 0.18, ck = track.tmap ? 0.72 : 1;
+      camera.position.set(Math.sin(a) * 7 * ck, 2.6 * ck, z + Math.cos(a) * 7 * ck);
+      camera.lookAt(0, 1.1 * ck, z);
+    }
   } else if (game.paused) {
     hud(); // 서버 점검: 그 자리에서 멈춰 있는다
   } else {
