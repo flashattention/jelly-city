@@ -473,3 +473,11 @@ body.touch #again-btn .enter-k { display: none; }
 .dr-news small { color: #d7c9ff; font-size: 12px; }
 .dr-news:hover { filter: brightness(1.12); }
 .dr-news.hidden { display: none; }
+
+/* 게임 등급 표시: 토스 미니앱 첫 화면에서만 (웹은 숨김) */
+.rating { display: none; align-items: center; justify-content: center; gap: 6px; margin: 2px auto 6px; font-size: 12px; color: var(--soft); }
+body.toss .rating { display: flex; }
+.rating i { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #1fa54a; border: 2px solid #fff; color: #fff; font: 700 9.5px/1 'Gowun Dodum', sans-serif; font-style: normal; letter-spacing: -.04em; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+.rating span { font-weight: 700; color: #e8ffe9; }
+.rating small { opacity: .75; }
+.rating small:empty { display: none; }

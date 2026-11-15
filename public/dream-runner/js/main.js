@@ -7,6 +7,9 @@ import { TOSS, bridge } from '../../shared/js/platform.js';
 // 토스 미니앱: 혼자 달리기 · 토스 로그인 · 광고 보너스 (같이 달리기 · 메인 화면 없음)
 // 웹: PWA 로 설치할 수 있게 (마이크로소프트 스토어 등). 토스 미니앱은 토스가 담아 주니 서비스 워커를 안 쓴다
 if (TOSS) document.body.classList.add('toss');
+// 게임 등급 (Microsoft Store IARC 3+ → 한국 전체이용가). 게임위에서 등급분류번호를 확인하면 no 에 적는다 (토스 첫 화면에 같이 보인다)
+const RATING = { grade: '전체이용가', no: '' };
+if (RATING.no) document.getElementById('rating-no').textContent = `등급분류번호 ${RATING.no}`;
 else if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 import { localChars, LOCAL_MAX } from '../../shared/js/local-chars.js';
 import { Chat } from '../../shared/js/chat.js';
