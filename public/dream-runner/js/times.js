@@ -28,12 +28,12 @@ export const TIMES = [
   // ===================== 제1장 우주 =====================
   t('빅뱅', '💥', '138억 년 전', '아무것도 없던 한 점에서 시간과 공간, 모든 것이 시작됐어요', 1, {
     sky: ['#1a0630', '#ffb74d', '#5a1020'], fog: [30, 320], light: 0.95, stars: 0.3, fx: 'rise', fxC: '#fff3c4', mus: m('lydian', 64, 132, 'sine'),
-    ground: ['#3a0a24', '#ff9100', 'lava', 0.45, 16], road: ['#ffcc80', '#ff6d00', 'light', 0.3],
+    ground: ['#3a0a24', '#ff9100', 'plasma', 0.4, 22], road: ['#ffcc80', '#ff6d00', 'light', 0.3],
     cast: c(COSMIC, { cross: ['photon', 'energyBall'], on: ['plasmaBlob'] }), near: ['plasmaPillar', 'energyShard', 'lightSeed'], mid: ['shockRing', 'plasmaPillar', 'energyShard'], far: ['bangCore', 'shockRing'], skyK: ['lightSeed'], scenes: ['bangBurst'],
     P: { a: '#ff9100', b: '#fff8e1', c: '#ff4081', g: '#ffffff' } }),
   t('급팽창', '🌀', '빅뱅 후 10⁻³²초', '눈 깜빡할 새보다 짧은 순간, 우주가 엄청나게 부풀어 올랐어요', 1, {
     sky: ['#3d1a78', '#ff6fd8', '#22104a'], fog: [30, 300], light: 1.1, stars: 0.4, fx: 'sparkles', fxC: '#ffd6ff', mus: m('whole', 60, 140, 'sine'),
-    ground: ['#2a1050', '#ff6fd8', 'circuit', 0.6, 10], road: ['#ff9ff3', '#ffffff', 'light', 0.8],
+    ground: ['#2a1050', '#ff6fd8', 'nebula', 0.5, 20], road: ['#ff9ff3', '#ffffff', 'light', 0.8],
     cast: c(COSMIC, { cross: ['quantumBubble', 'photon'], on: ['bubbleCluster'] }), near: ['gridNode', 'quantumBubble'], mid: ['gridTower', 'quantumBubble', 'stretchRing'], far: ['gridTower', 'stretchRing'], skyK: ['quantumBubble'], scenes: ['inflateBubble'],
     P: { a: '#ff6fd8', b: '#7c4dff', c: '#00e5ff', g: '#ffffff' } }),
   t('쿼크 수프', '🍲', '빅뱅 후 백만분의 1초', '뜨거운 수프 속에서 쿼크와 글루온이 끓어올랐어요', 1, {
@@ -767,13 +767,13 @@ export const TIMES = [
     near: ['flowerBed', 'wateringCan', 'sproutT'], mid: ['plantingTogether', 'overgrownTower', 'cherryTree'], far: ['overgrownTower', 'sunriseHills'], skyK: ['birdFlock'], scenes: ['plantingTogether'],
     P: { a: '#ff8a80', b: '#fff59d', c: '#80d8ff', wall: '#c8c8d0', roof: '#7a8a9a', leaf: '#4caf50', wood: '#6d4c41', rock: '#9a9aa8' } }),
   t('별을 향해', '🚀', '2200년?', '젤리와 로봇이 함께 만든 우주선을 타고, 이제 함께 은하 너머로 떠나요', 9, {
-    sky: ['#05051a', '#3a2a8a', '#02020d'], fog: [40, 400], light: 0.95, stars: 1, fx: 'sparkles', fxC: '#ffffff', mus: m('lydian', 67, 108, 'sine'),
+    wild: true, sky: ['#05051a', '#3a2a8a', '#02020d'], fog: [40, 400], light: 0.95, stars: 1, fx: 'sparkles', fxC: '#ffffff', mus: m('lydian', 67, 108, 'sine'),
     ground: ['#0a0a2a', '#7c4dff', 'nebula', 0.4, 20], road: ['#1a1a4a', '#ffd54f', 'light', 0.6],
     cast: { cross: ['jellyAstronaut'], on: ['starShuttle'], big: ['starship'], weave: ['comet'], wall: ['energyWall'], hurdle: ['plasmaRidge'], bar: ['lightBeam'] },
     near: ['starlet', 'launchPadLight', 'jellyAstronautT'], mid: ['starshipT', 'galaxySmallGround', 'planetRing'], far: ['galaxyDisc', 'starshipT'], skyK: ['planetSky', 'galaxySmall'], scenes: ['starshipLaunch'],
     P: { a: '#7c4dff', b: '#ffd54f', c: '#40c4ff', wall: '#e0e0f0', roof: '#7c4dff', leaf: '#76ff03', wood: '#5d4037', rock: '#3a3a5a' } }),
   t('또 다른 빅뱅', '🌀', '그리고 다시…', '모든 빛이 다시 한 점으로 모여요. 그리고 — 새로운 우주가 시작돼요', 9, {
-    sky: ['#000000', '#ffffff', '#ffd180'], fog: [30, 280], light: 1.1, stars: 0.6, fx: 'rise', fxC: '#ffffff', mus: m('lydian', 64, 120, 'sine'),
+    wild: true, sky: ['#000000', '#ffffff', '#ffd180'], fog: [30, 280], light: 1.1, stars: 0.6, fx: 'rise', fxC: '#ffffff', mus: m('lydian', 64, 120, 'sine'),
     ground: ['#1a0a2a', '#ffd180', 'plasma', 0.6, 16], road: ['#fff8e1', '#ff9100', 'light', 0.5],
     cast: { cross: ['photon', 'energyBall'], on: ['plasmaBlob'], big: ['cometHead'], weave: ['spark'], wall: ['energyWall'], hurdle: ['plasmaRidge'], bar: ['lightBeam'] },
     near: ['lightSeed', 'energyShard', 'plasmaPillar'], mid: ['shockRing', 'galaxySmall', 'energyShard'], far: ['bangCore'], skyK: ['galaxySmall'], scenes: ['bangBurst'],

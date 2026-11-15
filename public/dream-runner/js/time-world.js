@@ -88,6 +88,34 @@ function roadMat(r) {
   m = new THREE.MeshLambertMaterial({ map: t, emissive: glowK ? new THREE.Color('#ffffff') : new THREE.Color('#000000'), emissiveIntensity: Math.min(0.28, (glowK || 0) * 0.45), emissiveMap: glowK ? t : null, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   roadMats.set(key, m); return m;
 }
+// 사람이 길을 닦기 전 시대(제1 ~ 4장): 만든 길 대신 가장자리가 녹아 사라지는 자취만
+//   우주 = 별먼지가 흐르는 희미한 빛 줄기(더하기 빛), 땅 · 바다 = 그 땅 색으로 조금 밟히고 쓸린 자국
+const wildOf = (th) => th.wild ?? (th.ch || 9) <= 4;
+function trailMat(th) {
+  const g = th.ground || ['#555555', '#666666'], r = th.road || ['#8d6e63', '#5d4037', 'dirt'], cosmic = r[2] === 'light', key = 't' + g.join('|') + r.join('|');
+  let m = roadMats.get(key); if (m) return m;
+  const t = canvasTex('r' + key, 256, (x, n) => {
+    // 가로(u) 자리마다 진하기: 가운데가 가장 진하고 가장자리는 0 (sin²)
+    const prof = (u) => Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, u))), 2.2);
+    const soft = (cx, cy, rad, col, a) => { for (const oy of [-n, 0, n]) { const gr = x.createRadialGradient(cx, cy + oy, 0, cx, cy + oy, rad); gr.addColorStop(0, col); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.globalAlpha = a; x.fillStyle = gr; x.fillRect(cx - rad, cy + oy - rad, rad * 2, rad * 2); } x.globalAlpha = 1; };
+    if (cosmic) {
+      // 흐르는 빛 안개 + 별먼지 알갱이 (줄 · 테두리 없음)
+      for (let i = 0; i < 40; i++) { const u = 0.5 + (R() - 0.5) * 0.6; soft(u * n, R() * n, n * (0.08 + R() * 0.14), R() < 0.6 ? r[1] : r[0], 0.12 * prof(u)); }
+      for (let i = 0; i < 220; i++) { const u = 0.5 + (R() + R() + R() - 1.5) * 0.42, a = prof(u); if (a < 0.05) continue; x.globalAlpha = Math.min(1, a * (0.35 + R() * 0.5)); x.fillStyle = R() < 0.35 ? '#ffffff' : R() < 0.5 ? r[0] : r[1]; const yy = R() * n, rr2 = 0.4 + R() * 1.0; x.beginPath(); x.ellipse(u * n, yy, rr2, rr2 * (1.5 + R() * 2.5), 0, 0, 7); x.fill(); }
+      x.globalAlpha = 1;
+    } else {
+      // 밟히고 쓸린 자국: 땅보다 조금 밝거나 어두운 얼룩이 가운데에 모이고 가장자리로 흩어진다
+      const base = mixC(g[0], r[0], 0.45);
+      for (let i = 0; i < 90; i++) { const u = 0.5 + (R() - 0.5) * 0.8; soft(u * n, R() * n, n * (0.05 + R() * 0.1), R() < 0.7 ? base : shade(base, 1.15), 0.32 * prof(u)); }
+      for (let i = 0; i < 380; i++) { const u = 0.5 + (R() + R() - 1) * 0.5, a = prof(u); if (a < 0.08) continue; x.globalAlpha = a * 0.55; x.fillStyle = R() < 0.5 ? shade(base, 0.75) : shade(base, 1.25); x.beginPath(); x.arc(u * n, R() * n, 0.6 + R() * 1.8, 0, 7); x.fill(); }
+      x.globalAlpha = 1;
+    }
+  });
+  m = cosmic ? new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.6 })
+    : new THREE.MeshLambertMaterial({ map: t, transparent: true, depthWrite: false });
+  m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2;
+  roadMats.set(key, m); return m;
+}
 const G_PLANE = new THREE.PlaneGeometry(1, 1), BOX = new THREE.Box3();
 // 지나간 시대의 땅 · 길 그림을 버린다 (125개 시대를 다 달리면 그림이 250장 쌓여 휴대폰 메모리가 모자란다)
 function evict(cur) {
@@ -178,12 +206,12 @@ export class TimeWorld {
     const cuts = [s0, ...T.bounds.filter((b) => b > s0 && b < s1), s1];
     for (let i = 0; i + 1 < cuts.length; i++) {
       const a = cuts[i], b = cuts[i + 1], th = this.eraAt((a + b) / 2), len = b - a;
-      const gm = groundMat(th.ground || ['#555555', '#666666', 'dirt']), rm = roadMat(th.road || ['#8d6e63', '#5d4037', 'dirt']), dd = T.dreamAt((a + b) / 2);
+      const wild = wildOf(th), gm = groundMat(th.ground || ['#555555', '#666666', 'dirt']), rm = wild ? trailMat(th) : roadMat(th.road || ['#8d6e63', '#5d4037', 'dirt']), dd = T.dreamAt((a + b) / 2);
       gm.userData.used = Math.max(gm.userData.used ?? -1, dd); rm.userData.used = Math.max(rm.userData.used ?? -1, dd);
       // 무늬가 세상에 붙어 있게: 칸마다 UV 를 그 자리(s) 기준으로 (같은 재질을 나눠 써도 이음매가 맞는다)
-      const rep = th.ground?.[4] || 7, RW = TIME_W + 0.6;
+      const rep = th.ground?.[4] || 7, RW = wild ? TIME_W * 1.8 : TIME_W + 0.6;
       const gr = new THREE.Mesh(uvPlane(WIDE, len, WIDE / rep, len / rep, a / rep), gm); gr.userData.own = true; gr.rotation.x = -Math.PI / 2; gr.position.set(0, -0.02, -(a + b) / 2); g.add(gr);
-      const ro = new THREE.Mesh(uvPlane(RW, len, 1, len / RW, a / RW), rm); ro.userData.own = true; ro.rotation.x = -Math.PI / 2; ro.position.set(0, 0, -(a + b) / 2); g.add(ro);
+      const ro = new THREE.Mesh(uvPlane(RW, len, 1, wild ? len / 14 : len / RW, wild ? a / 14 : a / RW), rm); ro.userData.own = true; ro.rotation.x = -Math.PI / 2; ro.position.set(0, 0, -(a + b) / 2); g.add(ro);
       // 시대마다 풍경 묶음: 다음 시대 풍경은 그 시대의 문을 지날 때 펼쳐진다 (update)
       const seg = new THREE.Group(); seg.userData.d = T.dreamAt((a + b) / 2); seg.userData.s0 = a; g.add(seg); (g.userData.segs ||= []).push(seg);
       this.scenery(seg, a, b, th);
@@ -233,6 +261,17 @@ export class TimeWorld {
     // 땅 얼룩: 땅 색보다 조금 밝거나 어두운 넓은 둥근 판 (멀리서 봐도 같은 무늬가 되풀이돼 보이지 않게)
     const g0c = th.ground?.[0] || '#555555', g1c = th.ground?.[1] || '#666666';
     for (let i = 0; i < (isPhone ? 3 : 6); i++) { const side = R() < 0.5 ? -1 : 1, sx = 4 + R() * 10, sz = 3 + R() * 8, m = new THREE.Mesh(G1.disc, M(R() < 0.5 ? shade(g0c, 0.92 + R() * 0.06) : mixC(g0c, g1c, 0.2 + R() * 0.25))); m.position.set(side * (E + 1.5 + Math.max(sx, sz) + R() * 50), 0.05 + i * 0.006, -(a + R() * (b - a))); m.scale.set(sx, 1, sz); m.rotation.y = R() * 3; stat.add(m); }
+    // 길을 닦기 전 시대: 줄 맞춘 기둥 · 경계석 대신 그 땅의 작은 것을 흩어 놓는다 (우주 = 별 알갱이 · 땅 = 풀 · 조약돌)
+    if (wildOf(th)) {
+      const n = Math.round((b - a) * (isPhone ? 0.6 : 1.1));
+      for (let i = 0; i < n; i++) {
+        const side = R() < 0.5 ? -1 : 1, x = side * (TIME_W / 2 + 0.3 + Math.pow(R(), 1.6) * 9), z = -(a + R() * (b - a));
+        if (pat === 'light') { const l = new THREE.Mesh(G1.sph, glow(R() < 0.4 ? '#ffffff' : R() < 0.5 ? rc : th.road?.[0] || '#ffffff')); l.position.set(x, 0.15 + R() * 1.6, z); l.scale.setScalar(0.04 + R() * 0.09); stat.add(l); }
+        else if (R() < 0.6) { const t = new THREE.Mesh(G1.cone, M(R() < 0.3 ? shade(gc, 0.8) : gc)); t.position.set(x, 0.15, z); t.scale.set(0.1, 0.3 + R() * 0.35, 0.1); stat.add(t); }
+        else { const p2 = new THREE.Mesh(G1.dod, M(shade(th.ground?.[0] || '#777777', 0.8 + R() * 0.5))); p2.position.set(x, 0.06, z); p2.scale.setScalar(0.08 + R() * 0.16); stat.add(p2); }
+      }
+      return;
+    }
     const step = pat === 'asphalt' ? 2.2 : pat === 'light' || pat === 'metal' ? 6 : pat === 'plank' ? 3 : 1.6;
     for (let s = a + R() * step; s < b; s += step * (0.7 + R() * 0.6)) for (const side of [-1, 1]) {
       const x = side * (E + R() * 0.35), z = -s;
