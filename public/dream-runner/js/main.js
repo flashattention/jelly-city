@@ -170,7 +170,7 @@ $('c').addEventListener('pointerup', (e) => {
 const screens = ['title', 'lobby', 'room', 'over', 'board', 'stats'];
 // ESC: 순위표 · 방 목록을 닫는다
 addEventListener('keydown', (e) => { if (e.key !== 'Escape' || ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return; if (['board', 'lobby'].some((id) => !document.getElementById(id).classList.contains('hidden'))) show('title'); });
-function show(id) { for (const s of screens) $(s).classList.toggle('hidden', s !== id); if (id === 'title') renderFame(); }
+function show(id) { for (const s of screens) $(s).classList.toggle('hidden', s !== id); if (id === 'title') { renderFame(); $('title').scrollTop = 0; } } // 처음 화면으로 돌아오면 랜딩 맨 위(카드)부터
 // 처음 화면 왼쪽: 명예의 전당 (높은 난이도 1위부터, 한 사람은 한 번만)
 async function renderFame() {
   let d; try { d = await account.api('/api/dream/fame'); } catch { return; }
@@ -178,6 +178,29 @@ async function renderFame() {
   $('fame').innerHTML = `<div class="fame-h">🏆 명예의 전당</div>` + (d.fame.length ? d.fame.map(row).join('') : '<div class="empty">아직 기록이 없어요</div>');
 }
 renderFame(); // 처음 열 때
+// ---------- 랜딩: 처음 화면 카드 아래로 이어지는 드림 러너 이야기 (웹만 · docs/dream-runner/랜딩-작업지시서.md) ----------
+{
+  const T = $('title'), up = () => T.scrollTo({ top: 0, behavior: 'smooth' });
+  for (const a of document.querySelectorAll('[data-dl-go]')) a.onclick = (e) => { e.preventDefault(); $(a.dataset.dlGo)?.scrollIntoView({ behavior: 'smooth' }); };
+  // "이 세계로 달리기": 그 맵을 고르고 맨 위 카드로
+  for (const b of document.querySelectorAll('.dl-go[data-map]')) b.onclick = () => { document.querySelector(`#map-pick [data-m="${b.dataset.map}"]`)?.click(); up(); };
+  for (const b of document.querySelectorAll('[data-dl-top]')) b.onclick = up;
+  // 실시간 지표: 화면에 들어오면 숫자가 차오른다
+  const val = (o, path) => path.split('.').reduce((v, k) => v?.[k], o);
+  const fmt = (v, dec) => (dec ? v.toFixed(dec) : Math.round(v).toLocaleString());
+  const fill = (el, v) => {
+    const dec = +(el.dataset.dec || 0), suf = el.dataset.suf || '';
+    if (!('n' in el.dataset) || matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = fmt(v, dec) + suf; return; }
+    const t0 = performance.now(), step = (t) => { const k = Math.min(1, (t - t0) / 1400), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(v * e, dec) + suf; if (k < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  };
+  if (!TOSS) account.api('/api/dream/stats').then((st) => {
+    const els = [...document.querySelectorAll('#dl [data-st]')];
+    const io = 'IntersectionObserver' in window ? new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { io.unobserve(e.target); const v = val(st, e.target.dataset.st); if (typeof v === 'number') fill(e.target, v); } }, { root: T, threshold: 0.4 }) : null;
+    for (const el of els) { const v = val(st, el.dataset.st); if (typeof v !== 'number') continue; if (io) io.observe(el); else fill(el, v); }
+  }).catch(() => { /* 지표를 못 받으면 — 그대로 */ });
+}
+
 function hideScreens() { for (const s of screens) $(s).classList.add('hidden'); }
 function toast(text, ms = 1600) { const t = $('toast'); t.textContent = text; t.classList.remove('hidden'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.add('hidden'), ms); }
 function err(text) { $('err').textContent = text || ''; }

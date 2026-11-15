@@ -226,6 +226,18 @@ export class DreamBoard {
     if (Array.isArray(b.visit)) { const V = new Set(U.visit || []); for (const k of b.visit.slice(0, 600)) if (typeof k === 'string' && /^-?\d{1,3}_-?\d{1,3}$/.test(k)) V.add(k); U.visit = [...V].slice(0, 800); }
     this.dirty = true; return this.hgMe(sub);
   }
+  // 랜딩 공개 지표 (개인 정보 · 닉네임 없이 합계만, 1분 캐시): 판수 · 달린 시간 · 플레이어 · 순위표 기록 · 검증 비율 · 맵별 기록한 사람 · 오늘
+  publicStats(now = Date.now()) {
+    if (this._ps && now - this._ps.at < 60000) return this._ps.out;
+    let time = 0, players = 0, runs = 0; for (const s of Object.values(this.stats)) { time += s.time || 0; runs += s.runs || 0; if (s.runs) players++; }
+    const maps = Object.fromEntries(MAPS.map((m) => [m, new Set()])); let records = 0, verified = 0;
+    const visit = (map, T) => { for (const [sub, e] of Object.entries(T || {})) { records++; if (e.v) verified++; maps[map]?.add(sub); } };
+    visit('dream', this.best); visit('dream', this.bestItem);
+    for (const [k, T] of Object.entries(this.boards)) { const p = k.split(':'); visit(p.length === 3 ? p[0] : 'dream', T); }
+    const d = this.daily[dayKey(now)] || { runs: 0, subs: [] };
+    const out = { runs: Math.max(runs, this.runs), hours: Math.round(time / 360) / 10, players, records, verified: records ? Math.round((verified / records) * 100) : 0, maps: Object.fromEntries(Object.entries(maps).map(([m, set]) => [m, set.size])), today: { runs: d.runs || 0, players: (d.subs || []).length }, since: '2026-10-22' };
+    this._ps = { at: now, out }; return out;
+  }
   // 오늘(한국 시간) 지표 칸: 달린 사람(subs) · 판수 · 시간 · 난이도 · 맵 · 광고 제안(adOffer) · 시청(adWatch) · 광고로 준 별 · 광고 본 사람
   day(now = Date.now()) {
     const k = dayKey(now);
@@ -344,6 +356,7 @@ export async function dreamApi(req, res, url, who, board, json, isAdmin) {
   const mode = url.searchParams.get('mode') === 'item' ? 'item' : 'speed', diff = diffOf(url.searchParams.get('diff')), map = mapOf(url.searchParams.get('map'));
   if (url.pathname === '/api/dream/board') return json(res, 200, { mode, diff, map, top: board.top(mode, diff, map), me: board.mine(who?.sub || (ANON.test(anonId || '') ? 'anon:' + anonId : null), mode, diff, map), runs: board.runs });
   if (url.pathname === '/api/dream/fame') return json(res, 200, { fame: board.fame() });
+  if (url.pathname === '/api/dream/stats') return json(res, 200, board.publicStats());
   if (url.pathname === '/api/dream/adbonus' && req.method === 'POST') { if (!who) return json(res, 401, { error: 'login' }); const b = await readJson(req); try { return json(res, 200, board.adBonus(who.sub, b)); } catch (e) { return json(res, 400, { error: e.message }); } }
   if (url.pathname === '/api/dream/me') return json(res, 200, board.myStats(who?.sub || (ANON.test(anonId || '') ? 'anon:' + anonId : null), map));
   if (url.pathname === '/api/dream/played' && req.method === 'POST') {

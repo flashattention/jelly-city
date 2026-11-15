@@ -481,3 +481,79 @@ body.toss .rating { display: flex; }
 .rating span { font-weight: 700; color: #e8ffe9; }
 .rating small { opacity: .75; }
 .rating small:empty { display: none; }
+
+/* ===================== 드림 러너 랜딩 (처음 화면 카드 아래로 이어지는 이야기 · 웹만) ===================== */
+body:not(.toss) #title { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 0 16px; scroll-behavior: smooth; }
+body:not(.toss) #title > * { flex-shrink: 0; }
+body:not(.toss) #title > .card { margin-top: clamp(12px, 3.5vh, 48px); max-height: calc(100vh - 92px); }
+.dl-cue, .dl { display: none; }
+body:not(.toss) .dl-cue { display: inline-flex; align-items: center; gap: 8px; margin: 12px auto 0; padding: 8px 18px; border-radius: 999px; background: rgba(20, 10, 45, .55); border: 1px solid rgba(255,255,255,.22); color: var(--soft); font-size: 14px; text-decoration: none; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.dl-cue i { font-style: normal; display: inline-block; animation: dlBob 1.4s ease-in-out infinite; }
+.dl-cue:hover { color: #fff; border-color: rgba(255,255,255,.45); }
+@keyframes dlBob { 50% { transform: translateY(4px); } }
+body:not(.toss) .dl { display: block; width: min(1040px, 100%); margin: 26vh auto 40px; user-select: text; -webkit-user-select: text; }
+.dl-sec { position: relative; margin: 0 0 28px; padding: 56px 52px; border-radius: 32px; background: linear-gradient(160deg, rgba(34, 18, 74, .86), rgba(16, 9, 38, .9)); border: 1px solid rgba(255,255,255,.14); box-shadow: 0 30px 80px rgba(0,0,0,.45); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); overflow: hidden; }
+.dl-sec::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 280px; background: radial-gradient(ellipse 70% 100% at 50% 0, rgba(255, 143, 196, .16), transparent 72%); pointer-events: none; }
+.dl-lab { margin: 0 0 10px; color: var(--gold); font-size: 13px; letter-spacing: .22em; font-weight: 700; }
+.dl-h { margin: 0 0 14px; font-family: 'Jua', sans-serif; font-weight: 400; font-size: clamp(30px, 4.6vw, 46px); line-height: 1.2; color: #fff; }
+.dl-h em { font-style: normal; background: linear-gradient(100deg, #ffd84d, #ff8fc4 50%, #b388ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.dl-lead { margin: 0 0 30px; max-width: 640px; color: var(--soft); font-size: 16.5px; line-height: 1.75; }
+.dl-sec h3 { margin: 0 0 8px; font-family: 'Jua', sans-serif; font-weight: 400; font-size: 21px; color: #fff; }
+.dl-sec p { line-height: 1.75; }
+/* 기획 의도: 세 기둥 */
+.dl-pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.dl-pillars > div { padding: 24px 22px; border-radius: 22px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); }
+.dl-pillars b { display: block; font-size: 32px; margin-bottom: 10px; }
+.dl-pillars p { margin: 0; color: var(--soft); font-size: 14.5px; }
+/* 다섯 개의 세계 */
+.dl-world { --wc: #ff8fc4; display: grid; grid-template-columns: 1.05fr 1fr; gap: 34px; align-items: center; margin: 34px 0 0; padding-top: 34px; border-top: 1px solid rgba(255,255,255,.08); }
+.dl-world:first-of-type { border-top: 0; padding-top: 6px; }
+.dl-world:nth-of-type(even) .dl-pic { order: 2; }
+.w-hell { --wc: #ff7a2a; } .w-void { --wc: #b388ff; } .w-seoul { --wc: #6ec6ff; } .w-time { --wc: #ffd54f; }
+.dl-pic { position: relative; aspect-ratio: 4 / 3; border-radius: 24px; background-size: cover; background-position: center; box-shadow: 0 0 0 1px rgba(255,255,255,.14), 0 18px 50px rgba(0,0,0,.5), 0 0 60px color-mix(in srgb, var(--wc) 30%, transparent); transition: transform .5s; }
+.dl-world:hover .dl-pic { transform: translateY(-4px) scale(1.01); }
+.dl-pic span { position: absolute; left: 14px; top: 14px; padding: 4px 12px; border-radius: 999px; background: rgba(10, 6, 30, .6); color: #fff; font-size: 12.5px; backdrop-filter: blur(4px); }
+.dl-tag { margin: 0 0 6px; font-family: 'Jua', sans-serif; font-size: 16px; color: var(--wc); }
+.dl-txt h3 { font-size: 28px; margin-bottom: 10px; }
+.dl-txt > p:not(.dl-tag) { margin: 0 0 14px; color: var(--soft); font-size: 15px; }
+.dl-txt ul { margin: 0 0 18px; padding: 0; list-style: none; display: grid; gap: 7px; }
+.dl-txt li { position: relative; padding-left: 18px; font-size: 14.5px; color: rgba(255,250,243,.88); }
+.dl-txt li::before { content: ''; position: absolute; left: 2px; top: .62em; width: 7px; height: 7px; border-radius: 50%; background: var(--wc); box-shadow: 0 0 8px var(--wc); }
+.dl-txt li b { color: var(--wc); font-size: 1.12em; }
+.dl-go { border: 0; cursor: pointer; padding: 11px 20px; border-radius: 999px; font-family: 'Jua', sans-serif; font-size: 16px; color: #1c0f3a; background: var(--wc, #ffd84d); box-shadow: 0 6px 20px color-mix(in srgb, var(--wc, #ffd84d) 45%, transparent); transition: transform .15s, filter .15s; }
+.dl-go:hover { transform: translateY(-2px); filter: brightness(1.08); }
+.dl-go.big { --wc: #ffd84d; font-size: 20px; padding: 15px 30px; background: linear-gradient(100deg, #ffd84d, #ff8fc4 60%, #b388ff); }
+/* 숫자 */
+.dl-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.dl-stats > div { padding: 24px 20px; border-radius: 22px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
+.dl-stats b { display: block; font-family: 'Jua', sans-serif; font-weight: 400; font-size: clamp(34px, 4.4vw, 48px); line-height: 1.1; background: linear-gradient(100deg, #fff3c4, #ffd84d 45%, #ff8fc4); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.dl-stats span { color: var(--soft); font-size: 14px; }
+/* 만든 방식 */
+.dl-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.dl-grid > div { padding: 22px 20px; border-radius: 20px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
+.dl-grid p { margin: 0 0 6px; color: var(--soft); font-size: 14px; }
+.dl-grid b { color: var(--gold); }
+.dl-diffs { display: flex; flex-wrap: wrap; gap: 6px; }
+.dl-diffs span { padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.1); color: #fff; font-size: 12.5px; white-space: nowrap; }
+/* 걸어온 길 */
+.dl-time { list-style: none; margin: 8px 0 0; padding: 0 0 0 26px; position: relative; display: grid; gap: 20px; }
+.dl-time::before { content: ''; position: absolute; left: 7px; top: 6px; bottom: 6px; width: 2px; background: linear-gradient(#ff8fc4, #b388ff, #ffd54f); border-radius: 2px; }
+.dl-time li { position: relative; display: grid; grid-template-columns: 64px 1fr; column-gap: 14px; }
+.dl-time li::before { content: ''; position: absolute; left: -25px; top: 5px; width: 14px; height: 14px; border-radius: 50%; background: #1c0f3a; border: 3px solid #ffd84d; box-shadow: 0 0 10px rgba(255, 216, 77, .6); }
+.dl-time time { grid-row: span 2; font-family: 'Jua', sans-serif; font-size: 18px; color: var(--gold); }
+.dl-time b { font-family: 'Jua', sans-serif; font-weight: 400; font-size: 18px; color: #fff; }
+.dl-time span { color: var(--soft); font-size: 14px; }
+/* 마지막 */
+.dl-end { text-align: center; padding: 64px 32px 40px; }
+.dl-end .dl-h { margin-bottom: 26px; }
+.dl-foot { margin: 34px 0 0; color: rgba(255,250,243,.45); font-size: 12px; }
+@media (max-width: 760px) {
+  .dl-sec { padding: 36px 22px; border-radius: 26px; }
+  .dl-pillars, .dl-stats, .dl-grid { grid-template-columns: 1fr; }
+  .dl-stats { grid-template-columns: repeat(2, 1fr); }
+  .dl-world { grid-template-columns: 1fr; gap: 18px; }
+  .dl-world:nth-of-type(even) .dl-pic { order: 0; }
+  .dl-txt h3 { font-size: 24px; }
+  body:not(.toss) .dl { margin-top: 18vh; }
+}
+@media (prefers-reduced-motion: reduce) { .dl-cue i { animation: none; } body:not(.toss) #title { scroll-behavior: auto; } }
