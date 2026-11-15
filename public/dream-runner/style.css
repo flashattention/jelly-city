@@ -95,7 +95,7 @@ h3 { font-family: 'Jua', sans-serif; font-size: 20px; margin: 18px 0 8px; }
 .brow .md > * { white-space: nowrap; }
 .brow .md > .fire { margin: 0 9px; } /* 불꽃(🔥)이 옆 메달 · 점수 위로 넘치지 않게 */
 @media (max-width: 560px) { .brow .nm { flex-wrap: wrap; gap: 6px; } .brow .md { flex-basis: 100%; } .brow .md > * { font-size: 11px; } } /* 좁은 화면: 이름 줄은 비워 두고 메달은 그 아래 줄부터 */
-.brow .sc { font-family: 'Jua', sans-serif; font-size: 17px; }
+.brow .sc { font-family: 'Jua', sans-serif; font-size: 17px; position: relative; z-index: 1; } /* 특이점 1위 불길보다 앞에 */
 .brow .sc small { font-family: 'Gowun Dodum'; color: var(--soft); font-size: 12px; margin-left: 6px; }
 .brow.me { background: rgba(255,216,77,.22); outline: 1px solid var(--gold); }
 .brow.gap { background: transparent; justify-content: center; display: block; text-align: center; color: var(--soft); padding: 2px; }
