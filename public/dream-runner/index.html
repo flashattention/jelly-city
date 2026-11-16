@@ -217,23 +217,43 @@
       </header>
 
       <section class="dl-hero" id="dl-top">
-        <div class="dl-shade" aria-hidden="true"></div>
-        <div class="dl-intro">
-          <p class="dl-lab">잠든 곰돌이의 꿈 · 3D 러너</p>
-          <h1>꿈속을<br />끝없이 달려요</h1>
-          <p class="dl-lead"><span data-st="game.sec">20</span>초마다 다른 꿈이 펼쳐져요. 하늘에 뜬 꿈나라, 주먹이 내리치는 지옥, 규칙이 뒤틀린 이공간, 진짜 서울 거리, 그리고 빅뱅부터 AI의 미래까지.</p>
-          <dl class="dl-meta"><div><dt>판</dt><dd data-st="runs">—</dd></div><div><dt>곰돌이</dt><dd data-st="players">—</dd></div><div><dt>세계</dt><dd data-st="worlds">5</dd></div><div><dt>서브맵</dt><dd data-st="content.total">321</dd></div></dl>
-          <div data-slot="news"></div>
+        <!-- 첫 화면 배경 = 다섯 세계 판 (3차 T-1 ~ T-3). 펼친 판은 사진이 걷히고 뒤의 실시간 3D 세계가 보인다. 출발 카드(.dl-start)는 main.js 가 펼친 판 안으로 옮긴다 -->
+        <div class="dl-panes" id="dl-panes">
+          <div class="dl-pane" data-map="dream" style="--wc:#ff8fc4;--img:url(/hub/img/dr-dream.webp)">
+            <button class="dl-pane-hd" data-map="dream" aria-label="랜덤 꿈나라 고르기"><i>01</i><b>랜덤 꿈나라</b><em>꿈 <span data-st="content.dreams">116</span></em><small>하늘에 뜬 발판 · 20초마다 바뀌는 꿈</small></button>
+            <div class="dl-pane-body"></div>
+          </div>
+          <div class="dl-pane" data-map="hell" style="--wc:#ff9a5a;--img:url(/hub/img/dr-hell.webp)">
+            <button class="dl-pane-hd" data-map="hell" aria-label="랜덤 지옥 고르기"><i>02</i><b>랜덤 지옥</b><em>지옥 <span data-st="content.hells">30</span></em><small>용암 길 · 내리치는 주먹</small></button>
+            <div class="dl-pane-body"></div>
+          </div>
+          <div class="dl-pane" data-map="void" style="--wc:#b79bff;--img:url(/hub/img/dr-void.webp)">
+            <button class="dl-pane-hd" data-map="void" aria-label="랜덤 이공간 고르기"><i>03</i><b>랜덤 이공간</b><em>규칙 <span data-st="content.voids">30</span></em><small>공간마다 뒤틀린 규칙 하나</small></button>
+            <div class="dl-pane-body"></div>
+          </div>
+          <div class="dl-pane" data-map="seoul" style="--wc:#7cc8ff;--img:url(/hub/img/dr-seoul.webp)">
+            <button class="dl-pane-hd" data-map="seoul" aria-label="서울 고르기"><i>04</i><b>서울</b><em>코스 <span data-st="content.courses">20</span></em><small>진짜 서울 거리 · 차와 행인</small></button>
+            <div class="dl-pane-body"></div>
+          </div>
+          <div class="dl-pane" data-map="time" style="--wc:#ffd76e;--img:url(/hub/img/dr-time.webp)">
+            <button class="dl-pane-hd" data-map="time" aria-label="모든 것의 역사 고르기"><i>05</i><b>모든 것의 역사</b><em>시대 <span data-st="content.eras">125</span></em><small>빅뱅부터 AI의 미래까지, 이어서</small></button>
+            <div class="dl-pane-body"></div>
+          </div>
         </div>
-        <aside class="dl-start" aria-label="출발">
-          <p class="dl-lab">어떤 꿈을 꿀까요</p>
-          <ol class="dl-wpick" id="dl-wpick">
-            <li><button data-map="dream"><i>01</i><b>랜덤 꿈나라</b><em>꿈 <span data-st="content.dreams">116</span></em></button></li>
-            <li><button data-map="hell"><i>02</i><b>랜덤 지옥</b><em>지옥 <span data-st="content.hells">30</span></em></button></li>
-            <li><button data-map="void"><i>03</i><b>랜덤 이공간</b><em>규칙 <span data-st="content.voids">30</span></em></button></li>
-            <li><button data-map="seoul"><i>04</i><b>서울</b><em>코스 <span data-st="content.courses">20</span></em></button></li>
-            <li><button data-map="time"><i>05</i><b>모든 것의 역사</b><em>시대 <span data-st="content.eras">125</span></em></button></li>
-          </ol>
+        <div class="dl-shade" aria-hidden="true"></div>
+        <div class="dl-intro" id="dl-intro">
+          <div class="dl-intro-l">
+            <p class="dl-lab">잠든 곰돌이의 꿈 · 3D 러너</p>
+            <h1>꿈속을 끝없이 달려요</h1>
+            <p class="dl-lead"><span data-st="game.sec">20</span>초마다 다른 꿈이 펼쳐져요. 아래 다섯 세계 중 하나를 골라 보세요.</p>
+          </div>
+          <div class="dl-intro-r">
+            <dl class="dl-meta"><div><dt>판</dt><dd data-st="runs">—</dd></div><div><dt>곰돌이</dt><dd data-st="players">—</dd></div><div><dt>세계</dt><dd data-st="worlds">5</dd></div><div><dt>서브맵</dt><dd data-st="content.total">321</dd></div></dl>
+            <div data-slot="news"></div>
+          </div>
+        </div>
+        <aside class="dl-start" id="dl-start" aria-label="출발">
+          <div class="dl-board" id="dl-board" aria-live="polite"><div class="dl-board-h"><b id="dl-board-t">🏆 순위</b><button type="button" class="dl-board-more" data-tool="board-btn">전체 보기 ›</button></div><ol id="dl-board-list"></ol><p class="dl-board-me" id="dl-board-me"></p></div>
           <div data-slot="resume"></div>
           <div class="dl-row"><span>모드</span><div data-slot="mode"></div></div>
           <div class="dl-row"><span>난이도</span><div data-slot="diff"></div></div>
@@ -242,7 +262,7 @@
           <div data-slot="err"></div>
           <div class="dl-tools" data-slot="tools"></div>
         </aside>
-        <a class="dl-cue" href="#dl-worlds" data-dl-go="dl-worlds">다섯 개의 세계 보기 ↓</a>
+        <a class="dl-cue" href="#dl-worlds" data-dl-go="dl-worlds">다섯 개의 세계 이야기 ↓</a>
       </section>
 
       <section class="dl-worlds" id="dl-worlds">

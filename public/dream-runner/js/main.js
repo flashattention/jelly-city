@@ -192,12 +192,36 @@ if (!TOSS) {
   mv('mode', $('mode-pick')); mv('diff', $('diff-pick'));
   mv('play', $('play-btns')); mv('code', card.querySelector('.code-row')); mv('err', $('err'));
   mv('tools', ...tools); mv('fame', $('fame'));
-  // 세계 고르기: 01 ~ 05 목록 ↔ 숨은 맵 단추 (공지를 눌러 맵이 바뀌어도 따라간다)
-  const wp = [...document.querySelectorAll('#dl-wpick button')];
-  const sync = () => { for (const b of wp) b.classList.toggle('on', b.dataset.map === game.pickMap); };
+  // 세계 고르기: 첫 화면 다섯 판 ↔ 숨은 맵 단추 (공지를 눌러 맵이 바뀌어도 따라간다) · 고른 판이 펼쳐지고 그 안에 출발 카드
+  const panes = [...document.querySelectorAll('#dl-panes .dl-pane')], start = $('dl-start');
+  const WN = { dream: '랜덤 꿈나라', hell: '랜덤 지옥', void: '랜덤 이공간', seoul: '서울', time: '모든 것의 역사' };
+  const sync = () => {
+    const P = panes.find((p) => p.dataset.map === game.pickMap) || panes[0];
+    for (const p of panes) { p.classList.toggle('on', p === P); p.querySelector('.dl-pane-hd').setAttribute('aria-pressed', p === P); }
+    if (start.parentElement !== P.lastElementChild) P.lastElementChild.append(start);
+    dlBoard();
+  };
   const pick = (m) => { document.querySelector(`#map-pick [data-m="${m}"]`)?.click(); sync(); };
-  for (const b of wp) b.onclick = () => pick(b.dataset.map);
-  new MutationObserver(sync).observe($('map-pick'), { subtree: true, attributes: true, attributeFilter: ['class'] }); sync();
+  for (const b of document.querySelectorAll('#dl-panes .dl-pane-hd')) b.onclick = () => pick(b.dataset.map);
+  // 순위 TOP 5: 고른 세계 · 모드 · 난이도 (1분 동안은 받아 둔 것을 다시 쓴다)
+  const bc = new Map(); let bk = '';
+  async function dlBoard() {
+    const map = game.pickMap, mode = game.pickMode || 'speed', diff = game.pickDiff, key = `${map}|${mode}|${diff}`;
+    if (!map || !diff || key === bk) return; bk = key;
+    $('dl-board-t').textContent = `🏆 ${WN[map] || ''} · ${DIFFS[diff]?.name || ''} · ${mode === 'item' ? '🎁 아이템전' : '⚡ 스피드전'}`;
+    const list = $('dl-board-list'), meEl = $('dl-board-me');
+    let c = bc.get(key);
+    if (!c || Date.now() - c.at > 60e3) { list.classList.add('loading'); c = { at: Date.now(), d: await loadBoard(mode, diff, map) }; bc.set(key, c); }
+    if (bk !== key) return; // 받는 동안 다른 것을 골랐다
+    list.classList.remove('loading');
+    const top = (c.d.top || []).slice(0, 5), me = c.d.me;
+    list.innerHTML = top.length ? top.map((e) => `<li class="${e.id && e.id === me?.id ? 'me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><i style="background:${esc(e.color)}"></i>${esc(e.name)}</span><b>${(e.score ?? 0).toLocaleString()}</b></li>`).join('') : '<li class="empty">아직 기록이 없어요. 첫 번째 주인공이 되어 보세요!</li>';
+    meEl.textContent = me ? `내 순위 ${me.rank.toLocaleString()}위 · ${me.score.toLocaleString()}점` : '';
+  }
+  for (const id of ['map-pick', 'mode-pick', 'diff-pick']) new MutationObserver(sync).observe($(id), { subtree: true, attributes: true, attributeFilter: ['class'] });
+  setTimeout(sync, 0); // 고른 세계 · 모드 · 난이도를 읽은 다음
+  // 소개글 높이만큼 판 위쪽을 비운다 (PC 에서 소개글이 판 위에 얹힌다)
+  { const hero = $('dl-top'), intro = $('dl-intro'), fit = () => hero.style.setProperty('--ih', `${intro.offsetHeight}px`); if ('ResizeObserver' in window) new ResizeObserver(fit).observe(intro); fit(); }
   const up = () => T.scrollTo({ top: 0, behavior: 'smooth' });
   for (const a of document.querySelectorAll('#dl [data-dl-go]')) a.onclick = (e) => { e.preventDefault(); $(a.dataset.dlGo)?.scrollIntoView({ behavior: 'smooth' }); };
   for (const a of document.querySelectorAll('#dl [data-dl-top]')) a.onclick = (e) => { e.preventDefault(); up(); };
