@@ -192,7 +192,7 @@
         <div id="nick-row" class="hidden"><input id="nick" maxlength="14" placeholder="달리기 이름 (순위표 · 방에 보여요)" /></div>
       </div><div class="t-right">
         <div class="picks">
-        <div class="seg" id="map-pick"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button><button data-m="void">🌌 랜덤 이공간</button><button data-m="seoul">🗺️ 서울</button><button data-m="time">⏳ 모든 것의 역사</button></div>
+        <div class="seg" id="map-pick"><button data-m="dream">🌙 꿈나라</button><button data-m="hell">🔥 지옥</button><button data-m="void">🌌 이공간</button><button data-m="seoul">🗺️ 서울</button><button data-m="time">⏳ 모든 것의 역사</button></div>
         <div id="time-resume" class="time-resume hidden"></div>
         <div class="seg" id="mode-pick"><button data-m="speed">⚡ 스피드전</button><button data-m="item">🎁 아이템전</button></div>
         <div class="seg" id="diff-pick"></div>
@@ -220,15 +220,15 @@
         <!-- 첫 화면 배경 = 다섯 세계 판 (3차 T-1 ~ T-3). 펼친 판은 사진이 걷히고 뒤의 실시간 3D 세계가 보인다. 출발 카드(.dl-start)는 main.js 가 펼친 판 안으로 옮긴다 -->
         <div class="dl-panes" id="dl-panes">
           <div class="dl-pane" data-map="dream" style="--wc:#ff8fc4;--img:url(/hub/img/dr-dream.webp)">
-            <button class="dl-pane-hd" data-map="dream" aria-label="랜덤 꿈나라 고르기"><i>01</i><b>랜덤 꿈나라</b><em>꿈 <span data-st="content.dreams">116</span></em><small>하늘에 뜬 발판 · 20초마다 바뀌는 꿈</small></button>
+            <button class="dl-pane-hd" data-map="dream" aria-label="꿈나라 고르기"><i>01</i><b>꿈나라</b><em>꿈 <span data-st="content.dreams">116</span></em><small>하늘에 뜬 발판 · 20초마다 바뀌는 꿈</small></button>
             <div class="dl-pane-body"></div>
           </div>
           <div class="dl-pane" data-map="hell" style="--wc:#ff9a5a;--img:url(/hub/img/dr-hell.webp)">
-            <button class="dl-pane-hd" data-map="hell" aria-label="랜덤 지옥 고르기"><i>02</i><b>랜덤 지옥</b><em>지옥 <span data-st="content.hells">30</span></em><small>용암 길 · 내리치는 주먹</small></button>
+            <button class="dl-pane-hd" data-map="hell" aria-label="지옥 고르기"><i>02</i><b>지옥</b><em>지옥 <span data-st="content.hells">30</span></em><small>용암 길 · 내리치는 주먹</small></button>
             <div class="dl-pane-body"></div>
           </div>
           <div class="dl-pane" data-map="void" style="--wc:#b79bff;--img:url(/hub/img/dr-void.webp)">
-            <button class="dl-pane-hd" data-map="void" aria-label="랜덤 이공간 고르기"><i>03</i><b>랜덤 이공간</b><em>규칙 <span data-st="content.voids">30</span></em><small>공간마다 뒤틀린 규칙 하나</small></button>
+            <button class="dl-pane-hd" data-map="void" aria-label="이공간 고르기"><i>03</i><b>이공간</b><em>규칙 <span data-st="content.voids">30</span></em><small>공간마다 뒤틀린 규칙 하나</small></button>
             <div class="dl-pane-body"></div>
           </div>
           <div class="dl-pane" data-map="seoul" style="--wc:#7cc8ff;--img:url(/hub/img/dr-seoul.webp)">
@@ -269,19 +269,19 @@
         <header class="dl-head"><p class="dl-lab">다섯 개의 세계</p><h2>한 곰돌이,<br />다섯 가지 꿈</h2></header>
         <article class="dl-world" style="--wc:#ffb3d6">
           <div class="dl-pic" style="background-image:url(/hub/img/dr-dream.webp)"></div>
-          <div class="dl-txt"><p class="dl-no">01 · 2026.10.22</p><h3>랜덤 꿈나라</h3><p>하늘에 뜬 발판 위를 달리다 시간의 문을 지나면 꿈이 통째로 바뀌어요. 비 오는 도시, 무한히 떨어지는 하늘, 추상의 공간 — 꿈마다 색 · 음악 음계 · 장애물이 달라요.</p>
+          <div class="dl-txt"><p class="dl-no">01 · 2026.10.22</p><h3>꿈나라</h3><p>하늘에 뜬 발판 위를 달리다 시간의 문을 지나면 꿈이 통째로 바뀌어요. 비 오는 도시, 무한히 떨어지는 하늘, 추상의 공간 — 꿈마다 색 · 음악 음계 · 장애물이 달라요.</p>
             <dl><div><dt>꿈</dt><dd data-st="content.dreams">116</dd></div><div><dt>바뀌는 간격</dt><dd><span data-st="game.sec">20</span>초</dd></div><div><dt>기록한 곰돌이</dt><dd data-st="maps.dream">—</dd></div></dl>
             <button class="dl-link" data-map="dream">꿈나라로 달리기</button></div>
         </article>
         <article class="dl-world" style="--wc:#ff9a5a">
           <div class="dl-pic" style="background-image:url(/hub/img/dr-hell.webp)"></div>
-          <div class="dl-txt"><p class="dl-no">02 · 2026.11.05</p><h3>랜덤 지옥</h3><p>용암 위 오르내리는 길에 거대한 주먹이 내리쳐요. 내리치기 전 예고를 읽고 피하는 리듬 — 꿈나라보다 짧고 굵게, 긴장이 끊기지 않게.</p>
+          <div class="dl-txt"><p class="dl-no">02 · 2026.11.05</p><h3>지옥</h3><p>용암 위 오르내리는 길에 거대한 주먹이 내리쳐요. 내리치기 전 예고를 읽고 피하는 리듬 — 꿈나라보다 짧고 굵게, 긴장이 끊기지 않게.</p>
             <dl><div><dt>지옥</dt><dd data-st="content.hells">30</dd></div><div><dt>바뀌는 간격</dt><dd><span data-st="game.sec">20</span>초</dd></div><div><dt>기록한 곰돌이</dt><dd data-st="maps.hell">—</dd></div></dl>
             <button class="dl-link" data-map="hell">지옥으로 달리기</button></div>
         </article>
         <article class="dl-world" style="--wc:#c3a6ff">
           <div class="dl-pic" style="background-image:url(/hub/img/dr-void.webp)"></div>
-          <div class="dl-txt"><p class="dl-no">03 · 2026.11.07</p><h3>랜덤 이공간</h3><p>좌우가 거꾸로인 거울의 방, 운석이 떨어지는 최후의 날, 시간의 끝 — 공간마다 규칙이 하나씩 뒤틀려요. 손에 익은 러너를 다시 새롭게.</p>
+          <div class="dl-txt"><p class="dl-no">03 · 2026.11.07</p><h3>이공간</h3><p>좌우가 거꾸로인 거울의 방, 운석이 떨어지는 최후의 날, 시간의 끝 — 공간마다 규칙이 하나씩 뒤틀려요. 손에 익은 러너를 다시 새롭게.</p>
             <dl><div><dt>공간</dt><dd data-st="content.voids">30</dd></div><div><dt>뒤틀린 규칙</dt><dd data-st="content.voids">30</dd></div><div><dt>기록한 곰돌이</dt><dd data-st="maps.void">—</dd></div></dl>
             <button class="dl-link" data-map="void">이공간으로 달리기</button></div>
         </article>
@@ -382,7 +382,7 @@
       <h2 id="room-title"></h2>
       <div class="seg" id="room-team"><button data-t="0">🏃 개인전</button><button data-t="1">👥 팀전 <small>3분</small></button></div>
       <div class="seg" id="room-mode"><button data-m="speed">⚡ 스피드전</button><button data-m="item">🎁 아이템전</button></div>
-      <div class="seg" id="room-map"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button><button data-m="void">🌌 랜덤 이공간</button><button data-m="seoul">🗺️ 서울</button><button data-m="time">⏳ 모든 것의 역사</button></div>
+      <div class="seg" id="room-map"><button data-m="dream">🌙 꿈나라</button><button data-m="hell">🔥 지옥</button><button data-m="void">🌌 이공간</button><button data-m="seoul">🗺️ 서울</button><button data-m="time">⏳ 모든 것의 역사</button></div>
       <div class="seg" id="room-diff"></div>
       <div id="room-code"><span>초대 코드</span><b id="code-txt"></b><button id="copy-link" class="btn alt">🔗 링크 복사</button><button id="copy-code" class="btn ghost">코드 복사</button></div>
       <div class="note">링크를 보내거나 코드를 알려 주면 로그인 안 한 친구도 들어올 수 있어요</div>
@@ -418,7 +418,7 @@
   <div id="board" class="screen hidden">
     <div class="card wide">
       <h2>🏆 최고 기록</h2>
-      <div class="seg" id="board-map"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button><button data-m="void">🌌 랜덤 이공간</button><button data-m="seoul">🗺️ 서울</button><button data-m="time">⏳ 모든 것의 역사</button></div>
+      <div class="seg" id="board-map"><button data-m="dream">🌙 꿈나라</button><button data-m="hell">🔥 지옥</button><button data-m="void">🌌 이공간</button><button data-m="seoul">🗺️ 서울</button><button data-m="time">⏳ 모든 것의 역사</button></div>
       <div class="seg" id="board-mode"><button data-m="speed">⚡ 스피드전</button><button data-m="item">🎁 아이템전</button></div>
       <div class="seg" id="board-diff"></div>
       <div class="sub">점수 = 달린 거리(m) + 별사탕 × 10</div>
@@ -432,7 +432,7 @@
   <div id="stats" class="screen hidden">
     <div class="card wide">
       <h2>📊 내 기록</h2>
-      <div class="seg" id="stats-map"><button data-m="dream">🌙 랜덤 꿈나라</button><button data-m="hell">🔥 랜덤 지옥</button><button data-m="void">🌌 랜덤 이공간</button><button data-m="seoul">🗺️ 서울</button><button data-m="time">⏳ 모든 것의 역사</button></div>
+      <div class="seg" id="stats-map"><button data-m="dream">🌙 꿈나라</button><button data-m="hell">🔥 지옥</button><button data-m="void">🌌 이공간</button><button data-m="seoul">🗺️ 서울</button><button data-m="time">⏳ 모든 것의 역사</button></div>
       <div id="my-stats"></div>
       <div class="row2"><button id="stats-close" class="btn ghost">닫기</button></div>
     </div>

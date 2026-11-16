@@ -38,7 +38,7 @@ import { setupMapWin } from './hangang-mapwin.js';
 
 const $ = (id) => document.getElementById(id);
 const MODE_KEY = 'dreamrunner.mode', DIFF_KEY = 'dreamrunner.diff', CAM_KEY = 'dreamrunner.cam', MAP_KEY = 'dreamrunner.map';
-const mapOf = (m) => (m === 'hell' || m === 'void' || m === 'seoul' || m === 'time' ? m : 'dream'), mapName = (m) => (m === 'hell' ? '🔥 랜덤 지옥' : m === 'void' ? '🌌 랜덤 이공간' : m === 'seoul' ? '🗺️ 서울' : m === 'time' ? '⏳ 모든 것의 역사' : '🌙 랜덤 꿈나라');
+const mapOf = (m) => (m === 'hell' || m === 'void' || m === 'seoul' || m === 'time' ? m : 'dream'), mapName = (m) => (m === 'hell' ? '🔥 지옥' : m === 'void' ? '🌌 이공간' : m === 'seoul' ? '🗺️ 서울' : m === 'time' ? '⏳ 모든 것의 역사' : '🌙 꿈나라');
 const mapTag = (m) => (m === 'hell' ? '🔥 지옥 · ' : m === 'void' ? '🌌 이공간 · ' : m === 'seoul' ? '🗺️ 서울 · ' : m === 'time' ? '⏳ 모든 것의 역사 · ' : ''); // 순위표 · 방 이름 앞에
 const CHAR_KEY = 'dreamrunner.char', NICK_KEY = 'dreamrunner.nick', ANON_KEY = 'dreamrunner.anon';
 // 비로그인: 이 브라우저의 임시 아이디 (순위표에서 내 기록을 찾는 데만 쓴다)
@@ -194,19 +194,34 @@ if (!TOSS) {
   mv('tools', ...tools); mv('fame', $('fame'));
   // 세계 고르기: 첫 화면 다섯 판 ↔ 숨은 맵 단추 (공지를 눌러 맵이 바뀌어도 따라간다) · 고른 판이 펼쳐지고 그 안에 출발 카드
   const panes = [...document.querySelectorAll('#dl-panes .dl-pane')], start = $('dl-start');
-  const WN = { dream: '랜덤 꿈나라', hell: '랜덤 지옥', void: '랜덤 이공간', seoul: '서울', time: '모든 것의 역사' };
+  const WN = { dream: '꿈나라', hell: '지옥', void: '이공간', seoul: '서울', time: '모든 것의 역사' };
+  let hoverMap = null; // 마우스를 올려 미리 펼친 세계 (3D 배경은 멈췄을 때 바꾼다)
   const sync = () => {
-    const P = panes.find((p) => p.dataset.map === game.pickMap) || panes[0];
-    for (const p of panes) { p.classList.toggle('on', p === P); p.querySelector('.dl-pane-hd').setAttribute('aria-pressed', p === P); }
+    const cur = hoverMap || game.pickMap, P = panes.find((p) => p.dataset.map === cur) || panes[0];
+    for (const p of panes) { p.classList.toggle('on', p === P); p.classList.toggle('pv', p === P && cur !== game.pickMap); p.querySelector('.dl-pane-hd').setAttribute('aria-pressed', p === P); }
     if (start.parentElement !== P.lastElementChild) P.lastElementChild.append(start);
     dlBoard();
   };
-  const pick = (m) => { document.querySelector(`#map-pick [data-m="${m}"]`)?.click(); sync(); };
+  const pick = (m) => { hoverMap = null; document.querySelector(`#map-pick [data-m="${m}"]`)?.click(); sync(); };
   for (const b of document.querySelectorAll('#dl-panes .dl-pane-hd')) b.onclick = () => pick(b.dataset.map);
+  // 마우스를 올리기만 해도 그 세계가 펼쳐진다 (마우스가 있는 기기만)
+  //   왼쪽에서 오른쪽으로 쭉 훑으면 판은 바로바로 바뀌고(사진), 무거운 3D 배경(새 세계 짓기)은 커서가 0.3초 멈추거나 판 밖으로 나갈 때 한 번만 바꾼다
+  //   판이 넓어지며 커서 밑으로 이웃 판이 밀려와도 바뀌지 않게, 커서가 실제로 움직였을 때만
+  if (matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    let hx = -1, hy = -1, ht = 0;
+    const commit = () => { clearTimeout(ht); if (hoverMap && hoverMap !== game.pickMap) pick(hoverMap); else if (hoverMap) { hoverMap = null; sync(); } };
+    for (const p of panes) p.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse' || (e.clientX === hx && e.clientY === hy)) return; hx = e.clientX; hy = e.clientY;
+      const m = p.dataset.map; clearTimeout(ht);
+      if (m !== (hoverMap || game.pickMap)) { hoverMap = m; sync(); }
+      if (hoverMap) ht = setTimeout(commit, 300);
+    });
+    $('dl-panes').addEventListener('pointerleave', commit);
+  }
   // 순위 TOP 5: 고른 세계 · 모드 · 난이도 (1분 동안은 받아 둔 것을 다시 쓴다)
   const bc = new Map(); let bk = '';
   async function dlBoard() {
-    const map = game.pickMap, mode = game.pickMode || 'speed', diff = game.pickDiff, key = `${map}|${mode}|${diff}`;
+    const map = hoverMap || game.pickMap, mode = game.pickMode || 'speed', diff = game.pickDiff, key = `${map}|${mode}|${diff}`;
     if (!map || !diff || key === bk) return; bk = key;
     $('dl-board-t').textContent = `🏆 ${WN[map] || ''} · ${DIFFS[diff]?.name || ''} · ${mode === 'item' ? '🎁 아이템전' : '⚡ 스피드전'}`;
     const list = $('dl-board-list'), meEl = $('dl-board-me');
