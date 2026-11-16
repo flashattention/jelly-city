@@ -445,7 +445,7 @@ body.swplay:not(.swready) #sw-load { color: #f3eee6; background: radial-gradient
 .time-next b { color: #ffd54f; }
 .time-next span { display: block; font-size: 13px; color: #e1d5ff; margin-top: 2px; }
 .time-next.hidden { display: none; }
-#again-btn.time-again { color: #2b1400; background: linear-gradient(100deg, #ffd54f, #ffb300 35%, #ff7ac6 70%, #b388ff); background-size: 200% 100%; animation: timeShine 2.2s linear infinite; box-shadow: 0 0 22px rgba(255, 193, 7, .6), 0 4px 0 #8a5a00; font-weight: bold; }
+#again-btn.time-again { color: #2b1400; background: linear-gradient(100deg, #ffd54f, #ffb300 35%, #ff7ac6 70%, #b388ff); animation: timeBtnGlow 1.8s ease-in-out infinite alternate; box-shadow: 0 0 14px rgba(255, 193, 7, .45), 0 4px 0 #8a5a00; font-weight: bold; }
 #again-btn.time-again small { display: block; font-size: 12px; opacity: .85; }
 /* 결과 화면 버튼의 Enter 키 모양 (PC만) */
 #again-btn .enter-k { display: inline-flex; align-items: center; gap: 3px; margin-left: 10px; padding: 2px 8px 3px; border-radius: 7px; border: 1px solid rgba(0,0,0,.25); border-bottom-width: 3px; background: rgba(255,255,255,.75); color: #3a2a5a; font: 700 12px/1.2 'Gowun Dodum', sans-serif; vertical-align: 2px; white-space: nowrap; }
@@ -453,7 +453,7 @@ body.swplay:not(.swready) #sw-load { color: #f3eee6; background: radial-gradient
 body:not(.touch) #again-btn.time-again { position: relative; padding-right: 92px; }
 body.touch #again-btn .enter-k { display: none; }
 
-@keyframes timeShine { from { background-position: 0 0; } to { background-position: 200% 0; } }
+@keyframes timeBtnGlow { to { box-shadow: 0 0 26px rgba(255, 193, 7, .75), 0 4px 0 #8a5a00; } }
 @keyframes timeGlow { from { box-shadow: 0 0 10px rgba(255, 213, 79, .3); } to { box-shadow: 0 0 24px rgba(255, 213, 79, .7); } }
 /* ⏳ 시대 넘어갈 때: 빛 소용돌이 + 연도 */
 #time-warp { position: fixed; inset: 0; z-index: 3; pointer-events: none; display: flex; align-items: center; justify-content: center; }
