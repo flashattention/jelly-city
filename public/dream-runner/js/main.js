@@ -195,29 +195,34 @@ if (!TOSS) {
   // 세계 고르기: 첫 화면 다섯 판 ↔ 숨은 맵 단추 (공지를 눌러 맵이 바뀌어도 따라간다) · 고른 판이 펼쳐지고 그 안에 출발 카드
   const panes = [...document.querySelectorAll('#dl-panes .dl-pane')], start = $('dl-start');
   const WN = { dream: '꿈나라', hell: '지옥', void: '이공간', seoul: '서울', time: '모든 것의 역사' };
-  let hoverMap = null; // 마우스를 올려 미리 펼친 세계 (3D 배경은 멈췄을 때 바꾼다)
+  let hoverMap = null, hold = false, paneT = 0; // hoverMap: 마우스를 올려 미리 펼친 세계 (3D 배경은 멈췄을 때 바꾼다) · hold: 새 세계를 짓는 동안 사진으로 덮어 둔다 · paneT: 판이 마지막으로 바뀐 때
   const sync = () => {
     const cur = hoverMap || game.pickMap, P = panes.find((p) => p.dataset.map === cur) || panes[0];
-    for (const p of panes) { p.classList.toggle('on', p === P); p.classList.toggle('pv', p === P && cur !== game.pickMap); p.querySelector('.dl-pane-hd').setAttribute('aria-pressed', p === P); }
+    for (const p of panes) { p.classList.toggle('on', p === P); p.classList.toggle('pv', p === P && (cur !== game.pickMap || hold)); p.querySelector('.dl-pane-hd').setAttribute('aria-pressed', p === P); }
     if (start.parentElement !== P.lastElementChild) P.lastElementChild.append(start);
     dlBoard();
   };
   const pick = (m) => { hoverMap = null; document.querySelector(`#map-pick [data-m="${m}"]`)?.click(); sync(); };
-  for (const b of document.querySelectorAll('#dl-panes .dl-pane-hd')) b.onclick = () => pick(b.dataset.map);
+  // 판으로 고르기 (T-8): 사진으로 덮은 채 새 세계를 짓고, 두세 번 그린 뒤 사진을 걷는다 (짓는 끊김 · 셰이더 만들기가 사진 밑에서)
+  let unholdT = 0;
+  const go = (m) => { if (m === game.pickMap) { hoverMap = null; sync(); return; } hold = true; pick(m); cancelAnimationFrame(unholdT); let n = 0; const tick = () => { if (++n < 4) unholdT = requestAnimationFrame(tick); else { hold = false; sync(); } }; unholdT = requestAnimationFrame(tick); };
+  for (const b of document.querySelectorAll('#dl-panes .dl-pane-hd')) b.onclick = () => { paneT = performance.now(); hoverMap = b.dataset.map; sync(); go(b.dataset.map); };
   // 마우스를 올리기만 해도 그 세계가 펼쳐진다 (마우스가 있는 기기만)
   //   왼쪽에서 오른쪽으로 쭉 훑으면 판은 바로바로 바뀌고(사진), 무거운 3D 배경(새 세계 짓기)은 커서가 0.3초 멈추거나 판 밖으로 나갈 때 한 번만 바꾼다
   //   판이 넓어지며 커서 밑으로 이웃 판이 밀려와도 바뀌지 않게, 커서가 실제로 움직였을 때만
   if (matchMedia('(hover: hover) and (pointer: fine)').matches) {
     let hx = -1, hy = -1, ht = 0;
-    const commit = () => { clearTimeout(ht); if (hoverMap && hoverMap !== game.pickMap) pick(hoverMap); else if (hoverMap) { hoverMap = null; sync(); } };
+    // 판이 넓어지는 움직임(0.6초)이 끝난 뒤에 짓는다 (움직임 한가운데에 짓기가 겹쳐 더 끊겨 보였다)
+    const commit = () => { clearTimeout(ht); if (!hoverMap) return; const w = paneT + 620 - performance.now(); if (w > 0) { ht = setTimeout(commit, w); return; } go(hoverMap); };
     for (const p of panes) p.addEventListener('pointermove', (e) => {
       if (e.pointerType !== 'mouse' || (e.clientX === hx && e.clientY === hy)) return; hx = e.clientX; hy = e.clientY;
       const m = p.dataset.map; clearTimeout(ht);
-      if (m !== (hoverMap || game.pickMap)) { hoverMap = m; sync(); }
+      if (m !== (hoverMap || game.pickMap)) { hoverMap = m; paneT = performance.now(); sync(); }
       if (hoverMap) ht = setTimeout(commit, 300);
     });
-    $('dl-panes').addEventListener('pointerleave', commit);
+    $('dl-panes').addEventListener('pointerleave', () => { clearTimeout(ht); ht = setTimeout(commit, 0); });
   }
+  idleDo(prepSeoulTitle, 2500);
   // 순위 TOP 5: 고른 세계 · 모드 · 난이도 (1분 동안은 받아 둔 것을 다시 쓴다)
   const bc = new Map(); let bk = '';
   async function dlBoard() {
@@ -230,7 +235,7 @@ if (!TOSS) {
     if (bk !== key) return; // 받는 동안 다른 것을 골랐다
     list.classList.remove('loading');
     const top = (c.d.top || []).slice(0, 5), me = c.d.me;
-    list.innerHTML = top.length ? top.map((e) => `<li class="${e.id && e.id === me?.id ? 'me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><i style="background:${esc(e.color)}"></i>${esc(e.name)}</span><b>${(e.score ?? 0).toLocaleString()}</b></li>`).join('') : '<li class="empty">아직 기록이 없어요. 첫 번째 주인공이 되어 보세요!</li>';
+    list.innerHTML = top.length ? top.map((e) => `<li class="${e.id && e.id === me?.id ? 'me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="nm-t"><i style="background:${esc(e.color)}"></i>${esc(e.name)}</span><span class="md">${(e.medals || (e.medal ? [e.medal] : [])).map((m) => medalHtml(m, e.title)).join('')}${titleHtml(e.title)}</span></span><b>${(e.score ?? 0).toLocaleString()}</b></li>`).join('') : '<li class="empty">아직 기록이 없어요. 첫 번째 주인공이 되어 보세요!</li>';
     meEl.textContent = me ? `내 순위 ${me.rank.toLocaleString()}위 · ${me.score.toLocaleString()}점` : '';
   }
   for (const id of ['map-pick', 'mode-pick', 'diff-pick']) new MutationObserver(sync).observe($(id), { subtree: true, attributes: true, attributeFilter: ['class'] });
@@ -566,10 +571,23 @@ function countdown(ms) {
 function goRun() { game.mode = 'run'; $('countdown').classList.add('hidden'); }
 // 첫 화면 뒤 세상: 고른 세계(꿈나라 · 지옥 · 이공간 · 서울 · 모든 것의 역사)의 맵을 펼친다
 //   서울은 실제 지도(무겁고 시점이 다르다) 대신 성수 카페거리를 본뜬 가벼운 임시 거리 (seoul-title.js)
+// 랜딩 T-8: 다음에 나올 서울 임시 거리를 한가할 때 미리 지어 두고 셰이더도 미리 만든다 (처음 고를 때 짓기 130ms 가 걸렸다)
+let seoulNext = null;
+function prepSeoulTitle() {
+  if (TOSS || seoulNext) return;
+  const ks = Object.keys(SEOUL_TITLE_NAMES).filter((k) => k !== game.seoulLast && k !== seoulT?.kind);
+  seoulNext = makeSeoulTitle(ks[Math.floor(Math.random() * ks.length)]);
+  try { renderer.compileAsync?.(seoulNext.root, camera, scene)?.catch?.(() => {}); } catch { /* 그릴 때 만든다 */ }
+}
+function idleDo(f, ms = 1200) { setTimeout(() => (typeof requestIdleCallback === 'function' ? requestIdleCallback(f, { timeout: 2000 }) : f()), ms); }
 function setSeoulTitle(on) {
   // 누를 때마다 5곳(성수 · 명동 · 광화문 · 반포 한강 · 석촌호수) 중 바로 전과 다른 곳
   if (seoulT) { scene.remove(seoulT.root); seoulT.dispose(); seoulT = null; runner.bear.root.scale.setScalar(1); }
-  if (on) { const ks = Object.keys(SEOUL_TITLE_NAMES).filter((k) => k !== game.seoulLast); seoulT = makeSeoulTitle(ks[Math.floor(Math.random() * ks.length)]); game.seoulLast = seoulT.kind; scene.add(seoulT.root); }
+  if (on) {
+    if (seoulNext && seoulNext.kind !== game.seoulLast) { seoulT = seoulNext; seoulNext = null; } else { const ks = Object.keys(SEOUL_TITLE_NAMES).filter((k) => k !== game.seoulLast); seoulT = makeSeoulTitle(ks[Math.floor(Math.random() * ks.length)]); }
+    game.seoulLast = seoulT.kind; scene.add(seoulT.root);
+    if (!TOSS) idleDo(prepSeoulTitle);
+  }
   if (seoulT) seoulT.root.position.z = track.origin - runner.s;
   track.root.visible = !seoulT; // 임시 거리 위에는 판정용 길 · 장애물을 보이지 않는다
 }
