@@ -518,33 +518,44 @@ body:not(.toss) .dl { display: block;
 .dl-intro-r { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; max-width: 520px; }
 .dl-meta { margin: 0; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .dl-intro [data-slot="news"] .dr-news { margin: 0 !important; }
-.dl-panes { position: relative; flex: 1; display: flex; min-height: calc(var(--ih) + 560px); }
-.dl-pane { position: relative; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: flex-start; padding: calc(var(--ih) + 4px) 12px 44px; border-left: 1px solid rgba(255, 255, 255, .14); transition: flex-grow .6s cubic-bezier(.2, .8, .2, 1); }
+/* 4차 U-1: 판 폭은 늘 같다 (레이아웃이 움직이지 않는다). 마우스를 올리면 덮개가 걷히고 사진이 살짝 다가오며 설명 · 플레이가 떠오른다 — opacity · transform 만 */
+.dl-panes { position: relative; flex: 1; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); min-height: calc(var(--ih) + 420px); transition: opacity .3s; }
+.dl-pane { position: relative; min-width: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-start; padding: calc(var(--ih) + clamp(36px, 14vh, 170px)) clamp(12px, 1.4vw, 22px) 56px; border-left: 1px solid rgba(255, 255, 255, .14); isolation: isolate; }
 .dl-pane:first-child { border-left: 0; }
-/* T-8: 판 사진은 filter 없이 (판 폭이 0.6초 동안 바뀌는 내내 filter 를 다시 계산했다) · 크기는 높이 기준이라 폭이 바뀌어도 다시 늘리지 않는다. 어둡게는 ::after 층이, 마우스를 올리면 그 층만 걷힌다 */
-.dl-pane::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(16, 9, 42, .2), rgba(16, 9, 42, .05) 45%, rgba(16, 9, 42, .72)), linear-gradient(0deg, color-mix(in srgb, var(--wc) 34%, transparent), transparent 60%), var(--img) center / auto max(100%, 900px) no-repeat; transition: opacity .6s; }
-.dl-pane::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: rgba(14, 8, 36, .2); transition: opacity .35s; }
-.dl-pane:not(.on):hover::after { opacity: 0; }
-.dl-pane:not(.on):hover { flex-grow: 1.25; }
-.dl-pane.on { flex-grow: 5; }
-.dl-pane.on::before { opacity: 0; }
-.dl-pane.on.pv::before { opacity: 1; }
-.dl-pane.on::after { content: ''; position: absolute; inset: auto 0 0; height: 70%; pointer-events: none; background: linear-gradient(0deg, rgba(16, 9, 42, .55), transparent); }
-.dl-pane-hd { position: relative; z-index: 1; display: grid; justify-items: start; gap: 3px; width: 100%; padding: 14px 12px; border: 0; border-radius: 18px; background: transparent; color: #fff; font: inherit; text-align: left; cursor: pointer; text-shadow: 0 2px 12px rgba(10, 5, 30, .7); }
+.dl-pane::before { content: ''; position: absolute; inset: 0; z-index: -2; background: var(--img) center / cover no-repeat; transform: scale(1.001); transition: transform .7s cubic-bezier(.2, .7, .2, 1); will-change: transform; }
+.dl-pane::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(180deg, rgba(16, 9, 42, .3), rgba(16, 9, 42, .12) 40%, rgba(16, 9, 42, .82)), linear-gradient(0deg, color-mix(in srgb, var(--wc) 30%, transparent), transparent 55%), rgba(14, 8, 36, .28); transition: opacity .4s; }
+.dl-pane:hover::before, .dl-pane:focus-within::before { transform: scale(1.06); }
+.dl-pane:hover::after, .dl-pane:focus-within::after { opacity: .72; }
+.dl-pane-hd { position: relative; display: grid; justify-items: start; gap: 4px; width: 100%; padding: 0; border: 0; background: transparent; color: #fff; font: inherit; text-align: left; cursor: pointer; text-shadow: 0 2px 12px rgba(10, 5, 30, .7); transition: transform .4s cubic-bezier(.2, .7, .2, 1); }
 .dl-pane-hd i { font-style: normal; font-size: 13px; letter-spacing: .12em; color: var(--wc); }
-.dl-pane-hd b { font-family: 'Jua', sans-serif; font-weight: 400; font-size: clamp(19px, 1.9vw, 28px); line-height: 1.15; word-break: keep-all; }
-.dl-pane-hd em { font-style: normal; font-size: 13px; color: rgba(255, 255, 255, .82); }
-.dl-pane-hd small { font-size: 12.5px; line-height: 1.45; color: rgba(255, 255, 255, .72); word-break: keep-all; }
-.dl-pane-hd::after { content: '고르기 ›'; margin-top: 8px; padding: 5px 12px; border-radius: 999px; font-size: 12.5px; background: color-mix(in srgb, var(--wc) 85%, #fff); color: #1d1747; text-shadow: none; opacity: 0; transform: translateY(6px); transition: opacity .25s, transform .25s; }
-.dl-pane:not(.on):hover .dl-pane-hd::after, .dl-pane-hd:focus-visible::after { opacity: 1; transform: none; }
-.dl-pane.on .dl-pane-hd { cursor: default; padding: 0 4px 12px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
-.dl-pane.on .dl-pane-hd b { font-size: clamp(26px, 2.6vw, 40px); }
-.dl-pane.on .dl-pane-hd small { flex-basis: 100%; }
-.dl-pane-body { position: relative; z-index: 1; container: pane / inline-size; }
-
-.dl-pane:not(.on) .dl-pane-body { display: none; }
-.dl-pane.on .dl-pane-body { animation: dlPaneIn .5s .15s both; }
-@keyframes dlPaneIn { from { opacity: 0; transform: translateY(14px); } }
+.dl-pane-hd b { font-family: 'Jua', sans-serif; font-weight: 400; font-size: clamp(22px, 2.2vw, 34px); line-height: 1.12; word-break: keep-all; }
+.dl-pane-hd em { font-style: normal; font-size: 13px; color: rgba(255, 255, 255, .85); }
+.dl-pane-hd small { font-size: 12.5px; line-height: 1.45; color: rgba(255, 255, 255, .75); word-break: keep-all; }
+.dl-pane.on .dl-pane-hd i::after { content: ' · 지난번'; color: rgba(255, 255, 255, .7); letter-spacing: 0; }
+/* 설명 · 플레이: 늘 자리를 차지한 채 숨어 있다가 떠오른다 (높이가 바뀌지 않게) */
+.dl-pane-more { margin-top: 14px; opacity: 0; transform: translateY(12px); transition: opacity .3s, transform .4s cubic-bezier(.2, .7, .2, 1); }
+.dl-pane-more p { margin: 0; font-size: 13.5px; line-height: 1.65; color: rgba(255, 255, 255, .92); text-shadow: 0 2px 10px rgba(10, 5, 30, .8); word-break: keep-all; }
+.dl-play { margin-top: 14px; padding: 10px 18px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--wc) 80%, #fff); color: #1d1747; font-family: 'Jua', sans-serif; font-size: 15.5px; cursor: pointer; box-shadow: 0 10px 26px rgba(10, 5, 30, .35); transition: transform .2s, background .2s; }
+.dl-play:hover { transform: translateY(-2px); background: #fff; }
+.dl-pane:hover .dl-pane-more, .dl-pane:focus-within .dl-pane-more { opacity: 1; transform: none; }
+.dl-pane:hover .dl-pane-hd, .dl-pane:focus-within .dl-pane-hd { transform: translateY(-4px); }
+/* 출발 카드 팝업 (U-2): 뒤는 어둡게만 (흐림은 매 프레임 비싸다), 판 사진이 걷히며 그 세계 3D 가 보인다 */
+.dl-modal { position: fixed; inset: 0; z-index: 40; display: none; align-items: center; justify-content: center; padding: 76px 16px 24px; }
+.dl-modal.show { display: flex; }
+.dl-modal-bg { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(14, 8, 36, .25), rgba(14, 8, 36, .62)); opacity: 0; transition: opacity .25s; }
+.dl-modal-box { position: relative; width: min(880px, 100%); max-height: 100%; overflow: auto; overscroll-behavior: contain; container: pane / inline-size; border-radius: 26px; background: #fff; color: var(--ink); box-shadow: 0 40px 100px rgba(10, 5, 30, .5), 0 0 0 1px rgba(29, 23, 71, .06); opacity: 0; transform: translateY(18px) scale(.97); transition: opacity .22s, transform .3s cubic-bezier(.2, .8, .2, 1); }
+.dl-modal.open .dl-modal-bg, .dl-modal.open .dl-modal-box { opacity: 1; }
+.dl-modal.open .dl-modal-box { transform: none; }
+.dl-modal-h { display: flex; align-items: baseline; gap: 10px; padding: 18px 20px 4px; }
+.dl-modal-h i { font-style: normal; font-size: 13px; letter-spacing: .12em; color: color-mix(in srgb, var(--wc) 70%, #1d1747); font-weight: 700; }
+.dl-modal-h b { font-family: 'Jua', sans-serif; font-weight: 400; font-size: clamp(24px, 2.4vw, 32px); }
+.dl-modal-h small { flex: 1; min-width: 0; font-size: 13px; color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dl-x { flex: none; align-self: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--paper); color: var(--ink); font-size: 15px; cursor: pointer; }
+.dl-x:hover { background: #ebe4ff; }
+.dl-modal .dl-start { max-width: none; box-shadow: none; border-radius: 0; background: transparent; padding: 10px 20px 16px; }
+body.dl-open .dl-panes { opacity: 0; pointer-events: none; }
+body.dl-open .dl-cue { opacity: 0; }
+body.dl-open .dl-intro { opacity: .3; transition: opacity .25s; }
 .dl-start { position: relative; max-width: 540px; padding: 18px 20px 14px; border-radius: 24px; background: #fff; color: var(--ink); box-shadow: 0 30px 80px rgba(29, 23, 71, .35), 0 0 0 1px rgba(29, 23, 71, .06); }
 .dl-board { margin: 0 0 12px; padding: 0 0 10px; border-bottom: 2px dashed rgba(29, 23, 71, .12); }
 .dl-board-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 6px; }
@@ -691,17 +702,16 @@ body:not(.toss) .dl { display: block;
   .dl-hero h1 { font-size: clamp(34px, 10vw, 52px); }
   .dl-lead { font-size: 14.5px; margin-top: 10px; }
   .dl-intro-r { align-items: flex-start; } .dl-meta { justify-content: flex-start; } .dl-meta div { padding: 6px 11px; } .dl-meta dd { font-size: 19px; }
-  /* 다섯 판 → 한 줄 사진 타일 다섯 개, 고른 세계의 출발 카드는 그 아래 */
-  .dl-panes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; min-height: 0; padding: 6px 12px 28px; }
-  .dl-pane { display: contents; }
-  .dl-pane::before, .dl-pane::after, .dl-pane.on::after { content: none; }
-  .dl-pane-hd { grid-row: 1; min-height: 104px; padding: 8px 7px; border-radius: 14px; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; gap: 1px; background: linear-gradient(180deg, rgba(16, 9, 42, .05), rgba(16, 9, 42, .75)), var(--img) center / cover no-repeat; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18); filter: saturate(.8) brightness(.85); transition: filter .2s, box-shadow .2s, transform .2s; }
-  .dl-pane-hd i { font-size: 11px; }
+  /* 다섯 판 → 한 줄 사진 타일 다섯 개, 누르면 같은 팝업 */
+  .dl-panes { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; min-height: 0; padding: 6px 12px 28px; }
+  .dl-pane { min-height: 104px; padding: 8px 7px; border: 0; border-radius: 14px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18); }
+  .dl-pane.on { box-shadow: inset 0 0 0 2.5px var(--wc); }
+  .dl-pane-hd i { font-size: 11px; } .dl-pane.on .dl-pane-hd i::after { content: none; }
   .dl-pane-hd b { font-size: 14px; line-height: 1.2; }
-  .dl-pane-hd em, .dl-pane-hd small, .dl-pane-hd::after { display: none; }
-  .dl-pane.on .dl-pane-hd { padding: 8px 7px; display: flex; filter: none; box-shadow: inset 0 0 0 2.5px var(--wc), 0 8px 22px rgba(10, 5, 30, .35); transform: translateY(-2px); cursor: default; }
-  .dl-pane.on .dl-pane-hd b { font-size: 14px; }
-  .dl-pane-body { grid-row: 2; grid-column: 1 / -1; padding: 6px 0 0; }
+  .dl-pane-hd em, .dl-pane-hd small, .dl-pane-more { display: none; }
+  .dl-modal { padding: 64px 8px 12px; align-items: flex-end; }
+  .dl-modal-h { padding: 14px 14px 2px; } .dl-modal-h small { display: none; }
+  .dl-modal .dl-start { padding: 8px 14px 14px; }
   .dl-start { max-width: none; padding: 16px 14px 12px; border-radius: 20px; }
   .dl-cue { display: none; }
   .dl-worlds { grid-template-columns: 1fr; }

@@ -192,41 +192,40 @@ if (!TOSS) {
   mv('mode', $('mode-pick')); mv('diff', $('diff-pick'));
   mv('play', $('play-btns')); mv('code', card.querySelector('.code-row')); mv('err', $('err'));
   mv('tools', ...tools); mv('fame', $('fame'));
-  // 세계 고르기: 첫 화면 다섯 판 ↔ 숨은 맵 단추 (공지를 눌러 맵이 바뀌어도 따라간다) · 고른 판이 펼쳐지고 그 안에 출발 카드
-  const panes = [...document.querySelectorAll('#dl-panes .dl-pane')], start = $('dl-start');
+  // 세계 고르기 (4차): 판에 마우스를 올리면 설명만 (CSS), '플레이' · 판을 누르면 출발 카드가 가운데 팝업 · 숨은 맵 단추와 이어진다
+  const panes = [...document.querySelectorAll('#dl-panes .dl-pane')], modal = $('dl-modal');
   const WN = { dream: '꿈나라', hell: '지옥', void: '이공간', seoul: '서울', time: '모든 것의 역사' };
-  let hoverMap = null, hold = false, paneT = 0; // hoverMap: 마우스를 올려 미리 펼친 세계 (3D 배경은 멈췄을 때 바꾼다) · hold: 새 세계를 짓는 동안 사진으로 덮어 둔다 · paneT: 판이 마지막으로 바뀐 때
-  const sync = () => {
-    const cur = hoverMap || game.pickMap, P = panes.find((p) => p.dataset.map === cur) || panes[0];
-    for (const p of panes) { p.classList.toggle('on', p === P); p.classList.toggle('pv', p === P && (cur !== game.pickMap || hold)); p.querySelector('.dl-pane-hd').setAttribute('aria-pressed', p === P); }
-    if (start.parentElement !== P.lastElementChild) P.lastElementChild.append(start);
-    dlBoard();
+  const sync = () => { for (const p of panes) p.classList.toggle('on', p.dataset.map === game.pickMap); dlBoard(); };
+  const pick = (m) => { document.querySelector(`#map-pick [data-m="${m}"]`)?.click(); sync(); };
+  // 팝업 열기: 세계를 먼저 짓고(한 프레임) 두 프레임 그린 뒤 떠오른다 (짓는 끊김이 떠오르는 움직임과 겹치지 않게)
+  let openT = 0;
+  const openModal = (m) => {
+    const P = panes.find((p) => p.dataset.map === m) || panes[0];
+    if (T.scrollTop > 0) T.scrollTo({ top: 0 });
+    if (m !== game.pickMap) pick(m); else sync();
+    $('dl-modal-no').textContent = P.querySelector('.dl-pane-hd i').textContent; $('dl-modal-t').textContent = WN[m]; $('dl-modal-s').textContent = P.querySelector('.dl-pane-hd small').textContent;
+    modal.style.setProperty('--wc', getComputedStyle(P).getPropertyValue('--wc'));
+    game.dlIdle = false; game.wake = 4; modal.setAttribute('aria-hidden', 'false'); modal.classList.add('show');
+    cancelAnimationFrame(openT); openT = requestAnimationFrame(() => { openT = requestAnimationFrame(() => { document.body.classList.add('dl-open'); modal.classList.add('open'); modal.querySelector('#solo-btn')?.focus({ preventScroll: true }); }); });
   };
-  const pick = (m) => { hoverMap = null; document.querySelector(`#map-pick [data-m="${m}"]`)?.click(); sync(); };
-  // 판으로 고르기 (T-8): 사진으로 덮은 채 새 세계를 짓고, 두세 번 그린 뒤 사진을 걷는다 (짓는 끊김 · 셰이더 만들기가 사진 밑에서)
-  let unholdT = 0;
-  const go = (m) => { if (m === game.pickMap) { hoverMap = null; sync(); return; } hold = true; pick(m); cancelAnimationFrame(unholdT); let n = 0; const tick = () => { if (++n < 4) unholdT = requestAnimationFrame(tick); else { hold = false; sync(); } }; unholdT = requestAnimationFrame(tick); };
-  for (const b of document.querySelectorAll('#dl-panes .dl-pane-hd')) b.onclick = () => { paneT = performance.now(); hoverMap = b.dataset.map; sync(); go(b.dataset.map); };
-  // 마우스를 올리기만 해도 그 세계가 펼쳐진다 (마우스가 있는 기기만)
-  //   왼쪽에서 오른쪽으로 쭉 훑으면 판은 바로바로 바뀌고(사진), 무거운 3D 배경(새 세계 짓기)은 커서가 0.3초 멈추거나 판 밖으로 나갈 때 한 번만 바꾼다
-  //   판이 넓어지며 커서 밑으로 이웃 판이 밀려와도 바뀌지 않게, 커서가 실제로 움직였을 때만
-  if (matchMedia('(hover: hover) and (pointer: fine)').matches) {
-    let hx = -1, hy = -1, ht = 0;
-    // 판이 넓어지는 움직임(0.6초)이 끝난 뒤에 짓는다 (움직임 한가운데에 짓기가 겹쳐 더 끊겨 보였다)
-    const commit = () => { clearTimeout(ht); if (!hoverMap) return; const w = paneT + 620 - performance.now(); if (w > 0) { ht = setTimeout(commit, w); return; } go(hoverMap); };
-    for (const p of panes) p.addEventListener('pointermove', (e) => {
-      if (e.pointerType !== 'mouse' || (e.clientX === hx && e.clientY === hy)) return; hx = e.clientX; hy = e.clientY;
-      const m = p.dataset.map; clearTimeout(ht);
-      if (m !== (hoverMap || game.pickMap)) { hoverMap = m; paneT = performance.now(); sync(); }
-      if (hoverMap) ht = setTimeout(commit, 300);
-    });
-    $('dl-panes').addEventListener('pointerleave', () => { clearTimeout(ht); ht = setTimeout(commit, 0); });
-  }
+  const closeModal = () => {
+    if (!modal.classList.contains('show')) return; cancelAnimationFrame(openT);
+    modal.classList.remove('open'); document.body.classList.remove('dl-open'); modal.setAttribute('aria-hidden', 'true');
+    setTimeout(() => { if (!modal.classList.contains('open')) { modal.classList.remove('show'); game.dlIdle = true; game.wake = 2; } }, 260);
+  };
+  game.dlClose = closeModal;
+  for (const b of document.querySelectorAll('#dl-panes .dl-pane-hd, #dl-panes .dl-play')) b.onclick = () => openModal(b.dataset.map || b.closest('.dl-pane').dataset.map);
+  for (const b of modal.querySelectorAll('[data-dl-close]')) b.onclick = closeModal;
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.classList.contains('open') && game.mode === 'title') closeModal(); });
+  // 출발하면 닫는다 (돌아오면 깔끔한 첫 화면)
+  for (const id of ['solo-btn']) $(id)?.addEventListener('click', () => setTimeout(closeModal, 0));
+  // U-3: 첫 화면 판이 3D 를 다 덮고 있는 동안은 세계를 그리지 않는다 (팝업을 열면 다시)
+  game.dlIdle = true; game.wake = 30; // 처음 몇 번은 그려 둔다 (휴대폰은 소개글 뒤로 3D 가 비친다)
   idleDo(prepSeoulTitle, 2500);
   // 순위 TOP 5: 고른 세계 · 모드 · 난이도 (1분 동안은 받아 둔 것을 다시 쓴다)
   const bc = new Map(); let bk = '';
   async function dlBoard() {
-    const map = hoverMap || game.pickMap, mode = game.pickMode || 'speed', diff = game.pickDiff, key = `${map}|${mode}|${diff}`;
+    const map = game.pickMap, mode = game.pickMode || 'speed', diff = game.pickDiff, key = `${map}|${mode}|${diff}`;
     if (!map || !diff || key === bk) return; bk = key;
     $('dl-board-t').textContent = `🏆 ${WN[map] || ''} · ${DIFFS[diff]?.name || ''} · ${mode === 'item' ? '🎁 아이템전' : '⚡ 스피드전'}`;
     const list = $('dl-board-list'), meEl = $('dl-board-me');
@@ -245,7 +244,7 @@ if (!TOSS) {
   const up = () => T.scrollTo({ top: 0, behavior: 'smooth' });
   for (const a of document.querySelectorAll('#dl [data-dl-go]')) a.onclick = (e) => { e.preventDefault(); $(a.dataset.dlGo)?.scrollIntoView({ behavior: 'smooth' }); };
   for (const a of document.querySelectorAll('#dl [data-dl-top]')) a.onclick = (e) => { e.preventDefault(); up(); };
-  for (const b of document.querySelectorAll('#dl .dl-link[data-map]')) b.onclick = () => { pick(b.dataset.map); up(); };
+  for (const b of document.querySelectorAll('#dl .dl-link[data-map]')) b.onclick = () => openModal(b.dataset.map);
   for (const b of document.querySelectorAll('#dl [data-tool]')) b.onclick = () => $(b.dataset.tool)?.click();
   // 위 막대: 첫 화면을 지나면 종이색으로
   const bar = document.querySelector('.dl-bar');
@@ -592,7 +591,7 @@ function setSeoulTitle(on) {
   track.root.visible = !seoulT; // 임시 거리 위에는 판정용 길 · 장애물을 보이지 않는다
 }
 // 모든 것의 역사도 누를 때마다 125개 시대 중 하나를 배경으로 (출발은 그대로 마지막으로 쓰러진 시대부터 · renderTimeResume)
-function titleWorld() { const m = game.pickMap; newRun((Math.random() * 2 ** 31) | 0, false, game.pickDiff, m, m === 'time' ? Math.floor(Math.random() * ERAS.length) : null); setSeoulTitle(m === 'seoul'); }
+function titleWorld() { game.wake = Math.max(game.wake || 0, 4); const m = game.pickMap; newRun((Math.random() * 2 ** 31) | 0, false, game.pickDiff, m, m === 'time' ? Math.floor(Math.random() * ERAS.length) : null); setSeoulTitle(m === 'seoul'); }
 function toTitle() {
   game.team = false; $('teambar').classList.add('hidden');
   $('howto').classList.add('hidden'); $('itembar').classList.add('hidden');
@@ -988,6 +987,9 @@ function frame() {
   t += dt;
   readInput();
   if (game.mode === 'hangang') { hgFrame(dt); return; }
+  // 랜딩 첫 화면(웹): 판이 3D 를 다 덮고 있으면 그리지 않는다 (팝업을 열거나 세계가 바뀐 직후 몇 번은 그린다)
+  if (game.mode === 'title' && game.dlIdle && !(game.wake > 0)) { input.jump = input.slide = input.shove = input.item = false; return; }
+  if (game.wake > 0) game.wake--;
   const z = track.origin - runner.s;
   if (game.mode === 'title') {
     // 처음 화면: 출발 발판에서 제자리 달리기 + 꿈이 6초마다 바뀌며 빙글 도는 카메라
