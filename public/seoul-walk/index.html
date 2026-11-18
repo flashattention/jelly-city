@@ -25,7 +25,7 @@
 
   <header class="bar">
     <a class="mark" href="#film">젤리 서울 러너</a>
-    <nav><a class="home" href="/" title="젤리 게임즈 메인으로">🏠 <span>젤리 게임즈</span></a><a href="#story">만든 이야기</a><a href="#" data-open-map>서울 지도</a><a class="go" id="bar-go" href="/seoul-walk/play/?r=yeouido&amp;go=start">지금 걷기 →</a></nav>
+    <nav><a class="home" href="/" title="젤리 게임즈 메인으로">🏠 <span>젤리 게임즈</span></a><a href="#story">만든 이야기</a><a href="#" data-open-map>서울 지도</a><a class="op-nav" href="/seoul-walk/play/?x=12860&amp;z=1330&amp;f=2.3&amp;via=op&amp;n=%EC%98%AC%EB%A6%BC%ED%94%BD%EA%B3%B5%EC%9B%90">🏟️ 올림픽공원<i>NEW</i></a><a class="go" id="bar-go" href="/seoul-walk/play/?r=yeouido&amp;go=start">지금 걷기 →</a></nav>
   </header>
 
   <!-- 장면: 첫 화면부터 실시간 3D. 스크롤하면 카메라가 서울 곳곳을 지나간다 -->
@@ -44,6 +44,7 @@
         </div>
         <aside class="start" id="start" aria-label="어디서 걸을까요">
           <p class="lab">어디로 떠나 볼까요 <span id="tile-n"></span></p>
+          <a class="op-cta" href="/seoul-walk/play/?x=12860&amp;z=1330&amp;f=2.3&amp;via=op&amp;n=%EC%98%AC%EB%A6%BC%ED%94%BD%EA%B3%B5%EC%9B%90"><span class="op-badge">NEW · 공공데이터</span><b>🏟️ 올림픽공원 바로 가기</b><small>KSPO DOME · 핸드볼경기장 실제 3D · 오늘 공연 · 실시간 혼잡 · 산책 코스</small></a>
           <a class="resume hidden" id="resume" href="#"><span>이어 걷기</span><small id="resume-sub"></small></a>
           <ol class="hoods" id="hoods"></ol>
           <div class="acts"><a class="btn" id="go-now" href="/seoul-walk/play/?r=yeouido&amp;go=start">지금 걷기</a><a class="link" href="#" data-open-map>서울 지도에서 고르기 →</a></div>
@@ -55,6 +56,23 @@
       <div class="end" id="end"><h2>이제 직접<br />걸어보세요.</h2><a class="btn" id="go-end" href="/seoul-walk/play/?r=yeouido&amp;go=start">지금 걷기</a></div>
       <div class="prog" id="prog"><i id="prog-fill"></i><span id="prog-t">01 / 06</span></div>
       <p class="cue" id="cue">천천히 내려 보세요</p>
+    </div>
+  </section>
+
+  <!-- 새로 생긴 곳: 올림픽공원 (한국체육산업개발 공공데이터 · hangang-kspo.js) -->
+  <section class="opk" id="olympic">
+    <div class="opk-head">
+      <p class="lab">새로 생겼어요 · 2026년 11월</p>
+      <h2>올림픽공원을<br />공공데이터로 지었어요</h2>
+      <p class="opk-lead">한국체육산업개발이 공개한 공연장 3D · 공연 · 주차 · 잔디 데이터로, 송파 올림픽공원을 <b>지금 모습 그대로</b> 걸어요. 공연이 있는 날엔 KSPO DOME 앞에 젤리 관객이 줄을 서고, 붐비는 날엔 공원이 북적여요.</p>
+      <div class="acts"><a class="btn" href="/seoul-walk/play/?x=12860&amp;z=1330&amp;f=2.3&amp;via=op&amp;n=%EC%98%AC%EB%A6%BC%ED%94%BD%EA%B3%B5%EC%9B%90">올림픽공원으로 바로 가기</a><a class="link" href="#story">어떻게 만들었는지 →</a></div>
+    </div>
+    <figure class="opk-hero"><img src="/seoul-walk/img/op-hero.webp" alt="젤리 서울 러너 속 올림픽공원 — 지붕을 씌운 SK핸드볼경기장과 뒤쪽 KSPO DOME" loading="lazy" width="1280" height="720" /><figcaption>앞 SK핸드볼경기장 · 뒤 KSPO DOME — 기관의 무대 설계용 3D 를 98 ~ 99.6% 가볍게 줄여 실제 크기 · 실제 자리에</figcaption></figure>
+    <div class="opk-grid">
+      <article><p class="n">01</p><h3>진짜 공연장 3D</h3><p>KSPO DOME · SK핸드볼경기장 · 우리금융아트홀 · 88호수 수변무대 · 88잔디마당. 삼각형 49만 ~ 539만 개짜리 원본을 브라우저에서 바로 돌게 줄였어요.</p><dl><div><dt>공연장</dt><dd>5곳</dd></div><div><dt>줄인 비율</dt><dd>99%</dd></div></dl></article>
+      <article><img src="/seoul-walk/img/op-panel.webp" alt="오늘의 올림픽공원 창" loading="lazy" /><p class="n">02</p><h3>오늘의 올림픽공원</h3><p>공원에서 E 를 누르면 오늘 · 다음 공연과 예매, 지금 주차 대수로 본 혼잡, 사람 붐빔 · 날씨, 오늘 열린 잔디가 한 화면에.</p></article>
+      <article><img src="/seoul-walk/img/op-queue.webp" alt="공연 날 KSPO DOME 앞 젤리 관객 줄" loading="lazy" /><p class="n">03</p><h3>공연 날 · 붐비는 날</h3><p>공연이 있는 날 KSPO DOME 앞에 젤리 관객 입장 줄, 공연장 앞 전광판엔 그날 공연. 평소엔 실시간 혼잡만큼 방문객이 오가요.</p></article>
+      <article><p class="n">04</p><h3>올림픽공원 산책 코스</h3><p>세계평화의문 → 몽촌해자 → 나홀로나무 → 88호수 수변무대 → 88잔디마당 → KSPO DOME → SK핸드볼경기장. 빛기둥을 따라 약 2.2km, 완주하면 기록이 남아요.</p><dl><div><dt>지점</dt><dd>7곳</dd></div><div><dt>거리</dt><dd>2.2km</dd></div></dl></article>
     </div>
   </section>
 
@@ -77,6 +95,7 @@
           <tr><th>국토교통부 브이월드</th><td><b>건물 공간정보</b><code>LT_C_SPBD</code></td><td>서울 건물의 바닥 모양 · 층수 · 이름 → 서울 안 건물 약 55만 채의 덩어리와 높이 (오픈스트리트맵에 없는 빌라 · 단독주택까지)</td></tr>
           <tr><th>국토교통부 브이월드</th><td><b>건축물대장 정보</b><code>LT_C_BLDGINFO</code></td><td>주용도 · 구조 · 사용승인 연도 → 외벽 · 창 · 지붕</td></tr>
           <tr><th>소상공인시장진흥공단</th><td><b>상가(상권)정보</b><code>storeListInRectangle</code></td><td>서울 가게 약 42만 곳을 실제 건물 · 층과 연결 → 1층 가로 간판, 위층 창문 글씨 간판(칸마다 최대 7천 개), 업종마다 다른 간판 색, 식당 · 카페 · 편의점은 들어갈 수 있는 문</td></tr>
+          <tr><th>한국체육산업개발 · 공공데이터포털</th><td><b>올림픽공원 공연장 실감형 콘텐츠 · 공연정보 · 잔디시설정보 · 주차장 혼잡도 · 실시간 주차현황</b><code>15127487 · 15149169 · 15143220 · 15164156 · 15168686</code></td><td>KSPO DOME 등 공연장 5곳의 실제 3D(경량화), 공연장 전광판 · 오늘 공연, 열린 잔디, 지금 주차 대수로 본 혼잡 → 올림픽공원 방문객 수</td></tr>
           <tr><th>오픈스트리트맵</th><td><b>대한민국 원본 지도</b><code>Geofabrik 추출본</code></td><td>길 · 골목 · 인도 · 공원 · 숲 · 물 · 다리 · 철길 · 지하철 출구 · 카페 · 식당</td></tr>
           <tr><th>맵젠 · AWS 공개 데이터</th><td><b>지형 고도 타일</b><code>Terrarium</code></td><td>서울 전체 50m 간격 높이 → 땅이 실제 높낮이대로, 건물은 비탈에서도 수평 바닥으로 그 위에</td></tr>
         </table>
@@ -106,11 +125,11 @@
 
     <section class="last">
       <h2>오늘은 어디를<br />걸어볼까요?</h2>
-      <div class="acts"><a class="btn" id="go-last" href="/seoul-walk/play/?r=yeouido&amp;go=start">지금 걷기</a><a class="link" href="#" data-open-map>서울 지도에서 고르기 →</a></div>
+      <div class="acts"><a class="btn" id="go-last" href="/seoul-walk/play/?r=yeouido&amp;go=start">지금 걷기</a><a class="link" href="/seoul-walk/play/?x=12860&amp;z=1330&amp;f=2.3&amp;via=op&amp;n=%EC%98%AC%EB%A6%BC%ED%94%BD%EA%B3%B5%EC%9B%90">🏟️ 올림픽공원 바로 가기 →</a><a class="link" href="#" data-open-map>서울 지도에서 고르기 →</a></div>
     </section>
   </main>
 
-  <footer class="foot"><span>젤리 서울 러너</span><span>지도 © OpenStreetMap contributors · 건물 © 국토교통부 브이월드 · 실시간 © 서울 열린데이터광장 · 상가 © 소상공인시장진흥공단 · 지형 © Mapzen / AWS Terrain Tiles</span><span>서비스 개선을 위해 익명 이용 통계를 모아요 (이름 · 이메일 · IP 저장 없음, 위치는 2km 칸 단위)</span></footer>
+  <footer class="foot"><span>젤리 서울 러너</span><span>지도 © OpenStreetMap contributors · 건물 © 국토교통부 브이월드 · 실시간 © 서울 열린데이터광장 · 상가 © 소상공인시장진흥공단 · 지형 © Mapzen / AWS Terrain Tiles · 올림픽공원 공연장 3D · 공연 · 주차 · 잔디 © 한국체육산업개발(주)</span><span>서비스 개선을 위해 익명 이용 통계를 모아요 (이름 · 이메일 · IP 저장 없음, 위치는 2km 칸 단위)</span></footer>
 
   <!-- 서울 지도 (어디서든 열린다) -->
   <div class="mapbox hidden" id="mapbox" role="dialog" aria-label="서울 지도">

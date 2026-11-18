@@ -232,7 +232,7 @@ registerAttraction({
   build(A) {
     const hg = A.hg; loadLive();
     return {
-      tick(dt) { if (G) { G.root.visible = true; const t = (G.t = (G.t || 0) + (dt || 0.016)); G.crowd?.tick(t); G.course?.tick(t, hg.px, hg.pz, hg.face); if ((G.planT = (G.planT || 0) - (dt || 0.016)) <= 0) { G.planT = 30; loadLive().then(() => { G.crowd?.plan(); for (const b of G.boards || []) b.draw(); }); } return; } if (building) return; if (!hg.chunks?.has('6_0') || hg.chunkLoading) return; building = true; buildAll(hg).then((o) => { G = o; hg.olympicPark = o; }).finally(() => { building = false; }); },
+      tick(dt) { if (G) { G.root.visible = true; const t = (G.t = (G.t || 0) + (dt || 0.016)); G.crowd?.tick(t); G.course?.tick(t, hg.px, hg.pz, hg.face); if ((G.planT = (G.planT || 0) - (dt || 0.016)) <= 0) { G.planT = 30; loadLive().then(() => { G.crowd?.plan(); for (const b of G.boards || []) b.draw(); }); } return; } if (building) return; if (!hg.chunks?.has('6_0') || hg.chunkLoading) return; building = true; buildAll(hg).then((o) => { G = o; hg.olympicPark = o; if (o && /[?&]via=op\b/.test(location.search) && !G.opened) { G.opened = true; setTimeout(showPanel, 1200); } }).finally(() => { building = false; }); },
       dispose() { if (G) { G.root.visible = false; G.course?.stop(); } document.getElementById('op-panel')?.classList.add('hidden'); },
     };
   },

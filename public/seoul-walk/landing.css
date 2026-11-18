@@ -208,3 +208,33 @@ body.light .bar { color: #f3eee6; background: linear-gradient(180deg, rgba(7, 10
 .start .hoods a i { font-size: 14px; }
 .start .hoods a span { overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 720px) { .intro { grid-template-columns: 1fr; } .start .hoods { grid-template-columns: repeat(2, minmax(0, 1fr)); } .start .hoods a { padding: 9px 2px 8px; font-size: 14.5px; } }
+
+/* ---------- 새로 생긴 곳: 올림픽공원 ---------- */
+.bar nav .op-nav { display: inline-flex; align-items: center; gap: 6px; color: var(--fg); padding: 6px 12px; margin: -6px 0; border-radius: 999px; border: 1px solid rgba(231, 193, 139, .55); background: rgba(231, 193, 139, .12); }
+.bar nav .op-nav i { font-style: normal; font-size: 9.5px; letter-spacing: .12em; padding: 1px 6px; border-radius: 999px; background: var(--gold); color: #1a1408; }
+.bar nav .op-nav:hover { background: rgba(231, 193, 139, .24); }
+.op-cta { position: relative; display: grid; gap: 3px; padding: 14px 16px 13px 18px; border-radius: 16px; border: 1px solid rgba(231, 193, 139, .6); background: linear-gradient(120deg, rgba(231, 193, 139, .2), rgba(246, 207, 224, .12)); box-shadow: 0 12px 34px rgba(0, 0, 0, .35); transition: transform .25s, background .25s, box-shadow .25s; }
+.op-cta b { font-family: var(--ko); font-size: 19px; color: var(--fg); }
+.op-cta b::after { content: ' →'; color: var(--gold); transition: margin .25s; }
+.op-cta small { font-size: 12.5px; line-height: 1.5; color: var(--mute); }
+.op-cta:hover { transform: translateY(-2px); background: linear-gradient(120deg, rgba(231, 193, 139, .3), rgba(246, 207, 224, .18)); box-shadow: 0 18px 44px rgba(231, 193, 139, .22); }
+.op-badge { justify-self: start; font-family: var(--mono); font-size: 10px; letter-spacing: .14em; padding: 2px 8px; border-radius: 999px; background: var(--gold); color: #1a1408; }
+.op-cta::before { content: ''; position: absolute; right: 14px; top: 14px; width: 8px; height: 8px; border-radius: 50%; background: #ff8fb1; box-shadow: 0 0 0 0 rgba(255, 143, 177, .6); animation: opPing 2s infinite; }
+@keyframes opPing { 70% { box-shadow: 0 0 0 10px rgba(255, 143, 177, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 143, 177, 0); } }
+.opk { position: relative; z-index: 1; padding: clamp(80px, 12vh, 140px) var(--pad); background: linear-gradient(180deg, var(--bg), #0d1120 40%, var(--bg)); border-top: 1px solid var(--line); }
+.opk-head { max-width: 760px; }
+.opk-head h2 { margin: 14px 0 0; font-family: var(--ko); font-weight: 700; font-size: clamp(36px, 5vw, 66px); line-height: 1.12; }
+.opk-lead { margin: 20px 0 0; font-size: 16.5px; line-height: 1.85; color: var(--mute); } .opk-lead b { color: var(--fg); font-weight: 500; }
+.opk-head .acts { display: flex; flex-wrap: wrap; align-items: center; gap: 22px; margin-top: 28px; }
+.opk-hero { margin: 48px 0 0; } .opk-hero img { display: block; width: 100%; height: auto; border-radius: 22px; box-shadow: 0 30px 80px rgba(0, 0, 0, .5); }
+.opk-hero figcaption { margin-top: 12px; font-size: 13px; color: var(--dim); }
+.opk-grid { margin-top: 40px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+.opk-grid article { display: flex; flex-direction: column; gap: 8px; padding: 20px; border-radius: 18px; border: 1px solid var(--line); background: rgba(255, 255, 255, .03); }
+.opk-grid article img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 12px; margin-bottom: 6px; }
+.opk-grid .n { margin: 0; font-family: var(--mono); font-size: 11px; letter-spacing: .14em; color: var(--gold); }
+.opk-grid h3 { margin: 0; font-family: var(--ko); font-size: 21px; }
+.opk-grid article > p:not(.n) { margin: 0; font-size: 14px; line-height: 1.75; color: var(--mute); }
+.opk-grid dl { margin: auto 0 0; padding-top: 12px; display: flex; gap: 24px; } .opk-grid dl div { display: flex; flex-direction: column-reverse; } .opk-grid dt { font-size: 11.5px; color: var(--dim); } .opk-grid dd { margin: 0; font-family: var(--ko); font-size: 26px; font-weight: 700; color: var(--gold); }
+.last .acts { flex-wrap: wrap; }
+@media (max-width: 1100px) { .opk-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .bar nav .op-nav i { display: none; } .opk-grid { grid-template-columns: 1fr; } .opk-head .acts { gap: 16px; } }
