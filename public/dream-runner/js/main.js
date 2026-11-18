@@ -74,7 +74,7 @@ const runner = new Runner(scene, {});
 // 🗺️ 서울 맵 그리기 (6-7): 서울 산책 엔진으로 실제 서울을, 판정 자리 물체는 실제 길 위로 휘어서
 const seoulRun = new SeoulRun(renderer, camera), seoulCam = new THREE.PerspectiveCamera();
 seoulRun.api = (path) => account.api(path);
-let seoulT = null; // 첫 화면 서울: 성수 카페거리 임시 거리 (setSeoulTitle)
+let seoulT = null, seoulNext = null; // seoulT: 첫 화면 서울 임시 거리 (setSeoulTitle) · seoulNext: 미리 지어 둔 다음 거리 (맨 위에 둔다: 첫 화면이 서울이면 titleWorld 가 아래 선언보다 먼저 불려 게임이 멈췄다)
 let seoulPost = null, seoulWas = false, seoulWaitT = 0;
 const seoulOn = () => track.seoul && seoulRun.ready && game.mode !== 'title'; // 첫 화면은 성수 카페거리 임시 거리(seoul-title.js)
 // 서울 맵 판에 들어가고 나올 때: 곰 · 길 · 그림자를 서울 장면으로 옮기고, 화면 설정(색 · 그림자 · 먼 거리)을 서울 산책처럼
@@ -571,7 +571,6 @@ function goRun() { game.mode = 'run'; $('countdown').classList.add('hidden'); }
 // 첫 화면 뒤 세상: 고른 세계(꿈나라 · 지옥 · 이공간 · 서울 · 모든 것의 역사)의 맵을 펼친다
 //   서울은 실제 지도(무겁고 시점이 다르다) 대신 성수 카페거리를 본뜬 가벼운 임시 거리 (seoul-title.js)
 // 랜딩 T-8: 다음에 나올 서울 임시 거리를 한가할 때 미리 지어 두고 셰이더도 미리 만든다 (처음 고를 때 짓기 130ms 가 걸렸다)
-let seoulNext = null;
 function prepSeoulTitle() {
   if (TOSS || seoulNext) return;
   const ks = Object.keys(SEOUL_TITLE_NAMES).filter((k) => k !== game.seoulLast && k !== seoulT?.kind);
