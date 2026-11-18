@@ -53,7 +53,7 @@ if (want3d) {
     // 3D 는 웹 워커에서 (메인 스레드는 스크롤 · 글자만 → 약한 컴퓨터에서도 스크롤이 부드럽다)
     const off = cv.transferControlToOffscreen(), wk = new Worker('/seoul-walk/landing3d-worker.js', { type: 'module' }); let hasSet = new Set();
     W3D = { film: (P, act) => wk.postMessage({ type: 'film', P, active: act }), has: (i) => hasSet.has(i) }; window.SW_HAS = W3D.has;
-    wk.onmessage = (e) => { const m = e.data; if (m.type === 'progress') loader.set(0.08 + m.k * 0.9, m.s); else if (m.type === 'ready') onReady(); else if (m.type === 'fail') onFail(); else if (m.type === 'has') { hasSet = new Set(m.list); lastP = -1; filmTick(); } else if (m.type === 'log') console.error('[3D 워커]', m.msg); };
+    wk.onmessage = (e) => { const m = e.data; if (m.type === 'progress') loader.set(0.08 + m.k * 0.9, m.s); else if (m.type === 'ready') onReady(); else if (m.type === 'fail') onFail(); else if (m.type === 'slow') { ev('l_3d', { ok: 2, mode: 'slow' }); fallbackImages(); } else if (m.type === 'has') { hasSet = new Set(m.list); lastP = -1; filmTick(); } else if (m.type === 'log') console.error('[3D 워커]', m.msg); };
     wk.onerror = (e) => { console.warn('워커 3D 오류', e.message); onFail(); };
     wk.postMessage({ type: 'init', canvas: off, w: innerWidth, h: innerHeight, dpr: devicePixelRatio || 1, tier: qt != null ? +qt : null }, [off]);
     addEventListener('resize', () => wk.postMessage({ type: 'resize', w: innerWidth, h: innerHeight }));

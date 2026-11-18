@@ -33,8 +33,8 @@ export function start3d(canvas, opt = {}) {
   // 등급별: 해상도 · 그림자 · 빛 번짐(낮은 해상도로) · 스크롤 중 최대 장 수 · 사람 · 차 계산 횟수
   const dpr = devicePixelRatio || 1, Q = [
     { pr: 0.7, prMax: 0.8, shadows: false, bloom: false, bloomScale: 0.35, maxFps: 30, simHz: 15 },
-    { pr: Math.min(dpr, 0.85), prMax: Math.min(dpr, 1), shadows: false, bloom: true, bloomScale: 0.35, maxFps: 30, simHz: 20 },
-    { pr: Math.min(dpr, 1.15), prMax: Math.min(dpr, 1.4), shadows: true, bloom: true, bloomScale: 0.5, maxFps: 30, simHz: 30 },
+    { pr: Math.min(dpr, 1), prMax: Math.min(dpr, 1.35), shadows: false, bloom: true, bloomScale: 0.4, maxFps: 30, simHz: 20 },
+    { pr: Math.min(dpr, 1.25), prMax: Math.min(dpr, 2), shadows: true, bloom: true, bloomScale: 0.5, maxFps: 30, simHz: 30 },
   ][cl(tier, 0, 2)];
   Q.fps30 = Q.maxFps <= 30;
   const cam = new THREE.PerspectiveCamera(52, 1, 0.5, 24000), api = (p) => fetch(p).then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status))));
@@ -100,7 +100,7 @@ export function start3d(canvas, opt = {}) {
     // 그리는 속도 보기: 2초마다. 느리면(평균 26ms 넘게) 해상도부터 낮추고, 그다음 그림자 · 빛 번짐. 아주 빠르면 해상도를 조금 올린다
     if (active) { ema = ema * 0.9 + Math.min(raw, 200) * 0.1; evalT += dt; }
     if (evalT > 1) { evalT = 0; const slow = ema > (Q.fps30 ? 40 : 22);
-      if (slow) { goodT = 0; if (Q.pr > 0.56) Q.pr = Math.max(0.55, +(Q.pr * 0.85).toFixed(2)); else if (Q.shadows) Q.shadows = false; else if (Q.bloom) Q.bloom = false; else { Q.fps30 = true; Q.maxFps = 30; } applyQ(); }
+      if (slow) { goodT = 0; if (Q.pr > 0.76) Q.pr = Math.max(0.75, +(Q.pr * 0.88).toFixed(2)); else if (Q.shadows) Q.shadows = false; else if (Q.bloom) Q.bloom = false; else { Q.fps30 = true; Q.maxFps = 30; } applyQ(); }
       else if (ema < 13 && (goodT += 1) >= 5 && Q.pr < Q.prMax) { goodT = 0; Q.pr = Math.min(Q.prMax, +(Q.pr + 0.1).toFixed(2)); applyQ(); } }
   }
   requestAnimationFrame(frame);

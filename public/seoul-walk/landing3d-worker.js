@@ -19,7 +19,7 @@ const SCENES = [
   { map: 'yeouido', hour: 20.8, season: 'summer', weather: 'clear', cam: { type: 'orbit', lm: '63빌딩', az0: 150, az1: 205, d0: 1500, d1: 1050, el0: 60, el1: 40, ty0: 90, ty1: 110 } },
 ];
 
-let THREE, Hangang, makePost, makeBear, renderer, cam, Q, W = 1, H = 1, P = 0, active = false, lastActive = 0, visible = true;
+let THREE, Hangang, makePost, makeBear, renderer, cam, Q, W = 1, H = 1, P = 0, active = false, lastActive = 0, visible = true, stopped = false;
 const maps = new Map();
 const post = (m) => self.postMessage(m);
 const tellHas = () => post({ type: 'has', list: SCENES.map((S, i) => (maps.has(S.map) ? i : -1)).filter((i) => i >= 0) });
@@ -70,7 +70,7 @@ function pose(S, hg, t, wob) {
 let last = 0, lastDraw = 0, cur = -1, wob = 0, simAcc = 0, ready = false, ema = 30, evalT = 0, goodT = 0;
 const raf = self.requestAnimationFrame ? (f) => self.requestAnimationFrame(f) : (f) => setTimeout(() => f(performance.now()), 16);
 function frame(now) {
-  raf(frame); if (!visible) return;
+  if (stopped) return; raf(frame); if (!visible) return;
   const act = now - lastActive < 1200, gap = 1000 / (act ? Q.maxFps : Math.min(24, Q.maxFps)); if (now - lastDraw < gap - 2) return;
   const raw = last ? now - last : 33; last = now; lastDraw = now; const dt = Math.min(0.06, raw / 1000);
   const i = sceneIdx(), t = cl(P - i, 0, 1), S = SCENES[i], M = maps.get(S.map); if (!M) return;
@@ -83,8 +83,9 @@ function frame(now) {
   if (Q.bloom) M.post.render(); else renderer.render(hg.scene, cam);
   if (!ready && i === 0) { ready = true; post({ type: 'ready' }); }
   if (act) { ema = ema * 0.85 + Math.min(raw, 250) * 0.15; evalT += dt; }
-  if (evalT > 1) { evalT = 0; const target = 1000 / Q.maxFps;
-    if (ema > target * 1.45) { goodT = 0; if (Q.pr > 0.56) Q.pr = Math.max(0.55, +(Q.pr * 0.85).toFixed(2)); else if (Q.shadows) Q.shadows = false; else if (Q.bloom) Q.bloom = false; else if (Q.maxFps > 20) Q.maxFps = 20; applyQ(); }
+  if (evalT > 1 && !Q.fixed) { evalT = 0; const target = 1000 / Q.maxFps;
+    // 해상도는 0.75 배 밑으로 내리지 않는다 (0.55 까지 내려 흐린 그림처럼 보였다). 그래도 느리면 3D 를 멈추고 고화질 사진으로 (메인이 바꾼다)
+    if (ema > target * 1.45) { goodT = 0; if (Q.pr > 0.76) Q.pr = Math.max(0.75, +(Q.pr * 0.88).toFixed(2)); else if (Q.shadows) Q.shadows = false; else if (Q.bloom) Q.bloom = false; else if (Q.maxFps > 20) Q.maxFps = 20; else { stopped = true; post({ type: 'slow' }); return; } applyQ(); }
     else if (ema < target * 1.08 && (goodT += 1) >= 6 && Q.pr < Q.prMax) { goodT = 0; Q.pr = Math.min(Q.prMax, +(Q.pr + 0.08).toFixed(2)); applyQ(); } }
 }
 
@@ -101,10 +102,13 @@ self.onmessage = async (e) => {
       cam = new THREE.PerspectiveCamera(52, W / H, 0.5, 24000);
       const tier = m.tier != null ? m.tier : gpuTier(), dpr = m.dpr || 1;
       Q = [
-        { pr: 0.7, prMax: 0.8, shadows: false, bloom: false, bloomScale: 0.35, maxFps: 20, simHz: 12 },
-        { pr: Math.min(dpr, 0.85), prMax: Math.min(dpr, 1), shadows: false, bloom: true, bloomScale: 0.35, maxFps: 30, simHz: 15 },
-        { pr: Math.min(dpr, 1.1), prMax: Math.min(dpr, 1.3), shadows: true, bloom: true, bloomScale: 0.5, maxFps: 30, simHz: 20 },
+        // 해상도: 화면 픽셀 비율을 따라 (예전엔 0.7 ~ 0.85 배로 그려 고해상도 노트북에서 흐렸다)
+        { pr: Math.min(dpr, 0.85), prMax: Math.min(dpr, 1), shadows: false, bloom: false, bloomScale: 0.35, maxFps: 20, simHz: 12 },
+        { pr: Math.min(dpr, 1), prMax: Math.min(dpr, 1.35), shadows: false, bloom: true, bloomScale: 0.4, maxFps: 30, simHz: 15 },
+        { pr: Math.min(dpr, 1.25), prMax: Math.min(dpr, 2), shadows: true, bloom: true, bloomScale: 0.5, maxFps: 30, simHz: 20 },
       ][cl(tier, 0, 2)];
+      // 주소에 ?tier= 를 주면 그 품질 그대로 (자동 조절 · 사진 전환 없음, 점검 · 사진 찍기용)
+      if (m.tier != null) Q.fixed = true;
       applyQ(); raf(frame);
     } catch (err) { post({ type: 'log', msg: 'init ' + (err?.stack || err) }); post({ type: 'fail' }); }
   } else if (m.type === 'resize') { W = m.w; H = m.h; if (renderer) size(); }
