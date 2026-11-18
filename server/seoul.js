@@ -14,6 +14,7 @@
 //     시간마다 남은 예산을 고르게 나눠 쓰고, 한도 초과 · 키 미등록 응답이 오면 그 기능만 자정까지 쉬며 마지막 값을 준다
 //   /api/seoul/transit/status → 오늘 호출 수 · 예산 · 쉬는 기능 · 마지막 오류 (키는 안 보인다)
 //   도시 데이터 (키 SEOUL_CITY_KEY): /api/seoul/city?area=여의도 (5분 기억)
+//   올림픽공원 (공공데이터 활용 경진대회): /api/seoul/olympicpark → 한국체육산업개발 실시간 주차현황(키 KSPO_PARKING_KEY, 3분 기억) + 서울 도시데이터 '올림픽공원'(붐빔 · 날씨, 5분 기억)
 //   로컬 시험: SEOUL_MOCK=1 이면 키 없이 흉내 자료(server/seoul-mock.js)로 돈다 (운영에선 쓰지 않는다)
 import fs from 'fs';
 import path from 'path';
@@ -23,12 +24,13 @@ const MOCK = process.env.SEOUL_MOCK === '1';
 const KEY = process.env.SEOUL_SUBWAY_KEY || (MOCK ? 'mock' : '');
 const BUS_KEY = process.env.SEOUL_BUS_KEY || (MOCK ? 'mock' : '');
 const CITY_KEY = process.env.SEOUL_CITY_KEY || '';
+const KSPO_KEY = process.env.KSPO_PARKING_KEY || '';
 const F = MOCK ? (await import('./seoul-mock.js')).mockFetch : fetch;
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STATE_FILE = path.join(process.env.DATA_DIR || path.join(ROOT, 'data'), 'seoul-bus.json');
 // 정류소 기능이 안 될 때 쓰는 여의도 노선 (노선정보조회로 찾은 아이디 · 3 간선 파랑 · 4 지선 초록)
 const BUS_ROUTES = [['100100043', '261', 3], ['100100044', '262', 3], ['100100057', '360', 3], ['100100071', '461', 3], ['100100605', '463', 3], ['100100078', '503', 3], ['100100085', '600', 3], ['100100550', '662', 3], ['100100118', '753', 3], ['100100034', '162', 3], ['100100033', '160', 3], ['100100272', '5615', 4], ['100100275', '5618', 4], ['100100301', '6623', 4], ['100100347', '7613', 4]];
-const CITY_AREAS = ['여의도', '여의도한강공원', '홍대 관광특구', '남산공원', '이태원 관광특구', '반포한강공원', '뚝섬한강공원', '성수카페거리', '강남역', '잠실 관광특구', '명동 관광특구', '인사동', '북촌한옥마을', '신촌·이대역'];
+const CITY_AREAS = ['올림픽공원', '여의도', '여의도한강공원', '홍대 관광특구', '남산공원', '이태원 관광특구', '반포한강공원', '뚝섬한강공원', '성수카페거리', '강남역', '잠실 관광특구', '명동 관광특구', '인사동', '북촌한옥마을', '신촌·이대역'];
 const LINE_OF = { 1001: '1호선', 1002: '2호선', 1003: '3호선', 1004: '4호선', 1005: '5호선', 1006: '6호선', 1007: '7호선', 1008: '8호선', 1009: '9호선', 1063: '경의중앙선', 1065: '공항철도', 1067: '경춘선', 1075: '수인분당선', 1077: '신분당선', 1092: '우이신설선', 1093: '서해선', 1094: '신림선', 1032: 'GTX-A' };
 const LINE_RE = /^(\d호선|경의중앙선|공항철도|경춘선|수인분당선|신분당선|우이신설선|서해선|신림선|GTX-A)$/;
 
@@ -183,6 +185,12 @@ export async function seoulApi(req, res, url, json) {
       });
       return json(res, 200, v), true;
     } catch (e) { return json(res, 502, { error: e.message }), true; }
+  }
+  if (url.pathname === '/api/seoul/olympicpark') {
+    const out = { at: Date.now() };
+    if (KSPO_KEY) { try { out.parking = await cached('kspo:park', 180000, async () => { const r = await fetch(`https://www.ksponco.or.kr/online/main/parkingorsApi.do?apiKey=${encodeURIComponent(KSPO_KEY)}`, { signal: AbortSignal.timeout(8000) }); const j = await r.json(); const n = +(Array.isArray(j) ? j[0] : j)?.parking_sum; if (!Number.isFinite(n)) throw new Error('주차 자료 없음'); return { sum: n, at: Date.now() }; }); } catch (e) { out.parkingErr = String(e.message).slice(0, 80); } }
+    if (CITY_KEY) { try { out.city = await cached('c:올림픽공원', 300000, async () => { const r = await fetch(`http://openapi.seoul.go.kr:8088/${CITY_KEY}/json/citydata/1/5/${encodeURIComponent('올림픽공원')}`, { signal: AbortSignal.timeout(8000) }); const c = (await r.json()).CITYDATA; if (!c) throw new Error('도시 자료 없음'); const p = (c.LIVE_PPLTN_STTS || [])[0] || {}, w = (c.WEATHER_STTS || [])[0] || {}; return { congest: xs(p.AREA_CONGEST_LVL, 12), msg: xs(p.AREA_CONGEST_MSG, 160), pplMin: +p.AREA_PPLTN_MIN || 0, pplMax: +p.AREA_PPLTN_MAX || 0, temp: +w.TEMP, sky: xs(w.SKY_STTS, 12), pcp: xs(w.PCP_MSG, 60), fcst: (p.FCST_PPLTN || []).slice(0, 12).map((f) => [xs(f.FCST_TIME, 20), xs(f.FCST_CONGEST_LVL, 12)]) }; }); } catch (e) { out.cityErr = String(e.message).slice(0, 80); } }
+    return json(res, 200, out), true;
   }
   if (url.pathname === '/api/seoul/bus/near') {
     if (!BUS_KEY) return json(res, 503, { error: '버스 정보 준비 중이에요' }), true;

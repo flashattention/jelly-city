@@ -24,6 +24,8 @@ import { parkSkip } from './hangang-park.js';
 import './hangang-park-in.js';
 import './hangang-tower.js';
 import './hangang-attr-river.js';
+// 올림픽공원 (공공데이터 활용 경진대회): 한국체육산업개발 공연장 3D · 공연 · 주차 · 잔디 (hangang-kspo.js)
+import './hangang-kspo.js';
 import './hangang-attr-more.js';
 import './hangang-attr-more2.js';
 
