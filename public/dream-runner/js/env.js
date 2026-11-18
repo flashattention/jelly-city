@@ -109,6 +109,12 @@ export class Env {
     // 해 / 달
     this.sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: partTex('dot'), color: '#ffffff', transparent: true, depthWrite: false, fog: false }));
     this.sun.scale.setScalar(150); scene.add(this.sun);
+    // 해 · 달 언저리를 맴도는 새 떼 (새가 나오는 꿈만): 길가 'birds' 조각은 지나가면 사라져, 첫 화면에서 달 곁에 보이던 갈매기가 달리면 없어졌다 → 해 · 달처럼 카메라를 따라 늘 그 하늘에
+    { this.gulls = new THREE.Group(); this.gullM = new THREE.MeshBasicMaterial({ color: '#37474f', transparent: true, opacity: 0, depthWrite: false, fog: false });
+      // 날개는 어깨(몸 옆)를 축으로 접었다 편다
+      const wingG = { '-1': new THREE.BoxGeometry(1.1, 0.07, 0.34).translate(-0.6, 0, 0), 1: new THREE.BoxGeometry(1.1, 0.07, 0.34).translate(0.6, 0, 0) }, body = new THREE.BoxGeometry(0.26, 0.16, 0.75);
+      for (let i = 0; i < 7; i++) { const b = new THREE.Group(); b.userData.i = i; b.add(new THREE.Mesh(body, this.gullM)); for (const sd of [-1, 1]) { const w = new THREE.Mesh(wingG[sd], this.gullM); w.userData.s = sd; b.add(w); } this.gulls.add(b); }
+      this.gulls.scale.setScalar(9); this.gulls.visible = false; scene.add(this.gulls); }
     // 오로라
     this.aurora = new THREE.Group(); scene.add(this.aurora);
     const at = tex((x, n) => { const g = x.createLinearGradient(0, 0, 0, n); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,.75)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, n, n); }, 64, false);
@@ -141,6 +147,8 @@ export class Env {
     this.target = tgt;
     if (instant || !this.cur) this.cur = { top: tgt.top.clone(), mid: tgt.mid.clone(), bot: tgt.bot.clone(), near: tgt.near, far: tgt.far, light: tgt.light, stars: tgt.stars, hemiG: tgt.hemiG.clone(), sunA: tgt.sun ? 1 : 0 };
     if (tgt.sun) this.sun.material.color.copy(tgt.sun);
+    tgt.gull = !!(th.sun && th.kits?.includes('birds')); if (instant || this.cur.gullA == null) this.cur.gullA = tgt.gull ? 1 : 0;
+    if (tgt.gull) this.gullM.color.set(th.P?.bird || '#37474f');
     // 아래
     const old = this.unders[this.underI];
     this.underI ^= 1;
@@ -270,6 +278,11 @@ export class Env {
     const cp = camera.position;
     this.sky.position.copy(cp); this.stars.position.copy(cp);
     this.sun.position.set(cp.x + 260, cp.y + 230, cp.z - 700); this.sun.material.opacity = C.sunA * 0.95;
+    C.gullA += ((T.gull ? 1 : 0) - C.gullA) * k; this.gullM.opacity = C.gullA * 0.9; this.gulls.visible = C.gullA > 0.02;
+    if (this.gulls.visible) { const t = (this.gullT = (this.gullT || 0) + dt); this.gulls.position.set(cp.x + 190, cp.y + 175, cp.z - 640);
+      // 달 왼쪽 아래에서 느리게 원을 그리며 맴돈다 (새마다 고리 · 높이 · 날갯짓이 조금씩 다르게)
+      for (const b of this.gulls.children) { const i = b.userData.i, a = t * 0.16 + i * 0.9, rr = 4 + (i % 3) * 1.6; b.position.set(Math.cos(a) * rr * 1.6, Math.sin(t * 0.5 + i) * 0.8 + (i % 2) * 1.2, Math.sin(a) * rr);
+        b.rotation.y = -a; b.rotation.z = Math.sin(a) * 0.25; const f = Math.sin(t * (5 + (i % 3)) + i * 1.7); for (const w of b.children) if (w.userData.s) w.rotation.z = w.userData.s * (f * 0.55 + 0.15); } }
     this.dir.position.set(px + 30, py + 60, cp.z + 20); this.dir.target.position.set(px, py, cp.z - 20);
     this.aurora.position.set(cp.x, 0, cp.z);
     for (const m of this.aurora.children) {
