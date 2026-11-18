@@ -44,3 +44,5 @@ toss/app/*.ait
 *.appxbundle
 .cache/
 public/dream-runner/_hg.html
+
+tmp/
