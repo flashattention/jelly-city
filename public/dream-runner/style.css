@@ -505,6 +505,10 @@ body:not(.toss) .dl { display: block;
 .dl-bar.solid .dl-mark, .dl-bar.solid nav a { color: var(--ink); text-shadow: none; }
 .dl-bar nav a:hover { color: var(--straw) !important; }
 .dl-bar .dl-home { padding: 7px 14px; border-radius: 999px; border: 1.5px solid currentColor; }
+/* 언어 단추 (한국어 ⇄ English, landing-i18n.js) */
+.dl-bar .dl-lang { padding: 6px 12px; border-radius: 999px; border: 1.5px solid rgba(255, 255, 255, .55); background: rgba(255, 255, 255, .12); color: #fff; font: inherit; font-size: 13px; cursor: pointer; text-shadow: 0 1px 8px rgba(0, 0, 0, .4); transition: background .2s, color .2s; }
+.dl-bar .dl-lang:hover { background: rgba(255, 255, 255, .26); }
+.dl-bar.solid .dl-lang { color: var(--ink); border-color: rgba(29, 23, 71, .35); background: transparent; text-shadow: none; }
 .dl-bar .snd-btn { position: static; width: 36px; height: 36px; font-size: 16px; }
 /* 첫 화면 */
 /* ---- 첫 화면: 다섯 세계 판 (3차) ---- */
@@ -731,3 +735,11 @@ body.dl-open .dl-intro { opacity: .3; transition: opacity .25s; }
 
 .dl-line li.now::before { border-color: var(--straw); background: var(--straw); box-shadow: 0 0 0 6px rgba(255, 95, 143, .2); }
 .dl-line li.now time { color: var(--straw); }
+/* 🌐 영어 랜딩: 난이도 이름이 길어(Lightspeed · Singularity) 칸을 넘지 않게 글씨를 줄이고 넘치면 말줄임 · '지난번' 표시 */
+html[lang="en"] .dl-start #diff-pick button { font-size: 12px; padding: 7px 2px; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em; }
+html[lang="en"] .dl-start #diff-pick button small { font-size: 9.5px; }
+@media (min-width: 761px) { html[lang="en"] .dl-pane.on .dl-pane-hd i::after { content: ' · last played'; } }
+.dl-bar .dl-mark, .dl-bar .dl-home, .dl-bar .dl-lang { white-space: nowrap; }
+@media (max-width: 520px) { .dl-bar nav { gap: 8px; } .dl-bar .dl-home, .dl-bar .dl-lang { padding: 6px 10px; font-size: 12.5px; } .dl-bar .dl-mark { font-size: 17px; } }
+html[lang="en"] .dl-start .dl-row:has(#diff-pick) { flex-direction: column; align-items: stretch; gap: 6px; }
+html[lang="en"] .dl-start .dl-row:has(#diff-pick) > div, html[lang="en"] .dl-start #diff-pick { width: 100%; }

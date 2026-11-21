@@ -31,6 +31,7 @@ import { makeSeoulMover, seoulNight, seoulTick } from './seoul-movers.js';
 import { SeoulRun } from './seoul-run.js';
 import { openPatchNotes, showWhatsNew } from '../../shared/js/patchnotes.js';
 import { openWardrobe, notifyNew, titleHtml, medalHtml, loadCos } from '../../shared/js/wardrobe.js';
+import { applyLandingLang, EN, t as tr, WORLD_EN, diffName as dlDiff, modeName as dlModeName } from './landing-i18n.js';
 import { starsEarned } from '../../shared/js/cos-items.js';
 import { Hangang, SEASONS, WEATHERS, TIMES, SPEEDS, V_MIN, V_MAX } from './hangang.js';
 import { mapPlaces, HOOD_SPOTS } from './hangang-attractions.js';
@@ -183,6 +184,7 @@ renderFame(); // 처음 열 때
 // ---------- 랜딩 (웹만 · 토스 미니앱은 예전 카드 그대로) · docs/dream-runner/랜딩-작업지시서.md ----------
 // 예전 처음 화면의 단추를 랜딩의 [data-slot] 자리로 옮겨 붙인다 (아이디 · 눌렀을 때 하는 일은 그대로)
 if (!TOSS) {
+  applyLandingLang(); // 🌐 컴퓨터 언어 · 저장한 선택대로 (한국어가 아니면 영어, landing-i18n.js)
   const T = $('title'), card = document.querySelector('#title > .card'), slot = (n) => document.querySelector(`#dl [data-slot="${n}"]`);
   const mv = (n, ...els) => { const sl = slot(n); for (const e of els) if (e) sl.append(e); };
   const tools = [...card.querySelectorAll('.row2 > *')];
@@ -194,7 +196,7 @@ if (!TOSS) {
   mv('tools', ...tools); mv('fame', $('fame'));
   // 세계 고르기 (4차): 판에 마우스를 올리면 설명만 (CSS), '플레이' · 판을 누르면 출발 카드가 가운데 팝업 · 숨은 맵 단추와 이어진다
   const panes = [...document.querySelectorAll('#dl-panes .dl-pane')], modal = $('dl-modal');
-  const WN = { dream: '꿈나라', hell: '지옥', void: '이공간', seoul: '서울', time: '모든 것의 역사' };
+  const WN = EN ? WORLD_EN : { dream: '꿈나라', hell: '지옥', void: '이공간', seoul: '서울', time: '모든 것의 역사' };
   const sync = () => { for (const p of panes) p.classList.toggle('on', p.dataset.map === game.pickMap); dlBoard(); };
   const pick = (m) => { document.querySelector(`#map-pick [data-m="${m}"]`)?.click(); sync(); };
   // 팝업 열기: 세계를 먼저 짓고(한 프레임) 두 프레임 그린 뒤 떠오른다 (짓는 끊김이 떠오르는 움직임과 겹치지 않게)
@@ -227,15 +229,15 @@ if (!TOSS) {
   async function dlBoard() {
     const map = game.pickMap, mode = game.pickMode || 'speed', diff = game.pickDiff, key = `${map}|${mode}|${diff}`;
     if (!map || !diff || key === bk) return; bk = key;
-    $('dl-board-t').textContent = `🏆 ${WN[map] || ''} · ${DIFFS[diff]?.name || ''} · ${mode === 'item' ? '🎁 아이템전' : '⚡ 스피드전'}`;
+    $('dl-board-t').textContent = `🏆 ${WN[map] || ''} · ${dlDiff(DIFFS[diff]?.name || '')} · ${dlModeName(mode === 'item')}`;
     const list = $('dl-board-list'), meEl = $('dl-board-me');
     let c = bc.get(key);
     if (!c || Date.now() - c.at > 60e3) { list.classList.add('loading'); c = { at: Date.now(), d: await loadBoard(mode, diff, map) }; bc.set(key, c); }
     if (bk !== key) return; // 받는 동안 다른 것을 골랐다
     list.classList.remove('loading');
     const top = (c.d.top || []).slice(0, 5), me = c.d.me;
-    list.innerHTML = top.length ? top.map((e) => `<li class="${e.id && e.id === me?.id ? 'me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="nm-t"><i style="background:${esc(e.color)}"></i>${esc(e.name)}</span><span class="md">${(e.medals || (e.medal ? [e.medal] : [])).map((m) => medalHtml(m, e.title)).join('')}${titleHtml(e.title)}</span></span><b>${(e.score ?? 0).toLocaleString()}</b></li>`).join('') : '<li class="empty">아직 기록이 없어요. 첫 번째 주인공이 되어 보세요!</li>';
-    meEl.textContent = me ? `내 순위 ${me.rank.toLocaleString()}위 · ${me.score.toLocaleString()}점` : '';
+    list.innerHTML = top.length ? top.map((e) => `<li class="${e.id && e.id === me?.id ? 'me' : ''}"><span class="rk">${e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : e.rank}</span><span class="nm"><span class="nm-t"><i style="background:${esc(e.color)}"></i>${esc(e.name)}</span><span class="md">${(e.medals || (e.medal ? [e.medal] : [])).map((m) => medalHtml(m, e.title)).join('')}${titleHtml(e.title)}</span></span><b>${(e.score ?? 0).toLocaleString()}</b></li>`).join('') : `<li class="empty">${tr('아직 기록이 없어요. 첫 번째 주인공이 되어 보세요!', 'No records yet — be the first!')}</li>`;
+    meEl.textContent = me ? tr(`내 순위 ${me.rank.toLocaleString()}위 · ${me.score.toLocaleString()}점`, `My rank #${me.rank.toLocaleString()} · ${me.score.toLocaleString()} pts`) : '';
   }
   for (const id of ['map-pick', 'mode-pick', 'diff-pick']) new MutationObserver(sync).observe($(id), { subtree: true, attributes: true, attributeFilter: ['class'] });
   setTimeout(sync, 0); // 고른 세계 · 모드 · 난이도를 읽은 다음
@@ -260,11 +262,11 @@ if (!TOSS) {
   };
   account.api('/api/dream/stats').then((st) => {
     // 서버가 센 시각(오전 8시 · 낮 12시 · 오후 4시, 한국 시간) 기준
-    const k = new Date((st.asof || Date.now()) + 9 * 3600e3), h = k.getUTCHours(); $('dl-asof').textContent = `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일 ${h < 12 ? `오전 ${h}시` : h === 12 ? '낮 12시' : `오후 ${h - 12}시`} 기준`;
+    const k = new Date((st.asof || Date.now()) + 9 * 3600e3), h = k.getUTCHours(); $('dl-asof').textContent = EN ? `as of ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][k.getUTCMonth()]} ${k.getUTCDate()}, ${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'} KST` : `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일 ${h < 12 ? `오전 ${h}시` : h === 12 ? '낮 12시' : `오후 ${h - 12}시`} 기준`;
     const io = 'IntersectionObserver' in window ? new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { io.unobserve(e.target); const v = val(st, e.target.dataset.st); if (typeof v === 'number') fill(e.target, v); } }, { root: T, threshold: 0.4 }) : null;
     for (const el of document.querySelectorAll('#dl [data-st]')) { const v = val(st, el.dataset.st); if (typeof v === 'string') { el.textContent = v; continue; } if (typeof v !== 'number') continue; if (io && 'n' in el.dataset) io.observe(el); else fill(el, v); }
     // 난이도 배속: 게임 코드의 값 그대로 (예: 🙂 노멀 ×1 · 🔥 하드 ×1.4 …)
-    const dEl = document.querySelector('#dl [data-st-diffs]'); if (dEl && st.game?.diffs) dEl.textContent = st.game.diffs.map((d) => `${d.name.replace(/^\S+\s/, '')} ×${d.x}`).join(' · ');
+    const dEl = document.querySelector('#dl [data-st-diffs]'); if (dEl && st.game?.diffs) dEl.textContent = st.game.diffs.map((d) => `${dlDiff(d.name).replace(/^\S+\s/, '')} ×${d.x}`).join(' · ');
   }).catch(() => { /* 지표를 못 받으면 — 그대로 */ });
 }
 
@@ -402,7 +404,7 @@ for (const b of $('room-mode').children) b.onclick = () => net.send({ t: 'mode',
 // 난이도: 길은 같고 빠르기만 다르다 (하드 · 익스트림 · 광속 · 초월 · 특이점, 노멀은 2026-11-15 숨김)
 const diffName = (d) => DIFFS[diffOf(d)].name;
 // 모드 고르기: 이름 아래에 노멀 기준 몇 배속인지 (순위표 탭은 이름만)
-for (const id of ['diff-pick', 'room-diff', 'board-diff']) $(id).innerHTML = DIFF_KEYS.map((k) => `<button data-m="${k}">${DIFFS[k].name}${id === 'board-diff' ? '' : `<small class="vs-hard">${k === 'hard' ? '기준 속도' : `노멀 ×${vsHard(k)}`}</small>`}</button>`).join('');
+for (const id of ['diff-pick', 'room-diff', 'board-diff']) { const en = EN && !TOSS && id === 'diff-pick'; $(id).innerHTML = DIFF_KEYS.map((k) => `<button data-m="${k}">${en ? dlDiff(DIFFS[k].name).replace(/^\S+\s/, '') : DIFFS[k].name}${id === 'board-diff' ? '' : `<small class="vs-hard">${k === 'hard' ? (en ? 'base speed' : '기준 속도') : `${en ? 'Normal' : '노멀'} ×${vsHard(k)}`}</small>`}</button>`).join(''); }
 // 난이도 변경 공지: 2026-11-22 00:00 (한국 시간) 전까지만 · 토스 미니앱은 처음 하는 사람들이라 보이지 않는다
 game.pickDiff = store.get(DIFF_KEY) ? diffOf(store.get(DIFF_KEY)) : 'hard'; // 처음 온 사람은 하드부터 · 그다음부터는 마지막에 고른 난이도
 segSet('diff-pick', game.pickDiff);
@@ -414,7 +416,7 @@ for (const b of $('map-pick').children) b.onclick = () => { const was = game.pic
 function renderTimeResume() {
   const el = $('time-resume'), e = timeEra(), th = ERAS[e];
   el.classList.toggle('hidden', game.pickMap !== 'time');
-  el.innerHTML = e > 0 ? `<span>⏳ <b>${th.emoji} ${th.name}</b> <small>(시대 #${e + 1} · ${th.when})</small>부터 이어서 출발</span>` : `<span>⏳ <b>💥 빅뱅</b>부터 출발 · 쓰러지면 다음 판은 그 시대부터 이어져요</span>`;
+  el.innerHTML = EN && !TOSS ? (e > 0 ? `<span>⏳ Continue from <b>${th.emoji} era #${e + 1}</b> <small>(${th.name})</small></span>` : `<span>⏳ Start at <b>💥 the Big Bang</b> · fall, and your next run continues from that era</span>`) : e > 0 ? `<span>⏳ <b>${th.emoji} ${th.name}</b> <small>(시대 #${e + 1} · ${th.when})</small>부터 이어서 출발</span>` : `<span>⏳ <b>💥 빅뱅</b>부터 출발 · 쓰러지면 다음 판은 그 시대부터 이어져요</span>`;
 }
 renderTimeResume();
 if (game.pickMap !== 'dream') titleWorld(); // 첫 화면부터 고른 세계의 맵 (꿈나라는 처음 화면이 이미 꿈나라)
