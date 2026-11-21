@@ -7,6 +7,14 @@ import { TOSS, bridge } from '../../shared/js/platform.js';
 // 토스 미니앱: 혼자 달리기 · 토스 로그인 · 광고 보너스 (같이 달리기 · 메인 화면 없음)
 // 웹: PWA 로 설치할 수 있게 (마이크로소프트 스토어 등). 토스 미니앱은 토스가 담아 주니 서비스 워커를 안 쓴다
 if (TOSS) document.body.classList.add('toss');
+// 젤리 게임즈(메인)를 거쳐 들어온 사람만 젤리 게임즈로 가는 단추를 본다. 드림 러너 링크로 바로 온 사람은 숨김 (그 탭 동안 기억)
+// 서울 산책(/seoul-walk/play/)은 아래 SEOUL_WALK 쪽에서 따로 정한다
+if (!window.SEOUL_WALK) { const q = new URLSearchParams(location.search); let hub = false;
+  try { hub = sessionStorage.getItem('dr-hub') === '1'; } catch {}
+  if (!hub) { let ref = ''; try { const r = new URL(document.referrer); if (r.origin === location.origin) ref = r.pathname; } catch {}
+    hub = q.get('from') === 'hub' || (!!ref && !/^\/(dream-runner|seoul-walk)\//.test(ref)); }
+  if (hub) { try { sessionStorage.setItem('dr-hub', '1'); } catch {} } else document.body.classList.add('no-hub');
+  if (q.has('from')) { q.delete('from'); history.replaceState(null, '', location.pathname + (q.size ? '?' + q : '') + location.hash); } }
 // 게임 등급 (Microsoft Store IARC 3+ → 한국 전체이용가). 게임위에서 등급분류번호를 확인하면 no 에 적는다 (토스 첫 화면에 같이 보인다)
 const RATING = { grade: '전체이용가', no: 'MSFT-SG-261107-0045' }; // 게임위 자체등급분류 (Microsoft · 2026-11-07)
 if (RATING.no) document.getElementById('rating-no').textContent = `등급분류번호 ${RATING.no}`;

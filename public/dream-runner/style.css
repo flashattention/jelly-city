@@ -257,6 +257,7 @@ body #chat { bottom: 150px; }
 }
 
 /* 토스 미니앱: 혼자 달리기만 · 메인 화면 · 같이 달리기 · 패치노트 없이. 계정 칸은 닉네임만 보여 준다 */
+body.no-hub a[href="/"], body.no-hub #hg-home { display: none !important; }
 body.toss #multi-btn, body.toss .code-row, body.toss #pn-btn, body.toss a[href="/"], body.toss #logout { display: none !important; }
 body.toss #title #who-row:not(.hidden) { display: flex !important; justify-content: center; }
 body.toss #title #acct-nick:not(.hidden) { display: block !important; }
