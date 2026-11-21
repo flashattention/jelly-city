@@ -1,4 +1,5 @@
-// 메인 화면 게시판: 글 · 댓글 · 좋아요/싫어요 · 신고. 보는 건 누구나, 쓰고 누르는 건 로그인(구글 · 체험판)한 사람만
+// 메인 화면 게시판: 글 · 댓글 · 좋아요/싫어요 · 신고
+//   2026-11-22 부터 기존 회원만: 이때까지 구글로 로그인해 만든 계정(체험판 · 토스 제외)과 관리자만 보고 쓴다. 그 뒤 새로 오는 사람에겐 게시판이 안 보인다
 //   화면에 나가는 건 닉네임뿐이다. 계정 id · 이메일은 저장만 하고 절대 내보내지 않는다
 import fs from 'node:fs';
 import path from 'node:path';
@@ -148,8 +149,15 @@ export class Board {
   unhide(id, cid) { const it = this.item(id, cid); it.hidden = false; it.reports = {}; this.dirty = true; }
 }
 
+// 기존 회원 기준 시각 (한국 시간 2026-11-22 05:00). 이보다 먼저 만든 구글 계정만 (created 가 없는 아주 예전 계정도 기존 회원)
+export const BOARD_CUTOFF = Date.parse('2026-11-22T05:00:00+09:00');
+export const boardMember = (who) => !!who?.user && !who.user.guest && !who.user.toss && (who.user.created || 0) < BOARD_CUTOFF;
 export async function boardApi(req, res, url, who, board, json, isAdmin, check = moderate) {
   const sub = who?.sub || null, admin = !!who && isAdmin(who.user), id = url.searchParams.get('id');
+  // 볼 수 있나 (메인 화면이 게시판 칸을 보일지 정한다) · 기존 회원 · 관리자가 아니면 목록 · 글 · 쓰기 모두 막는다
+  const member = admin || boardMember(who);
+  if (url.pathname === '/api/board/access') return json(res, 200, { ok: member });
+  if (!member) return json(res, 403, { error: '건의 게시판은 기존 회원만 볼 수 있어요', closed: true });
   try {
     if (req.method === 'GET') {
       if (url.pathname === '/api/board/list') return json(res, 200, board.list(url.searchParams.get('sort') === 'hot' ? 'hot' : 'new', Math.floor(+url.searchParams.get('page')) || 0, sub, admin));

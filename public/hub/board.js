@@ -22,7 +22,11 @@ async function send(btn, el, what, fn) {
   finally { wait.remove(); if (btn.isConnected) { btn.disabled = false; btn.textContent = label; } }
 }
 
+// 2026-11-22 부터 기존 회원(그때까지 구글로 로그인한 계정)만 게시판이 보인다. 아니면 칸째 숨긴다
+let allowed = null;
+async function access() { try { allowed = !!(await account.api('/api/board/access')).ok; } catch { allowed = false; } $('board-sec').classList.toggle('hidden', !allowed); document.body.classList.toggle('no-board', !allowed); return allowed; }
 export async function refreshBoard() {
+  if (!(await access())) return;
   let d; try { d = await account.api(`/api/board/list?sort=${S.sort}&page=${S.page}`); } catch { $('bd-list').innerHTML = '<div class="bd-empty">건의 게시판을 불러오지 못했어요</div>'; return; }
   S.total = d.total; S.size = d.page;
   $('bd-list').innerHTML = d.posts.length ? d.posts.map((p) => `<button class="bd-row" data-id="${esc(p.id)}"><span class="bd-t"><span class="bd-tt">${esc(p.title)}</span>${p.comments ? `<b>[${p.comments}]</b>` : ''}</span><span class="bd-meta"><span class="bd-v">👍 ${p.up}</span><span class="bd-v">👎 ${p.down}</span><span class="bd-n">${esc(p.name)}</span><span>${ago(p.at)}</span></span></button>`).join('') : '<div class="bd-empty">아직 건의가 없어요. 바라는 점을 남겨 주세요!</div>';

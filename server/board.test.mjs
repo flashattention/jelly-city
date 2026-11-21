@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
-import { Board, boardApi } from './board.js';
+import { Board, boardApi, BOARD_CUTOFF } from './board.js';
 import { spamCheck } from './shared/guard.js';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jelly-board-'));
@@ -45,11 +45,21 @@ test('8-3 도배: 같은 글 되풀이 · 여러 계정이 같은 글 · 연락�
   assert.match(spamCheck('g:x', '계정 팝니다 싸게', { now }) || '', /광고/);
   assert.match(spamCheck('g:x', '여기 와 보세요 https://evil.example', { now, strict: true }) || '', /링크/);
   assert.equal(spamCheck('g:y', '유튜브 영상 https://youtu.be/x 참고하세요', { now }), null, '오래된 계정은 링크 가능 (AI 검사가 본다)');
-  // 체험판은 1분에 한 번
-  const g = { sub: 'guest:1', user: { guest: true, name: '체험판 손님 1234', created: now } };
-  assert.equal((await call(B, g, '/api/board/write', { title: '안녕', body: '처음 왔어요 반가워요' })).code, 200);
-  B.lastPost.set('guest:1', Date.now() - 40000);
-  assert.match((await call(B, g, '/api/board/write', { title: '또', body: '두 번째 글입니다 반가워요' })).obj.error, /1분/);
+});
+
+test('2026-11-22 부터 기존 회원만: 그때까지의 구글 계정 · 관리자는 보고 쓰고, 새 계정 · 체험판 · 로그인 안 한 사람은 못 본다', async () => {
+  const B = new Board(dir), now = Date.now();
+  assert.equal((await call(B, user(60), '/api/board/access', null, { method: 'GET' })).obj.ok, true, '기존 구글 계정');
+  assert.equal((await call(B, user(61), '/api/board/write', { title: '건의', body: '기존 회원은 계속 써요' })).code, 200);
+  assert.equal((await call(B, { sub: 'g:old', user: { nick: '옛곰' } }, '/api/board/list', null, { method: 'GET' })).code, 200, '가입 시각이 없는 아주 예전 계정도 기존 회원');
+  const fresh = { sub: 'g:new', user: { nick: '새곰', created: Math.max(now, BOARD_CUTOFF + 1) } };
+  assert.equal((await call(B, fresh, '/api/board/access', null, { method: 'GET' })).obj.ok, false, '기준 뒤 새 계정');
+  assert.equal((await call(B, fresh, '/api/board/list', null, { method: 'GET' })).code, 403);
+  assert.equal((await call(B, fresh, '/api/board/write', { title: '안녕', body: '새로 왔어요 반가워요' })).code, 403);
+  const g = { sub: 'guest:1', user: { guest: true, name: '체험판 손님 1234', created: OLD } };
+  assert.equal((await call(B, g, '/api/board/list', null, { method: 'GET' })).code, 403, '체험판');
+  assert.equal((await call(B, null, '/api/board/list', null, { method: 'GET' })).code, 403, '로그인 안 함');
+  assert.equal((await call(B, fresh, '/api/board/list', null, { method: 'GET', admin: true })).code, 200, '관리자는 언제나');
 });
 
 test('8-2 보이지 않는 글자 · 방향 바꾸기 글자는 걷어 낸다', async () => {
@@ -61,8 +71,8 @@ test('8-2 보이지 않는 글자 · 방향 바꾸기 글자는 걷어 낸다', 
 test('8-4 신고: 5점이면 가림 · 같은 곳(IP)에서 계정 여러 개로 신고하면 한 번만 센다', async () => {
   const B = new Board(dir);
   const w = await call(B, user(40), '/api/board/write', { title: '평범한 글', body: '평범한 내용이에요 여러분' });
-  for (let i = 0; i < 10; i++) await call(B, { sub: `guest:r${i}`, user: { guest: true, created: Date.now() } }, '/api/board/report', { id: w.obj.id, why: 'spam' }, { ip: '9.9.9.9' });
-  assert.equal(B.find(w.obj.id).hidden, undefined, '한 곳에서 10번 = 0.5점');
+  for (let i = 0; i < 10; i++) await call(B, user(`r${i}`), '/api/board/report', { id: w.obj.id, why: 'spam' }, { ip: '9.9.9.9' });
+  assert.equal(B.find(w.obj.id).hidden, undefined, '한 곳에서 계정 10개로 10번 = 한 번만');
   for (let i = 0; i < 5; i++) await call(B, user(50 + i), '/api/board/report', { id: w.obj.id, why: 'abuse' }, { ip: `8.8.8.${i}` });
   assert.equal(B.find(w.obj.id).hidden, true, '서로 다른 5곳 = 가림');
   const d = B.detail(w.obj.id, 'g:999', true); assert.ok(d.reps.length >= 5, '관리자는 사유를 본다');

@@ -378,3 +378,6 @@ footer { text-align: center; color: rgba(255,255,255,.5); padding: 0 16px 36px; 
 .bd-box .bd-pages { margin: 0; padding: 4px 0 6px; border-top: 1px solid rgba(255,255,255,.08); }
 .bd-box .bd-pages.hidden { display: none; }
 @media (min-width: 861px) { #board-sec { display: flex; flex-direction: column; } }
+
+/* 건의 게시판을 볼 수 없는 사람(2026-11-22 뒤 새로 온 사람): 게시판 칸 자리를 남기지 않는다 */
+body.no-board .duo { grid-template-columns: 1fr; }
