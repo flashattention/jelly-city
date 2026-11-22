@@ -73,7 +73,7 @@ export class Chat {
     else {
       const me = m.id === this.o.myId(), tc = m.team ? this.o.teamColor?.(m.team) : null;
       d.className = 'msg' + (me ? ' me' : '');
-      d.innerHTML = `${m.team ? `<span class="tm" style="background:${esc(tc || '#ff5a7a')}">팀</span>` : ''}<b style="color:${esc(m.color || '#ffd84d')}">${esc(m.name)}</b>${esc(m.s)}`;
+      d.innerHTML = `${m.team ? `<span class="tm" style="background:${esc(tc || '#ff5a7a')}">팀</span>` : ''}<b style="color:${esc(m.color || '#ffd84d')}" translate="no">${esc(m.name)}</b><span translate="no">${esc(m.s)}</span>`;
     }
     this.log.appendChild(d);
     while (this.log.children.length > 80) this.log.firstElementChild.remove();

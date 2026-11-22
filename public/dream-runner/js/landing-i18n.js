@@ -1,13 +1,8 @@
 // 🌐 드림 러너 랜딩 언어 (웹 랜딩만 · docs/dream-runner/랜딩-작업지시서.md 5차)
 //   정하기: 저장한 선택(localStorage 'dr-lang') → 없으면 브라우저 언어 목록 첫 번째가 한국어면 한국어, 아니면 영어
 //   한국어는 index.html 그대로, 영어는 아래 표대로 바꿔 끼운다 (실시간 숫자 자리 data-st 는 그대로 살린다)
-const KEY = 'dr-lang';
-const saved = (() => { try { return localStorage.getItem(KEY); } catch { return null; } })();
-const first = ((navigator.languages && navigator.languages[0]) || navigator.language || 'ko').toLowerCase();
-export const LANG = saved === 'ko' || saved === 'en' ? saved : first.startsWith('ko') ? 'ko' : 'en';
-export const EN = LANG === 'en';
-export const t = (ko, en) => (EN ? en : ko);
-export function setLang(l) { try { localStorage.setItem(KEY, l); } catch { /* 이번만 */ } location.reload(); }
+import { LANG, EN, t, setLang } from './lang.js';
+export { LANG, EN, t, setLang };
 
 // 세계 · 난이도 · 모드 이름
 export const WORLD_EN = { dream: 'Dreamland', hell: 'Hell', void: 'The Void', seoul: 'Seoul', time: 'History of Everything' };
@@ -95,7 +90,7 @@ export function applyLandingLang() {
 }
 function addLangBtn(nav) {
   if (!nav || nav.querySelector('.dl-lang')) return;
-  const b = document.createElement('button'); b.type = 'button'; b.className = 'dl-lang'; b.textContent = EN ? '한국어' : 'EN'; b.title = EN ? '한국어로 보기' : 'View in English';
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'dl-lang'; b.translate = false; b.setAttribute('translate', 'no'); b.textContent = EN ? '한국어' : 'EN'; b.title = EN ? '한국어로 보기' : 'View in English';
   b.onclick = () => setLang(EN ? 'ko' : 'en');
   nav.insertBefore(b, nav.querySelector('.dl-home'));
 }

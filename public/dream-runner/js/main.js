@@ -7,6 +7,10 @@ import { TOSS, bridge } from '../../shared/js/platform.js';
 // 토스 미니앱: 혼자 달리기 · 토스 로그인 · 광고 보너스 (같이 달리기 · 메인 화면 없음)
 // 웹: PWA 로 설치할 수 있게 (마이크로소프트 스토어 등). 토스 미니앱은 토스가 담아 주니 서비스 워커를 안 쓴다
 if (TOSS) document.body.classList.add('toss');
+// 🌐 영어(컴퓨터 언어가 한국어가 아니면): 화면 글씨를 사전대로 바꿔 끼우는 엔진을 먼저 켠다 (js/i18n/engine.js · 한국어 사용자는 안 받음)
+// 언어 단추 (첫 화면 · 서울 산책 설정): 토스 · 젤리 서울 러너는 한국어 고정이라 없앤다
+for (const b of document.querySelectorAll('[data-lang-btn]')) { if (TOSS || window.SEOUL_WALK) { b.closest('.hg-row')?.remove(); b.remove(); continue; } b.textContent = EN ? '한국어' : 'EN'; b.title = EN ? '한국어로 보기' : 'View in English'; b.onclick = () => setLang(EN ? 'ko' : 'en'); }
+if (EN) { try { window.__tx = (await (await import('./i18n/engine.js')).start()).tx; } catch (e) { console.warn('i18n', e); } }
 // 젤리 게임즈(메인)를 거쳐 들어온 사람만 젤리 게임즈로 가는 단추를 본다. 드림 러너 링크로 바로 온 사람은 숨김 (그 탭 동안 기억)
 // 서울 산책(/seoul-walk/play/)은 아래 SEOUL_WALK 쪽에서 따로 정한다
 if (!window.SEOUL_WALK) { const q = new URLSearchParams(location.search); let hub = false;
@@ -39,7 +43,7 @@ import { makeSeoulMover, seoulNight, seoulTick } from './seoul-movers.js';
 import { SeoulRun } from './seoul-run.js';
 import { openPatchNotes, showWhatsNew } from '../../shared/js/patchnotes.js';
 import { openWardrobe, notifyNew, titleHtml, medalHtml, loadCos } from '../../shared/js/wardrobe.js';
-import { applyLandingLang, EN, t as tr, WORLD_EN, diffName as dlDiff, modeName as dlModeName } from './landing-i18n.js';
+import { applyLandingLang, EN, setLang, t as tr, WORLD_EN, diffName as dlDiff, modeName as dlModeName } from './landing-i18n.js';
 import { starsEarned } from '../../shared/js/cos-items.js';
 import { Hangang, SEASONS, WEATHERS, TIMES, SPEEDS, V_MIN, V_MAX } from './hangang.js';
 import { mapPlaces, HOOD_SPOTS } from './hangang-attractions.js';
@@ -351,7 +355,7 @@ function renderAccount() {
   if (!$('nick').value) {
     // 기본 이름: 체험판은 손님 이름, 아니면 번호 붙은 곰돌이 (구글 실명은 순위표에 안 보이게)
     let nick = store.get(NICK_KEY);
-    if (!nick) { nick = on && account.user.name?.startsWith('체험판') ? account.user.name : `꿈꾸는 곰돌이 ${1000 + Math.floor(Math.random() * 9000)}`; store.set(NICK_KEY, nick); }
+    if (!nick) { nick = on && account.user.name?.startsWith('체험판') ? account.user.name : `${tr('꿈꾸는 곰돌이', 'Dreaming Bear')} ${1000 + Math.floor(Math.random() * 9000)}`; store.set(NICK_KEY, nick); }
     $('nick').value = nick;
   }
   const eq = account.cos?.equip; game.profile = c ? { name: c.name, color: c.profile?.color || '#8a5634', look: c.profile?.look, acc: c.profile?.accessories || [], gender: c.profile?.gender } : { name: (on && account.user.nick) || $('nick').value.trim() || '꿈꾸는 곰돌이', color: '#8a5634', look: eq && Object.keys(eq).length ? { cos: eq } : undefined };
@@ -365,7 +369,7 @@ async function saveNick() {
 $('acct-nick-save').onclick = saveNick;
 $('acct-nick-in').onkeydown = (e) => { if (e.key === 'Enter') saveNick(); };
 $('pw').addEventListener('input', () => { store.set('roachcity.pw', $('pw').value); err(''); });
-$('nick').addEventListener('input', () => { store.set(NICK_KEY, $('nick').value.trim()); if (!$('nick-row').classList.contains('hidden')) game.profile.name = $('nick').value.trim() || '꿈꾸는 곰돌이'; });
+$('nick').addEventListener('input', () => { store.set(NICK_KEY, $('nick').value.trim()); if (!$('nick-row').classList.contains('hidden')) game.profile.name = $('nick').value.trim() || tr('꿈꾸는 곰돌이', 'Dreaming Bear'); });
 $('guest-btn').onclick = async () => { try { await account.login({ guest: true }); renderAccount(); } catch (e) { err(e.message); } };
 $('dev-btn').onclick = async () => { try { await account.login({ dev: $('dev-name').value || '러너' }); renderAccount(); } catch (e) { err(e.message); } };
 $('logout').onclick = async () => { await account.logout(); renderAccount(); };

@@ -233,6 +233,7 @@ a.btn { text-decoration: none; display: inline-block; }
 #ov-team { font-family: 'Jua', sans-serif; font-size: 20px; margin-top: 6px; }
 
 /* 처음 화면 · 방에서도 소리 켜기 · 끄기 (오른쪽 위) */
+.lang-btn { left: auto; right: 64px; width: auto; min-width: 40px; padding: 0 12px; border-radius: 999px; font: 600 13px/1 inherit; color: inherit; cursor: pointer; z-index: 2; }
 .snd-btn { left: auto; right: 16px; cursor: pointer; color: inherit; padding: 0; font-family: inherit; z-index: 2; }
 
 /* 채팅이 조작법 안내를 가리지 않게 */
